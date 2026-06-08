@@ -126,9 +126,241 @@ Should I draft the replacement markdown for these sections?
 ## 🧱 System Design Details
 
 ### 1. Domain Model
-- Define core entities for users, profiles, expenses, groups, settlements, notes, goals, and attachments.
-- Capture ownership, membership, and sharing boundaries for each entity.
-- Document lifecycle rules before backend schema work starts.
+#### Scope
+Core entities finalized for schema design:
+- User
+- Profile
+- Expense
+- ExpenseSplit
+- Group
+- GroupMember
+- Settlement
+- Note
+- Goal
+- Attachment
+- AuditLog
+
+#### Naming Conventions (Final)
+- Entity class names: singular PascalCase (`User`, `ExpenseSplit`).
+- Table names: plural snake_case (`users`, `expense_splits`, `group_members`).
+- Primary keys: UUID (`id uuid`).
+- Foreign keys: `<entity>_id` (`user_id`, `group_id`, `expense_id`).
+- Money: `decimal(12,2)` + `char(3)` currency code (ISO 4217).
+- Timestamps: `created_at`, `updated_at` on mutable entities.
+- Soft delete (optional later phase): `deleted_at`.
+- Enum columns: snake_case values (`pending`, `settled`, `active`, `archived`).
+
+#### Ownership and Sharing Boundaries
+- Personal scope (owned by `User`): `Profile`, personal `Expense`, personal `Note`, personal `Goal`, related `Attachment`.
+- Shared scope (owned by `Group`): shared `Expense`, `GroupMember`, group `Note`, `Settlement`, related `Attachment`.
+- Split scope: `ExpenseSplit` can reference either a direct `User` context or a `GroupMember` context.
+- Governance scope: `AuditLog` is append-only, immutable after insert, and retained indefinitely.
+
+#### Entity Field List (Required)
+
+##### User
+- `id: uuid` (PK)
+- `email: varchar(255)` (unique, required)
+- `password_hash: varchar(255)` (required)
+- `display_name: varchar(120)` (nullable)
+- `status: enum(active|disabled|invited)` (default `active`)
+- `last_login_at: timestamptz` (nullable)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+
+##### Profile
+- `id: uuid` (PK)
+- `user_id: uuid` (FK -> users.id, unique, required)
+- `avatar_url: text` (nullable)
+- `locale: varchar(10)` (default `en-IN`)
+- `timezone: varchar(64)` (default `Asia/Kolkata`)
+- `default_currency: char(3)` (required)
+- `monthly_budget: decimal(12,2)` (nullable)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+
+##### Group
+- `id: uuid` (PK)
+- `name: varchar(120)` (required)
+- `description: text` (nullable)
+- `visibility: enum(private|invite_only|public_readonly)` (default `private`)
+- `owner_user_id: uuid` (FK -> users.id, required)
+- `is_archived: boolean` (default `false`)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+
+##### GroupMember
+- `id: uuid` (PK)
+- `group_id: uuid` (FK -> groups.id, required)
+- `user_id: uuid` (FK -> users.id, required)
+- `role: enum(owner|admin|member|viewer)` (required)
+- `join_status: enum(invited|active|left|removed)` (required)
+- `joined_at: timestamptz` (nullable)
+- `left_at: timestamptz` (nullable)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+- Unique constraint: `(group_id, user_id)`
+
+##### Expense
+- `id: uuid` (PK)
+- `title: varchar(160)` (required)
+- `description: text` (nullable)
+- `amount_total: decimal(12,2)` (required)
+- `currency: char(3)` (required)
+- `category: varchar(64)` (required)
+- `paid_by_user_id: uuid` (FK -> users.id, required)
+- `owner_user_id: uuid` (FK -> users.id, required)
+- `group_id: uuid` (FK -> groups.id, nullable)
+- `expense_date: date` (required)
+- `status: enum(draft|posted|void)` (default `posted`)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+
+##### ExpenseSplit
+- `id: uuid` (PK)
+- `expense_id: uuid` (FK -> expenses.id, required)
+- `participant_user_id: uuid` (FK -> users.id, nullable)
+- `participant_group_member_id: uuid` (FK -> group_members.id, nullable)
+- `split_type: enum(equal|fixed|percent|share)` (required)
+- `share_value: decimal(12,4)` (required)
+- `amount_owed: decimal(12,2)` (required)
+- `is_settled: boolean` (default `false`)
+- `settled_at: timestamptz` (nullable)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+- Check constraint: exactly one participant reference is non-null.
+
+##### Settlement
+- `id: uuid` (PK)
+- `group_id: uuid` (FK -> groups.id, required)
+- `from_user_id: uuid` (FK -> users.id, required)
+- `to_user_id: uuid` (FK -> users.id, required)
+- `amount: decimal(12,2)` (required)
+- `currency: char(3)` (required)
+- `status: enum(proposed|confirmed|cancelled)` (default `proposed`)
+- `settled_on: date` (nullable)
+- `note: text` (nullable)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+
+##### Note
+- `id: uuid` (PK)
+- `author_user_id: uuid` (FK -> users.id, required)
+- `group_id: uuid` (FK -> groups.id, nullable)
+- `title: varchar(160)` (required)
+- `body: text` (required)
+- `visibility: enum(private|group)` (required)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+
+##### Goal
+- `id: uuid` (PK)
+- `owner_user_id: uuid` (FK -> users.id, required)
+- `title: varchar(160)` (required)
+- `target_amount: decimal(12,2)` (required)
+- `saved_amount: decimal(12,2)` (default `0`)
+- `currency: char(3)` (required)
+- `target_date: date` (nullable)
+- `status: enum(active|achieved|paused|cancelled)` (default `active`)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+
+##### Attachment
+- `id: uuid` (PK)
+- `uploader_user_id: uuid` (FK -> users.id, required)
+- `expense_id: uuid` (FK -> expenses.id, nullable)
+- `note_id: uuid` (FK -> notes.id, nullable)
+- `goal_id: uuid` (FK -> goals.id, nullable)
+- `group_id: uuid` (FK -> groups.id, nullable)
+- `storage_key: text` (required)
+- `original_name: varchar(255)` (required)
+- `mime_type: varchar(128)` (required)
+- `size_bytes: bigint` (required)
+- `checksum_sha256: char(64)` (nullable)
+- `created_at: timestamptz` (required)
+- Check constraint: attached to at least one parent context.
+
+##### AuditLog
+- `id: uuid` (PK)
+- `actor_user_id: uuid` (FK -> users.id, nullable for system actions)
+- `action: varchar(80)` (required)
+- `entity_type: varchar(80)` (required)
+- `entity_id: uuid` (required)
+- `scope: enum(personal|group|system)` (required)
+- `group_id: uuid` (FK -> groups.id, nullable)
+- `request_id: varchar(64)` (nullable)
+- `ip_hash: varchar(128)` (nullable)
+- `metadata_json: jsonb` (nullable)
+- `created_at: timestamptz` (required)
+- Immutable rule: no update/delete operations at application layer.
+
+#### Relationship Cardinality Definitions
+- `User 1:1 Profile` (a user has one profile; a profile belongs to one user).
+- `User 1:N Group (owner)` (one user can own many groups; each group has one owner).
+- `User N:M Group` via `GroupMember`.
+- `Group 1:N GroupMember`.
+- `User 1:N GroupMember`.
+- `User 1:N Expense` as payer (`paid_by_user_id`).
+- `User 1:N Expense` as owner (`owner_user_id`).
+- `Group 1:N Expense` (optional on expense for personal vs shared).
+- `Expense 1:N ExpenseSplit`.
+- `User 1:N ExpenseSplit` (optional participant path).
+- `GroupMember 1:N ExpenseSplit` (optional participant path).
+- `Group 1:N Settlement`.
+- `User 1:N Settlement` as debtor (`from_user_id`).
+- `User 1:N Settlement` as creditor (`to_user_id`).
+- `User 1:N Note` as author.
+- `Group 1:N Note` (optional for group notes).
+- `User 1:N Goal`.
+- `User 1:N Attachment` as uploader.
+- `Expense 1:N Attachment` (optional).
+- `Note 1:N Attachment` (optional).
+- `Goal 1:N Attachment` (optional).
+- `Group 1:N Attachment` (optional).
+- `User 1:N AuditLog` as actor (optional for system).
+- `Group 1:N AuditLog` (optional scoped logs).
+
+#### ERD (Mermaid)
+```mermaid
+erDiagram
+   USER ||--|| PROFILE : has
+   USER ||--o{ GROUP : owns
+   USER ||--o{ GROUP_MEMBER : joins
+   GROUP ||--o{ GROUP_MEMBER : contains
+
+   USER ||--o{ EXPENSE : paid_by
+   USER ||--o{ EXPENSE : owns
+   GROUP ||--o{ EXPENSE : includes
+
+   EXPENSE ||--o{ EXPENSE_SPLIT : split_into
+   USER o|--o{ EXPENSE_SPLIT : participant_user
+   GROUP_MEMBER o|--o{ EXPENSE_SPLIT : participant_member
+
+   GROUP ||--o{ SETTLEMENT : settles
+   USER ||--o{ SETTLEMENT : debtor
+   USER ||--o{ SETTLEMENT : creditor
+
+   USER ||--o{ NOTE : authors
+   GROUP o|--o{ NOTE : shares
+
+   USER ||--o{ GOAL : owns
+
+   USER ||--o{ ATTACHMENT : uploads
+   EXPENSE o|--o{ ATTACHMENT : has
+   NOTE o|--o{ ATTACHMENT : has
+   GOAL o|--o{ ATTACHMENT : has
+   GROUP o|--o{ ATTACHMENT : has
+
+   USER o|--o{ AUDIT_LOG : acts
+   GROUP o|--o{ AUDIT_LOG : scoped_to
+```
+
+#### Lifecycle Notes
+- User deactivation disables login and future writes, but historical records remain.
+- Group archive blocks new shared writes; read-only access is preserved.
+- Expense status `void` keeps auditability without hard deletion.
+- Settlement moves `proposed -> confirmed/cancelled`; only confirmed updates split settlement flags.
+- Audit logs are write-once records.
 
 ### 2. RBAC Matrix
 - Define explicit role/permission pairs for personal, shared, and admin contexts.
@@ -231,6 +463,8 @@ Should I draft the replacement markdown for these sections?
 - Folder structure & naming conventions.
 - API contracts (Swagger/OpenAPI).
 - DFD & ERD diagrams.
+- Domain Model ERD source of truth: System Design Details -> Domain Model -> ERD (Mermaid).
+- DFD must map data movement across personal scope, shared group scope, sync engine, and AI boundary.
 - Setup & deployment guide.
 
 ---

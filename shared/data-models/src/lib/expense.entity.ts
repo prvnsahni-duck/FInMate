@@ -1,26 +1,45 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { User } from './user.entity';
+import { Group } from './group.entity';
 
 @Entity('expenses')
 export class Expense {
   @PrimaryGeneratedColumn('uuid')
-  id: string;
+  id!: string;
 
-  @Column()
-  description: string;
+  @Column({ type: 'varchar', length: 160 })
+  title!: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  amount: number;
+  @Column({ type: 'text', nullable: true })
+  description?: string;
 
-  @Column()
-  currency: string;
+  @Column('decimal', { precision: 12, scale: 2 })
+  amountTotal!: number;
+
+  @Column({ type: 'char', length: 3 })
+  currency!: string;
+
+  @Column({ type: 'varchar', length: 64 })
+  category!: string;
 
   @ManyToOne(() => User, { nullable: false })
-  user: User;
+  paidByUser!: User;
+
+  @ManyToOne(() => User, { nullable: false })
+  ownerUser!: User;
+
+  @ManyToOne(() => Group, { nullable: true })
+  group?: Group;
+
+  @Column({ type: 'date' })
+  expenseDate!: string;
+
+  @Column({ type: 'varchar', length: 20, default: 'posted' })
+  status!: 'draft' | 'posted' | 'void';
 
   @CreateDateColumn()
-  createdAt: Date;
+  createdAt!: Date;
 
   @UpdateDateColumn()
-  updatedAt: Date;
+  updatedAt!: Date;
 }
