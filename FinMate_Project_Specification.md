@@ -361,7 +361,7 @@ Should I draft the replacement markdown for these sections?
 - **API.md** - API documentation (Swagger/OpenAPI)
 - **SECURITY.md** - Security architecture and best practices
 - **PERFORMANCE.md** - Optimization techniques and benchmarks
-- **WORK_LOG.md** - Detailed development log with timestamps
+- **Progress Log (this file)** - Dated project decisions and execution record
 - **CONVERSATIONS.md** - Archive of important decisions and discussions
 - **DEVELOPMENT_NOTES.md** - Technical learnings and insights
 - **CHANGELOG.md** - Version history and release notes
@@ -370,7 +370,38 @@ Should I draft the replacement markdown for these sections?
 
 ---
 
+## 🗂️ Progress Log
+
+### Entry Template
+- **Date:** YYYY-MM-DD
+- **Summary:** 1-2 lines on what was done
+- **Changes Made:**
+   - Item 1
+   - Item 2
+- **Artifacts Updated:**
+   - File/Module/Issue references
+- **Decisions:**
+   - Decision and rationale
+- **Next Actions:**
+   - Immediate next step
+
+### 2026-06-08
+- **Summary:** Established Linear-first project coordination approach and consolidated the active planning record format.
+- **Changes Made:**
+   - Standardized project operating model to one team + one project (FinMate MVP) with epic grouping and dependency-driven execution.
+   - Defined that ongoing progress and detail should be maintained in this specification file as the long-term record.
+- **Artifacts Updated:**
+   - TICKET_BACKLOG.md
+   - FinMate_Project_Specification.md
+- **Decisions:**
+   - Keep tracking lightweight by using one Linear project during MVP planning.
+   - Use this section for date-stamped progress entries instead of splitting history across multiple planning files.
+- **Next Actions:**
+   - Add one new dated entry at the end of this section whenever meaningful project work is completed.
+
+---
+
 **Version:** 2.0 (Enhanced with Security & Performance)  
 **Author:** Prvn Sahni  
-**Last Updated:** November 22, 2025  
+**Last Updated:** June 8, 2026  
 **Status:** Planning & Architecture Phase
