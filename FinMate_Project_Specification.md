@@ -820,11 +820,69 @@ function simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedT
 
 ## 🧰 Operational Requirements
 
-- **Backups:** encrypted automated backups with restore testing.
-- **Recovery Targets:** define RTO/RPO for personal data and shared groups.
-- **Incident Response:** logging, alert routing, and user-facing status updates.
-- **Dependency Constraints:** capture limits for OpenAI, Supabase, and monitoring tools.
-- **Cost Controls:** document any usage caps needed for MVP operation.
+Operational policies and targets to ensure high availability, data durability, and fast incident response in production.
+
+### 1. Ops Baseline Matrix (RTO & RPO Targets)
+
+The Recovery Time Objective (RTO) and Recovery Point Objective (RPO) targets vary by data classification and system criticality:
+
+| Service Category | Critical Path | RTO Target | RPO Target | Recovery Strategy |
+| :--- | :---: | :---: | :---: | :--- |
+| **User Identity & Auth** | Yes | 4 Hours | 1 Hour | JWT token caching, active replicas, WAL backups. |
+| **Ledger & Balances (DB)** | Yes | 4 Hours | 1 Hour | Point-in-Time Recovery (PITR) via Write-Ahead Logging (WAL). |
+| **File Storage (Receipts)** | No | 12 Hours | 6 Hours | Supabase storage replication & cold-bucket backups. |
+| **AI Insights / Chat** | No | 24 Hours | N/A (Stateless) | API key rotation and model fallbacks. |
+| **Offline Local Storage** | No | 0 (Instant) | 0 (Instant) | Local client-side IndexedDB caching. Sync upon reconnect. |
+
+### 2. Backups & Restore Drills
+
+*   **Backup Automation**:
+    *   **Full Backups**: Captured automatically every 24 hours at 02:00 UTC during low-traffic windows.
+    *   **Differential Log Backups**: WAL archives streamed continuously (every 5 minutes) to secure off-site object storage.
+*   **Encryption**:
+    *   All backup archives MUST be encrypted before transit using AES-256.
+    *   Encryption keys are managed via AWS KMS / GCP KMS, separate from the primary application server database credentials.
+*   **Retention Policy**: Daily backups retained for 30 days; weekly backups retained for 90 days; monthly backups archived for 1 year.
+*   **Testing and Restore Drills**:
+    *   **Automated Integrity Check (Weekly)**: An automated script provisions an ephemeral sandbox database, restores the latest backup, runs test queries, and outputs validation reports.
+    *   **Manual Disaster Recovery Drill (Quarterly)**: Engineering team executes a simulated total service recovery to verify RTO compliance.
+
+### 3. Incident Severity & Alerting Path
+
+Incidents are classified into three severity tiers, triggering unique alerting and communication paths:
+
+```mermaid
+graph TD
+    A[Anomaly Detected] --> B{Severity Level?}
+    B -->|Sev-1| C[PagerDuty Alert to On-Call]
+    B -->|Sev-2| D[Slack Notification to Dev Channel]
+    B -->|Sev-3| E[Linear Ticket Generated]
+    
+    C --> F[Update Status Page]
+    C --> G[Resolution inside 4 hrs]
+    D --> H[Resolution inside 12 hrs]
+```
+
+#### 🚨 Severity Level Mappings & Alert Routing
+
+*   **Sev-1 (Critical Outage)**:
+    *   *Triggers*: Database connection failures, Auth endpoint down, major latency (> 5s for > 5% of users).
+    *   *Alerting Route*: Automated Sentry/Prometheus trigger -> PagerDuty notification to On-Call Engineer. Auto-escalates to Lead Architect if unacknowledged within 15 minutes.
+    *   *Communication*: Auto-updates public status page (e.g. status.finmate.com) via API heartbeats.
+    *   *SLA*: Resolution or mitigation within **4 hours**.
+*   **Sev-2 (Degraded Operations)**:
+    *   *Triggers*: AI API failing, CSV imports timing out, elevated error rates (2xx/3xx latency > 1s).
+    *   *Alerting Route*: Slack bot notification posted to `#alerts-finmate-prod` channel. Handled by the active engineering team on a priority queue.
+    *   *SLA*: Resolution or hotfix deployed within **12 hours**.
+    *   *Communication*: Banner added to user dashboard indicating feature degradation.
+*   **Sev-3 (Minor Issues)**:
+    *   *Triggers*: Minor CSS layout alignment bugs, static page warnings, non-blocking UI exceptions.
+    *   *Alerting Route*: Automatically creates a card in Linear backlog tagged `bug:minor`.
+    *   *SLA*: Prioritized and resolved in subsequent sprint cycles.
+
+### 4. Dependency Constraints & Cost Controls
+- OpenAI API: Rates limited at client level; auto-fallback to cache for repeating smart forecast questions.
+- Supabase storage caps: Active alerts when total storage utilization reaches 80% of current subscription tier.
 
 ---
 
@@ -1120,7 +1178,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Define encryption boundary classifications.
 
 ### 2026-06-09
-- **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, and defined encryption boundaries, AI policies, and error taxonomies.
+- **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, defined encryption boundaries, AI policies, error taxonomies, and finalized production reliability guardrails.
 - **Changes Made:**
     - Added standard error payload schema and mappings under `API Error Taxonomy`.
     - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
@@ -1133,6 +1191,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Replaced the placeholder at `System Design Details -> 3. Encryption Boundary Table` with key tier definitions and the entity-field encryption matrix.
     - Added `Security & Privacy -> AI Data Access & Handling Rules` defining opt-in mechanics, local decryption rules, and zero-retention integration constraints.
     - Added TypeScript interfaces for client-side programmatic parsing of API errors and established the complete **Error Code Catalog** mapping all potential errors (`AUTH_`, `VAL_`, `RES_`, `CON_`, `SYS_`).
+    - Replaced the placeholder bullet list under `## 🧰 Operational Requirements` with the Ops Baseline Matrix (RTO/RPO targets), backup automation rules, weekly/quarterly restore testing requirements, and Sev-1/Sev-2/Sev-3 incident alerting paths.
 - **Artifacts Updated:**
     - FinMate_Project_Specification.md
     - API.md
@@ -1145,12 +1204,13 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Process file imports atomically inside a single database transaction to prevent partial data corruption and duplicates.
     - Keep transaction titles and descriptions strictly client-side encrypted (zero-knowledge) by default, using ephemeral plaintext transmission for AI features only on explicit user opt-in.
     - Provide programmatically classifiable error codes (e.g. `AUTH_MFA_REQUIRED`, `CON_VERSION_CONFLICT`) to allow frontend clients to run localized translations and route users dynamically.
+    - Target 4-hour RTO for critical paths (Auth, DB sync, REST API) and 1-hour RPO using Write-Ahead Logging PITR.
 - **Next Actions:**
-    - Complete outstanding architecture design reviews.
+    - Transition to coding phase once all architecture definitions are complete.
 
 ---
 
-**Version:** 2.6 (Enhanced with API Contracts, RBAC, Settlements, Import/Export, Encryption, & Error Catalog)  
+**Version:** 2.7 (Enhanced with API Contracts, RBAC, Settlements, Import/Export, Encryption, Error Catalog, & Reliability Guardrails)  
 **Author:** Prvn Sahni  
 **Last Updated:** June 9, 2026  
 **Status:** Planning & Architecture Phase
