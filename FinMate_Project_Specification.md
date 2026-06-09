@@ -1272,7 +1272,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Define encryption boundary classifications.
 
 ### 2026-06-09
-- **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, defined encryption boundaries, AI policies, error taxonomies, finalized production reliability guardrails, defined collaborative concurrent edit conflict resolution strategies, and built the shared validation DTO library.
+- **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, defined encryption boundaries, AI policies, error taxonomies, finalized production reliability guardrails, defined collaborative concurrent edit conflict resolution strategies, built the shared validation DTO library, and implemented global NestJS exception filters for standardized error taxonomy.
 - **Changes Made:**
     - Added standard error payload schema and mappings under `API Error Taxonomy`.
     - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
@@ -1291,11 +1291,15 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Updated [API.md](file:///d:/prvn/Projects/FinMate/API.md) examples with the `version` field.
     - Created shared validation DTO classes in `shared/data-models/src/lib/dto/` for user preferences, authentication registrations, group invitations, settlements, expense recording, and notes CRUD.
     - Exported all validation classes from the `@finmate/data-models` shared library entry point index.ts.
+    - Created NestJS global `HttpExceptionFilter` handling programmatic mapping of error status codes, validation formatting arrays, and database unique/foreign key constraint errors.
+    - Registered the custom global exception filter and active validation pipes in `main.ts`, adjusting the path-based versioning global prefix to `api/v1`.
 - **Artifacts Updated:**
     - FinMate_Project_Specification.md
     - API.md
     - openapi.yaml
     - shared/data-models/src/index.ts
+    - backend/src/main.ts
+    - backend/src/app/filters/http-exception.filter.ts
 - **Decisions:**
     - Use URL-based versioning (`/api/v1`) for NestJS routing simplicity.
     - Maintain a standardized JSON error shape containing `errorCode` for ease of handling.
@@ -1308,11 +1312,11 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Use a request body-based `"version": integer` parameter on mutable shared resource updates to simplify payload validation.
     - Handle concurrency conflicts dynamically via client-side interception of 412 errors, executing silent automerges for non-overlapping fields or rendering interactive side-by-side diff modals for overlapping edits.
 - **Next Actions:**
-    - Implement global NestJS validation filters and API error exception middleware (FIN-18).
+    - Implement User Registration and JWT Authentication Service (FIN-19).
 
 ---
 
-**Version:** 2.10 (Shared Validation DTO Library completed)  
+**Version:** 2.11 (Global Exception Filters and API Error Taxonomy Middleware completed)  
 **Author:** Prvn Sahni  
 **Last Updated:** June 9, 2026  
 **Status:** Implementation (Coding) Phase
