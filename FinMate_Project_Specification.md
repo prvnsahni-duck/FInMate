@@ -1272,7 +1272,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Define encryption boundary classifications.
 
 ### 2026-06-09
-- **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, defined encryption boundaries, AI policies, error taxonomies, finalized production reliability guardrails, and defined collaborative concurrent edit conflict resolution strategies.
+- **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, defined encryption boundaries, AI policies, error taxonomies, finalized production reliability guardrails, defined collaborative concurrent edit conflict resolution strategies, and built the shared validation DTO library.
 - **Changes Made:**
     - Added standard error payload schema and mappings under `API Error Taxonomy`.
     - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
@@ -1289,10 +1289,13 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Added `System Design Details -> 6. Conflict Resolution` detailing optimistic locking (version-based concurrency), database update strategies, API conflict response structures (412), client-side automerge policies vs interactive manual diff modals, and two timeline worked scenarios.
     - Updated [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml) schemas and PATCH endpoints to require the `version` field for `Group`, `Expense`, `Settlement`, `Note`, and `Goal`.
     - Updated [API.md](file:///d:/prvn/Projects/FinMate/API.md) examples with the `version` field.
+    - Created shared validation DTO classes in `shared/data-models/src/lib/dto/` for user preferences, authentication registrations, group invitations, settlements, expense recording, and notes CRUD.
+    - Exported all validation classes from the `@finmate/data-models` shared library entry point index.ts.
 - **Artifacts Updated:**
     - FinMate_Project_Specification.md
     - API.md
     - openapi.yaml
+    - shared/data-models/src/index.ts
 - **Decisions:**
     - Use URL-based versioning (`/api/v1`) for NestJS routing simplicity.
     - Maintain a standardized JSON error shape containing `errorCode` for ease of handling.
@@ -1305,11 +1308,11 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Use a request body-based `"version": integer` parameter on mutable shared resource updates to simplify payload validation.
     - Handle concurrency conflicts dynamically via client-side interception of 412 errors, executing silent automerges for non-overlapping fields or rendering interactive side-by-side diff modals for overlapping edits.
 - **Next Actions:**
-    - Implement shared data models validation DTO library (FIN-17).
+    - Implement global NestJS validation filters and API error exception middleware (FIN-18).
 
 ---
 
-**Version:** 2.9 (Database Configuration and Schema Migration Setup completed)  
+**Version:** 2.10 (Shared Validation DTO Library completed)  
 **Author:** Prvn Sahni  
 **Last Updated:** June 9, 2026  
 **Status:** Implementation (Coding) Phase
