@@ -450,9 +450,56 @@ Role-Based Access Control (RBAC) in FinMate is applied at the group level. A use
 
 
 ### 3. Encryption Boundary Table
-- Mark which fields are encrypted client-side, server-side, or left plaintext.
-- Identify which data can be sent to AI services and which must remain zero-knowledge.
-- Resolve conflicts between AI features and privacy guarantees.
+
+To enforce a Zero-Knowledge Architecture, user data containing transactional details, personal notes, and goal titles is encrypted client-side before submission. The backend server acts as a blind sync engine for these fields. Other fields needed for database querying, sorting, or settlements are stored in plaintext or server-side encrypted.
+
+#### 🔐 Encryption Key Tiers
+1.  **Client-Side Encrypted (Zero-Knowledge / ZK)**:
+    *   **Mechanism**: Encrypted on the client device using AES-256-GCM.
+    *   **Keys**: Keys are derived locally on the client device using PBKDF2/Argon2. The master key never leaves the client device.
+    *   **Server Access**: The server only sees base64-encoded ciphertext and initialization vectors. The server cannot decrypt this data.
+2.  **Server-Side Encrypted (SSE)**:
+    *   **Mechanism**: Encrypted in transit and at rest on the server using database-level or application-level encryption keys (PostgreSQL `pgcrypto` or KMS).
+    *   **Keys**: Managed securely by the server environment.
+    *   **Server Access**: Decrypted ephemerally in server memory when running authorized queries (e.g. rendering user profile values or computing budget margins).
+3.  **Plaintext**:
+    *   **Mechanism**: Stored as plaintext in database tables.
+    *   **Server Access**: Fully searchable, indexable, and sortable.
+
+#### 📊 Entity-Field Encryption & AI Access Matrix
+
+| Entity | Field Name | Encryption Classification | AI Access Eligibility | Rationale |
+| :--- | :--- | :--- | :---: | :--- |
+| **User** | `id`, `status`, `created_at` | Plaintext | ❌ | Needed for joins, audits, and routing. |
+| | `email`, `password_hash` | SSE | ❌ | Sensitive credentials, protected at rest. |
+| **Profile** | `id`, `user_id`, `created_at` | Plaintext | ❌ | Index keys. |
+| | `avatar_url`, `monthly_budget` | SSE | ❌ | Personal financial settings, protected at rest. |
+| | `locale`, `timezone`, `default_currency` | Plaintext | ❌ | Used for localized formatting and server runs. |
+| **Group** | `id`, `owner_user_id`, `is_archived` | Plaintext | ❌ | Used for routing and soft-deletes. |
+| | `name`, `description` | SSE | ❌ | Shared identifiers, accessible to group. |
+| **GroupMember**| `id`, `group_id`, `user_id` | Plaintext | ❌ | Unique constraints and indexing. |
+| | `role`, `join_status`, `joined_at` | Plaintext | ❌ | Enforces RBAC permissions. |
+| **Expense** | `id`, `paid_by_user_id`, `group_id` | Plaintext | ❌ | Primary/foreign keys. |
+| | `currency`, `expense_date`, `status` | Plaintext | ❌ | Indexing, sorting, and balance calculations. |
+| | `amount_total` | SSE | ⚠️ (Optional) | Numeric totals for smart analytics (opt-in). |
+| | `category` | Plaintext | ⚠️ (Optional) | Categorization tags for spending analysis. |
+| | `title`, `description` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Private transaction contents. Zero-knowledge. |
+| **ExpenseSplit**| `id`, `expense_id`, `split_type` | Plaintext | ❌ | Database constraints. |
+| | `share_value`, `is_settled` | Plaintext | ❌ | Settlement balance processing. |
+| | `amount_owed` | SSE | ❌ | Owed amount calculations. |
+| **Settlement** | `id`, `group_id`, `from_user_id`, `to_user_id` | Plaintext | ❌ | Core relation indicators. |
+| | `amount`, `currency`, `status` | Plaintext | ❌ | Ledger balance updates. |
+| | `note` | Client-Side (ZK) | ❌ | Personal payment notes. Zero-knowledge. |
+| **Note** | `id`, `author_user_id`, `group_id` | Plaintext | ❌ | Index keys. |
+| | `visibility` | Plaintext | ❌ | Privacy boundaries control. |
+| | `title`, `body` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Private contents. Zero-knowledge. |
+| **Goal** | `id`, `owner_user_id`, `currency` | Plaintext | ❌ | Core structure and parameters. |
+| | `status`, `target_date` | Plaintext | ❌ | Tracking status. |
+| | `target_amount`, `saved_amount` | SSE | ⚠️ (Optional) | Target numbers. |
+| | `title` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Goal identifier. Zero-knowledge. |
+| **Attachment** | `id`, `storage_key`, `mime_type` | Plaintext | ❌ | File retrieval references. |
+| | `original_name`, `file_content` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Personal files (PDFs, images) are encrypted locally. |
+
 
 ### 4. API Error Taxonomy
 
@@ -805,6 +852,28 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
 - Minimal data collection.
 - Privacy by design.
 
+### 🤖 AI Data Access & Handling Rules
+
+To reconcile zero-knowledge encryption with intelligent AI features, FinMate adheres to strict data handling constraints:
+
+1.  **Strict Ephemeral Processing**:
+    *   Plaintext data sent for AI processing (such as expense receipt OCR or note summarization) is **never written to persistent database storage** on the backend.
+    *   Plaintext exists only in-memory in server execution space and is discarded immediately after transmitting to/from the AI provider.
+2.  **Explicit User Opt-In Settings**:
+    *   By default, all AI capabilities are disabled.
+    *   Users must explicitly opt-in via account settings (`ai_opt_in = true`) to enable features requiring remote AI orchestration.
+    *   Users can revoke this consent at any time, which instantly sweeps any client-side cached suggestions.
+3.  **Local Decryption & Secure Transit**:
+    *   Since transactional data is client-side encrypted, the client device decrypts the target fields locally using the local keys.
+    *   The client sends the plaintext payload of only the specific active transaction (e.g. the active note body or receipt file binary) to the server via TLS.
+4.  **Zero-Retention AI Integration**:
+    *   The backend proxy routes AI calls strictly to enterprise API endpoints (e.g., OpenAI API) governed by strict data privacy agreements:
+        *   **Zero-Data-Retention (ZDR)**: The AI partner does not retain files or prompt contents.
+        *   **No Training**: The AI partner is contractually blocked from training future LLMs or models using FinMate API prompts or contents.
+5.  **Anonymization Boundaries**:
+    *   Before sending prompts, the backend sweeps any metadata headers to exclude internal database keys (e.g. `user_id`, `group_id`). Only the raw contextual plaintext (the note text or receipt metadata) is sent.
+
+
 ---
 
 ## 💡 Future Enhancements
@@ -1005,7 +1074,7 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
     - Define encryption boundary classifications.
 
 ### 2026-06-09
-- **Summary:** Froze initial API contracts, mapped RBAC rules, defined the debt simplification algorithm, and standardized the import/export file formats.
+- **Summary:** Froze API contracts, mapped RBAC rules, defined the debt simplification algorithm, standardized import/export formats, and defined encryption boundaries and AI data policies.
 - **Changes Made:**
     - Added standard error payload schema and mappings under `API Error Taxonomy`.
     - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
@@ -1015,6 +1084,8 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
     - Replaced the placeholder at `System Design Details -> 5. Settlement Logic` with the mathematical balance formula, round-half-up remainder allocations, tie-breaking rules, greedy matching pseudocode, and three concrete worked examples.
     - Expanded `- Export/Import (CSV, XLSX) support.` under `Shared Group Module` to include explicit column layouts (CSV schema v1), split math validation rules, and transaction atomicity logic.
     - Updated `API Error Taxonomy` with the structured error response payload example for bulk file import validation failures.
+    - Replaced the placeholder at `System Design Details -> 3. Encryption Boundary Table` with key tier definitions and the entity-field encryption matrix.
+    - Added `Security & Privacy -> AI Data Access & Handling Rules` defining opt-in mechanics, local decryption rules, and zero-retention integration constraints.
 - **Artifacts Updated:**
     - FinMate_Project_Specification.md
     - API.md
@@ -1025,12 +1096,13 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
     - Allocate rounding discrepancies to the payer (or the lexicographically first participant if the payer is not in the split) to ensure split sum parity.
     - Enforce UUID string ascending as the ultimate tie-breaker during greedy matching debtor/creditor lists.
     - Process file imports atomically inside a single database transaction to prevent partial data corruption and duplicates.
+    - Keep transaction titles and descriptions strictly client-side encrypted (zero-knowledge) by default, using ephemeral plaintext transmission for AI features only on explicit user opt-in.
 - **Next Actions:**
-    - Draft structural design specifications for the encryption boundary table.
+    - Complete outstanding architecture design reviews.
 
 ---
 
-**Version:** 2.4 (Enhanced with API Contracts, RBAC, Settlements, & Import/Export Formats)  
+**Version:** 2.5 (Enhanced with API Contracts, RBAC, Settlements, Import/Export, & Encryption boundaries)  
 **Author:** Prvn Sahni  
 **Last Updated:** June 9, 2026  
 **Status:** Planning & Architecture Phase
