@@ -373,9 +373,56 @@ erDiagram
 - Resolve conflicts between AI features and privacy guarantees.
 
 ### 4. API Error Taxonomy
-- Standardize validation, auth, conflict, not-found, and server-error responses.
-- Define a shared response shape for all REST endpoints.
-- Include retry guidance for recoverable failures.
+
+Standardize all error responses across FinMate REST APIs to maintain consistency, ease frontend debugging, and provide explicit instructions for client-side recovery.
+
+#### Shared Error Response Schema
+All error responses from any API endpoint (HTTP status code >= 400) MUST conform to the following standard JSON payload structure:
+
+```json
+{
+  "statusCode": 400,
+  "timestamp": "2026-06-09T17:15:00.000Z",
+  "path": "/api/v1/expenses",
+  "errorCode": "VAL_INVALID_INPUT",
+  "message": "Input validation failed",
+  "details": [
+    {
+      "field": "amountTotal",
+      "issue": "must be a positive decimal number"
+    }
+  ],
+  "retryable": false
+}
+```
+
+#### Field Glossary
+*   `statusCode` (integer): The HTTP status code matching the response headers.
+*   `timestamp` (string): ISO-8601 formatted timestamp of the event.
+*   `path` (string): The requested URI path.
+*   `errorCode` (string): A unique domain-specific alphanumeric code for client-side programmatic handling (e.g. error translation/routing).
+*   `message` (string): Human-readable summary message.
+*   `details` (array, optional): Specific parameter or input field issues.
+*   `retryable` (boolean): Flag indicating whether the client can retry the request immediately or after a cooldown.
+
+#### Error Code Classification and HTTP Mappings
+
+| HTTP Status | Error Code Range | Description | Example Error Code | Retryable |
+| :--- | :--- | :--- | :--- | :--- |
+| **400 Bad Request** | `VAL_*` | Input verification or format validation errors. | `VAL_INVALID_INPUT` | No |
+| **401 Unauthorized** | `AUTH_*` | Missing, invalid, or expired authentication tokens. | `AUTH_TOKEN_EXPIRED` | No (must refresh token/login) |
+| **403 Forbidden** | `AUTH_*`, `RES_*` | Lack of permissions for resource context, or incomplete authentication step (MFA). | `RES_FORBIDDEN` | No |
+| **404 Not Found** | `RES_*` | Requested resource or endpoint does not exist. | `RES_NOT_FOUND` | No |
+| **409 Conflict** | `RES_*`, `CON_*` | Duplicate unique identifiers or database constraint failures. | `RES_ALREADY_EXISTS` | No |
+| **412 Precondition Failed** | `CON_*` | State conflict or optimistic lock version mismatch (concurrency resolution). | `CON_VERSION_CONFLICT` | Yes (fetch state, merge, and retry) |
+| **429 Too Many Requests** | `CON_*` | Throttling limits hit. Includes `Retry-After` header. | `CON_LIMIT_EXCEEDED` | Yes (after duration specified in header) |
+| **500 Internal Error** | `SYS_*` | Unexpected errors within server context. | `SYS_INTERNAL_ERROR` | No (or retry with exponential backoff) |
+| **503 Service Unavailable** | `SYS_*` | Downstream services, database, or dependencies down. | `SYS_SERVICE_UNAVAILABLE` | Yes (retry with exponential backoff) |
+
+#### Concurrency & Retry Guidance
+*   **Version Conflicts (`CON_VERSION_CONFLICT`)**: Triggered when the client attempts to update a shared entity (e.g., group notes, split details) using an outdated version ID. The client must retrieve the latest version from `GET /api/v1/.../{id}`, merge local edits, and submit again.
+*   **Network & Rate Limit Recoverability**: For status 429 and 503, the client must honor the `Retry-After` response header and implement exponential backoff (starting at 1000ms with a factor of 2, capped at 10 seconds, max 3 retries).
+
 
 ### 5. Settlement Logic
 - Specify how group balances are calculated from contributions and shared costs.
@@ -461,7 +508,7 @@ erDiagram
 
 **Include:**
 - Folder structure & naming conventions.
-- API contracts (Swagger/OpenAPI).
+- **API Contracts**: Detailed endpoint request/response specifications are documented in [API.md](file:///d:/prvn/Projects/FinMate/API.md), with a full OpenAPI 3.0 draft in [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml).
 - DFD & ERD diagrams.
 - Domain Model ERD source of truth: System Design Details -> Domain Model -> ERD (Mermaid).
 - DFD must map data movement across personal scope, shared group scope, sync engine, and AI boundary.
@@ -631,11 +678,28 @@ erDiagram
    - Keep tracking lightweight by using one Linear project during MVP planning.
    - Use this section for date-stamped progress entries instead of splitting history across multiple planning files.
 - **Next Actions:**
-   - Add one new dated entry at the end of this section whenever meaningful project work is completed.
+    - Define encryption classifications and RBAC matrix detail.
+
+### 2026-06-09
+- **Summary:** Froze initial API contracts for all core modules, defined global standards, error taxonomy, and pagination rules.
+- **Changes Made:**
+    - Added standard error payload schema and mappings under `API Error Taxonomy`.
+    - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
+    - Generated [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml) draft for the REST API.
+- **Artifacts Updated:**
+    - FinMate_Project_Specification.md
+    - API.md
+    - openapi.yaml
+- **Decisions:**
+    - Use URL-based versioning (`/api/v1`) for NestJS routing simplicity.
+    - Maintain a standardized JSON error shape containing `errorCode` for ease of handling.
+- **Next Actions:**
+    - Draft structural design specifications for the group settlement algorithm.
 
 ---
 
-**Version:** 2.0 (Enhanced with Security & Performance)  
+**Version:** 2.1 (Enhanced with API Contracts & Taxonomy)  
 **Author:** Prvn Sahni  
-**Last Updated:** June 8, 2026  
+**Last Updated:** June 9, 2026  
 **Status:** Planning & Architecture Phase
+
