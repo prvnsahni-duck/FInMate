@@ -73,7 +73,36 @@ Should I draft the replacement markdown for these sections?
 - Create or join expense groups (public/private).
 - Add members via invite or link.
 - Shared ledger with smart settlement.
-- Export/Import (CSV, XLSX) support.
+- **Export/Import (CSV, XLSX) Support**:
+  Enables offline bulk editing and migrations. Exported files MUST align with the import schema, allowing zero-modification re-imports of the exact same records.
+
+  #### 📊 1. CSV Schema v1 (and XLSX Template Columns)
+  Both CSV and XLSX files share the same column layout and header names:
+
+  | Column Index | Column Header | Data Type | Constraint / Validation | Description |
+  | :--- | :--- | :--- | :--- | :--- |
+  | 1 | `date` | Date | Required. Format: `YYYY-MM-DD`. Must be in the past or today. | The calendar date of the expense. |
+  | 2 | `title` | String | Required. Max 160 characters. | Short name of the expense. |
+  | 3 | `amount` | Decimal | Required. Positive number (> 0.00). Max 2 decimal places. | Total expenditure amount. |
+  | 4 | `currency` | String | Required. ISO 4217 code (3 chars, uppercase, e.g. `INR`, `USD`). | Transaction currency. |
+  | 5 | `category` | String | Required. Max 64 characters. | Expense category (e.g. Travel, Food). |
+  | 6 | `payer_email` | String | Required. Valid email format. Must belong to an active member. | The user who paid the amount. |
+  | 7 | `split_type` | String | Required. Enum: `equal`, `fixed`, `percent`, `share`. | Distribution algorithm model. |
+  | 8 | `shares_data` | String | Optional. Semicolon-separated list: `email:value;email:value`. | Allocation parameters. If empty, defaults to equal splits among all active group members. |
+  | 9 | `description` | String | Optional. Text format. | Additional contextual notes. |
+
+  #### 🛡️ 2. Validation & Atomic Processing Rules
+  1.  **Row-Level Structural Integrity**:
+      *   **Emails Resolution**: All emails in `payer_email` and `shares_data` must resolve to registered user records currently active in the group.
+      *   **Currency Check**: Must match currency codes active in the group parameters.
+      *   **Split Math Validation**:
+          *   `equal`: Shares data can be omitted or define participant emails with values of `1` (weights).
+          *   `fixed`: Sum of values in `shares_data` must equal the exact value of the `amount` column.
+          *   `percent`: Sum of values in `shares_data` must equal exactly `100.00`.
+          *   `share`: Shares sum can be arbitrary; fractional owed values are computed relative to the total share sum.
+  2.  **Transactional Atomicity**:
+      *   API uploads are processed within a single database transaction boundary.
+      *   If **any** validation check fails (e.g., cell parsing error, unknown member email, invalid split math), the entire file import is **rejected** and rolled back. No partial records are committed.
 - Collaborative notes inside groups.
 
 ### C. Notes & Content Integration
@@ -448,6 +477,29 @@ All error responses from any API endpoint (HTTP status code >= 400) MUST conform
   "retryable": false
 }
 ```
+
+*   **Bulk File Import Validation Failure (`VAL_INVALID_INPUT`)**:
+    When a file upload (CSV or XLSX) contains structural, relational, or mathematical errors, the API returns a structured list mapping rows and columns to their respective validation errors:
+    ```json
+    {
+      "statusCode": 400,
+      "timestamp": "2026-06-09T22:56:00.000Z",
+      "path": "/api/v1/import/expenses",
+      "errorCode": "VAL_INVALID_INPUT",
+      "message": "File validation failed. No transactions were imported.",
+      "details": [
+        {
+          "field": "Row 5: payer_email",
+          "issue": "User 'unknown@example.com' is not a member of the group."
+        },
+        {
+          "field": "Row 8: split_type",
+          "issue": "Fixed split amounts sum up to $45.00, but amount is $50.00."
+        }
+      ],
+      "retryable": false
+    }
+    ```
 
 #### Field Glossary
 *   `statusCode` (integer): The HTTP status code matching the response headers.
@@ -953,7 +1005,7 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
     - Define encryption boundary classifications.
 
 ### 2026-06-09
-- **Summary:** Froze initial API contracts, mapped RBAC rules, and defined the group debt simplification algorithm.
+- **Summary:** Froze initial API contracts, mapped RBAC rules, defined the debt simplification algorithm, and standardized the import/export file formats.
 - **Changes Made:**
     - Added standard error payload schema and mappings under `API Error Taxonomy`.
     - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
@@ -961,6 +1013,8 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
     - Replaced the placeholder at `System Design Details -> 2. RBAC Matrix` with group roles definition, permission matrix table, and contextual policy constraints.
     - Added `Security & Privacy -> Authorization Behavior` with 403 error payload examples and boundary/conflict safeguards.
     - Replaced the placeholder at `System Design Details -> 5. Settlement Logic` with the mathematical balance formula, round-half-up remainder allocations, tie-breaking rules, greedy matching pseudocode, and three concrete worked examples.
+    - Expanded `- Export/Import (CSV, XLSX) support.` under `Shared Group Module` to include explicit column layouts (CSV schema v1), split math validation rules, and transaction atomicity logic.
+    - Updated `API Error Taxonomy` with the structured error response payload example for bulk file import validation failures.
 - **Artifacts Updated:**
     - FinMate_Project_Specification.md
     - API.md
@@ -970,12 +1024,13 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
     - Maintain a standardized JSON error shape containing `errorCode` for ease of handling.
     - Allocate rounding discrepancies to the payer (or the lexicographically first participant if the payer is not in the split) to ensure split sum parity.
     - Enforce UUID string ascending as the ultimate tie-breaker during greedy matching debtor/creditor lists.
+    - Process file imports atomically inside a single database transaction to prevent partial data corruption and duplicates.
 - **Next Actions:**
     - Draft structural design specifications for the encryption boundary table.
 
 ---
 
-**Version:** 2.3 (Enhanced with API Contracts, RBAC, & Debt Simplification Logic)  
+**Version:** 2.4 (Enhanced with API Contracts, RBAC, Settlements, & Import/Export Formats)  
 **Author:** Prvn Sahni  
 **Last Updated:** June 9, 2026  
 **Status:** Planning & Architecture Phase
