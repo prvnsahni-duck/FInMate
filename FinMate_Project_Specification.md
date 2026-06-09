@@ -802,6 +802,100 @@ function simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedT
     1.  `User_A` pays `User_C`: **$100.00**
     2.  `User_B` pays `User_C`: **$100.00**
 
+### 6. Conflict Resolution
+
+To maintain data integrity in collaborative, offline-first environments, FinMate enforces version-based optimistic concurrency controls on all mutable shared entities.
+
+#### 🔄 1. Version-Based Concurrency Control (Optimistic Locking)
+1.  **Schema Support**: Every mutable shared database entity (e.g. `Group`, `Expense`, `Note`, `Goal`, `Settlement`) contains a `version: integer` column, initialized to `1` on creation.
+2.  **API Read Contract**: Read endpoints (e.g., `GET /api/v1/notes/{id}`) return the resource's current `version`.
+3.  **API Write Contract**: All mutative endpoints (e.g., `PATCH /api/v1/notes/{id}`) require the expected version parameter in the request payload. Example JSON:
+    ```json
+    {
+      "title": "Updated Trip Notes",
+      "body": "Day 3 plans...",
+      "version": 4
+    }
+    ```
+4.  **Database Concurrency Verification**:
+    Update statements verify version matches in the SQL `WHERE` clause:
+    ```sql
+    UPDATE notes 
+    SET title = $1, body = $2, version = version + 1, updated_at = NOW() 
+    WHERE id = $3 AND version = $4;
+    ```
+    If the update statement returns `0` affected rows, the transaction rolls back, and the server rejects the request.
+
+#### ❌ 2. Conflict Response & API Behavior
+When a version mismatch is detected, the API immediately throws a `412 Precondition Failed` error with code `CON_VERSION_CONFLICT`.
+*   **Payload**:
+    ```json
+    {
+      "statusCode": 412,
+      "timestamp": "2026-06-09T23:08:00.000Z",
+      "path": "/api/v1/notes/ca8b3de3-d144-4822-ba30-dcbbf11ab9c2",
+      "errorCode": "CON_VERSION_CONFLICT",
+      "message": "Resource version conflict. The note has been modified by another user.",
+      "details": [
+        {
+          "field": "version",
+          "issue": "Submitted version 4, but current database version is 5."
+        }
+      ],
+      "retryable": true
+    }
+    ```
+
+#### 🤝 3. Client-Side Conflict Resolution & Merge Policy
+Upon intercepting a `412` error, the client (Angular) handles the conflict based on field overlap:
+
+```mermaid
+graph TD
+    A[412 Error Intercepted] --> B{Overlapping Fields?}
+    B -->|No| C[Automerge client edits]
+    B -->|Yes| D[Render side-by-side Diff Modal]
+    
+    C --> E[Submit with new server version]
+    D -->|User Choice: Keep Mine| F[Overwrite server with local edits]
+    D -->|User Choice: Keep Theirs| G[Discard local edits & refresh]
+    D -->|User Choice: Manual Merge| H[Submit user custom merged text]
+```
+
+1.  **Automatic Non-Overlapping Merge (Automerge)**:
+    If the fields modified by the local edits do not overlap with the changes made on the server (e.g., local edit modified the note `title` while the server update modified the note `body`), the client automatically merges the two sets of changes, retrieves the current database `version`, and re-submits.
+2.  **Interactive User Resolution (Manual Diff)**:
+    If there are overlapping changes (e.g., both local and server edits modified the note `body` text), the client blocks automated submits and displays a conflict resolution modal:
+    *   **Side-by-Side Diff**: Displays the user's local version, the current server version, and a proposed merge.
+    *   **Resolution Choices**:
+        *   *Keep Mine*: Overwrite the server's changes with the user's local edits (submitting the new server version).
+        *   *Keep Theirs*: Discard the user's local edits and accept the server's version.
+        *   *Merge Manually*: Present a rich-text editor for the user to combine the two files and submit.
+
+#### 📝 4. Concurrency worked scenarios
+
+##### Scenario A: Non-Overlapping Automerge (Expense Update)
+1.  `Expense_1` is created (Version = 1, `description = "Dinner"`, `category = "Food"`).
+2.  **User A** edits `description` locally to `"Goa Celebration Dinner"`.
+3.  **User B** concurrently edits `category` locally to `"Dining"`.
+4.  User B submits their patch request containing `"version": 1`. It succeeds; `Expense_1` database state becomes `version = 2`, `category = "Dining"`.
+5.  User A submits their patch request containing `"version": 1`.
+6.  The server rejects User A's update since version in database (2) != version submitted (1), returning `412 CON_VERSION_CONFLICT`.
+7.  User A's client intercepts the `412` error, fetches `Expense_1` latest state (`version = 2`, `category = "Dining"`), and checks for field overlap:
+    *   *Local Edit*: `description`
+    *   *Server Edit*: `category` (no overlap)
+8.  Client merges them (`description = "Goa Celebration Dinner"`, `category = "Dining"`), sets `"version": 2`, and re-submits automatically. The update succeeds.
+
+##### Scenario B: Overlapping Manual Resolve (Collaborative Note Edit)
+1.  `Note_1` is created (Version = 5, `body = "Bring sunscreen"`).
+2.  **User A** edits `body` locally to `"Bring sunscreen and hats"`.
+3.  **User B** concurrently edits `body` locally to `"Bring sunscreen and umbrellas"`.
+4.  User B submits their request (`"version": 5`). The database updates successfully; state becomes `version = 6`, `body = "Bring sunscreen and umbrellas"`.
+5.  User A submits their request (`"version": 5`).
+6.  The server rejects User A's update since version in database (6) != version submitted (5), returning `412`.
+7.  User A's client intercepts the `412` error, fetches `Note_1` latest copy, detects overlapping edits on `body`, and opens the **Conflict Resolution Modal**.
+8.  User A reviews the diff and chooses *Keep Mine*.
+9.  The client sets the note `body` to `"Bring sunscreen and hats"`, sets `"version": 6`, and submits. The database updates successfully to Version 7.
+
 
 ## 📦 Deployment & Infrastructure
 
@@ -1178,7 +1272,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Define encryption boundary classifications.
 
 ### 2026-06-09
-- **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, defined encryption boundaries, AI policies, error taxonomies, and finalized production reliability guardrails.
+- **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, defined encryption boundaries, AI policies, error taxonomies, finalized production reliability guardrails, and defined collaborative concurrent edit conflict resolution strategies.
 - **Changes Made:**
     - Added standard error payload schema and mappings under `API Error Taxonomy`.
     - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
@@ -1192,6 +1286,9 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Added `Security & Privacy -> AI Data Access & Handling Rules` defining opt-in mechanics, local decryption rules, and zero-retention integration constraints.
     - Added TypeScript interfaces for client-side programmatic parsing of API errors and established the complete **Error Code Catalog** mapping all potential errors (`AUTH_`, `VAL_`, `RES_`, `CON_`, `SYS_`).
     - Replaced the placeholder bullet list under `## 🧰 Operational Requirements` with the Ops Baseline Matrix (RTO/RPO targets), backup automation rules, weekly/quarterly restore testing requirements, and Sev-1/Sev-2/Sev-3 incident alerting paths.
+    - Added `System Design Details -> 6. Conflict Resolution` detailing optimistic locking (version-based concurrency), database update strategies, API conflict response structures (412), client-side automerge policies vs interactive manual diff modals, and two timeline worked scenarios.
+    - Updated [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml) schemas and PATCH endpoints to require the `version` field for `Group`, `Expense`, `Settlement`, `Note`, and `Goal`.
+    - Updated [API.md](file:///d:/prvn/Projects/FinMate/API.md) examples with the `version` field.
 - **Artifacts Updated:**
     - FinMate_Project_Specification.md
     - API.md
@@ -1205,12 +1302,14 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     - Keep transaction titles and descriptions strictly client-side encrypted (zero-knowledge) by default, using ephemeral plaintext transmission for AI features only on explicit user opt-in.
     - Provide programmatically classifiable error codes (e.g. `AUTH_MFA_REQUIRED`, `CON_VERSION_CONFLICT`) to allow frontend clients to run localized translations and route users dynamically.
     - Target 4-hour RTO for critical paths (Auth, DB sync, REST API) and 1-hour RPO using Write-Ahead Logging PITR.
+    - Use a request body-based `"version": integer` parameter on mutable shared resource updates to simplify payload validation.
+    - Handle concurrency conflicts dynamically via client-side interception of 412 errors, executing silent automerges for non-overlapping fields or rendering interactive side-by-side diff modals for overlapping edits.
 - **Next Actions:**
     - Transition to coding phase once all architecture definitions are complete.
 
 ---
 
-**Version:** 2.7 (Enhanced with API Contracts, RBAC, Settlements, Import/Export, Encryption, Error Catalog, & Reliability Guardrails)  
+**Version:** 2.8 (Enhanced with API Contracts, RBAC, Settlements, Import/Export, Encryption, Error Catalog, Reliability Guardrails, & Concurrency Conflict Resolution)  
 **Author:** Prvn Sahni  
 **Last Updated:** June 9, 2026  
 **Status:** Planning & Architecture Phase

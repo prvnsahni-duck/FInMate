@@ -438,7 +438,8 @@ graph TD
     ```json
     {
       "status": "confirmed",
-      "settledOn": "2026-06-09"
+      "settledOn": "2026-06-09",
+      "version": 1
     }
     ```
 *   **Response Example (`200 OK`)**: Updates status to `confirmed` and triggers internal ledger updates.

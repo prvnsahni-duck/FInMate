@@ -442,6 +442,8 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - version
               properties:
                 name:
                   type: string
@@ -453,6 +455,9 @@ paths:
                   enum: [private, invite_only, public_readonly]
                 isArchived:
                   type: boolean
+                version:
+                  type: integer
+                  example: 1
       responses:
         '200':
           description: Group updated successfully
@@ -801,6 +806,8 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - version
               properties:
                 title:
                   type: string
@@ -831,6 +838,9 @@ paths:
                   type: array
                   items:
                     type: string
+                version:
+                  type: integer
+                  example: 1
       responses:
         '200':
           description: Expense updated successfully
@@ -1061,6 +1071,7 @@ paths:
               type: object
               required:
                 - status
+                - version
               properties:
                 status:
                   type: string
@@ -1069,6 +1080,9 @@ paths:
                   type: string
                   format: date
                   example: "2026-06-09"
+                version:
+                  type: integer
+                  example: 1
       responses:
         '200':
           description: Settlement status updated
@@ -1214,6 +1228,8 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - version
               properties:
                 title:
                   type: string
@@ -1227,6 +1243,9 @@ paths:
                   type: string
                   format: uuid
                   nullable: true
+                version:
+                  type: integer
+                  example: 5
       responses:
         '200':
           description: Note updated successfully
@@ -1394,6 +1413,8 @@ paths:
           application/json:
             schema:
               type: object
+              required:
+                - version
               properties:
                 title:
                   type: string
@@ -1411,6 +1432,9 @@ paths:
                 status:
                   type: string
                   enum: [active, achieved, paused, cancelled]
+                version:
+                  type: integer
+                  example: 2
       responses:
         '200':
           description: Goal updated successfully
@@ -1840,6 +1864,7 @@ components:
         - visibility
         - ownerUserId
         - isArchived
+        - version
         - createdAt
         - updatedAt
       properties:
@@ -1859,6 +1884,9 @@ components:
           format: uuid
         isArchived:
           type: boolean
+        version:
+          type: integer
+          example: 1
         createdAt:
           type: string
           format: date-time
@@ -1923,6 +1951,7 @@ components:
         - status
         - splits
         - attachments
+        - version
         - createdAt
         - updatedAt
       properties:
@@ -1964,6 +1993,9 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Attachment'
+        version:
+          type: integer
+          example: 1
         createdAt:
           type: string
           format: date-time
@@ -2095,6 +2127,7 @@ components:
         - amount
         - currency
         - status
+        - version
         - createdAt
         - updatedAt
       properties:
@@ -2124,6 +2157,9 @@ components:
         note:
           type: string
           nullable: true
+        version:
+          type: integer
+          example: 1
         createdAt:
           type: string
           format: date-time
@@ -2139,6 +2175,7 @@ components:
         - title
         - body
         - visibility
+        - version
         - createdAt
         - updatedAt
       properties:
@@ -2159,6 +2196,9 @@ components:
         visibility:
           type: string
           enum: [private, group]
+        version:
+          type: integer
+          example: 4
         createdAt:
           type: string
           format: date-time
@@ -2176,6 +2216,7 @@ components:
         - savedAmount
         - currency
         - status
+        - version
         - createdAt
         - updatedAt
       properties:
@@ -2200,6 +2241,9 @@ components:
         status:
           type: string
           enum: [active, achieved, paused, cancelled]
+        version:
+          type: integer
+          example: 2
         createdAt:
           type: string
           format: date-time
