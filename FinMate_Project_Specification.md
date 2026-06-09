@@ -363,9 +363,62 @@ erDiagram
 - Audit logs are write-once records.
 
 ### 2. RBAC Matrix
-- Define explicit role/permission pairs for personal, shared, and admin contexts.
-- List actions such as create, view, edit, delete, invite, export, and settle.
-- Clarify which actions are allowed offline and which require sync.
+
+Role-Based Access Control (RBAC) in FinMate is applied at the group level. A user's role within a group determines their authorization level for group-scoped resources. Personal resources (personal expenses, personal notes, saving goals, user profiles) are governed strictly by individual ownership (User Scope) and are zero-knowledge to other users.
+
+#### 👥 Group Roles Definition
+*   **Owner**: The creator of the group. Holds absolute administrative power, including the ability to delete the group or manage Admin roles.
+*   **Admin**: Group administrators. Can manage general members and group settings, invite users, and moderate content.
+*   **Member**: General collaborators. Can create expenses, notes, and settlements, and edit/delete their own submissions.
+*   **Viewer**: Read-only access. Can view ledger and shared logs but cannot write or modify data.
+
+#### 📊 Unified Permission Matrix (Shared Group Scope)
+
+| Module | Action | Owner | Admin | Member | Viewer |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **Groups** | View Group Metadata / Ledger | ✅ | ✅ | ✅ | ✅ |
+| | Edit Group Settings (Name, Desc) | ✅ | ✅ | ❌ | ❌ |
+| | Archive Group (Read-only status) | ✅ | ✅ | ❌ | ❌ |
+| | Delete Group | ✅ | ❌ | ❌ | ❌ |
+| **Group Members**| View Member List | ✅ | ✅ | ✅ | ✅ |
+| | Invite Member / Link Invite | ✅ | ✅ | ⚠️ | ❌ |
+| | Promote to Admin / Demote Admin | ✅ | ❌ | ❌ | ❌ |
+| | Promote to Member / Demote to Viewer| ✅ | ✅ | ❌ | ❌ |
+| | Remove Member (Admin/Owner) | ✅ | ❌ | ❌ | ❌ |
+| | Remove Member (Member/Viewer) | ✅ | ✅ | ❌ | ❌ |
+| | Leave Group | ✅ (Must transfer) | ✅ | ✅ | ✅ |
+| **Expenses** | View Group Expenses | ✅ | ✅ | ✅ | ✅ |
+| | Create Group Expense | ✅ | ✅ | ✅ | ❌ |
+| | Update/Void Own Group Expense | ✅ | ✅ | ✅ | ❌ |
+| | Update/Void Other's Group Expense | ✅ | ✅ | ❌ | ❌ |
+| **Notes** | View Group Notes | ✅ | ✅ | ✅ | ✅ |
+| | Create Group Note | ✅ | ✅ | ✅ | ❌ |
+| | Update/Delete Own Group Note | ✅ | ✅ | ✅ | ❌ |
+| | Update/Delete Other's Group Note | ✅ | ✅ | ❌ | ❌ |
+| **Settlements** | View Group Settlements | ✅ | ✅ | ✅ | ✅ |
+| | Propose Settlement (Own Debt) | ✅ | ✅ | ✅ | ❌ |
+| | Confirm Settlement (as Creditor only) | ✅ | ✅ | ✅ | ❌ |
+| | Cancel Settlement (as Debtor/Creditor) | ✅ | ✅ | ✅ | ❌ |
+| **Import/Export**| Export Group Ledger | ✅ | ✅ | ✅ | ✅ |
+| | Import Expenses to Group | ✅ | ✅ | ✅ | ❌ |
+
+*   `⚠️` *Allowed for Members only if the group Owner has enabled "Allow Member Invites" in group settings (default: false).*
+
+#### 🔑 Contextual Access Control Policy
+
+*   **Personal Context (User Scope)**:
+    - Governed by ownership: `Owner User ID == Authenticated User ID`.
+    - Applies to: Personal Expenses (`group_id` is null), Personal Notes (`visibility == 'private'`), saving Goals, user Profile, and personal Attachments.
+    - No other user, regardless of role, can read, update, or delete these resources.
+*   **Shared Context (Group Scope)**:
+    - Governed by the group membership role.
+    - Applies to: Group Expenses, Group Notes, Settlements, Group Member Records, Group Attachments, and Group Audit Logs.
+    - Viewers are strictly restricted from all mutative actions.
+    - Members can only mutate resources they authored (`author_user_id == user_id` or `paid_by_user_id == user_id`).
+*   **Offline Actions vs. Cloud Sync**:
+    - **Offline Allowed**: View ledger (cached in IndexedDB), draft new personal/group expenses, draft personal notes.
+    - **Sync Required**: Inviting members, modifying member roles, archiving/deleting groups, proposing settlements, and exporting data.
+
 
 ### 3. Encryption Boundary Table
 - Mark which fields are encrypted client-side, server-side, or left plaintext.
@@ -472,6 +525,49 @@ All error responses from any API endpoint (HTTP status code >= 400) MUST conform
 - **XSS/CSRF protection** (built-in NestJS guards).
 - **Audit logging** (all financial operations tracked).
 - **Session management** (device tracking, remote logout).
+
+### 🛡️ Authorization Behavior
+
+The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-matrix). If a user attempts to perform an action for which they lack permissions, the API MUST reject the request immediately.
+
+#### ❌ Unauthorized Action Responses (HTTP Status Code & Error Payload)
+
+*   **Error Type: Resource Access Forbidden (`RES_FORBIDDEN`)**
+    When an authenticated user requests a resource belonging to a different personal scope or a group they are not a member of:
+    *   **HTTP Status**: `403 Forbidden`
+    *   **Payload**:
+        ```json
+        {
+          "statusCode": 403,
+          "timestamp": "2026-06-09T22:49:00.000Z",
+          "path": "/api/v1/groups/2ab72e81-b20f-488f-a9cb-b2f5cf111818/members",
+          "errorCode": "RES_FORBIDDEN",
+          "message": "You do not have access to view this group.",
+          "retryable": false
+        }
+        ```
+
+*   **Error Type: Action Not Allowed (`RES_FORBIDDEN`)**
+    When a user is a member of the group but does not have the required role privileges (e.g. a `Viewer` attempting to invite a member, or a `Member` attempting to update an expense created by another member):
+    *   **HTTP Status**: `403 Forbidden`
+    *   **Payload**:
+        ```json
+        {
+          "statusCode": 403,
+          "timestamp": "2026-06-09T22:49:00.000Z",
+          "path": "/api/v1/groups/2ab72e81-b20f-488f-a9cb-b2f5cf111818/members",
+          "errorCode": "RES_FORBIDDEN",
+          "message": "You do not have permission to perform this action.",
+          "retryable": false
+        }
+        ```
+
+#### 🛡️ Explicit Conflict Resolution & Boundary Safeguards
+
+*   **No Ambiguous Admin Promotions**: Admins cannot promote other members to `Admin` or demote current `Admins`. This prevents admin privilege escalation. Only the group `Owner` can manage Admin status.
+*   **Settlement Approvals Safeguard**: A settlement can ONLY be confirmed by the creditor (the user receiving the money). Group Owners, Admins, and standard members cannot confirm a settlement on behalf of others or confirm a settlement where they are the debtor (paying). Attempting to do so returns `RES_FORBIDDEN`.
+*   **Member Invites Settings**: Standard members can only invite other members if the group settings (managed by the Owner) permit member invites. If this setting is disabled, attempts by standard members to invite others return `RES_FORBIDDEN`.
+*   **Personal Scope Lock**: No group owner or admin can read or write another member's personal expenses or private notes. The authorization logic verifies `group_id` presence; if null, it resolves purely to individual user ownership checks.
 
 ### 🔒 Privacy Compliance
 - No tracking/ads.
@@ -678,14 +774,16 @@ All error responses from any API endpoint (HTTP status code >= 400) MUST conform
    - Keep tracking lightweight by using one Linear project during MVP planning.
    - Use this section for date-stamped progress entries instead of splitting history across multiple planning files.
 - **Next Actions:**
-    - Define encryption classifications and RBAC matrix detail.
+    - Define encryption boundary classifications.
 
 ### 2026-06-09
-- **Summary:** Froze initial API contracts for all core modules, defined global standards, error taxonomy, and pagination rules.
+- **Summary:** Froze initial API contracts, defined global standards, error taxonomy, pagination rules, and mapped the explicit RBAC Matrix and authorization behaviors.
 - **Changes Made:**
     - Added standard error payload schema and mappings under `API Error Taxonomy`.
     - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
     - Generated [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml) draft for the REST API.
+    - Replaced the placeholder at `System Design Details -> 2. RBAC Matrix` with group roles definition, permission matrix table, and contextual policy constraints.
+    - Added `Security & Privacy -> Authorization Behavior` with 403 error payload examples and boundary/conflict safeguards.
 - **Artifacts Updated:**
     - FinMate_Project_Specification.md
     - API.md
@@ -693,12 +791,13 @@ All error responses from any API endpoint (HTTP status code >= 400) MUST conform
 - **Decisions:**
     - Use URL-based versioning (`/api/v1`) for NestJS routing simplicity.
     - Maintain a standardized JSON error shape containing `errorCode` for ease of handling.
+    - Block group Admins from performing actions on other Admins or Owner, and restrict settlement confirmation to the creditor, Owner, or Admin (no self-settlement by debtor).
 - **Next Actions:**
-    - Draft structural design specifications for the group settlement algorithm.
+    - Draft structural design specifications for the encryption boundary table and group settlement algorithm.
 
 ---
 
-**Version:** 2.1 (Enhanced with API Contracts & Taxonomy)  
+**Version:** 2.2 (Enhanced with API Contracts, Error Taxonomy, & RBAC Matrix)  
 **Author:** Prvn Sahni  
 **Last Updated:** June 9, 2026  
 **Status:** Planning & Architecture Phase
