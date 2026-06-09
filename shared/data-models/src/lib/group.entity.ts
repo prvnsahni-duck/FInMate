@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, VersionColumn } from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('groups')
@@ -20,6 +20,9 @@ export class Group {
 
   @Column({ type: 'boolean', default: false })
   isArchived!: boolean;
+
+  @VersionColumn()
+  version!: number;
 
   @CreateDateColumn()
   createdAt!: Date;

@@ -2,7 +2,14 @@
   "name": "@finmate/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "db:up": "docker compose up -d || docker-compose up -d",
+    "db:down": "docker compose down || docker-compose down",
+    "db:migrate": "npx typeorm-ts-node-commonjs migration:run -d backend/src/ormconfig.ts",
+    "db:migrate:revert": "npx typeorm-ts-node-commonjs migration:revert -d backend/src/ormconfig.ts",
+    "start:dev": "npx nx serve backend",
+    "setup": "npm run db:up && npm run db:migrate && npm run start:dev"
+  },
   "private": true,
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",

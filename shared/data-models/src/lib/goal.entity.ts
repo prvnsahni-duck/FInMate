@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, VersionColumn } from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('goals')
@@ -26,6 +26,9 @@ export class Goal {
 
   @Column({ type: 'varchar', length: 20, default: 'active' })
   status!: 'active' | 'achieved' | 'paused' | 'cancelled';
+
+  @VersionColumn()
+  version!: number;
 
   @CreateDateColumn()
   createdAt!: Date;

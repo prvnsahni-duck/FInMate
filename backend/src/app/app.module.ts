@@ -3,12 +3,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { InitialSchema1717977600000 } from '../migrations/1717977600000-InitialSchema';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: '.env.dev',
+      envFilePath: ['.env', '.env.dev'],
     }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
@@ -17,6 +18,7 @@ import { AppService } from './app.service';
         url: configService.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
         synchronize: false, // never true in production
+        migrations: [InitialSchema1717977600000],
         migrationsRun: true,
       }),
       inject: [ConfigService],

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
 
@@ -36,6 +36,9 @@ export class Expense {
 
   @Column({ type: 'varchar', length: 20, default: 'posted' })
   status!: 'draft' | 'posted' | 'void';
+
+  @VersionColumn()
+  version!: number;
 
   @CreateDateColumn()
   createdAt!: Date;

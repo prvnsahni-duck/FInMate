@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, VersionColumn } from 'typeorm';
 import { Group } from './group.entity';
 import { User } from './user.entity';
 
@@ -30,6 +30,9 @@ export class Settlement {
 
   @Column({ type: 'text', nullable: true })
   note?: string;
+
+  @VersionColumn()
+  version!: number;
 
   @CreateDateColumn()
   createdAt!: Date;

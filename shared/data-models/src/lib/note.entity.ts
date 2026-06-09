@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, VersionColumn } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
 
@@ -21,6 +21,9 @@ export class Note {
 
   @Column({ type: 'varchar', length: 20 })
   visibility!: 'private' | 'group';
+
+  @VersionColumn()
+  version!: number;
 
   @CreateDateColumn()
   createdAt!: Date;
