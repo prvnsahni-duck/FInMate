@@ -3,7 +3,8 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
 import { User, Profile } from '@finmate/data-models';
 import { Repository, DataSource } from 'typeorm';
-import { ConflictException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
+import { EncryptionService } from '../encryption/encryption.service';
 import * as argon2 from 'argon2';
 
 jest.mock('argon2');
@@ -13,6 +14,7 @@ describe('UsersService', () => {
   let userRepository: jest.Mocked<Repository<User>>;
   let profileRepository: jest.Mocked<Repository<Profile>>;
   let dataSource: jest.Mocked<DataSource>;
+  let encryptionService: jest.Mocked<EncryptionService>;
 
   beforeEach(async () => {
     const mockRepository = {
@@ -30,12 +32,18 @@ describe('UsersService', () => {
       transaction: jest.fn((cb) => cb(mockManager)),
     };
 
+    const mockEncryptionService = {
+      encrypt: jest.fn((text) => `encrypted:${text}`),
+      decrypt: jest.fn((cipher) => cipher.replace('encrypted:', '')),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
         { provide: getRepositoryToken(User), useValue: mockRepository },
         { provide: getRepositoryToken(Profile), useValue: mockRepository },
         { provide: DataSource, useValue: mockDataSource },
+        { provide: EncryptionService, useValue: mockEncryptionService },
       ],
     }).compile();
 
@@ -43,6 +51,7 @@ describe('UsersService', () => {
     userRepository = module.get(getRepositoryToken(User));
     profileRepository = module.get(getRepositoryToken(Profile));
     dataSource = module.get(DataSource);
+    encryptionService = module.get(EncryptionService);
   });
 
   it('should be defined', () => {
@@ -70,6 +79,73 @@ describe('UsersService', () => {
       expect(result.email).toBe('test@example.com');
       expect(result.passwordHash).toBe('hashed-password');
       expect(result.displayName).toBe('Test User');
+    });
+  });
+
+  describe('findProfileByUserId', () => {
+    it('should return null if profile not found', async () => {
+      profileRepository.findOne.mockResolvedValue(null);
+
+      const result = await service.findProfileByUserId('user-id');
+      expect(result).toBeNull();
+    });
+
+    it('should return profile and decrypt avatarUrl if set', async () => {
+      const mockProfile = {
+        id: 'profile-id',
+        avatarUrl: 'encrypted:https://example.com/avatar.png',
+      } as any;
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      const result = await service.findProfileByUserId('user-id');
+      expect(result).toBeDefined();
+      expect(result?.avatarUrl).toBe('https://example.com/avatar.png');
+      expect(encryptionService.decrypt).toHaveBeenCalledWith('encrypted:https://example.com/avatar.png');
+    });
+  });
+
+  describe('updateProfile', () => {
+    it('should throw NotFoundException if user not found', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.updateProfile('user-id', {})).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if profile not found', async () => {
+      userRepository.findOne.mockResolvedValue({ id: 'user-id' } as any);
+      profileRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.updateProfile('user-id', {})).rejects.toThrow(NotFoundException);
+    });
+
+    it('should update user and profile settings, encrypting avatarUrl', async () => {
+      const mockUser = {
+        id: 'user-id',
+        displayName: 'Old Name',
+      } as any;
+
+      const mockProfile = {
+        id: 'profile-id',
+        locale: 'en-IN',
+        avatarUrl: undefined,
+      } as any;
+
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+      userRepository.save.mockResolvedValue(mockUser);
+      profileRepository.save.mockResolvedValue(mockProfile);
+
+      const result = await service.updateProfile('user-id', {
+        displayName: 'New Name',
+        avatarUrl: 'https://example.com/new.png',
+        locale: 'en-US',
+      });
+
+      expect(mockUser.displayName).toBe('New Name');
+      expect(mockProfile.locale).toBe('en-US');
+      expect(encryptionService.encrypt).toHaveBeenCalledWith('https://example.com/new.png');
+      expect(result.user.displayName).toBe('New Name');
+      expect(result.profile.avatarUrl).toBe('https://example.com/new.png');
     });
   });
 });

@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { User } from '@finmate/data-models';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
@@ -18,6 +19,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly encryptionService: EncryptionService,
   ) {
     this.jwtSecret = this.configService.get<string>('JWT_SECRET') || 'default_jwt_secret';
     this.jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET') || 'default_jwt_refresh_secret';
@@ -52,7 +54,8 @@ export class AuthService {
         });
       }
 
-      const isMfaValid = verifyTotp(user.twoFactorSecret || '', mfaCode);
+      const decryptedSecret = user.twoFactorSecret ? this.encryptionService.decrypt(user.twoFactorSecret) : '';
+      const isMfaValid = verifyTotp(decryptedSecret, mfaCode);
       if (!isMfaValid) {
         throw new BadRequestException({
           errorCode: 'AUTH_MFA_INVALID',
@@ -82,7 +85,7 @@ export class AuthService {
 
   async enable2Fa(user: User) {
     const secret = generateSecret();
-    user.twoFactorSecret = secret;
+    user.twoFactorSecret = this.encryptionService.encrypt(secret);
     user.isTwoFactorEnabled = false; // pending verification
     await this.usersService.updateUser(user);
 
@@ -101,7 +104,8 @@ export class AuthService {
       });
     }
 
-    const isValid = verifyTotp(user.twoFactorSecret, code);
+    const decryptedSecret = this.encryptionService.decrypt(user.twoFactorSecret);
+    const isValid = verifyTotp(decryptedSecret, code);
     if (!isValid) {
       throw new BadRequestException({
         errorCode: 'AUTH_MFA_INVALID',
@@ -122,7 +126,8 @@ export class AuthService {
       });
     }
 
-    const isValid = verifyTotp(user.twoFactorSecret, code);
+    const decryptedSecret = this.encryptionService.decrypt(user.twoFactorSecret);
+    const isValid = verifyTotp(decryptedSecret, code);
     if (!isValid) {
       throw new BadRequestException({
         errorCode: 'AUTH_MFA_INVALID',
