@@ -4,8 +4,9 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
-import { UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { generateTotp } from './utils/totp.util';
 
 jest.mock('argon2');
 
@@ -115,13 +116,14 @@ describe('AuthService', () => {
       );
     });
 
-    it('should return token pair and user if credentials are valid', async () => {
+    it('should return token pair and user if credentials are valid and 2FA not enabled', async () => {
       const mockUser = {
         id: 'user-id',
         email: 'test@example.com',
         displayName: 'Test User',
         status: 'active',
         passwordHash: 'hashed',
+        isTwoFactorEnabled: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any;
@@ -146,6 +148,139 @@ describe('AuthService', () => {
           updatedAt: mockUser.updatedAt,
         },
       });
+    });
+
+    it('should throw ForbiddenException if 2FA is enabled but code is missing', async () => {
+      const mockUser = {
+        id: 'user-id',
+        email: 'test@example.com',
+        status: 'active',
+        passwordHash: 'hashed',
+        isTwoFactorEnabled: true,
+        twoFactorSecret: 'KVKFKRCSN5RHK33O',
+      } as any;
+
+      usersService.findByEmail.mockResolvedValue(mockUser);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login('test@example.com', 'password')).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw BadRequestException if 2FA is enabled but code is invalid', async () => {
+      const mockUser = {
+        id: 'user-id',
+        email: 'test@example.com',
+        status: 'active',
+        passwordHash: 'hashed',
+        isTwoFactorEnabled: true,
+        twoFactorSecret: 'KVKFKRCSN5RHK33O',
+      } as any;
+
+      usersService.findByEmail.mockResolvedValue(mockUser);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+
+      await expect(service.login('test@example.com', 'password', '111111')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should log in successfully if 2FA is enabled and correct code is provided', async () => {
+      const mockUser = {
+        id: 'user-id',
+        email: 'test@example.com',
+        displayName: 'Test User',
+        status: 'active',
+        passwordHash: 'hashed',
+        isTwoFactorEnabled: true,
+        twoFactorSecret: 'KVKFKRCSN5RHK33O',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any;
+
+      usersService.findByEmail.mockResolvedValue(mockUser);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+      jwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
+
+      const currentStep = Math.floor(Date.now() / 1000 / 30);
+      const correctCode = generateTotp('KVKFKRCSN5RHK33O', currentStep);
+
+      const result = await service.login('test@example.com', 'password', correctCode);
+
+      expect(result.accessToken).toBe('access-token');
+      expect(result.refreshToken).toBe('refresh-token');
+    });
+  });
+
+  describe('2FA Management', () => {
+    it('enable2Fa should generate secret and QR URL', async () => {
+      const mockUser = {
+        id: 'user-id',
+        email: 'test@example.com',
+        isTwoFactorEnabled: false,
+      } as any;
+
+      const result = await service.enable2Fa(mockUser);
+
+      expect(result.secret).toHaveLength(16);
+      expect(result.qrCodeUrl).toContain('otpauth://totp/FinMate:test@example.com');
+      expect(usersService.updateUser).toHaveBeenCalled();
+    });
+
+    it('verify2Fa should fail with invalid code', async () => {
+      const mockUser = {
+        id: 'user-id',
+        twoFactorSecret: 'KVKFKRCSN5RHK33O',
+        isTwoFactorEnabled: false,
+      } as any;
+
+      await expect(service.verify2Fa(mockUser, '000000')).rejects.toThrow(BadRequestException);
+    });
+
+    it('verify2Fa should succeed with valid code and enable 2FA', async () => {
+      const mockUser = {
+        id: 'user-id',
+        twoFactorSecret: 'KVKFKRCSN5RHK33O',
+        isTwoFactorEnabled: false,
+      } as any;
+
+      const currentStep = Math.floor(Date.now() / 1000 / 30);
+      const correctCode = generateTotp('KVKFKRCSN5RHK33O', currentStep);
+
+      const result = await service.verify2Fa(mockUser, correctCode);
+
+      expect(result.success).toBe(true);
+      expect(mockUser.isTwoFactorEnabled).toBe(true);
+      expect(usersService.updateUser).toHaveBeenCalledWith(mockUser);
+    });
+
+    it('disable2Fa should fail with invalid code', async () => {
+      const mockUser = {
+        id: 'user-id',
+        twoFactorSecret: 'KVKFKRCSN5RHK33O',
+        isTwoFactorEnabled: true,
+      } as any;
+
+      await expect(service.disable2Fa(mockUser, '000000')).rejects.toThrow(BadRequestException);
+    });
+
+    it('disable2Fa should succeed with valid code and disable 2FA', async () => {
+      const mockUser = {
+        id: 'user-id',
+        twoFactorSecret: 'KVKFKRCSN5RHK33O',
+        isTwoFactorEnabled: true,
+      } as any;
+
+      const currentStep = Math.floor(Date.now() / 1000 / 30);
+      const correctCode = generateTotp('KVKFKRCSN5RHK33O', currentStep);
+
+      const result = await service.disable2Fa(mockUser, correctCode);
+
+      expect(result.success).toBe(true);
+      expect(mockUser.isTwoFactorEnabled).toBe(false);
+      expect(mockUser.twoFactorSecret).toBeUndefined();
+      expect(usersService.updateUser).toHaveBeenCalledWith(mockUser);
     });
   });
 

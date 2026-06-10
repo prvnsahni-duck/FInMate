@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
@@ -6,6 +6,7 @@ import { RedisService } from '../redis/redis.service';
 import { User } from '@finmate/data-models';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
+import { generateSecret, verifyTotp } from './utils/totp.util';
 
 @Injectable()
 export class AuthService {
@@ -27,7 +28,7 @@ export class AuthService {
     return this.serializeUser(savedUser);
   }
 
-  async login(email: string, passwordPlain: string) {
+  async login(email: string, passwordPlain: string, mfaCode?: string) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -40,6 +41,24 @@ export class AuthService {
     const isPasswordCorrect = await argon2.verify(user.passwordHash, passwordPlain);
     if (!isPasswordCorrect) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Check Multi-Factor Authentication
+    if (user.isTwoFactorEnabled) {
+      if (!mfaCode) {
+        throw new ForbiddenException({
+          errorCode: 'AUTH_MFA_REQUIRED',
+          message: 'MFA verification required',
+        });
+      }
+
+      const isMfaValid = verifyTotp(user.twoFactorSecret || '', mfaCode);
+      if (!isMfaValid) {
+        throw new BadRequestException({
+          errorCode: 'AUTH_MFA_INVALID',
+          message: 'The provided 2FA verification code is invalid',
+        });
+      }
     }
 
     const refreshId = randomUUID();
@@ -59,6 +78,62 @@ export class AuthService {
       refreshToken,
       user: this.serializeUser(user),
     };
+  }
+
+  async enable2Fa(user: User) {
+    const secret = generateSecret();
+    user.twoFactorSecret = secret;
+    user.isTwoFactorEnabled = false; // pending verification
+    await this.usersService.updateUser(user);
+
+    const qrCodeUrl = `otpauth://totp/FinMate:${user.email}?secret=${secret}&issuer=FinMate`;
+    return {
+      secret,
+      qrCodeUrl,
+    };
+  }
+
+  async verify2Fa(user: User, code: string) {
+    if (!user.twoFactorSecret) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: '2FA setup not initiated',
+      });
+    }
+
+    const isValid = verifyTotp(user.twoFactorSecret, code);
+    if (!isValid) {
+      throw new BadRequestException({
+        errorCode: 'AUTH_MFA_INVALID',
+        message: 'The provided 6-digit TOTP code failed verification',
+      });
+    }
+
+    user.isTwoFactorEnabled = true;
+    await this.usersService.updateUser(user);
+    return { success: true };
+  }
+
+  async disable2Fa(user: User, code: string) {
+    if (!user.isTwoFactorEnabled || !user.twoFactorSecret) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: '2FA is not enabled on this account',
+      });
+    }
+
+    const isValid = verifyTotp(user.twoFactorSecret, code);
+    if (!isValid) {
+      throw new BadRequestException({
+        errorCode: 'AUTH_MFA_INVALID',
+        message: 'The provided 6-digit TOTP code failed verification',
+      });
+    }
+
+    user.isTwoFactorEnabled = false;
+    user.twoFactorSecret = undefined;
+    await this.usersService.updateUser(user);
+    return { success: true };
   }
 
   async refresh(refreshToken: string) {
