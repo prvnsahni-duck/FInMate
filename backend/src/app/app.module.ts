@@ -8,6 +8,7 @@ import { AddTwoFactorAuth1718000000000 } from '../migrations/1718000000000-AddTw
 import { SnakeNamingStrategy } from './common/snake-naming-strategy';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
+import { GroupsModule } from './groups/groups.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { UsersModule } from './users/users.module';
     }),
     AuthModule,
     UsersModule,
+    GroupsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
