@@ -4,6 +4,7 @@ import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
+import { EncryptionService } from '../encryption/encryption.service';
 import { UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { generateTotp } from './utils/totp.util';
@@ -15,6 +16,7 @@ describe('AuthService', () => {
   let usersService: jest.Mocked<UsersService>;
   let jwtService: jest.Mocked<JwtService>;
   let redisService: jest.Mocked<RedisService>;
+  let encryptionService: jest.Mocked<EncryptionService>;
 
   beforeEach(async () => {
     const mockUsersService = {
@@ -44,6 +46,11 @@ describe('AuthService', () => {
       }),
     };
 
+    const mockEncryptionService = {
+      encrypt: jest.fn((val) => `encrypted:${val}`),
+      decrypt: jest.fn((val) => val.replace('encrypted:', '')),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -51,6 +58,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RedisService, useValue: mockRedisService },
+        { provide: EncryptionService, useValue: mockEncryptionService },
       ],
     }).compile();
 
@@ -58,6 +66,7 @@ describe('AuthService', () => {
     usersService = module.get(UsersService);
     jwtService = module.get(JwtService);
     redisService = module.get(RedisService);
+    encryptionService = module.get(EncryptionService);
   });
 
   it('should be defined', () => {

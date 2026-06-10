@@ -17,9 +17,15 @@ describe('UsersService', () => {
   let encryptionService: jest.Mocked<EncryptionService>;
 
   beforeEach(async () => {
-    const mockRepository = {
+    const mockUserRepository = {
       findOne: jest.fn(),
-      save: jest.fn(),
+      save: jest.fn(async (data) => data),
+      create: jest.fn((entity, data) => data),
+    };
+
+    const mockProfileRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(async (data) => data),
       create: jest.fn((entity, data) => data),
     };
 
@@ -40,8 +46,8 @@ describe('UsersService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         UsersService,
-        { provide: getRepositoryToken(User), useValue: mockRepository },
-        { provide: getRepositoryToken(Profile), useValue: mockRepository },
+        { provide: getRepositoryToken(User), useValue: mockUserRepository },
+        { provide: getRepositoryToken(Profile), useValue: mockProfileRepository },
         { provide: DataSource, useValue: mockDataSource },
         { provide: EncryptionService, useValue: mockEncryptionService },
       ],
