@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, PreconditionFailedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
-import { Group, GroupMember, Expense, ExpenseSplit, Settlement } from '@finmate/data-models';
+import { Group, GroupMember, Expense, ExpenseSplit, Settlement, ProposeSettlementDto, UpdateSettlementDto } from '@finmate/data-models';
+import { paginate, PaginatedResponse } from '../common/pagination.util';
 
 export interface MemberBalance {
   userId: string;
@@ -227,5 +228,127 @@ export class SettlementsService {
       balances: finalBalances,
       suggestedSettlements: finalSuggestedSettlements,
     };
+  }
+
+  async proposeSettlement(userId: string, groupId: string, dto: ProposeSettlementDto): Promise<Settlement> {
+    // 1. Validate caller active membership in group
+    const callerMember = await this.groupMemberRepository.findOne({
+      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+      relations: ['user'],
+    });
+    if (!callerMember) {
+      throw new ForbiddenException('You do not have access to this group');
+    }
+
+    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
+
+    // 2. Validate recipient active/invited membership in group
+    const recipientMember = await this.groupMemberRepository.findOne({
+      where: { group: { id: groupId }, user: { id: dto.toUserId }, joinStatus: In(['active', 'invited']) },
+      relations: ['user'],
+    });
+    if (!recipientMember) {
+      throw new BadRequestException('Recipient is not a member of this group');
+    }
+
+    // Proposer is the fromUser (caller)
+    const settlement = this.settlementRepository.create({
+      group,
+      fromUser: callerMember.user,
+      toUser: recipientMember.user,
+      amount: dto.amount,
+      currency: dto.currency,
+      status: 'proposed',
+      note: dto.note,
+    });
+
+    return this.settlementRepository.save(settlement);
+  }
+
+  async listSettlements(
+    userId: string,
+    groupId: string,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResponse<Settlement>> {
+    // Validate caller active membership
+    const callerMember = await this.groupMemberRepository.findOne({
+      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+    });
+    if (!callerMember) {
+      throw new ForbiddenException('You do not have access to this group');
+    }
+
+    const query = this.settlementRepository
+      .createQueryBuilder('settlement')
+      .leftJoinAndSelect('settlement.fromUser', 'fromUser')
+      .leftJoinAndSelect('settlement.toUser', 'toUser')
+      .where('settlement.groupId = :groupId', { groupId })
+      .orderBy('settlement.createdAt', 'DESC');
+
+    const total = await query.getCount();
+    const settlements = await query
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getMany();
+
+    return paginate(settlements, total, page, limit, `/api/v1/groups/${groupId}/settlements`);
+  }
+
+  async updateSettlement(
+    userId: string,
+    groupId: string,
+    id: string,
+    dto: UpdateSettlementDto,
+  ): Promise<Settlement> {
+    // Validate caller active membership
+    const callerMember = await this.groupMemberRepository.findOne({
+      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+    });
+    if (!callerMember) {
+      throw new ForbiddenException('You do not have access to this group');
+    }
+
+    const settlement = await this.settlementRepository.findOne({
+      where: { id, group: { id: groupId } },
+      relations: ['fromUser', 'toUser'],
+    });
+    if (!settlement) {
+      throw new NotFoundException('Settlement not found');
+    }
+
+    // Concurrency control: verify version matches
+    if (settlement.version !== dto.version) {
+      throw new PreconditionFailedException({
+        errorCode: 'CON_VERSION_CONFLICT',
+        message: 'Version conflict: the resource has been modified by another request',
+      });
+    }
+
+    if (dto.status === 'confirmed') {
+      // ONLY the creditor (toUser) can confirm receipt
+      if (settlement.toUser.id !== userId) {
+        throw new ForbiddenException({
+          errorCode: 'RES_FORBIDDEN',
+          message: 'Only the creditor can confirm receipt of the settlement',
+        });
+      }
+      settlement.status = 'confirmed';
+      settlement.settledOn = dto.settledOn || new Date().toISOString().split('T')[0];
+    } else if (dto.status === 'cancelled') {
+      // Either debtor (fromUser) or creditor (toUser) can cancel
+      if (settlement.fromUser.id !== userId && settlement.toUser.id !== userId) {
+        throw new ForbiddenException({
+          errorCode: 'RES_FORBIDDEN',
+          message: 'Only the debtor or creditor can cancel the settlement',
+        });
+      }
+      settlement.status = 'cancelled';
+    }
+
+    return this.settlementRepository.save(settlement);
   }
 }
