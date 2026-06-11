@@ -1,0 +1,121 @@
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, DataSource } from 'typeorm';
+import { User, Profile, UpdateProfileDto } from '@finmate/data-models';
+import { EncryptionService } from '../encryption/encryption.service';
+import * as argon2 from 'argon2';
+
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    @InjectRepository(Profile)
+    private readonly profileRepository: Repository<Profile>,
+    private readonly dataSource: DataSource,
+    private readonly encryptionService: EncryptionService,
+  ) {}
+
+  async createUser(email: string, passwordPlain: string, displayName?: string): Promise<User> {
+    const existing = await this.userRepository.findOne({ where: { email } });
+    if (existing) {
+      // mapped by global filter to RES_ALREADY_EXISTS
+      throw new ConflictException('User with this email already exists');
+    }
+
+    const passwordHash = await argon2.hash(passwordPlain);
+
+    return this.dataSource.transaction(async (manager) => {
+      const user = manager.create(User, {
+        email,
+        passwordHash,
+        displayName,
+        status: 'active',
+      });
+      const savedUser = await manager.save(User, user);
+
+      const profile = manager.create(Profile, {
+        user: savedUser,
+        defaultCurrency: 'INR',
+        locale: 'en-IN',
+        timezone: 'Asia/Kolkata',
+      });
+      await manager.save(Profile, profile);
+
+      return savedUser;
+    });
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { email } });
+  }
+
+  async findById(id: string): Promise<User | null> {
+    return this.userRepository.findOne({ where: { id } });
+  }
+
+  async updateUser(user: User): Promise<User> {
+    return this.userRepository.save(user);
+  }
+
+  async findProfileByUserId(userId: string): Promise<Profile | null> {
+    const profile = await this.profileRepository.findOne({
+      where: { user: { id: userId } },
+    });
+    if (!profile) return null;
+    return this.decryptProfile(profile);
+  }
+
+  async updateProfile(userId: string, data: UpdateProfileDto): Promise<{ user: User; profile: Profile }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const profile = await this.profileRepository.findOne({
+      where: { user: { id: userId } },
+    });
+    if (!profile) {
+      throw new NotFoundException('Profile not found');
+    }
+
+    if (data.displayName !== undefined) {
+      user.displayName = data.displayName;
+      await this.userRepository.save(user);
+    }
+
+    if (data.locale !== undefined) {
+      profile.locale = data.locale;
+    }
+    if (data.timezone !== undefined) {
+      profile.timezone = data.timezone;
+    }
+    if (data.defaultCurrency !== undefined) {
+      profile.defaultCurrency = data.defaultCurrency;
+    }
+    if (data.monthlyBudget !== undefined) {
+      profile.monthlyBudget = data.monthlyBudget;
+    }
+    if (data.avatarUrl !== undefined) {
+      profile.avatarUrl = data.avatarUrl ? this.encryptionService.encrypt(data.avatarUrl) : undefined;
+    }
+
+    const savedProfile = await this.profileRepository.save(profile);
+
+    return {
+      user,
+      profile: this.decryptProfile(savedProfile),
+    };
+  }
+
+  private decryptProfile(profile: Profile): Profile {
+    if (profile.avatarUrl) {
+      try {
+        profile.avatarUrl = this.encryptionService.decrypt(profile.avatarUrl);
+      } catch (err) {
+        // Fallback to original value if decryption fails (e.g. if database has unencrypted values)
+      }
+    }
+    return profile;
+  }
+}
