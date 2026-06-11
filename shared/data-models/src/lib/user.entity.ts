@@ -20,6 +20,12 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   lastLoginAt?: Date;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  twoFactorSecret?: string;
+
+  @Column({ type: 'boolean', default: false })
+  isTwoFactorEnabled!: boolean;
+
   @CreateDateColumn()
   createdAt!: Date;
 

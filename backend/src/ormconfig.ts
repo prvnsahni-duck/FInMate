@@ -12,6 +12,8 @@ import { Goal } from '../../shared/data-models/src/lib/goal.entity';
 import { Attachment } from '../../shared/data-models/src/lib/attachment.entity';
 import { AuditLog } from '../../shared/data-models/src/lib/audit-log.entity';
 import { InitialSchema1717977600000 } from './migrations/1717977600000-InitialSchema';
+import { AddTwoFactorAuth1718000000000 } from './migrations/1718000000000-AddTwoFactorAuth';
+import { SnakeNamingStrategy } from './app/common/snake-naming-strategy';
 
 dotenv.config({ path: '.env' });
 if (!process.env.DATABASE_URL) {
@@ -34,6 +36,7 @@ export default new DataSource({
     Attachment,
     AuditLog
   ],
-  migrations: [InitialSchema1717977600000],
+  migrations: [InitialSchema1717977600000, AddTwoFactorAuth1718000000000],
+  namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,
 });

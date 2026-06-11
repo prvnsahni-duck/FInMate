@@ -23,6 +23,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
         message = resBody;
       } else if (typeof resBody === 'object' && resBody !== null) {
         message = resBody.message || exception.message;
+        if (resBody.errorCode) {
+          errorCode = resBody.errorCode;
+        }
 
         // Extract class-validator array formatting
         if (statusCode === HttpStatus.BAD_REQUEST && Array.isArray(resBody.message)) {
