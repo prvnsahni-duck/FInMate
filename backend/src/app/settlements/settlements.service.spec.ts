@@ -21,6 +21,11 @@ describe('SettlementsService', () => {
     const mockGroupMemberRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
+      createQueryBuilder: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockImplementation(() => mockGroupMemberRepository.findOne()),
+      })),
     };
 
     const mockExpenseRepository = {

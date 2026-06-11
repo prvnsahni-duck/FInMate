@@ -47,8 +47,8 @@ export class GroupsService {
   ): Promise<PaginatedResponse<Group>> {
     const query = this.groupRepository
       .createQueryBuilder('group')
-      .innerJoin(GroupMember, 'member', 'member.groupId = group.id')
-      .where('member.userId = :userId', { userId })
+      .innerJoin(GroupMember, 'member', 'member.group = group.id')
+      .where('member.user = :userId', { userId })
       .andWhere('member.joinStatus = :status', { status: 'active' });
 
     if (isArchived !== undefined) {
@@ -65,9 +65,12 @@ export class GroupsService {
   }
 
   async findGroupById(userId: string, groupId: string): Promise<Group> {
-    const membership = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
-    });
+    const membership = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group = :groupId', { groupId })
+      .andWhere('member.user = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
     if (!membership) {
       const groupExists = await this.groupRepository.findOne({ where: { id: groupId } });
       if (!groupExists) {
@@ -84,9 +87,12 @@ export class GroupsService {
   }
 
   async updateGroup(userId: string, groupId: string, dto: UpdateGroupDto): Promise<Group> {
-    const membership = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
-    });
+    const membership = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group = :groupId', { groupId })
+      .andWhere('member.user = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
     if (!membership) {
       throw new ForbiddenException('You do not have access to this group');
     }
@@ -131,9 +137,12 @@ export class GroupsService {
   }
 
   async inviteMember(userId: string, groupId: string, dto: InviteMemberDto): Promise<GroupMember> {
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
-    });
+    const callerMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group = :groupId', { groupId })
+      .andWhere('member.user = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
     if (!callerMember || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
       throw new ForbiddenException('Only owners and admins can invite members');
     }
@@ -156,10 +165,12 @@ export class GroupsService {
     }
 
     // Check existing membership
-    const existingMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: targetUser.id } },
-      relations: ['user'],
-    });
+    const existingMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .leftJoinAndSelect('member.user', 'user')
+      .where('member.group = :groupId', { groupId })
+      .andWhere('member.user = :targetUserId', { targetUserId: targetUser.id })
+      .getOne();
 
     if (existingMember) {
       if (existingMember.joinStatus === 'active' || existingMember.joinStatus === 'invited') {
@@ -187,9 +198,12 @@ export class GroupsService {
   }
 
   async listMembers(userId: string, groupId: string): Promise<GroupMember[]> {
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
-    });
+    const callerMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group = :groupId', { groupId })
+      .andWhere('member.user = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
     if (!callerMember) {
       throw new ForbiddenException('You do not have access to this group');
     }
@@ -208,9 +222,11 @@ export class GroupsService {
     memberId: string,
     dto: UpdateMemberDto,
   ): Promise<GroupMember> {
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId } },
-    });
+    const callerMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group = :groupId', { groupId })
+      .andWhere('member.user = :userId', { userId })
+      .getOne();
     if (!callerMember) {
       throw new ForbiddenException('You do not have access to this group');
     }
@@ -218,10 +234,12 @@ export class GroupsService {
       throw new ForbiddenException('You do not have access to this group');
     }
 
-    const targetMember = await this.groupMemberRepository.findOne({
-      where: { id: memberId, group: { id: groupId } },
-      relations: ['user'],
-    });
+    const targetMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .leftJoinAndSelect('member.user', 'user')
+      .where('member.id = :memberId', { memberId })
+      .andWhere('member.group = :groupId', { groupId })
+      .getOne();
     if (!targetMember) {
       throw new NotFoundException('Member record not found');
     }
@@ -298,9 +316,11 @@ export class GroupsService {
   }
 
   async removeMember(userId: string, groupId: string, memberId: string): Promise<void> {
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId } },
-    });
+    const callerMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group = :groupId', { groupId })
+      .andWhere('member.user = :userId', { userId })
+      .getOne();
     if (!callerMember) {
       throw new ForbiddenException('You do not have access to this group');
     }
@@ -308,10 +328,12 @@ export class GroupsService {
       throw new ForbiddenException('You do not have access to this group');
     }
 
-    const targetMember = await this.groupMemberRepository.findOne({
-      where: { id: memberId, group: { id: groupId } },
-      relations: ['user'],
-    });
+    const targetMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .leftJoinAndSelect('member.user', 'user')
+      .where('member.id = :memberId', { memberId })
+      .andWhere('member.group = :groupId', { groupId })
+      .getOne();
     if (!targetMember) {
       throw new NotFoundException('Member record not found');
     }

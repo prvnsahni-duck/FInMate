@@ -14,6 +14,9 @@
         "browser": "frontend/src/main.ts",
         "tsConfig": "frontend/tsconfig.app.json",
         "inlineStyleLanguage": "scss",
+        "polyfills": [
+          "zone.js"
+        ],
         "assets": [
           {
             "glob": "**/*",

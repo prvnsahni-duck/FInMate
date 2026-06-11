@@ -374,15 +374,15 @@ export class ExpensesService {
       .leftJoinAndSelect('expense.group', 'group')
       .where(
         new Brackets((qb) => {
-          qb.where('(expense.ownerUserId = :userId AND expense.groupId IS NULL)', { userId });
+          qb.where('(ownerUser.id = :userId AND group.id IS NULL)', { userId });
           if (membershipGroupIds.length > 0) {
-            qb.orWhere('expense.groupId IN (:...groupIds)', { groupIds: membershipGroupIds });
+            qb.orWhere('group.id IN (:...groupIds)', { groupIds: membershipGroupIds });
           }
         }),
       );
 
     if (params.groupId) {
-      query.andWhere('expense.groupId = :groupId', { groupId: params.groupId });
+      query.andWhere('group.id = :groupId', { groupId: params.groupId });
     }
 
     if (params.category) {

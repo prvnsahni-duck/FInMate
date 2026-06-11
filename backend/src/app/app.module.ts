@@ -13,6 +13,7 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { SettlementsModule } from './settlements/settlements.module';
 import { ImportModule } from './import/import.module';
 import { AiModule } from './ai/ai.module';
+import { Note, Goal, AuditLog } from '@finmate/data-models';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { AiModule } from './ai/ai.module';
       isGlobal: true,
       envFilePath: ['.env', '.env.dev'],
     }),
+    TypeOrmModule.forFeature([Note, Goal, AuditLog]),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

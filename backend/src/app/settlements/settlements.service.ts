@@ -106,9 +106,12 @@ export class SettlementsService {
 
   async calculateGroupBalances(userId: string, groupId: string) {
     // 1. Verify access: caller must have active membership
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
-    });
+    const callerMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group = :groupId', { groupId })
+      .andWhere('member.user = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
     if (!callerMember) {
       throw new ForbiddenException('You do not have access to this group');
     }
@@ -286,7 +289,7 @@ export class SettlementsService {
       .createQueryBuilder('settlement')
       .leftJoinAndSelect('settlement.fromUser', 'fromUser')
       .leftJoinAndSelect('settlement.toUser', 'toUser')
-      .where('settlement.groupId = :groupId', { groupId })
+      .where('settlement.group = :groupId', { groupId })
       .orderBy('settlement.createdAt', 'DESC');
 
     const total = await query.getCount();

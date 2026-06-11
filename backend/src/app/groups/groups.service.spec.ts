@@ -36,6 +36,12 @@ describe('GroupsService', () => {
       find: jest.fn(),
       save: jest.fn(),
       create: jest.fn((entity, data) => data),
+      createQueryBuilder: jest.fn(() => ({
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        getOne: jest.fn().mockImplementation(() => mockGroupMemberRepository.findOne()),
+      })),
     };
 
     const mockManager = {

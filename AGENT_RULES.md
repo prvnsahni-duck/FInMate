@@ -10,6 +10,7 @@
 
 ### Rule 1 — Ask Before Implementing
 If **any** of the following are unclear, stop and ask the user before writing a single line of code:
+- If the user's request is not specific to the issue or lacks sufficient details (ask clarifying questions instead of guessing or making assumptions)
 - Which technology / library / package to use for a given concern
 - Whether a dependency is already installed or needs to be added
 - Whether a UI component should be built from scratch or reuse an existing one
@@ -88,6 +89,9 @@ We use a hybrid approach leveraging **Signals**, **RxJS**, and **NGXS** dependin
 ---
 
 ## 📐 Coding Standards
+
+### General
+- **Use Latest Stable Features** — Always use the latest stable syntax and features from the libraries being used (provided they are officially stable and supported by the organization).
 
 ### TypeScript
 - **No `any` types** — use `unknown` with type guards, or explicit generics.
