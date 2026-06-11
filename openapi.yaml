@@ -1,0 +1,2252 @@
+openapi: 3.0.3
+info:
+  title: FinMate API
+  description: |
+    API Contract for FinMate, a Personal Finance & Lifestyle Companion.
+    Provides endpoints for Auth, Users, Groups, Expenses, Settlements, Notes, Goals, and Import/Export.
+    
+    ### Versioning Strategy
+    URL-based versioning is used. All paths start with `/api/v1`.
+    
+    ### Pagination & Filtering
+    Paginated GET endpoints support standard query parameters:
+    * `page`: 1-based page index (default: `1`)
+    * `limit`: Page size (default: `20`, max: `100`)
+    * `cursor`: Cursor string (for cursor-based pagination on rapidly updated lists like Expenses and Audit Logs)
+  version: 1.0.0
+servers:
+  - url: /api/v1
+    description: Local Dev Server
+
+paths:
+  /auth/register:
+    post:
+      summary: Register a new user
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  minLength: 8
+                  example: securePassword123!
+                displayName:
+                  type: string
+                  maxLength: 120
+                  example: John Doe
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+
+  /auth/login:
+    post:
+      summary: Login user and retrieve JWT tokens
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+                password:
+                  type: string
+                  format: password
+                  example: securePassword123!
+                deviceId:
+                  type: string
+                  example: "web-client-chrome-1234"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - accessToken
+                  - refreshToken
+                  - user
+                properties:
+                  accessToken:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refreshToken:
+                    type: string
+                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/refresh:
+    post:
+      summary: Refresh access token using a valid refresh token
+      tags:
+        - Auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Tokens refreshed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - accessToken
+                  - refreshToken
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/logout:
+    post:
+      summary: Invalidate user session
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Logout successful
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/2fa/enable:
+    post:
+      summary: Initiate 2FA TOTP setup
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 2FA initialization details returned
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - secret
+                  - qrCodeUrl
+                properties:
+                  secret:
+                    type: string
+                    example: "KVKFKRCSN5RHK33O"
+                  qrCodeUrl:
+                    type: string
+                    example: "otpauth://totp/FinMate:user@example.com?secret=KVKFKRCSN5RHK33O&issuer=FinMate"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/2fa/verify:
+    post:
+      summary: Verify and complete 2FA setup
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  pattern: "^[0-9]{6}$"
+                  example: "123456"
+      responses:
+        '200':
+          description: 2FA enabled successfully
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /auth/2fa/disable:
+    post:
+      summary: Disable 2FA for the account
+      tags:
+        - Auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  type: string
+                  pattern: "^[0-9]{6}$"
+                  example: "123456"
+      responses:
+        '204':
+          description: 2FA disabled successfully
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /users/me:
+    get:
+      summary: Get current user profile
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile details
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - user
+                  - profile
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  profile:
+                    $ref: '#/components/schemas/Profile'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    patch:
+      summary: Update user profile
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName:
+                  type: string
+                  maxLength: 120
+                avatarUrl:
+                  type: string
+                  format: uri
+                locale:
+                  type: string
+                  example: "en-IN"
+                timezone:
+                  type: string
+                  example: "Asia/Kolkata"
+                defaultCurrency:
+                  type: string
+                  maxLength: 3
+                  example: "INR"
+                monthlyBudget:
+                  type: number
+                  minimum: 0
+                  example: 50000.00
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - user
+                  - profile
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserResponse'
+                  profile:
+                    $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    delete:
+      summary: Deactivate user account
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Account deactivated successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /groups:
+    post:
+      summary: Create an expense group
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  maxLength: 120
+                  example: "Flatmates Goa Trip"
+                description:
+                  type: string
+                  example: "Sharing expenses for our trip to Goa"
+                visibility:
+                  type: string
+                  enum: [private, invite_only, public_readonly]
+                  default: private
+      responses:
+        '201':
+          description: Group created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    get:
+      summary: List groups current user is a member of
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: isArchived
+          in: query
+          schema:
+            type: boolean
+          required: false
+      responses:
+        '200':
+          description: List of groups
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /groups/{id}:
+    get:
+      summary: Get details of a group
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      summary: Update group metadata or archive group
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                name:
+                  type: string
+                  maxLength: 120
+                description:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [private, invite_only, public_readonly]
+                isArchived:
+                  type: boolean
+                version:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Group updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Group'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /groups/{id}/members:
+    post:
+      summary: Invite or add a member to the group
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - role
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: friend@example.com
+                role:
+                  type: string
+                  enum: [admin, member, viewer]
+                  default: member
+      responses:
+        '201':
+          description: Member added/invited successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMember'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+    get:
+      summary: List all members of the group
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of group members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupMember'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /groups/{id}/members/{memberId}:
+    patch:
+      summary: Update a group member role or join status
+      description: |
+        Used by admins to modify member roles, or by the member themselves to accept/decline/leave group.
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role:
+                  type: string
+                  enum: [owner, admin, member, viewer]
+                joinStatus:
+                  type: string
+                  enum: [invited, active, left, removed]
+      responses:
+        '200':
+          description: Member updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GroupMember'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      summary: Remove a member from the group or leave the group
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: memberId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Member removed successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /expenses:
+    post:
+      summary: Create a personal or group expense
+      tags:
+        - Expenses
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - amountTotal
+                - currency
+                - category
+                - paidByUserId
+                - expenseDate
+                - splits
+              properties:
+                title:
+                  type: string
+                  maxLength: 160
+                  example: "Dinner at Taj"
+                description:
+                  type: string
+                  example: "Celebration dinner"
+                amountTotal:
+                  type: number
+                  format: float
+                  example: 4500.00
+                currency:
+                  type: string
+                  maxLength: 3
+                  example: "INR"
+                category:
+                  type: string
+                  example: "Food"
+                paidByUserId:
+                  type: string
+                  format: uuid
+                groupId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                expenseDate:
+                  type: string
+                  format: date
+                  example: "2026-06-09"
+                status:
+                  type: string
+                  enum: [draft, posted, void]
+                  default: posted
+                splits:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ExpenseSplitInput'
+                attachmentKeys:
+                  type: array
+                  items:
+                    type: string
+                  example: ["receipts/20260609_taj.jpg"]
+      responses:
+        '201':
+          description: Expense created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    get:
+      summary: List expenses with pagination and filtering
+      tags:
+        - Expenses
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          required: false
+        - name: groupId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          required: false
+        - name: category
+          in: query
+          schema:
+            type: string
+          required: false
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          required: false
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          required: false
+      responses:
+        '200':
+          description: List of expenses
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ExpenseResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /expenses/{id}:
+    get:
+      summary: Retrieve specific expense details
+      tags:
+        - Expenses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Expense details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      summary: Update expense details and splits
+      tags:
+        - Expenses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                title:
+                  type: string
+                  maxLength: 160
+                description:
+                  type: string
+                amountTotal:
+                  type: number
+                currency:
+                  type: string
+                  maxLength: 3
+                category:
+                  type: string
+                paidByUserId:
+                  type: string
+                  format: uuid
+                expenseDate:
+                  type: string
+                  format: date
+                status:
+                  type: string
+                  enum: [draft, posted, void]
+                splits:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ExpenseSplitInput'
+                attachmentKeys:
+                  type: array
+                  items:
+                    type: string
+                version:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Expense updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpenseResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedError'
+    delete:
+      summary: Void or remove an expense
+      tags:
+        - Expenses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Expense voided or deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /groups/{groupId}/settlements:
+    post:
+      summary: Propose a new settlement balance payment
+      tags:
+        - Settlements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - toUserId
+                - amount
+                - currency
+              properties:
+                toUserId:
+                  type: string
+                  format: uuid
+                  example: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
+                amount:
+                  type: number
+                  example: 1250.00
+                currency:
+                  type: string
+                  maxLength: 3
+                  example: "INR"
+                note:
+                  type: string
+                  example: "Settling taj dinner"
+      responses:
+        '201':
+          description: Settlement proposed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settlement'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+    get:
+      summary: List settlements in a group
+      tags:
+        - Settlements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List of settlements
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Settlement'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /groups/{groupId}/settlements/balances:
+    get:
+      summary: Retrieve the simplified net balances for all members in the group
+      description: |
+        Calculates group ledger totals. Negative balance means you owe money; positive means you are owed money.
+      tags:
+        - Settlements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Calculated net balances and suggested direct settlements to resolve debts
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - balances
+                  - suggestedSettlements
+                properties:
+                  balances:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - userId
+                        - displayName
+                        - netBalance
+                        - currency
+                      properties:
+                        userId:
+                          type: string
+                          format: uuid
+                        displayName:
+                          type: string
+                        netBalance:
+                          type: number
+                          description: Positive indicates creditor, negative indicates debtor.
+                        currency:
+                          type: string
+                  suggestedSettlements:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - fromUserId
+                        - toUserId
+                        - amount
+                        - currency
+                      properties:
+                        fromUserId:
+                          type: string
+                          format: uuid
+                        toUserId:
+                          type: string
+                          format: uuid
+                        amount:
+                          type: number
+                        currency:
+                          type: string
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /groups/{groupId}/settlements/{id}:
+    patch:
+      summary: Update settlement status (Confirm or Cancel)
+      description: |
+        Confirming a settlement closes the debt transaction. Declining/cancelling voids it.
+      tags:
+        - Settlements
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: groupId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+                - version
+              properties:
+                status:
+                  type: string
+                  enum: [confirmed, cancelled]
+                settledOn:
+                  type: string
+                  format: date
+                  example: "2026-06-09"
+                version:
+                  type: integer
+                  example: 1
+      responses:
+        '200':
+          description: Settlement status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settlement'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /notes:
+    post:
+      summary: Create a personal or group note
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - body
+                - visibility
+              properties:
+                title:
+                  type: string
+                  maxLength: 160
+                  example: "Trip Itinerary"
+                body:
+                  type: string
+                  example: "Day 1: Arrive, check-in. Day 2: Beach day."
+                visibility:
+                  type: string
+                  enum: [private, group]
+                  example: "group"
+                groupId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                  description: Required if visibility is set to group
+      responses:
+        '201':
+          description: Note created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    get:
+      summary: List notes with pagination and filtering
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: visibility
+          in: query
+          schema:
+            type: string
+            enum: [private, group]
+          required: false
+        - name: groupId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          required: false
+      responses:
+        '200':
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Note'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /notes/{id}:
+    get:
+      summary: Get specific note details
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Note details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      summary: Update a note
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                title:
+                  type: string
+                  maxLength: 160
+                body:
+                  type: string
+                visibility:
+                  type: string
+                  enum: [private, group]
+                groupId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                version:
+                  type: integer
+                  example: 5
+      responses:
+        '200':
+          description: Note updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedError'
+    delete:
+      summary: Delete a note
+      tags:
+        - Notes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Note deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /goals:
+    post:
+      summary: Create a financial goal
+      tags:
+        - Goals
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - targetAmount
+                - currency
+              properties:
+                title:
+                  type: string
+                  maxLength: 160
+                  example: "Trip to Goa"
+                targetAmount:
+                  type: number
+                  example: 30000.00
+                savedAmount:
+                  type: number
+                  default: 0.00
+                  example: 5000.00
+                currency:
+                  type: string
+                  maxLength: 3
+                  example: "INR"
+                targetDate:
+                  type: string
+                  format: date
+                  nullable: true
+                  example: "2026-12-31"
+      responses:
+        '201':
+          description: Goal created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    get:
+      summary: List goals with pagination
+      tags:
+        - Goals
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, achieved, paused, cancelled]
+          required: false
+      responses:
+        '200':
+          description: List of goals
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Goal'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /goals/{id}:
+    get:
+      summary: Get details of a goal
+      tags:
+        - Goals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Goal details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      summary: Update goal progress or status
+      tags:
+        - Goals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                title:
+                  type: string
+                  maxLength: 160
+                targetAmount:
+                  type: number
+                savedAmount:
+                  type: number
+                currency:
+                  type: string
+                  maxLength: 3
+                targetDate:
+                  type: string
+                  format: date
+                status:
+                  type: string
+                  enum: [active, achieved, paused, cancelled]
+                version:
+                  type: integer
+                  example: 2
+      responses:
+        '200':
+          description: Goal updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Goal'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      summary: Delete a goal
+      tags:
+        - Goals
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Goal deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /import/expenses:
+    post:
+      summary: Upload CSV/XLSX to import expenses
+      description: |
+        Imports raw transactions into drafts or posted expenses.
+      tags:
+        - Import/Export
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The CSV or XLSX file containing expense transactions.
+                groupId:
+                  type: string
+                  format: uuid
+                  description: Optional group to associate imported expenses with.
+      responses:
+        '200':
+          description: Import processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - successCount
+                  - errorCount
+                  - errors
+                properties:
+                  successCount:
+                    type: integer
+                    example: 12
+                  errorCount:
+                    type: integer
+                    example: 1
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        row:
+                          type: integer
+                          example: 5
+                        message:
+                          type: string
+                          example: "Missing required field: amount"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /export/expenses:
+    get:
+      summary: Export expenses as CSV or XLSX
+      tags:
+        - Import/Export
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [csv, xlsx]
+            default: csv
+        - name: groupId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          required: false
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+          required: false
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+          required: false
+      responses:
+        '200':
+          description: File download containing exported expenses
+          headers:
+            Content-Disposition:
+              schema:
+                type: string
+                example: "attachment; filename=\"expenses_export_20260609.csv\""
+          content:
+            text/csv:
+              schema:
+                type: string
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Page number (1-indexed)
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      description: Number of elements per page
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    ValidationError:
+      description: Input validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 400
+            timestamp: "2026-06-09T17:15:00.000Z"
+            path: "/api/v1/auth/register"
+            errorCode: "VAL_INVALID_INPUT"
+            message: "Input validation failed"
+            details:
+              - field: "email"
+                issue: "must be a valid email address"
+            retryable: false
+
+    UnauthorizedError:
+      description: Authentication failed or token missing/expired
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 401
+            timestamp: "2026-06-09T17:15:00.000Z"
+            path: "/api/v1/users/me"
+            errorCode: "AUTH_TOKEN_EXPIRED"
+            message: "JWT access token has expired"
+            retryable: false
+
+    ForbiddenError:
+      description: Permissions not met for resource action
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 403
+            timestamp: "2026-06-09T17:15:00.000Z"
+            path: "/api/v1/groups/d3b07384-d113-49c3-a558-f54248880bf6"
+            errorCode: "RES_FORBIDDEN"
+            message: "You do not have access to view this group."
+            retryable: false
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 404
+            timestamp: "2026-06-09T17:15:00.000Z"
+            path: "/api/v1/expenses/f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
+            errorCode: "RES_NOT_FOUND"
+            message: "Expense with ID f81d4fae-7dec-11d0-a765-00a0c91e6bf6 does not exist."
+            retryable: false
+
+    ConflictError:
+      description: Resource constraint or duplication conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 409
+            timestamp: "2026-06-09T17:15:00.000Z"
+            path: "/api/v1/auth/register"
+            errorCode: "RES_ALREADY_EXISTS"
+            message: "A user with email user@example.com already exists."
+            retryable: false
+
+    PreconditionFailedError:
+      description: State conflict or optimistic lock version mismatch
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            statusCode: 412
+            timestamp: "2026-06-09T17:15:00.000Z"
+            path: "/api/v1/expenses/f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
+            errorCode: "CON_VERSION_CONFLICT"
+            message: "The resource version has changed. Please fetch the latest state and retry."
+            retryable: true
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - timestamp
+        - path
+        - errorCode
+        - message
+        - retryable
+      properties:
+        statusCode:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        path:
+          type: string
+        errorCode:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            required:
+              - field
+              - issue
+            properties:
+              field:
+                type: string
+              issue:
+                type: string
+        retryable:
+          type: boolean
+
+    PaginatedResponse:
+      type: object
+      required:
+        - data
+        - meta
+        - links
+      properties:
+        meta:
+          type: object
+          required:
+            - totalItems
+            - itemCount
+            - itemsPerPage
+            - totalPages
+            - currentPage
+          properties:
+            totalItems:
+              type: integer
+            itemCount:
+              type: integer
+            itemsPerPage:
+              type: integer
+            totalPages:
+              type: integer
+            currentPage:
+              type: integer
+        links:
+          type: object
+          required:
+            - first
+            - last
+          properties:
+            first:
+              type: string
+            previous:
+              type: string
+              nullable: true
+            next:
+              type: string
+              nullable: true
+            last:
+              type: string
+
+    UserResponse:
+      type: object
+      required:
+        - id
+        - email
+        - displayName
+        - status
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, disabled, invited]
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Profile:
+      type: object
+      required:
+        - id
+        - userId
+        - avatarUrl
+        - locale
+        - timezone
+        - defaultCurrency
+        - monthlyBudget
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        avatarUrl:
+          type: string
+          format: uri
+          nullable: true
+        locale:
+          type: string
+        timezone:
+          type: string
+        defaultCurrency:
+          type: string
+        monthlyBudget:
+          type: number
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Group:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - visibility
+        - ownerUserId
+        - isArchived
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+          enum: [private, invite_only, public_readonly]
+        ownerUserId:
+          type: string
+          format: uuid
+        isArchived:
+          type: boolean
+        version:
+          type: integer
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GroupMember:
+      type: object
+      required:
+        - id
+        - groupId
+        - userId
+        - role
+        - joinStatus
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          enum: [owner, admin, member, viewer]
+        joinStatus:
+          type: string
+          enum: [invited, active, left, removed]
+        joinedAt:
+          type: string
+          format: date-time
+          nullable: true
+        leftAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ExpenseResponse:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - amountTotal
+        - currency
+        - category
+        - paidByUserId
+        - ownerUserId
+        - groupId
+        - expenseDate
+        - status
+        - splits
+        - attachments
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        amountTotal:
+          type: number
+        currency:
+          type: string
+        category:
+          type: string
+        paidByUserId:
+          type: string
+          format: uuid
+        ownerUserId:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+          nullable: true
+        expenseDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [draft, posted, void]
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExpenseSplit'
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attachment'
+        version:
+          type: integer
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ExpenseSplit:
+      type: object
+      required:
+        - id
+        - expenseId
+        - splitType
+        - shareValue
+        - amountOwed
+        - isSettled
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        expenseId:
+          type: string
+          format: uuid
+        participantUserId:
+          type: string
+          format: uuid
+          nullable: true
+        participantGroupMemberId:
+          type: string
+          format: uuid
+          nullable: true
+        splitType:
+          type: string
+          enum: [equal, fixed, percent, share]
+        shareValue:
+          type: number
+        amountOwed:
+          type: number
+        isSettled:
+          type: boolean
+        settledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ExpenseSplitInput:
+      type: object
+      required:
+        - splitType
+        - shareValue
+      properties:
+        participantUserId:
+          type: string
+          format: uuid
+          nullable: true
+        participantGroupMemberId:
+          type: string
+          format: uuid
+          nullable: true
+        splitType:
+          type: string
+          enum: [equal, fixed, percent, share]
+        shareValue:
+          type: number
+
+    Attachment:
+      type: object
+      required:
+        - id
+        - uploaderUserId
+        - storageKey
+        - originalName
+        - mimeType
+        - sizeBytes
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        uploaderUserId:
+          type: string
+          format: uuid
+        expenseId:
+          type: string
+          format: uuid
+          nullable: true
+        noteId:
+          type: string
+          format: uuid
+          nullable: true
+        goalId:
+          type: string
+          format: uuid
+          nullable: true
+        groupId:
+          type: string
+          format: uuid
+          nullable: true
+        storageKey:
+          type: string
+        originalName:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+        checksumSha256:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    Settlement:
+      type: object
+      required:
+        - id
+        - groupId
+        - fromUserId
+        - toUserId
+        - amount
+        - currency
+        - status
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+        fromUserId:
+          type: string
+          format: uuid
+        toUserId:
+          type: string
+          format: uuid
+        amount:
+          type: number
+        currency:
+          type: string
+        status:
+          type: string
+          enum: [proposed, confirmed, cancelled]
+        settledOn:
+          type: string
+          format: date
+          nullable: true
+        note:
+          type: string
+          nullable: true
+        version:
+          type: integer
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Note:
+      type: object
+      required:
+        - id
+        - authorUserId
+        - title
+        - body
+        - visibility
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        authorUserId:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+        body:
+          type: string
+        visibility:
+          type: string
+          enum: [private, group]
+        version:
+          type: integer
+          example: 4
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Goal:
+      type: object
+      required:
+        - id
+        - ownerUserId
+        - title
+        - targetAmount
+        - savedAmount
+        - currency
+        - status
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        ownerUserId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        targetAmount:
+          type: number
+        savedAmount:
+          type: number
+        currency:
+          type: string
+        targetDate:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [active, achieved, paused, cancelled]
+        version:
+          type: integer
+          example: 2
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
