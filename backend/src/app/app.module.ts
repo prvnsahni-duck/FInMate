@@ -10,6 +10,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { GroupsModule } from './groups/groups.module';
 import { SettlementsModule } from './settlements/settlements.module';
+import { ImportModule } from './import/import.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { SettlementsModule } from './settlements/settlements.module';
     UsersModule,
     GroupsModule,
     SettlementsModule,
+    ImportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
