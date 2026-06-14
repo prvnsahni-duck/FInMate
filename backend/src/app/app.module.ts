@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { InitialSchema1717977600000 } from '../migrations/1717977600000-InitialSchema';
 import { AddTwoFactorAuth1718000000000 } from '../migrations/1718000000000-AddTwoFactorAuth';
 import { AddGroupCurrencyAndExpenseSoftDelete1718100000000 } from '../migrations/1718100000000-AddGroupCurrencyAndExpenseSoftDelete';
+import { AddGroupTypeAndSpectatorAndHousehold1718200000000 } from '../migrations/1718200000000-AddGroupTypeAndSpectatorAndHousehold';
 import { SnakeNamingStrategy } from './common/snake-naming-strategy';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -34,6 +35,7 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
           InitialSchema1717977600000,
           AddTwoFactorAuth1718000000000,
           AddGroupCurrencyAndExpenseSoftDelete1718100000000,
+          AddGroupTypeAndSpectatorAndHousehold1718200000000,
         ],
         migrationsRun: true,
         namingStrategy: new SnakeNamingStrategy(),

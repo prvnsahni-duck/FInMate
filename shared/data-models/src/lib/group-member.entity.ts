@@ -14,8 +14,17 @@ export class GroupMember {
   @ManyToOne(() => User, { nullable: false })
   user!: User;
 
+  /**
+   * Member role within the group:
+   * - `owner` — full control; created the group.
+   * - `admin` — can manage members and group settings.
+   * - `member` — can create/edit own expenses.
+   * - `viewer` — read-only; cannot write any data.
+   * - `spectator` — can add/update expenses but is NEVER included in splits
+   *   or settlement calculations.
+   */
   @Column({ type: 'varchar', length: 20 })
-  role!: 'owner' | 'admin' | 'member' | 'viewer';
+  role!: 'owner' | 'admin' | 'member' | 'viewer' | 'spectator';
 
   @Column({ type: 'varchar', length: 20 })
   joinStatus!: 'invited' | 'active' | 'left' | 'removed';
@@ -32,3 +41,4 @@ export class GroupMember {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
+

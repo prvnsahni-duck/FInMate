@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, PreconditionFailedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Group, GroupMember, User, CreateGroupDto, UpdateGroupDto, InviteMemberDto, UpdateMemberDto } from '@finmate/data-models';
+import { Group, GroupMember, User, AuditLog, CreateGroupDto, UpdateGroupDto, InviteMemberDto, UpdateMemberDto } from '@finmate/data-models';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
@@ -13,6 +13,8 @@ export class GroupsService {
     private readonly groupRepository: Repository<Group>,
     @InjectRepository(GroupMember)
     private readonly groupMemberRepository: Repository<GroupMember>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepository: Repository<AuditLog>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -23,6 +25,8 @@ export class GroupsService {
         description: dto.description,
         visibility: dto.visibility || 'private',
         currency: dto.currency || 'USD',
+        groupType: dto.groupType || 'normal',
+        carryForwardEnabled: dto.carryForwardEnabled ?? false,
         ownerUser: owner,
       });
       const savedGroup = await manager.save(Group, group);
@@ -121,6 +125,7 @@ export class GroupsService {
     if (dto.visibility !== undefined) group.visibility = dto.visibility;
     if (dto.isArchived !== undefined) group.isArchived = dto.isArchived;
     if (dto.currency !== undefined) group.currency = dto.currency.toUpperCase();
+    if (dto.carryForwardEnabled !== undefined) group.carryForwardEnabled = dto.carryForwardEnabled;
 
     return this.groupRepository.save(group);
   }
@@ -364,5 +369,54 @@ export class GroupsService {
       targetMember.leftAt = new Date();
       await this.groupMemberRepository.save(targetMember);
     }
+  }
+
+  /**
+   * Get paginated audit history for a group.
+   * Returns all expense create/update/delete/restore events for this group.
+   */
+  async getGroupHistory(
+    userId: string,
+    groupId: string,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResponse<Record<string, unknown>>> {
+    // Verify caller has access
+    const membership = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
+    if (!membership) {
+      const groupExists = await this.groupRepository.findOne({ where: { id: groupId } });
+      if (!groupExists) throw new NotFoundException('Group not found');
+      throw new ForbiddenException('You do not have access to this group');
+    }
+
+    const p = page > 0 ? page : 1;
+    const l = limit > 0 ? limit : 20;
+
+    const [logs, total] = await this.auditLogRepository
+      .createQueryBuilder('log')
+      .leftJoinAndSelect('log.actorUser', 'actorUser')
+      .where('log.group_id = :groupId', { groupId })
+      .orderBy('log.created_at', 'DESC')
+      .skip((p - 1) * l)
+      .take(l)
+      .getManyAndCount();
+
+    const data = logs.map((log) => ({
+      id: log.id,
+      action: log.action,
+      entityType: log.entityType,
+      entityId: log.entityId,
+      actorUserId: log.actorUser?.id ?? null,
+      actorDisplayName: log.actorUser?.displayName ?? null,
+      metadata: log.metadataJson ?? null,
+      createdAt: log.createdAt,
+    }));
+
+    return paginate(data, total, p, l, `/api/v1/groups/${groupId}/history`, {});
   }
 }

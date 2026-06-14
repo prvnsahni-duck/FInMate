@@ -15,8 +15,25 @@ export class Group {
   @Column({ type: 'varchar', length: 24, default: 'private' })
   visibility!: 'private' | 'invite_only' | 'public_readonly';
 
+  /** Base currency for all expenses in this group (ISO 4217). */
   @Column({ type: 'char', length: 3, default: 'USD' })
   currency!: string;
+
+  /**
+   * Group type:
+   * - `normal` — standard expense-sharing group.
+   * - `household` — month-based ledger; previous months are immutable;
+   *   optional carry-forward of extra-paid balances.
+   */
+  @Column({ type: 'varchar', length: 20, default: 'normal' })
+  groupType!: 'normal' | 'household';
+
+  /**
+   * Household-only: when true, at month close the system carries forward
+   * any extra-paid balance per member into the next month.
+   */
+  @Column({ type: 'boolean', default: false })
+  carryForwardEnabled!: boolean;
 
   @ManyToOne(() => User, { nullable: false })
   ownerUser!: User;
@@ -33,3 +50,4 @@ export class Group {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
+

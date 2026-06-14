@@ -5,6 +5,7 @@ import { Group } from './group.entity';
 @Entity('expenses')
 @Index(['group', 'status', 'expenseDate'])
 @Index(['group', 'category'])
+@Index(['group', 'ledgerMonth'])
 export class Expense {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -39,6 +40,20 @@ export class Expense {
   @Column({ type: 'varchar', length: 20, default: 'posted' })
   status!: 'draft' | 'posted' | 'void';
 
+  /**
+   * Household-only: the billing month this expense belongs to (format `YYYY-MM`).
+   * Null for normal group and personal expenses.
+   */
+  @Column({ type: 'char', length: 7, nullable: true })
+  ledgerMonth?: string;
+
+  /**
+   * True if this expense is a system-generated carry-forward record from
+   * a previous month's surplus balance (household groups only).
+   */
+  @Column({ type: 'boolean', default: false })
+  isCarryForward!: boolean;
+
   @VersionColumn()
   version!: number;
 
@@ -51,3 +66,4 @@ export class Expense {
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt?: Date;
 }
+
