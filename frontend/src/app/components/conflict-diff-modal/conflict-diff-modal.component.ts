@@ -71,22 +71,22 @@ export class ConflictDiffModalComponent<T extends Record<string, unknown>> imple
     const newVersion = (this.context.serverState['version'] as number) ?? 1;
 
     if (strategy === 'keep-mine') {
-      const mergedPayload: Partial<T> = {
+      const mergedPayload: any = {
         ...this.context.localPayload,
-        version: newVersion as T[keyof T],
+        version: newVersion,
       };
       this.resolved.emit({ strategy: 'keep-mine', mergedPayload, newVersion });
     } else if (strategy === 'keep-theirs') {
-      const mergedPayload: Partial<T> = {
-        version: newVersion as T[keyof T],
+      const mergedPayload: any = {
+        version: newVersion,
       };
       this.resolved.emit({ strategy: 'keep-theirs', mergedPayload, newVersion });
     } else {
       const field = this.primaryField() as keyof T;
-      const mergedPayload: Partial<T> = {
+      const mergedPayload: any = {
         ...this.context.localPayload,
-        [field]: this.manualText() as T[keyof T],
-        version: newVersion as T[keyof T],
+        [field]: this.manualText(),
+        version: newVersion,
       };
       this.resolved.emit({ strategy: 'manual', mergedPayload, newVersion });
     }

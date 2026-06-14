@@ -46,8 +46,40 @@ After each major feature is finished and tests pass, produce a conventional comm
 | **Frontend Framework** | Angular 21 (standalone components) | No NgModules; use `app.config.ts` providers |
 | **Frontend HTTP** | Angular `HttpClient` + `HttpInterceptorFn` | Register via `provideHttpClient(withInterceptors([...]))` in `app.config.ts` |
 | **Frontend Styling** | **Tailwind CSS v3** (primary) + SCSS (fallback) | Use Tailwind for all UI; use SCSS only when Tailwind utility classes cannot cover the need (e.g. complex keyframe animations) |
-| **Frontend State** | Angular Signals (`signal`, `computed`, `effect`) | Prefer over RxJS for local/ephemeral UI state; use NGXS for global persistent state when set up |
+| **Frontend State** | Signals, RxJS, and NGXS | See detailed State Management Strategy section below |
 | **Spreadsheet I/O** | SheetJS (`xlsx`) | Already installed |
+
+---
+
+## 🧠 Frontend State Management Strategy
+
+We use a hybrid approach leveraging **Signals**, **RxJS**, and **NGXS** depending on the specific requirement of the state variable. Follow these guidelines strictly:
+
+### 1. Angular Signals (`signal`, `computed`, `effect`)
+**Use for:** Local, component-scoped, synchronous UI state.
+- **When to use:** 
+  - Simple form toggles (e.g., `isDropdownOpen`, `isLoading`).
+  - Derived/computed values that only depend on other local signals (e.g., `fullName = computed(() => firstName() + ' ' + lastName())`).
+  - Fast, synchronous reactivity where streams are not required.
+- **Why:** Signals are the modern Angular default for local reactivity. They are synchronous, glitch-free, and do not require manual subscription management or `async` pipes in templates.
+
+### 2. RxJS (Observables, Subjects, `takeUntilDestroyed`)
+**Use for:** Asynchronous data streams, event handling, and complex timing operations.
+- **When to use:**
+  - HTTP requests (`HttpClient` returns observables).
+  - WebSockets or Server-Sent Events (SSE).
+  - Debouncing/Throttling inputs (e.g., search typeahead).
+  - Composing multiple async events (e.g., `switchMap`, `combineLatest`).
+- **Why:** RxJS excels at composing asynchronous events and handling race conditions. Use RxJS to fetch data, and then convert the result to a Signal (e.g., `toSignal()`) if it only needs to be consumed locally in the UI.
+
+### 3. NGXS (Global State Management)
+**Use for:** Global, persistent, shared, or complex application state.
+- **When to use:**
+  - User Authentication state (`AuthState`, tokens, user profile).
+  - Cached entity data shared across multiple views (e.g., `GroupsState`, `ExpensesState`).
+  - User preferences (e.g., theme settings if they need to be persisted to a backend).
+  - Complex state logic where actions need to trigger side effects (e.g., dispatching `Login` triggering a redirect on success).
+- **Why:** NGXS provides a clear CQRS (Command Query Responsibility Segregation) pattern. It gives us a single source of truth, allows for easy debugging via Redux DevTools, and handles complex state mutations safely outside of components.
 | **Frontend Encryption** | Web Crypto API (`SubtleCrypto`) — PBKDF2 + AES-256-GCM | No third-party crypto libs |
 | **Backend Encryption** | Node.js `crypto` — AES-256-GCM | See `EncryptionService` |
 | **Testing** | Jest via `npx nx test <project>` | All new services and interceptors must have unit tests |

@@ -1,0 +1,56 @@
+<div class="min-h-screen bg-finmate-light dark:bg-finmate-dark text-slate-800 dark:text-slate-200 transition-colors duration-300 flex flex-col md:flex-row">
+  
+  <!-- Mobile Top Bar -->
+  <header class="md:hidden flex items-center justify-between p-4 bg-white/50 dark:bg-finmate-card/50 backdrop-blur-md sticky top-0 z-50 border-b border-black/5 dark:border-white/5">
+    <div class="font-bold text-xl bg-gradient-neon text-transparent bg-clip-text">FinMate</div>
+    <button (click)="toggleTheme()" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
+      <svg *ngIf="isDarkMode()" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+      <svg *ngIf="!isDarkMode()" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+    </button>
+  </header>
+
+  <!-- Desktop Sidebar -->
+  <aside class="hidden md:flex flex-col w-64 bg-white/50 dark:bg-finmate-card/50 backdrop-blur-md border-r border-black/5 dark:border-white/5 h-screen sticky top-0 z-40">
+    <div class="p-6">
+      <div class="font-extrabold text-3xl bg-gradient-neon text-transparent bg-clip-text tracking-tight mb-10">FinMate</div>
+      
+      <nav class="space-y-2 flex-1">
+        <a routerLink="/dashboard" routerLinkActive="bg-black/5 dark:bg-white/10 text-finmate-neon2 font-semibold" class="flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all hover:bg-black/5 dark:hover:bg-white/5">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+          <span>Dashboard</span>
+        </a>
+        <a routerLink="/groups" routerLinkActive="bg-black/5 dark:bg-white/10 text-finmate-neon2 font-semibold" class="flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all hover:bg-black/5 dark:hover:bg-white/5">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+          <span>Groups</span>
+        </a>
+      </nav>
+    </div>
+    
+    <div class="mt-auto p-6">
+      <button (click)="toggleTheme()" class="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-2xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
+        <span>{{ isDarkMode() ? 'Light Mode' : 'Dark Mode' }}</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8 relative">
+    <!-- Background decorative blobs -->
+    <div class="fixed top-0 right-0 w-[600px] h-[600px] rounded-full bg-finmate-neon/10 blur-[150px] pointer-events-none z-0"></div>
+    <div class="relative z-10 max-w-5xl mx-auto">
+      <router-outlet></router-outlet>
+    </div>
+  </main>
+
+  <!-- Mobile Bottom Nav -->
+  <nav class="md:hidden fixed bottom-0 w-full bg-white/80 dark:bg-finmate-card/80 backdrop-blur-xl border-t border-black/5 dark:border-white/5 z-50 flex justify-around p-3 pb-safe">
+    <a routerLink="/dashboard" routerLinkActive="text-finmate-neon2" class="flex flex-col items-center p-2 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+      <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+      <span class="text-xs font-medium">Home</span>
+    </a>
+    <a routerLink="/groups" routerLinkActive="text-finmate-neon2" class="flex flex-col items-center p-2 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
+      <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+      <span class="text-xs font-medium">Groups</span>
+    </a>
+  </nav>
+</div>

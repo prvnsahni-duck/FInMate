@@ -1,9 +1,6 @@
 import { Injectable } from '@angular/core';
 
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  if (typeof Buffer !== 'undefined') {
-    return Buffer.from(buffer).toString('base64');
-  }
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.byteLength; i++) {
@@ -13,10 +10,6 @@ export function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 export function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  if (typeof Buffer !== 'undefined') {
-    const buf = Buffer.from(base64, 'base64');
-    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-  }
   const binaryString = atob(base64);
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
@@ -37,16 +30,6 @@ export class ClientEncryptionService {
     // Fallback for Node.js / Jest testing environment
     if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
       return globalThis.crypto.subtle;
-    }
-    // Fallback for older Node.js testing environments where crypto is required
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const nodeCrypto = require('crypto');
-      if (nodeCrypto && nodeCrypto.webcrypto) {
-        return nodeCrypto.webcrypto.subtle;
-      }
-    } catch {
-      // Ignore
     }
     throw new Error('Web Cryptography API (SubtleCrypto) is not available');
   }
@@ -114,22 +97,19 @@ export class ClientEncryptionService {
     } else if (typeof globalThis !== 'undefined' && globalThis.crypto) {
       iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
     } else {
-      // Node fallback
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const nodeCrypto = require('crypto');
-      iv = new Uint8Array(nodeCrypto.randomBytes(12));
+      throw new Error('Web Cryptography API (SubtleCrypto) is not available');
     }
 
     const ciphertextBuffer = await subtle.encrypt(
       {
         name: 'AES-GCM',
-        iv: iv,
+        iv: iv as any,
       },
       key,
       encodedPlaintext
     );
 
-    const ivBase64 = arrayBufferToBase64(iv.buffer);
+    const ivBase64 = arrayBufferToBase64(iv.buffer as ArrayBuffer);
     const ciphertextBase64 = arrayBufferToBase64(ciphertextBuffer);
 
     return `${ivBase64}:${ciphertextBase64}`;
@@ -155,7 +135,7 @@ export class ClientEncryptionService {
     const decryptedBuffer = await subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv: iv,
+        iv: iv as any,
       },
       key,
       ciphertextBuffer

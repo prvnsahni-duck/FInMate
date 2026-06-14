@@ -1,0 +1,35 @@
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="bg-white dark:bg-finmate-card rounded-3xl w-full max-w-lg p-6 shadow-2xl shadow-black/20 border border-slate-200 dark:border-white/5 relative">
+    <button class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+    </button>
+    
+    <h2 class="text-2xl font-bold mb-6">Add Expense</h2>
+    
+    <form class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Description</label>
+        <input type="text" placeholder="Dinner with friends" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon outline-none transition-all">
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1">Amount</label>
+          <input type="number" placeholder="0.00" class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon outline-none transition-all">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1">Currency</label>
+          <select class="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon outline-none transition-all">
+            <option value="USD">USD ($)</option>
+            <option value="INR">INR (₹)</option>
+            <option value="EUR">EUR (€)</option>
+          </select>
+        </div>
+      </div>
+      
+      <button type="button" class="w-full mt-6 py-3 px-4 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 transition-all">
+        Save Expense
+      </button>
+    </form>
+  </div>
+</div>
