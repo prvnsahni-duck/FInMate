@@ -35,7 +35,7 @@ describe('ExpensesController', () => {
   it('should parse pagination defaults and pass filters to service', async () => {
     service.listExpenses.mockResolvedValue({} as any);
 
-    await controller.findAll(undefined, undefined, 'cursor-1', 'group-1', 'Food', '2026-06-01', '2026-06-10', {
+    await controller.findAll(undefined, undefined, 'cursor-1', 'group-1', 'Food', 'posted', '2026-06-01', '2026-06-10', {
       user: { id: 'user-1' },
     });
 
@@ -45,6 +45,7 @@ describe('ExpensesController', () => {
       cursor: 'cursor-1',
       groupId: 'group-1',
       category: 'Food',
+      status: 'posted',
       startDate: '2026-06-01',
       endDate: '2026-06-10',
     });

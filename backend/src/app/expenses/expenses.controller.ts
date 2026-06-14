@@ -20,6 +20,7 @@ export class ExpensesController {
     @Query('cursor') cursor?: string,
     @Query('groupId') groupId?: string,
     @Query('category') category?: string,
+    @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Req() req?: any,
@@ -33,6 +34,7 @@ export class ExpensesController {
       cursor,
       groupId,
       category,
+      status,
       startDate,
       endDate,
     });

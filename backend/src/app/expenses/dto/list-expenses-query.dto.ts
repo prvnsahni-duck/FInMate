@@ -26,6 +26,10 @@ export class ListExpensesQueryDto {
   category?: string;
 
   @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
   @IsDateString()
   startDate?: string;
 

@@ -12,6 +12,7 @@ interface ExpenseListParams {
   cursor?: string;
   groupId?: string;
   category?: string;
+  status?: string;
   startDate?: string;
   endDate?: string;
 }
@@ -388,6 +389,10 @@ export class ExpensesService {
       query.andWhere('expense.category = :category', { category: params.category });
     }
 
+    if (params.status) {
+      query.andWhere('expense.status = :status', { status: params.status });
+    }
+
     if (params.startDate) {
       query.andWhere('expense.expenseDate >= :startDate', { startDate: params.startDate });
     }
@@ -413,6 +418,7 @@ export class ExpensesService {
     return paginate(mapped, total, page, limit, '/api/v1/expenses', {
       groupId: params.groupId,
       category: params.category,
+      status: params.status,
       startDate: params.startDate,
       endDate: params.endDate,
       cursor: params.cursor,
