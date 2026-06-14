@@ -43,13 +43,14 @@ describe('Expenses API End-to-End', () => {
       amountTotal: 100,
       currency: 'USD',
       category: 'Food',
+      paidByUserId: userId,
       groupId,
       expenseDate: '2026-06-15',
       status: 'posted',
       splits: [
         {
           participantUserId: userId,
-          amountOwed: 100,
+          shareValue: 1,
           splitType: 'equal'
         }
       ]

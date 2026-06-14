@@ -1314,10 +1314,59 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
     - Implement User Registration and JWT Authentication Service (FIN-19).
 
+### 2026-06-14
+- **Summary:** Audited the current codebase status against the specification and updated agent guidelines.
+- **Changes Made:**
+   - Added Rule 6 to AGENT_RULES.md to enforce updating the Progress Log at the end of the project specification file for every task/update.
+- **Artifacts Updated:**
+   - AGENT_RULES.md
+   - FinMate_Project_Specification.md
+- **Decisions:**
+   - Document all implementations and decisions directly in the spec Progress Log to ensure seamless project handovers and clarity for future updates.
+- **Next Actions:**
+   - Address Jest unit test failures in the frontend (mocking Web Crypto and correcting App component test config).
+   - Implement backend endpoints for the Notes and Goals modules.
+
 ---
 
-**Version:** 2.11 (Global Exception Filters and API Error Taxonomy Middleware completed)  
+**Version:** 2.12 (Agent Rules updated and codebase status audited)  
 **Author:** Prvn Sahni  
-**Last Updated:** June 9, 2026  
+**Last Updated:** June 14, 2026  
 **Status:** Implementation (Coding) Phase
+
+
+
+📝 Pending / Missing in Expenses Module
+1. Backend (Outstanding Tasks)
+Group Currency Matching Validation:
+The latest migration 1718100000000-AddGroupCurrencyAndExpenseSoftDelete.ts added a currency column to the groups table, and the specification states: "Currency Check: Must match currency codes active in the group parameters."
+However, the backend createExpense and updateExpense methods do not validate if the expense currency matches the group's currency code.
+Soft Delete Wiring (deleted_at):
+The migration and entity definition for deleted_at (soft delete) are present.
+However, deleteExpense() in ExpensesService still hard-deletes draft expenses and sets the status to 'void' for non-drafts. TypeORM's softDelete() is not utilized.
+Server-Side Encryption (SSE) for Amounts:
+The encryption boundary table dictates that amount_total (in expenses) and amount_owed (in expense_splits) should be encrypted at rest via Server-Side Encryption (SSE). Currently, they are stored and queried as plaintext decimal numbers in the database.
+Analytics Endpoints:
+There are no endpoints to aggregate expenses into monthly or yearly summaries, or provide category spending distributions.
+2. Frontend (Outstanding Tasks)
+Personal Expenses UI:
+There is no dashboard view or page to list, add, or manage personal (non-group) expenses (the dashboard current view displays a static $0.00 balance).
+Edit & Delete Expense UI:
+The group ledger view only lists expenses. There is no modal or page to edit, void, or delete existing expenses.
+Import/Export UI:
+There is no button, input, or drag-and-drop component to upload CSV/XLSX spreadsheets or download the group ledger.
+Analytics Charts:
+No visual charts or graphs for monthly/yearly expense trends.
+
+plan for these pending task
+cehck and update if not cotrrect
+we will keep the curencty update in group setting
+and other basioc thing from grooup setting for groiup
+
+we will show the currency icon to user in front of amount input
+
+now we have one more goiupr type house hold expesisn where we will not who shared between as all expesisnt 2will be shared with all those are added in group we can added spectator user as well who will be not part of this expsneis means they can add and and update the espensis but it will not shared with them 
+
+thjis one is for all group: we will keep an history to the group ehat ever is happn ot group ensponssis for exmaple who added who deleted and all and even edited the thing and provide direct restoire button to that expessis under group setting 
+house expensis will be carry forward to next month under that group and same will be reflect to all members as it is house expensis we will keep track of this expnsisis only in that group not in other type of group and we will not provide any modify option to this expense for previous month expsnsis 
 

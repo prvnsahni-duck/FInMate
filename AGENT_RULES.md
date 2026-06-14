@@ -35,6 +35,9 @@ For any non-trivial feature (more than 1 file or more than ~30 lines):
 ### Rule 5 — Commit Messages on Completion
 After each major feature is finished and tests pass, produce a conventional commit message.
 
+### Rule 6 — Always Update the Progress Log in the Project Specification File
+Upon completing any change, feature, or project step, you MUST update the **"Progress Log"** section at the bottom of [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md) with a new date-stamped entry. Follow the established dated format (Date, Summary, Changes Made, Artifacts Updated, Decisions, Next Actions) to keep it as the single, long-term project source of truth.
+
 ---
 
 ## 🏗️ Technology Stack (Do Not Deviate Without Asking)

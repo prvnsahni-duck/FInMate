@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, Req, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto';
@@ -41,18 +41,18 @@ export class ExpensesController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: any) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     return this.expensesService.getExpenseById(req.user.id, id);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateExpenseDto, @Req() req: any) {
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateExpenseDto, @Req() req: any) {
     return this.expensesService.updateExpense(req.user.id, id, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string, @Req() req: any): Promise<void> {
+  async remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: any): Promise<void> {
     await this.expensesService.deleteExpense(req.user.id, id);
   }
 }

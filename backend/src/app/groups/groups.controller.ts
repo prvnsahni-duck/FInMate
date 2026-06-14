@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Body, Query, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, Query, Param, UseGuards, Req, ParseUUIDPipe } from '@nestjs/common';
 import { CreateGroupDto, UpdateGroupDto } from '@finmate/data-models';
 import { GroupsService } from './groups.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -28,13 +28,13 @@ export class GroupsController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Req() req: any) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     return this.groupsService.findGroupById(req.user.id, id);
   }
 
   @Patch(':id')
   async update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateGroupDto: UpdateGroupDto,
     @Req() req: any,
   ) {

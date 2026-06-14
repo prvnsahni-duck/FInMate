@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, Req, UseGuards, ParseUUIDPipe } from '@nestjs/common';
 import { SettlementsService } from './settlements.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
@@ -12,14 +12,14 @@ export class SettlementsController {
 
   @Get('balances')
   @GroupRoles('owner', 'admin', 'member', 'viewer')
-  async getBalances(@Param('groupId') groupId: string, @Req() req: any) {
+  async getBalances(@Param('groupId', ParseUUIDPipe) groupId: string, @Req() req: any) {
     return this.settlementsService.calculateGroupBalances(req.user.id, groupId);
   }
 
   @Post()
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async propose(
-    @Param('groupId') groupId: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
     @Body() proposeSettlementDto: ProposeSettlementDto,
     @Req() req: any,
   ) {
@@ -29,7 +29,7 @@ export class SettlementsController {
   @Get()
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async findAll(
-    @Param('groupId') groupId: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Req() req?: any,
@@ -42,8 +42,8 @@ export class SettlementsController {
   @Patch(':id')
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async update(
-    @Param('groupId') groupId: string,
-    @Param('id') id: string,
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateSettlementDto: UpdateSettlementDto,
     @Req() req: any,
   ) {

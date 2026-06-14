@@ -13,6 +13,11 @@ export class CreateGroupDto {
   @IsEnum(['private', 'invite_only', 'public_readonly'], { message: 'Invalid group visibility option' })
   @IsOptional()
   visibility?: 'private' | 'invite_only' | 'public_readonly';
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(3, { message: 'Currency code must be a 3-character ISO code' })
+  currency?: string;
 }
 
 export class UpdateGroupDto {
@@ -32,6 +37,11 @@ export class UpdateGroupDto {
   @IsBoolean()
   @IsOptional()
   isArchived?: boolean;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(3, { message: 'Currency code must be a 3-character ISO code' })
+  currency?: string;
 
   @IsInt({ message: 'Version must be an integer' })
   @IsNotEmpty({ message: 'Version is required to resolve concurrent edits' })

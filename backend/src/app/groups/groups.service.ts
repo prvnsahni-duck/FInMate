@@ -22,6 +22,7 @@ export class GroupsService {
         name: dto.name,
         description: dto.description,
         visibility: dto.visibility || 'private',
+        currency: dto.currency || 'USD',
         ownerUser: owner,
       });
       const savedGroup = await manager.save(Group, group);
@@ -47,8 +48,8 @@ export class GroupsService {
   ): Promise<PaginatedResponse<Group>> {
     const query = this.groupRepository
       .createQueryBuilder('group')
-      .innerJoin(GroupMember, 'member', 'member.group = group.id')
-      .where('member.user = :userId', { userId })
+      .innerJoin(GroupMember, 'member', 'member.group_id = group.id')
+      .where('member.user_id = :userId', { userId })
       .andWhere('member.joinStatus = :status', { status: 'active' });
 
     if (isArchived !== undefined) {
@@ -67,8 +68,8 @@ export class GroupsService {
   async findGroupById(userId: string, groupId: string): Promise<Group> {
     const membership = await this.groupMemberRepository
       .createQueryBuilder('member')
-      .where('member.group = :groupId', { groupId })
-      .andWhere('member.user = :userId', { userId })
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
       .andWhere('member.joinStatus = :status', { status: 'active' })
       .getOne();
     if (!membership) {
@@ -89,8 +90,8 @@ export class GroupsService {
   async updateGroup(userId: string, groupId: string, dto: UpdateGroupDto): Promise<Group> {
     const membership = await this.groupMemberRepository
       .createQueryBuilder('member')
-      .where('member.group = :groupId', { groupId })
-      .andWhere('member.user = :userId', { userId })
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
       .andWhere('member.joinStatus = :status', { status: 'active' })
       .getOne();
     if (!membership) {
@@ -119,6 +120,7 @@ export class GroupsService {
     if (dto.description !== undefined) group.description = dto.description;
     if (dto.visibility !== undefined) group.visibility = dto.visibility;
     if (dto.isArchived !== undefined) group.isArchived = dto.isArchived;
+    if (dto.currency !== undefined) group.currency = dto.currency.toUpperCase();
 
     return this.groupRepository.save(group);
   }
@@ -139,8 +141,8 @@ export class GroupsService {
   async inviteMember(userId: string, groupId: string, dto: InviteMemberDto): Promise<GroupMember> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
-      .where('member.group = :groupId', { groupId })
-      .andWhere('member.user = :userId', { userId })
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
       .andWhere('member.joinStatus = :status', { status: 'active' })
       .getOne();
     if (!callerMember || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
@@ -168,8 +170,8 @@ export class GroupsService {
     const existingMember = await this.groupMemberRepository
       .createQueryBuilder('member')
       .leftJoinAndSelect('member.user', 'user')
-      .where('member.group = :groupId', { groupId })
-      .andWhere('member.user = :targetUserId', { targetUserId: targetUser.id })
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :targetUserId', { targetUserId: targetUser.id })
       .getOne();
 
     if (existingMember) {
@@ -200,8 +202,8 @@ export class GroupsService {
   async listMembers(userId: string, groupId: string): Promise<GroupMember[]> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
-      .where('member.group = :groupId', { groupId })
-      .andWhere('member.user = :userId', { userId })
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
       .andWhere('member.joinStatus = :status', { status: 'active' })
       .getOne();
     if (!callerMember) {
@@ -224,8 +226,8 @@ export class GroupsService {
   ): Promise<GroupMember> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
-      .where('member.group = :groupId', { groupId })
-      .andWhere('member.user = :userId', { userId })
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
       .getOne();
     if (!callerMember) {
       throw new ForbiddenException('You do not have access to this group');
@@ -238,7 +240,7 @@ export class GroupsService {
       .createQueryBuilder('member')
       .leftJoinAndSelect('member.user', 'user')
       .where('member.id = :memberId', { memberId })
-      .andWhere('member.group = :groupId', { groupId })
+      .andWhere('member.group_id = :groupId', { groupId })
       .getOne();
     if (!targetMember) {
       throw new NotFoundException('Member record not found');
@@ -318,8 +320,8 @@ export class GroupsService {
   async removeMember(userId: string, groupId: string, memberId: string): Promise<void> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
-      .where('member.group = :groupId', { groupId })
-      .andWhere('member.user = :userId', { userId })
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
       .getOne();
     if (!callerMember) {
       throw new ForbiddenException('You do not have access to this group');
@@ -332,7 +334,7 @@ export class GroupsService {
       .createQueryBuilder('member')
       .leftJoinAndSelect('member.user', 'user')
       .where('member.id = :memberId', { memberId })
-      .andWhere('member.group = :groupId', { groupId })
+      .andWhere('member.group_id = :groupId', { groupId })
       .getOne();
     if (!targetMember) {
       throw new NotFoundException('Member record not found');

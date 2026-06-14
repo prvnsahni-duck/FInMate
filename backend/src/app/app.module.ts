@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { InitialSchema1717977600000 } from '../migrations/1717977600000-InitialSchema';
 import { AddTwoFactorAuth1718000000000 } from '../migrations/1718000000000-AddTwoFactorAuth';
+import { AddGroupCurrencyAndExpenseSoftDelete1718100000000 } from '../migrations/1718100000000-AddGroupCurrencyAndExpenseSoftDelete';
 import { SnakeNamingStrategy } from './common/snake-naming-strategy';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -29,7 +30,11 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
         url: configService.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
         synchronize: false, // never true in production
-        migrations: [InitialSchema1717977600000, AddTwoFactorAuth1718000000000],
+        migrations: [
+          InitialSchema1717977600000,
+          AddTwoFactorAuth1718000000000,
+          AddGroupCurrencyAndExpenseSoftDelete1718100000000,
+        ],
         migrationsRun: true,
         namingStrategy: new SnakeNamingStrategy(),
       }),

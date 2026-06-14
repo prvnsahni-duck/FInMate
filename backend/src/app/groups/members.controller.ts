@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, Req, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, Req, HttpCode, HttpStatus, ParseUUIDPipe } from '@nestjs/common';
 import { InviteMemberDto, UpdateMemberDto } from '@finmate/data-models';
 import { GroupsService } from './groups.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -13,7 +13,7 @@ export class MembersController {
   @Post()
   @GroupRoles('owner', 'admin')
   async invite(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() inviteMemberDto: InviteMemberDto,
     @Req() req: any,
   ) {
@@ -22,15 +22,15 @@ export class MembersController {
 
   @Get()
   @GroupRoles('owner', 'admin', 'member', 'viewer')
-  async findAll(@Param('id') id: string, @Req() req: any) {
+  async findAll(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
     return this.groupsService.listMembers(req.user.id, id);
   }
 
   @Patch(':memberId')
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async update(
-    @Param('id') id: string,
-    @Param('memberId') memberId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
     @Body() updateMemberDto: UpdateMemberDto,
     @Req() req: any,
   ) {
@@ -41,8 +41,8 @@ export class MembersController {
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(
-    @Param('id') id: string,
-    @Param('memberId') memberId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('memberId', ParseUUIDPipe) memberId: string,
     @Req() req: any,
   ) {
     await this.groupsService.removeMember(req.user.id, id, memberId);

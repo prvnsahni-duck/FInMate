@@ -108,8 +108,8 @@ export class SettlementsService {
     // 1. Verify access: caller must have active membership
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
-      .where('member.group = :groupId', { groupId })
-      .andWhere('member.user = :userId', { userId })
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
       .andWhere('member.joinStatus = :status', { status: 'active' })
       .getOne();
     if (!callerMember) {
@@ -289,7 +289,7 @@ export class SettlementsService {
       .createQueryBuilder('settlement')
       .leftJoinAndSelect('settlement.fromUser', 'fromUser')
       .leftJoinAndSelect('settlement.toUser', 'toUser')
-      .where('settlement.group = :groupId', { groupId })
+      .where('settlement.group_id = :groupId', { groupId })
       .orderBy('settlement.createdAt', 'DESC');
 
     const total = await query.getCount();

@@ -226,7 +226,6 @@ export class ExpensesService {
       await manager.getRepository(ExpenseSplit).save(
         manager.getRepository(ExpenseSplit).create({
           expense,
-          participantUser: participantByUser?.user,
           participantGroupMember: participantGroupMember || participantByUser,
           splitType: split.splitType,
           shareValue: split.shareValue,

@@ -15,6 +15,9 @@ export class Group {
   @Column({ type: 'varchar', length: 24, default: 'private' })
   visibility!: 'private' | 'invite_only' | 'public_readonly';
 
+  @Column({ type: 'char', length: 3, default: 'USD' })
+  currency!: string;
+
   @ManyToOne(() => User, { nullable: false })
   ownerUser!: User;
 

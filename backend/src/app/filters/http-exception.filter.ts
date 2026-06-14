@@ -1,5 +1,5 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { QueryFailedError } from 'typeorm';
+import { QueryFailedError, EntityNotFoundError } from 'typeorm';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -49,6 +49,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
           }
         }
       }
+    } else if (exception instanceof EntityNotFoundError) {
+      statusCode = HttpStatus.NOT_FOUND;
+      errorCode = 'RES_NOT_FOUND';
+      message = exception.message || 'The requested resource was not found';
     } else if (exception instanceof QueryFailedError) {
       const driverError = exception.driverError;
       this.logger.error(`Database Exception: ${exception.message}`, exception.stack);
@@ -61,6 +65,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
         statusCode = HttpStatus.BAD_REQUEST;
         errorCode = 'VAL_INVALID_INPUT';
         message = driverError.detail || 'Database foreign key constraint violation: referenced resource does not exist';
+      } else if (driverError && ['22P02', '22007', '22001', '22003'].includes(driverError.code)) {
+        statusCode = HttpStatus.BAD_REQUEST;
+        errorCode = 'VAL_INVALID_INPUT';
+        message = 'Invalid input format: ' + (driverError.message || exception.message);
       } else {
         statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
         errorCode = 'SYS_INTERNAL_ERROR';
