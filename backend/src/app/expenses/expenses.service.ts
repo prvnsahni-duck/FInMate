@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, PreconditionFailedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Attachment, CreateExpenseDto, Expense, ExpenseSplit, Group, GroupMember, UpdateExpenseDto, User } from '@finmate/data-models';
-import { In, Repository } from 'typeorm';
+import { Attachment, Expense, ExpenseSplit, Group, GroupMember, User } from '@finmate/data-models';
+import { Brackets, In, Repository } from 'typeorm';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import { calculateDeterministicSplits } from './split-calculator.util';
+import { CreateExpenseDto, UpdateExpenseDto } from './dto';
 
 interface ExpenseListParams {
   page: number;
@@ -344,6 +345,9 @@ export class ExpensesService {
       });
     }
 
+    const page = Number.isFinite(params.page) && params.page > 0 ? params.page : 1;
+    const limit = Number.isFinite(params.limit) && params.limit > 0 ? params.limit : 20;
+
     const membershipGroupIds = (await this.groupMemberRepository.find({
       where: { user: { id: userId }, joinStatus: In(['active', 'invited']) },
       relations: ['group'],
@@ -361,11 +365,14 @@ export class ExpensesService {
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
       .leftJoinAndSelect('expense.ownerUser', 'ownerUser')
       .leftJoinAndSelect('expense.group', 'group')
-      .where('(expense.ownerUserId = :userId AND expense.groupId IS NULL)', { userId });
-
-    if (membershipGroupIds.length > 0) {
-      query.orWhere('expense.groupId IN (:...groupIds)', { groupIds: membershipGroupIds });
-    }
+      .where(
+        new Brackets((qb) => {
+          qb.where('(expense.ownerUserId = :userId AND expense.groupId IS NULL)', { userId });
+          if (membershipGroupIds.length > 0) {
+            qb.orWhere('expense.groupId IN (:...groupIds)', { groupIds: membershipGroupIds });
+          }
+        }),
+      );
 
     if (params.groupId) {
       query.andWhere('expense.groupId = :groupId', { groupId: params.groupId });
@@ -391,13 +398,13 @@ export class ExpensesService {
 
     const total = await query.getCount();
     const expenses = await query
-      .skip((params.page - 1) * params.limit)
-      .take(params.limit)
+      .skip((page - 1) * limit)
+      .take(limit)
       .getMany();
 
     const mapped = await Promise.all(expenses.map((expense) => this.mapExpenseResponse(expense)));
 
-    return paginate(mapped, total, params.page, params.limit, '/api/v1/expenses', {
+    return paginate(mapped, total, page, limit, '/api/v1/expenses', {
       groupId: params.groupId,
       category: params.category,
       startDate: params.startDate,

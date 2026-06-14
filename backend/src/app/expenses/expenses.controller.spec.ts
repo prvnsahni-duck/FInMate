@@ -67,4 +67,27 @@ describe('ExpensesController', () => {
 
     expect(service.deleteExpense).toHaveBeenCalledWith('user-1', 'exp-1');
   });
+
+  it('should forward get by id call', async () => {
+    service.getExpenseById.mockResolvedValue({ id: 'exp-1' } as any);
+
+    const result = await controller.findOne('exp-1', { user: { id: 'user-1' } });
+
+    expect(result).toEqual({ id: 'exp-1' });
+    expect(service.getExpenseById).toHaveBeenCalledWith('user-1', 'exp-1');
+  });
+
+  it('should forward update call', async () => {
+    service.updateExpense.mockResolvedValue({ id: 'exp-1', title: 'Updated' } as any);
+
+    const result = await controller.update('exp-1', { title: 'Updated', version: 1 } as any, {
+      user: { id: 'user-1' },
+    });
+
+    expect(result).toEqual({ id: 'exp-1', title: 'Updated' });
+    expect(service.updateExpense).toHaveBeenCalledWith('user-1', 'exp-1', {
+      title: 'Updated',
+      version: 1,
+    });
+  });
 });

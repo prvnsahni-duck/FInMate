@@ -63,4 +63,34 @@ describe('split-calculator.util', () => {
       ]),
     ).toThrow(BadRequestException);
   });
+
+  it('should compute valid fixed splits', () => {
+    const result = calculateDeterministicSplits(10, [
+      { participantUserId: 'aaaa', splitType: 'fixed', shareValue: 4 },
+      { participantUserId: 'bbbb', splitType: 'fixed', shareValue: 6 },
+    ]);
+
+    expect(result).toHaveLength(2);
+    expect(result.find((s) => s.participantUserId === 'aaaa')?.amountOwed).toBe(4);
+    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(6);
+  });
+
+  it('should compute valid percent splits', () => {
+    const result = calculateDeterministicSplits(99, [
+      { participantUserId: 'aaaa', splitType: 'percent', shareValue: 40 },
+      { participantUserId: 'bbbb', splitType: 'percent', shareValue: 60 },
+    ]);
+
+    expect(result.find((s) => s.participantUserId === 'aaaa')?.amountOwed).toBe(39.6);
+    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(59.4);
+  });
+
+  it('should reject mixed split types', () => {
+    expect(() =>
+      calculateDeterministicSplits(100, [
+        { participantUserId: 'aaaa', splitType: 'equal', shareValue: 1 },
+        { participantUserId: 'bbbb', splitType: 'share', shareValue: 1 },
+      ]),
+    ).toThrow(BadRequestException);
+  });
 });

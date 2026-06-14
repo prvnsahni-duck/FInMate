@@ -119,6 +119,50 @@ describe('ExpensesService', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
+  it('should reject personal create with participantGroupMemberId', async () => {
+    userRepository.findOne
+      .mockResolvedValueOnce({ id: 'caller-id' } as any)
+      .mockResolvedValueOnce({ id: 'caller-id' } as any);
+
+    await expect(
+      service.createExpense('caller-id', {
+        title: 'Lunch',
+        amountTotal: 100,
+        currency: 'USD',
+        category: 'Food',
+        paidByUserId: 'caller-id',
+        expenseDate: '2026-06-10',
+        splits: [{ participantGroupMemberId: 'member-1', splitType: 'equal', shareValue: 1 }],
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should reject create when group is archived', async () => {
+    userRepository.findOne
+      .mockResolvedValueOnce({ id: 'caller-id' } as any)
+      .mockResolvedValueOnce({ id: 'caller-id' } as any);
+
+    groupMemberRepository.findOne.mockResolvedValueOnce({
+      id: 'membership-id',
+      role: 'member',
+      joinStatus: 'active',
+    } as any);
+    groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id', isArchived: true } as any);
+
+    await expect(
+      service.createExpense('caller-id', {
+        title: 'Trip stay',
+        amountTotal: 100,
+        currency: 'INR',
+        category: 'Accommodation',
+        paidByUserId: 'caller-id',
+        groupId: 'group-id',
+        expenseDate: '2026-06-10',
+        splits: [{ participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 }],
+      } as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
   it('should throw precondition failed on version conflict', async () => {
     expenseRepository.findOne.mockResolvedValue({
       id: 'exp-1',
@@ -165,6 +209,64 @@ describe('ExpensesService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('should reject personal update when paidByUserId is not caller', async () => {
+    expenseRepository.findOne.mockResolvedValue({
+      id: 'exp-1',
+      version: 1,
+      title: 'Lunch',
+      description: null,
+      amountTotal: 50,
+      currency: 'USD',
+      category: 'Food',
+      paidByUser: { id: 'caller-id' },
+      ownerUser: { id: 'caller-id' },
+      expenseDate: '2026-06-10',
+      status: 'posted',
+      group: null,
+    } as any);
+    userRepository.findOne.mockResolvedValue({ id: 'other-user' } as any);
+
+    await expect(
+      service.updateExpense('caller-id', 'exp-1', {
+        version: 1,
+        paidByUserId: 'other-user',
+      } as any),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('should reject group update when new payer is not group member', async () => {
+    expenseRepository.findOne.mockResolvedValue({
+      id: 'exp-1',
+      version: 1,
+      title: 'Trip',
+      description: null,
+      amountTotal: 50,
+      currency: 'USD',
+      category: 'Travel',
+      paidByUser: { id: 'caller-id' },
+      ownerUser: { id: 'caller-id' },
+      expenseDate: '2026-06-10',
+      status: 'posted',
+      group: { id: 'group-id' },
+    } as any);
+    groupMemberRepository.findOne
+      .mockResolvedValueOnce({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any)
+      .mockResolvedValueOnce(null);
+    groupRepository.findOne.mockResolvedValue({ id: 'group-id', isArchived: false } as any);
+    userRepository.findOne.mockResolvedValue({ id: 'other-user' } as any);
+
+    await expect(
+      service.updateExpense('caller-id', 'exp-1', {
+        version: 1,
+        paidByUserId: 'other-user',
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('should void posted expense on delete', async () => {
     const expense = {
       id: 'exp-1',
@@ -181,6 +283,20 @@ describe('ExpensesService', () => {
 
     expect(expense.status).toBe('void');
     expect(expenseRepository.save).toHaveBeenCalledWith(expense);
+  });
+
+  it('should hard delete draft expense on delete', async () => {
+    expenseRepository.findOne.mockResolvedValue({
+      id: 'exp-1',
+      status: 'draft',
+      group: null,
+      ownerUser: { id: 'caller-id' },
+      paidByUser: { id: 'caller-id' },
+    } as any);
+
+    await service.deleteExpense('caller-id', 'exp-1');
+
+    expect(expenseRepository.delete).toHaveBeenCalledWith({ id: 'exp-1' });
   });
 
   it('should build paginated list for caller', async () => {
@@ -228,5 +344,27 @@ describe('ExpensesService', () => {
 
     expect(result.meta.totalItems).toBe(1);
     expect(result.data).toHaveLength(1);
+  });
+
+  it('should reject list request with invalid date format', async () => {
+    await expect(
+      service.listExpenses('caller-id', {
+        page: 1,
+        limit: 20,
+        startDate: '06-10-2026',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should reject list request for unauthorized group filter', async () => {
+    groupMemberRepository.find.mockResolvedValue([] as any);
+
+    await expect(
+      service.listExpenses('caller-id', {
+        page: 1,
+        limit: 20,
+        groupId: 'group-id',
+      }),
+    ).rejects.toThrow(ForbiddenException);
   });
 });

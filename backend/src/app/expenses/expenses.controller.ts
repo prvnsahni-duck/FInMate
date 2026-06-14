@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { CreateExpenseDto, UpdateExpenseDto } from '@finmate/data-models';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ExpensesService } from './expenses.service';
+import { CreateExpenseDto, UpdateExpenseDto } from './dto';
 
 @Controller('expenses')
 @UseGuards(JwtAuthGuard)
