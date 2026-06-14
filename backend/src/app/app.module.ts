@@ -9,6 +9,7 @@ import { SnakeNamingStrategy } from './common/snake-naming-strategy';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { GroupsModule } from './groups/groups.module';
+import { ExpensesModule } from './expenses/expenses.module';
 import { SettlementsModule } from './settlements/settlements.module';
 import { ImportModule } from './import/import.module';
 import { AiModule } from './ai/ai.module';
@@ -35,6 +36,7 @@ import { AiModule } from './ai/ai.module';
     AuthModule,
     UsersModule,
     GroupsModule,
+    ExpensesModule,
     SettlementsModule,
     ImportModule,
     AiModule,
