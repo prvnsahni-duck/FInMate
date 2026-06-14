@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, PreconditionFailedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { Attachment, Expense, ExpenseSplit, Group, GroupMember, User } from '@finmate/data-models';
-import { Brackets, In, Repository } from 'typeorm';
+import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import { calculateDeterministicSplits } from './split-calculator.util';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto';
@@ -19,6 +19,8 @@ interface ExpenseListParams {
 @Injectable()
 export class ExpensesService {
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(Expense)
     private readonly expenseRepository: Repository<Expense>,
     @InjectRepository(ExpenseSplit)
@@ -50,11 +52,11 @@ export class ExpensesService {
     });
   }
 
-  private async buildGroupParticipantMaps(groupId: string): Promise<{
+  private async buildGroupParticipantMaps(groupId: string, manager: EntityManager): Promise<{
     groupMemberById: Map<string, GroupMember>;
     activeOrInvitedByUserId: Map<string, GroupMember>;
   }> {
-    const members = await this.groupMemberRepository.find({
+    const members = await manager.getRepository(GroupMember).find({
       where: { group: { id: groupId }, joinStatus: In(['active', 'invited']) },
       relations: ['user'],
     });
@@ -165,9 +167,10 @@ export class ExpensesService {
   private async persistSplits(
     expense: Expense,
     dto: Pick<CreateExpenseDto, 'splits' | 'amountTotal' | 'paidByUserId' | 'groupId'>,
+    manager: EntityManager,
   ): Promise<void> {
     const payerKey = dto.groupId
-      ? (await this.groupMemberRepository.findOne({
+      ? (await manager.getRepository(GroupMember).findOne({
           where: { group: { id: dto.groupId }, user: { id: dto.paidByUserId }, joinStatus: In(['active', 'invited']) },
         }))?.id
       : dto.paidByUserId;
@@ -176,7 +179,7 @@ export class ExpensesService {
 
     if (!dto.groupId) {
       const participantIds = [...new Set(dto.splits.map((split) => split.participantUserId || ''))].filter(Boolean);
-      const users = await this.userRepository.find({ where: { id: In(participantIds) } });
+      const users = await manager.getRepository(User).find({ where: { id: In(participantIds) } });
       const userMap = new Map(users.map((u) => [u.id, u]));
 
       for (const split of calculated) {
@@ -188,8 +191,8 @@ export class ExpensesService {
           });
         }
 
-        await this.expenseSplitRepository.save(
-          this.expenseSplitRepository.create({
+        await manager.getRepository(ExpenseSplit).save(
+          manager.getRepository(ExpenseSplit).create({
             expense,
             participantUser,
             splitType: split.splitType,
@@ -202,7 +205,7 @@ export class ExpensesService {
       return;
     }
 
-    const { groupMemberById, activeOrInvitedByUserId } = await this.buildGroupParticipantMaps(dto.groupId);
+    const { groupMemberById, activeOrInvitedByUserId } = await this.buildGroupParticipantMaps(dto.groupId, manager);
 
     for (const split of calculated) {
       const participantGroupMember = split.participantGroupMemberId
@@ -219,8 +222,8 @@ export class ExpensesService {
         });
       }
 
-      await this.expenseSplitRepository.save(
-        this.expenseSplitRepository.create({
+      await manager.getRepository(ExpenseSplit).save(
+        manager.getRepository(ExpenseSplit).create({
           expense,
           participantUser: participantByUser?.user,
           participantGroupMember: participantGroupMember || participantByUser,
@@ -294,42 +297,45 @@ export class ExpensesService {
       }
     }
 
-    const expense = await this.expenseRepository.save(
-      this.expenseRepository.create({
-        title: dto.title,
-        description: dto.description,
-        amountTotal: dto.amountTotal,
-        currency: dto.currency.toUpperCase(),
-        category: dto.category,
-        paidByUser,
-        ownerUser,
-        group,
-        expenseDate: dto.expenseDate,
-        status: dto.status || 'posted',
-      }),
-    );
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const expense = await manager.getRepository(Expense).save(
+        manager.getRepository(Expense).create({
+          title: dto.title,
+          description: dto.description,
+          amountTotal: dto.amountTotal,
+          currency: dto.currency.toUpperCase(),
+          category: dto.category,
+          paidByUser,
+          ownerUser,
+          group,
+          expenseDate: dto.expenseDate,
+          status: dto.status || 'posted',
+        }),
+      );
 
-    await this.persistSplits(expense, dto);
+      await this.persistSplits(expense, dto, manager);
 
-    if (dto.attachmentKeys?.length) {
-      for (const key of dto.attachmentKeys) {
-        await this.attachmentRepository.save(
-          this.attachmentRepository.create({
-            uploaderUser: ownerUser,
-            expense,
-            storageKey: key,
-            originalName: this.basename(key),
-            mimeType: 'application/octet-stream',
-            sizeBytes: '0',
-          }),
-        );
+      if (dto.attachmentKeys?.length) {
+        for (const key of dto.attachmentKeys) {
+          await manager.getRepository(Attachment).save(
+            manager.getRepository(Attachment).create({
+              uploaderUser: ownerUser,
+              expense,
+              storageKey: key,
+              originalName: this.basename(key),
+              mimeType: 'application/octet-stream',
+              sizeBytes: '0',
+            }),
+          );
+        }
       }
-    }
 
-    const saved = await this.expenseRepository.findOne({
-      where: { id: expense.id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      return await manager.getRepository(Expense).findOne({
+        where: { id: expense.id },
+        relations: ['paidByUser', 'ownerUser', 'group'],
+      });
     });
+
     if (!saved) {
       throw new NotFoundException('Expense not found after creation');
     }
@@ -486,44 +492,46 @@ export class ExpensesService {
     if (dto.expenseDate !== undefined) expense.expenseDate = dto.expenseDate;
     if (dto.status !== undefined) expense.status = dto.status;
 
-    await this.expenseRepository.save(expense);
+    const saved = await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(Expense).save(expense);
 
-    if (dto.splits) {
-      if (!expense.group && dto.splits.some((split) => !!split.participantGroupMemberId)) {
-        throw new BadRequestException({
-          errorCode: 'VAL_INVALID_INPUT',
-          message: 'Personal expenses cannot include participantGroupMemberId in splits',
-        });
+      if (dto.splits) {
+        if (!expense.group && dto.splits.some((split) => !!split.participantGroupMemberId)) {
+          throw new BadRequestException({
+            errorCode: 'VAL_INVALID_INPUT',
+            message: 'Personal expenses cannot include participantGroupMemberId in splits',
+          });
+        }
+
+        await manager.getRepository(ExpenseSplit).delete({ expense: { id: expense.id } as any });
+        await this.persistSplits(expense, {
+          splits: dto.splits,
+          amountTotal: dto.amountTotal ?? Number(expense.amountTotal),
+          paidByUserId: dto.paidByUserId ?? expense.paidByUser.id,
+          groupId: expense.group?.id,
+        }, manager);
       }
 
-      await this.expenseSplitRepository.delete({ expense: { id: expense.id } as any });
-      await this.persistSplits(expense, {
-        splits: dto.splits,
-        amountTotal: dto.amountTotal ?? Number(expense.amountTotal),
-        paidByUserId: dto.paidByUserId ?? expense.paidByUser.id,
-        groupId: expense.group?.id,
+      if (dto.attachmentKeys) {
+        await manager.getRepository(Attachment).delete({ expense: { id: expense.id } as any });
+        for (const key of dto.attachmentKeys) {
+          await manager.getRepository(Attachment).save(
+            manager.getRepository(Attachment).create({
+              uploaderUser: expense.ownerUser,
+              expense,
+              storageKey: key,
+              originalName: this.basename(key),
+              mimeType: 'application/octet-stream',
+              sizeBytes: '0',
+            }),
+          );
+        }
+      }
+
+      return await manager.getRepository(Expense).findOne({
+        where: { id: expense.id },
+        relations: ['paidByUser', 'ownerUser', 'group'],
       });
-    }
-
-    if (dto.attachmentKeys) {
-      await this.attachmentRepository.delete({ expense: { id: expense.id } as any });
-      for (const key of dto.attachmentKeys) {
-        await this.attachmentRepository.save(
-          this.attachmentRepository.create({
-            uploaderUser: expense.ownerUser,
-            expense,
-            storageKey: key,
-            originalName: this.basename(key),
-            mimeType: 'application/octet-stream',
-            sizeBytes: '0',
-          }),
-        );
-      }
-    }
-
-    const saved = await this.expenseRepository.findOne({
-      where: { id: expense.id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
     });
 
     if (!saved) {

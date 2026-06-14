@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, NotFoundException, PreconditionFailedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
+import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import { Attachment, Expense, ExpenseSplit, Group, GroupMember, User } from '@finmate/data-models';
 import { Repository } from 'typeorm';
 import { ExpensesService } from './expenses.service';
@@ -51,6 +51,21 @@ describe('ExpensesService', () => {
       delete: jest.fn(),
     };
 
+    const mockEntityManager = {
+      getRepository: jest.fn((entity) => {
+        if (entity === Expense) return mockExpenseRepository;
+        if (entity === ExpenseSplit) return mockSplitRepository;
+        if (entity === Group) return mockGroupRepository;
+        if (entity === GroupMember) return mockGroupMemberRepository;
+        if (entity === User) return mockUserRepository;
+        if (entity === Attachment) return mockAttachmentRepository;
+      }),
+    };
+
+    const mockDataSource = {
+      transaction: jest.fn(async (cb) => await cb(mockEntityManager)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExpensesService,
@@ -60,6 +75,7 @@ describe('ExpensesService', () => {
         { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepository },
         { provide: getRepositoryToken(User), useValue: mockUserRepository },
         { provide: getRepositoryToken(Attachment), useValue: mockAttachmentRepository },
+        { provide: getDataSourceToken(), useValue: mockDataSource },
       ],
     }).compile();
 
