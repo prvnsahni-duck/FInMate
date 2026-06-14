@@ -32,7 +32,7 @@ export class SettlementsController {
     @Param('groupId') groupId: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-    @Req() req: any,
+    @Req() req?: any,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;

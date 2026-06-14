@@ -18,7 +18,7 @@ export class GroupsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('isArchived') isArchived?: string,
-    @Req() req: any,
+    @Req() req?: any,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;

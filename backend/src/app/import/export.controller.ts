@@ -20,8 +20,8 @@ export class ExportController {
     @Query('groupId') groupId?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
-    @Req() req: RequestWithUser,
-    @Res() res: Response,
+    @Req() req?: RequestWithUser,
+    @Res() res?: Response,
   ): Promise<void> {
     if (format !== 'csv' && format !== 'xlsx') {
       throw new BadRequestException('Format must be either csv or xlsx');

@@ -1,8 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, VersionColumn, Index } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
 
 @Entity('expenses')
+@Index(['group', 'status', 'expenseDate'])
+@Index(['group', 'category'])
 export class Expense {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
