@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager } from 'typeorm';
+import { Repository, DataSource, EntityManager, Brackets, In } from 'typeorm';
 import { Group, GroupMember, Expense, ExpenseSplit, User } from '@finmate/data-models';
 import * as XLSX from 'xlsx';
 
@@ -444,5 +444,156 @@ export class ImportService {
         errors: [],
       };
     });
+  }
+
+  async exportExpenses(
+    userId: string,
+    format: 'csv' | 'xlsx',
+    groupId?: string,
+    startDate?: string,
+    endDate?: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
+    // 1. Validate date filters format if provided
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (startDate && !dateRegex.test(startDate)) {
+      throw new BadRequestException('startDate must match YYYY-MM-DD format');
+    }
+    if (endDate && !dateRegex.test(endDate)) {
+      throw new BadRequestException('endDate must match YYYY-MM-DD format');
+    }
+
+    let groupIds: string[] = [];
+
+    if (groupId) {
+      // Validate Group exists and caller is active member
+      const group = await this.groupRepository.findOne({ where: { id: groupId } });
+      if (!group) {
+        throw new NotFoundException('Group not found');
+      }
+
+      const callerMember = await this.groupMemberRepository.findOne({
+        where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+      });
+      if (!callerMember) {
+        throw new ForbiddenException('You do not have access to this group');
+      }
+    } else {
+      // Find all groups caller is active member of
+      const memberships = await this.groupMemberRepository.find({
+        where: { user: { id: userId }, joinStatus: 'active' },
+        relations: ['group'],
+      });
+      groupIds = memberships.map((m) => m.group.id);
+    }
+
+    // 2. Query expenses with splits
+    // 2. Query expenses
+    const query = this.expenseRepository.createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.group', 'group')
+      .leftJoinAndSelect('expense.ownerUser', 'ownerUser');
+
+    if (groupId) {
+      query.andWhere('group.id = :groupId', { groupId });
+    } else {
+      if (groupIds.length > 0) {
+        query.andWhere(
+          new Brackets((qb) => {
+            qb.where('group.id IN (:...groupIds)', { groupIds })
+              .orWhere('group.id IS NULL AND ownerUser.id = :userId', { userId });
+          }),
+        );
+      } else {
+        query.andWhere('group.id IS NULL AND ownerUser.id = :userId', { userId });
+      }
+    }
+
+    if (startDate) {
+      query.andWhere('expense.expenseDate >= :startDate', { startDate });
+    }
+    if (endDate) {
+      query.andWhere('expense.expenseDate <= :endDate', { endDate });
+    }
+
+    query.orderBy('expense.expenseDate', 'ASC')
+         .addOrderBy('expense.createdAt', 'ASC');
+
+    const expenses = await query.getMany();
+
+    // Query splits for these expenses to avoid circular dependency in entities
+    const splitsMap = new Map<string, ExpenseSplit[]>();
+    if (expenses.length > 0) {
+      const expenseIds = expenses.map((e) => e.id);
+      const allSplits = await this.expenseSplitRepository.find({
+        where: { expense: { id: In(expenseIds) } },
+        relations: ['participantUser', 'expense'],
+      });
+
+      for (const split of allSplits) {
+        const expId = split.expense.id;
+        if (!splitsMap.has(expId)) {
+          splitsMap.set(expId, []);
+        }
+        splitsMap.get(expId)!.push(split);
+      }
+    }
+
+    // 3. Format into layout structure matching the import schema
+    const exportData = expenses.map((expense) => {
+      const splits = splitsMap.get(expense.id) || [];
+      const sharesData = splits
+        .filter((s) => s.participantUser?.email)
+        .map((s) => `${s.participantUser!.email.toLowerCase()}:${Number(s.shareValue)}`)
+        .sort()
+        .join(';');
+
+      const dateVal = expense.expenseDate as unknown;
+      let dateStr = '';
+      if (dateVal instanceof Date) {
+        const y = dateVal.getUTCFullYear();
+        const m = String(dateVal.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(dateVal.getUTCDate()).padStart(2, '0');
+        dateStr = `${y}-${m}-${d}`;
+      } else {
+        dateStr = String(dateVal || '');
+      }
+
+      return {
+        date: dateStr,
+        title: expense.title,
+        amount: Number(expense.amountTotal).toFixed(2),
+        currency: expense.currency.toUpperCase(),
+        category: expense.category,
+        payer_email: expense.paidByUser.email.toLowerCase(),
+        split_type: splits[0]?.splitType || 'equal',
+        shares_data: sharesData,
+        description: expense.description || '',
+      };
+    });
+
+    // 4. Generate worksheet
+    const worksheet = XLSX.utils.json_to_sheet(exportData, {
+      header: ['date', 'title', 'amount', 'currency', 'category', 'payer_email', 'split_type', 'shares_data', 'description'],
+    });
+
+    let buffer: Buffer;
+    let mimeType: string;
+    let filename: string;
+    const timestamp = Date.now();
+
+    if (format === 'xlsx') {
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Expenses');
+      buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      mimeType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      filename = `expenses_export_${timestamp}.xlsx`;
+    } else {
+      const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+      buffer = Buffer.from(csvContent, 'utf-8');
+      mimeType = 'text/csv';
+      filename = `expenses_export_${timestamp}.csv`;
+    }
+
+    return { buffer, mimeType, filename };
   }
 }

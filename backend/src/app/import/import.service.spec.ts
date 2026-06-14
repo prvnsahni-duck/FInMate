@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager } from 'typeorm';
+import { Repository, DataSource, EntityManager, SelectQueryBuilder, Brackets } from 'typeorm';
 import { Group, GroupMember, Expense, ExpenseSplit, User } from '@finmate/data-models';
 import { ImportService } from './import.service';
 import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
@@ -27,11 +27,13 @@ describe('ImportService', () => {
     const mockExpenseRepository = {
       create: jest.fn(),
       save: jest.fn(),
+      createQueryBuilder: jest.fn(),
     };
 
     const mockExpenseSplitRepository = {
       create: jest.fn(),
       save: jest.fn(),
+      find: jest.fn(),
     };
 
     const mockDataSource = {
@@ -271,6 +273,150 @@ describe('ImportService', () => {
       // Since payer A (aaaa) is not in the split, remainder -0.01 goes to lexicographically first member in the split.
       // Members in split: bbbb and cccc. 'bbbb' is smaller than 'cccc'.
       // So B gets 5.01 - 0.01 = 5.00. C gets 5.01.
+    });
+  });
+
+  describe('exportExpenses', () => {
+    let mockQueryBuilder: any;
+
+    beforeEach(() => {
+      mockQueryBuilder = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockImplementation((condition) => {
+          if (condition instanceof Brackets) {
+            condition.whereFactory(mockQueryBuilder);
+          }
+          return mockQueryBuilder;
+        }),
+        where: jest.fn().mockReturnThis(),
+        orWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+
+      expenseRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+    });
+
+    it('should throw BadRequestException if startDate format is invalid', async () => {
+      await expect(service.exportExpenses('user-1', 'csv', 'group-1', '2026/06/10')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException if endDate format is invalid', async () => {
+      await expect(service.exportExpenses('user-1', 'csv', 'group-1', undefined, '2026-06-100')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw NotFoundException if groupId is provided but group does not exist', async () => {
+      groupRepository.findOne.mockResolvedValueOnce(null);
+      await expect(service.exportExpenses('user-1', 'csv', 'group-1')).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw ForbiddenException if caller is not an active group member', async () => {
+      groupRepository.findOne.mockResolvedValueOnce({ id: 'group-1' } as Group);
+      groupMemberRepository.findOne.mockResolvedValueOnce(null); // not found or inactive
+      await expect(service.exportExpenses('user-1', 'csv', 'group-1')).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should export all expenses for group if groupId is provided and caller is active member', async () => {
+      const mockGroup = { id: 'group-1' } as Group;
+      const mockCallerMember = { id: 'member-1', role: 'member' } as GroupMember;
+      
+      groupRepository.findOne.mockResolvedValueOnce(mockGroup);
+      groupMemberRepository.findOne.mockResolvedValueOnce(mockCallerMember);
+
+      const mockExpenses = [
+        {
+          id: 'exp-1',
+          title: 'Lunch',
+          amountTotal: 15.50,
+          currency: 'USD',
+          category: 'Food',
+          paidByUser: { id: 'user-a', email: 'a@ex.com' } as User,
+          ownerUser: { id: 'user-1', email: 'caller@ex.com' } as User,
+          expenseDate: new Date('2026-06-10T00:00:00.000Z'),
+          description: 'Team lunch',
+        }
+      ] as unknown as Expense[];
+
+      const mockSplits = [
+        {
+          id: 'split-1',
+          expense: { id: 'exp-1' },
+          participantUser: { id: 'user-a', email: 'a@ex.com' } as User,
+          splitType: 'equal',
+          shareValue: 1.0,
+          amountOwed: 7.75,
+        },
+        {
+          id: 'split-2',
+          expense: { id: 'exp-1' },
+          participantUser: { id: 'user-b', email: 'b@ex.com' } as User,
+          splitType: 'equal',
+          shareValue: 1.0,
+          amountOwed: 7.75,
+        }
+      ] as unknown as ExpenseSplit[];
+
+      mockQueryBuilder.getMany.mockResolvedValueOnce(mockExpenses);
+      (expenseSplitRepository.find as jest.Mock).mockResolvedValueOnce(mockSplits);
+
+      const result = await service.exportExpenses('user-1', 'csv', 'group-1');
+
+      expect(result.mimeType).toBe('text/csv');
+      expect(result.filename).toMatch(/^expenses_export_\d+\.csv$/);
+      expect(result.buffer).toBeDefined();
+
+      const csvContent = result.buffer.toString('utf-8');
+      expect(csvContent).toContain('date,title,amount,currency,category,payer_email,split_type,shares_data,description');
+      expect(csvContent).toContain('2026-06-10');
+      expect(csvContent).toContain('Lunch');
+      expect(csvContent).toContain('15.50');
+      expect(csvContent).toContain('USD');
+      expect(csvContent).toContain('Food');
+      expect(csvContent).toContain('a@ex.com');
+      expect(csvContent).toContain('equal');
+      expect(csvContent).toContain('a@ex.com:1;b@ex.com:1');
+      expect(csvContent).toContain('Team lunch');
+    });
+
+    it('should export all user expenses if no groupId is specified', async () => {
+      const mockMemberships = [
+        { group: { id: 'group-1' } }
+      ] as unknown as GroupMember[];
+      groupMemberRepository.find.mockResolvedValueOnce(mockMemberships);
+
+      const mockExpenses = [
+        {
+          id: 'exp-2',
+          title: 'Individual expense',
+          amountTotal: 30.00,
+          currency: 'EUR',
+          category: 'Transport',
+          paidByUser: { id: 'user-1', email: 'caller@ex.com' } as User,
+          ownerUser: { id: 'user-1', email: 'caller@ex.com' } as User,
+          expenseDate: '2026-06-11',
+          description: '',
+        }
+      ] as unknown as Expense[];
+
+      const mockSplits = [] as unknown as ExpenseSplit[];
+
+      mockQueryBuilder.getMany.mockResolvedValueOnce(mockExpenses);
+      (expenseSplitRepository.find as jest.Mock).mockResolvedValueOnce(mockSplits);
+
+      const result = await service.exportExpenses('user-1', 'xlsx');
+
+      expect(result.mimeType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(result.filename).toMatch(/^expenses_export_\d+\.xlsx$/);
+      
+      const workbook = XLSX.read(result.buffer, { type: 'buffer' });
+      expect(workbook.SheetNames).toContain('Expenses');
+      const sheet = workbook.Sheets['Expenses'];
+      const data = XLSX.utils.sheet_to_json<any>(sheet);
+      expect(data.length).toBe(1);
+      expect(data[0].title).toBe('Individual expense');
+      expect(data[0].amount).toBe('30.00');
+      expect(data[0].currency).toBe('EUR');
     });
   });
 });
