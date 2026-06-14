@@ -1,0 +1,8 @@
+/*
+ * All visual styles are applied via Tailwind utility classes in the HTML template.
+ * Custom keyframe animations (animate-fade-in, animate-slide-in) are defined
+ * in tailwind.config.js and generated at build time.
+ *
+ * This file is intentionally minimal — add SCSS only for effects that
+ * Tailwind cannot express (e.g. complex procedural loops, third-party overrides).
+ */
