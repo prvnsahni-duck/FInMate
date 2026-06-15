@@ -848,15 +848,30 @@ export class ExpensesService {
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31`;
 
-    const rows = await this.buildBaseAnalyticsQuery(userId, groupId, startDate, endDate)
-      .select(`TO_CHAR(expense.expense_date, 'YYYY-MM')`, 'month')
-      .addSelect('SUM(CAST(expense.amount_total AS DECIMAL))', 'total')
-      .addSelect('expense.currency', 'currency')
-      .groupBy(`TO_CHAR(expense.expense_date, 'YYYY-MM'), expense.currency`)
-      .orderBy('month', 'ASC')
-      .getRawMany<{ month: string; total: string; currency: string }>();
+    const expenses = await this.buildBaseAnalyticsQuery(userId, groupId, startDate, endDate)
+      .select(['expense.id', 'expense.expenseDate', 'expense.amountTotal', 'expense.currency'])
+      .getMany();
 
-    return rows.map((r) => ({ month: r.month, total: Number(r.total), currency: r.currency }));
+    const groups = new Map<string, { total: number; currency: string }>();
+    for (const exp of expenses) {
+      const month = exp.expenseDate.slice(0, 7); // YYYY-MM
+      const key = `${month}_${exp.currency}`;
+      const existing = groups.get(key) || { total: 0, currency: exp.currency };
+      existing.total += Number(exp.amountTotal);
+      groups.set(key, existing);
+    }
+
+    const results: MonthlyTotal[] = [];
+    for (const [key, val] of groups.entries()) {
+      const month = key.split('_')[0];
+      results.push({
+        month,
+        total: Math.round(val.total * 100) / 100,
+        currency: val.currency,
+      });
+    }
+
+    return results.sort((a, b) => a.month.localeCompare(b.month));
   }
 
   /**
@@ -868,15 +883,30 @@ export class ExpensesService {
 
     await this.assertGroupAccess(userId, groupId);
 
-    const rows = await this.buildBaseAnalyticsQuery(userId, groupId)
-      .select(`TO_CHAR(expense.expense_date, 'YYYY')`, 'month')
-      .addSelect('SUM(CAST(expense.amount_total AS DECIMAL))', 'total')
-      .addSelect('expense.currency', 'currency')
-      .groupBy(`TO_CHAR(expense.expense_date, 'YYYY'), expense.currency`)
-      .orderBy('month', 'ASC')
-      .getRawMany<{ month: string; total: string; currency: string }>();
+    const expenses = await this.buildBaseAnalyticsQuery(userId, groupId)
+      .select(['expense.id', 'expense.expenseDate', 'expense.amountTotal', 'expense.currency'])
+      .getMany();
 
-    return rows.map((r) => ({ month: r.month, total: Number(r.total), currency: r.currency }));
+    const groups = new Map<string, { total: number; currency: string }>();
+    for (const exp of expenses) {
+      const year = exp.expenseDate.slice(0, 4); // YYYY
+      const key = `${year}_${exp.currency}`;
+      const existing = groups.get(key) || { total: 0, currency: exp.currency };
+      existing.total += Number(exp.amountTotal);
+      groups.set(key, existing);
+    }
+
+    const results: MonthlyTotal[] = [];
+    for (const [key, val] of groups.entries()) {
+      const year = key.split('_')[0];
+      results.push({
+        month: year,
+        total: Math.round(val.total * 100) / 100,
+        currency: val.currency,
+      });
+    }
+
+    return results.sort((a, b) => a.month.localeCompare(b.month));
   }
 
   /**
@@ -888,15 +918,29 @@ export class ExpensesService {
 
     await this.assertGroupAccess(userId, groupId);
 
-    const rows = await this.buildBaseAnalyticsQuery(userId, groupId, startDate, endDate)
-      .select('expense.category', 'category')
-      .addSelect('SUM(CAST(expense.amount_total AS DECIMAL))', 'total')
-      .addSelect('expense.currency', 'currency')
-      .groupBy('expense.category, expense.currency')
-      .orderBy('total', 'DESC')
-      .getRawMany<{ category: string; total: string; currency: string }>();
+    const expenses = await this.buildBaseAnalyticsQuery(userId, groupId, startDate, endDate)
+      .select(['expense.id', 'expense.category', 'expense.amountTotal', 'expense.currency'])
+      .getMany();
 
-    return rows.map((r) => ({ category: r.category, total: Number(r.total), currency: r.currency }));
+    const groups = new Map<string, { total: number; currency: string }>();
+    for (const exp of expenses) {
+      const key = `${exp.category}_${exp.currency}`;
+      const existing = groups.get(key) || { total: 0, currency: exp.currency };
+      existing.total += Number(exp.amountTotal);
+      groups.set(key, existing);
+    }
+
+    const results: CategoryTotal[] = [];
+    for (const [key, val] of groups.entries()) {
+      const category = key.split('_')[0];
+      results.push({
+        category,
+        total: Math.round(val.total * 100) / 100,
+        currency: val.currency,
+      });
+    }
+
+    return results.sort((a, b) => b.total - a.total);
   }
 
   private buildBaseAnalyticsQuery(userId: string, groupId?: string, startDate?: string, endDate?: string) {

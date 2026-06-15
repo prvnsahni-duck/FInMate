@@ -1391,9 +1391,35 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
    - Implement the remaining database/service-level Server-Side Encryption (SSE) for expense amount columns as detailed in the Encryption Boundary Table.
 
+### 2026-06-15 (Part 4)
+- **Summary:** Implemented database/service-level Server-Side Encryption (SSE) at rest for expense amount columns (`amount_total` in `expenses` and `amount_owed` in `expense_splits`).
+- **Changes Made:**
+   - Created `EntityEncryptionHolder` and `encryptionTransformer` value transformer in `@finmate/data-models`.
+   - Wired `EncryptionService` to register itself with the shared data-models holder on initialization.
+   - Updated `Expense` and `ExpenseSplit` entities to apply `encryptionTransformer` on amount columns.
+   - Refactored `getMonthlySummary`, `getYearlySummary`, and `getCategoryDistribution` in `ExpensesService` to perform in-memory decryption and grouping.
+   - Added a new database migration to alter amount columns from `DECIMAL(12,2)` to `VARCHAR(255)`.
+   - Added unit tests in `encryption.service.spec.ts` for the custom transformer.
+- **Artifacts Updated:**
+   - shared/data-models/src/lib/encryption.transformer.ts
+   - shared/data-models/src/index.ts
+   - shared/data-models/src/lib/expense.entity.ts
+   - shared/data-models/src/lib/expense-split.entity.ts
+   - backend/src/app/encryption/encryption.service.ts
+   - backend/src/app/expenses/expenses.service.ts
+   - backend/src/app/app.module.ts
+   - backend/src/ormconfig.ts
+   - backend/src/app/encryption/encryption.service.spec.ts
+   - FinMate_Project_Specification.md
+- **Decisions:**
+   - Change database amount columns to `VARCHAR(255)` to accommodate base64 GCM ciphertexts.
+   - Decrypt and aggregate values in memory for analytics to avoid breaking SQL numeric operations.
+- **Next Actions:**
+   - Verify application by executing tests.
+
 ---
 
-**Version:** 2.14 (Jest unit tests passing, specifications updated)  
+**Version:** 2.15 (Server-Side Encryption for expense amounts implemented)  
 **Author:** Prvn Sahni  
 **Last Updated:** June 15, 2026  
 **Status:** Implementation (Coding) Phase

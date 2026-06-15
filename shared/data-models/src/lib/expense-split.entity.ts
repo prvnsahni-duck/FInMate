@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Expense } from './expense.entity';
 import { User } from './user.entity';
 import { GroupMember } from './group-member.entity';
+import { encryptionTransformer } from './encryption.transformer';
 
 @Entity('expense_splits')
 @Check('("participantUserId" IS NOT NULL AND "participantGroupMemberId" IS NULL) OR ("participantUserId" IS NULL AND "participantGroupMemberId" IS NOT NULL)')
@@ -24,7 +25,12 @@ export class ExpenseSplit {
   @Column('decimal', { precision: 12, scale: 4 })
   shareValue!: number;
 
-  @Column('decimal', { precision: 12, scale: 2 })
+  @Column({
+    type: 'varchar',
+    name: 'amount_owed',
+    length: 255,
+    transformer: encryptionTransformer,
+  })
   amountOwed!: number;
 
   @Column({ type: 'boolean', default: false })

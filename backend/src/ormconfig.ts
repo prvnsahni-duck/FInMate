@@ -14,6 +14,8 @@ import { AuditLog } from '../../shared/data-models/src/lib/audit-log.entity';
 import { InitialSchema1717977600000 } from './migrations/1717977600000-InitialSchema';
 import { AddTwoFactorAuth1718000000000 } from './migrations/1718000000000-AddTwoFactorAuth';
 import { AddGroupCurrencyAndExpenseSoftDelete1718100000000 } from './migrations/1718100000000-AddGroupCurrencyAndExpenseSoftDelete';
+import { AddGroupTypeAndSpectatorAndHousehold1718200000000 } from './migrations/1718200000000-AddGroupTypeAndSpectatorAndHousehold';
+import { EncryptExpenseAmounts1718300000000 } from './migrations/1718300000000-EncryptExpenseAmounts';
 import { SnakeNamingStrategy } from './app/common/snake-naming-strategy';
 
 dotenv.config({ path: '.env' });
@@ -40,7 +42,9 @@ export default new DataSource({
   migrations: [
     InitialSchema1717977600000,
     AddTwoFactorAuth1718000000000,
-    AddGroupCurrencyAndExpenseSoftDelete1718100000000
+    AddGroupCurrencyAndExpenseSoftDelete1718100000000,
+    AddGroupTypeAndSpectatorAndHousehold1718200000000,
+    EncryptExpenseAmounts1718300000000,
   ],
   namingStrategy: new SnakeNamingStrategy(),
   synchronize: false,

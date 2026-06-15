@@ -41,4 +41,34 @@ describe('EncryptionService', () => {
   it('should throw error on invalid ciphertext format', () => {
     expect(() => service.decrypt('invalid-format')).toThrow('Could not decrypt field data');
   });
+
+  describe('encryptionTransformer', () => {
+    // Note: EntityEncryptionHolder was initialized in the beforeEach block
+    // because the EncryptionService constructor calls setService(this).
+    
+    it('should transform number to encrypted string on saving', () => {
+      const value = 123.45;
+      const dbValue = require('@finmate/data-models').encryptionTransformer.to(value);
+      expect(dbValue).toBeDefined();
+      expect(typeof dbValue).toBe('string');
+      expect(dbValue).not.toBe('123.45');
+      
+      const parts = dbValue!.split(':');
+      expect(parts).toHaveLength(3); // iv:encrypted:authTag
+    });
+
+    it('should transform encrypted string back to number on reading', () => {
+      const value = 123.45;
+      const dbValue = require('@finmate/data-models').encryptionTransformer.to(value);
+      
+      const decoded = require('@finmate/data-models').encryptionTransformer.from(dbValue);
+      expect(decoded).toBe(123.45);
+    });
+
+    it('should fallback to original number if decryption fails', () => {
+      const plaintext = '456.78';
+      const decoded = require('@finmate/data-models').encryptionTransformer.from(plaintext);
+      expect(decoded).toBe(456.78);
+    });
+  });
 });

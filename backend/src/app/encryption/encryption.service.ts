@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
+import { EntityEncryptionHolder } from '@finmate/data-models';
 
 @Injectable()
 export class EncryptionService {
@@ -11,6 +12,9 @@ export class EncryptionService {
     const rawSecret = this.configService.get<string>('ENCRYPTION_KEY') || 'default_encryption_key_for_finmate_development_phase';
     // Ensure key is exactly 32 bytes by hashing the secret using SHA-256
     this.key = createHash('sha256').update(rawSecret).digest();
+    
+    // Register this instance with the static data-models encryption holder
+    EntityEncryptionHolder.setService(this);
   }
 
   encrypt(text: string): string {
