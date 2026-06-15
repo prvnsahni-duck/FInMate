@@ -1063,10 +1063,10 @@ export class ExpensesService {
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
       .leftJoinAndSelect('expense.ownerUser', 'ownerUser')
       .leftJoinAndSelect('expense.group', 'group')
-      .where('expense.group_id = :groupId', { groupId })
-      .andWhere('expense.deleted_at IS NOT NULL')
+      .where('group.id = :groupId', { groupId })
+      .andWhere('expense.deletedAt IS NOT NULL')
       .withDeleted()
-      .orderBy('expense.deleted_at', 'DESC');
+      .orderBy('expense.deletedAt', 'DESC');
 
     const total = await query.getCount();
     const expenses = await query

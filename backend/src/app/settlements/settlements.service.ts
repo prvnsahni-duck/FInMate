@@ -289,7 +289,7 @@ export class SettlementsService {
       .createQueryBuilder('settlement')
       .leftJoinAndSelect('settlement.fromUser', 'fromUser')
       .leftJoinAndSelect('settlement.toUser', 'toUser')
-      .where('settlement.group_id = :groupId', { groupId })
+      .where('settlement.group = :groupId', { groupId })
       .orderBy('settlement.createdAt', 'DESC');
 
     const total = await query.getCount();

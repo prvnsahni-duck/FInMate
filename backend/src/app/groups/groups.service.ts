@@ -400,8 +400,8 @@ export class GroupsService {
     const [logs, total] = await this.auditLogRepository
       .createQueryBuilder('log')
       .leftJoinAndSelect('log.actorUser', 'actorUser')
-      .where('log.group_id = :groupId', { groupId })
-      .orderBy('log.created_at', 'DESC')
+      .where('log.group = :groupId', { groupId })
+      .orderBy('log.createdAt', 'DESC')
       .skip((p - 1) * l)
       .take(l)
       .getManyAndCount();

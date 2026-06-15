@@ -1466,8 +1466,28 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 
 ---
 
-**Version:** 2.17 (Expenses Backend Verification Completed)  
+### 2026-06-15 (Part 7)
+- **Summary:** Resolved 500 internal server errors in group history, deleted expenses, and settlements endpoints.
+- **Changes Made:**
+   - Modified [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts) to query `log.group` instead of `log.group_id` and order by `log.createdAt` instead of `log.created_at` in `getGroupHistory`.
+   - Modified [expenses.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts) to query `group.id` instead of `expense.group_id` and query/order by `expense.deletedAt` instead of `expense.deleted_at` in `listDeletedExpenses`.
+   - Modified [settlements.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/settlements/settlements.service.ts) to query `settlement.group` instead of `settlement.group_id` in `listSettlements`.
+- **Artifacts Updated:**
+   - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
+   - [expenses.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts)
+   - [settlements.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/settlements/settlements.service.ts)
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Use TypeORM camelCase property names instead of database snake_case column names for both relation lookups and sorting conditions in QueryBuilder to prevent EntityPropertyNotFoundError.
+- **Next Actions:**
+   - Prompt the user to re-test the history and deleted expenses endpoints.
+
+---
+
+**Version:** 2.19 (Resolved 500 Query and Order-By Errors)  
 **Author:** Antigravity AI  
 **Last Updated:** June 15, 2026  
 **Status:** Rollout and Verification Phase
+
+
 
