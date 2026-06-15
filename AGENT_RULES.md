@@ -38,6 +38,10 @@ After each major feature is finished and tests pass, produce a conventional comm
 ### Rule 6 — Always Update the Progress Log in the Project Specification File
 Upon completing any change, feature, or project step, you MUST update the **"Progress Log"** section at the bottom of [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md) with a new date-stamped entry. Follow the established dated format (Date, Summary, Changes Made, Artifacts Updated, Decisions, Next Actions) to keep it as the single, long-term project source of truth.
 
+### Rule 7 — Ask User to Run Terminal Commands to Save Token Expenses
+To avoid unnecessary token usage and token expenses, the agent must not run heavy, long-running, or highly verbose terminal commands (such as running tests, linting, or building the project) directly using the run command tool.
+Instead, the agent must ask/instruct the user in the chat to run these terminal commands themselves on their own machine and report/paste the result back if needed.
+
 ---
 
 ## 🏗️ Technology Stack (Do Not Deviate Without Asking)
