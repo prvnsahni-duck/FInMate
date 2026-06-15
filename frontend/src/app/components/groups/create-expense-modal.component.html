@@ -81,6 +81,8 @@
             <option value="Travel">Travel</option>
             <option value="Utilities">Utilities</option>
             <option value="Entertainment">Entertainment</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Housing">Housing</option>
             <option value="Others">Others</option>
           </select>
         </div>
@@ -129,6 +131,27 @@
         <span *ngIf="selectedUserIds.size === 0" class="text-xs text-red-500 mt-1 block">
           At least one participant must be selected.
         </span>
+      </div>
+
+      <!-- Attachments Section (Zero-Knowledge file uploader simulation) -->
+      <div>
+        <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Attachments (Optional)</label>
+        <div class="flex items-center space-x-2">
+          <label class="cursor-pointer py-2 px-4 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl font-semibold border border-slate-200 dark:border-white/10 transition-all flex items-center space-x-2 text-xs">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+            <span>Attach Receipt</span>
+            <input type="file" (change)="onFileSelected($event)" multiple class="hidden">
+          </label>
+        </div>
+        <!-- List attached files -->
+        <div *ngIf="attachedFiles.length > 0" class="mt-2 flex flex-wrap gap-2">
+          <div *ngFor="let file of attachedFiles; let idx = index" class="flex items-center space-x-1.5 py-1 px-3 bg-slate-100 dark:bg-white/5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-white/5">
+            <span class="truncate max-w-[150px]" [title]="file.name">{{ file.name }}</span>
+            <button type="button" (click)="removeAttachment(idx)" class="text-slate-400 hover:text-red-500 font-bold ml-1 focus:outline-none">
+              &times;
+            </button>
+          </div>
+        </div>
       </div>
       
       <div class="flex space-x-4 pt-4">

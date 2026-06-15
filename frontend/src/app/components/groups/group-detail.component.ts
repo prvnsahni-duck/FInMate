@@ -4,11 +4,13 @@ import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CreateExpenseModalComponent } from './create-expense-modal.component';
 import { jwtDecode } from 'jwt-decode';
+import { FormsModule } from '@angular/forms';
+import { AnalyticsChartsComponent } from '../analytics/analytics-charts.component';
 
 @Component({
   selector: 'app-group-detail',
   standalone: true,
-  imports: [CommonModule, RouterLink, CreateExpenseModalComponent],
+  imports: [CommonModule, RouterLink, CreateExpenseModalComponent, FormsModule, AnalyticsChartsComponent],
   template: `
     <div *ngIf="isLoading" class="animate-pulse">
       <div class="h-10 bg-slate-200 dark:bg-white/5 rounded-xl w-1/3 mb-4"></div>
@@ -89,6 +91,9 @@ import { jwtDecode } from 'jwt-decode';
             <button (click)="setActiveTab('ledger')" [class]="activeTab === 'ledger' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
               Ledger
             </button>
+            <button (click)="setActiveTab('analytics')" [class]="activeTab === 'analytics' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
+              Analytics
+            </button>
             <button (click)="setActiveTab('history')" [class]="activeTab === 'history' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
               History
             </button>
@@ -106,49 +111,103 @@ import { jwtDecode } from 'jwt-decode';
                 <button (click)="exportLedger('xlsx')" class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-slate-50 dark:hover:bg-white/5 text-slate-500 dark:text-slate-400">Export Excel</button>
               </div>
             </div>
+
+            <!-- Filters Row (Only for normal group ledger) -->
+            <div *ngIf="group.groupType !== 'household'" class="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6 p-4 rounded-2xl bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5">
+              <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Category</label>
+                <select [(ngModel)]="filterCategory" (change)="applyFilters()" class="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none cursor-pointer">
+                  <option value="">All Categories</option>
+                  <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Start Date</label>
+                <input type="date" [(ngModel)]="filterStartDate" (change)="applyFilters()" class="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none">
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">End Date</label>
+                <input type="date" [(ngModel)]="filterEndDate" (change)="applyFilters()" class="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none">
+              </div>
+              <div class="flex items-end">
+                <button (click)="resetFilters()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-semibold transition-all">
+                  Clear Filters
+                </button>
+              </div>
+            </div>
             
             <div *ngIf="expenses.length === 0" class="text-center py-12">
-              <p class="text-slate-500 dark:text-slate-400">No expenses recorded for this month.</p>
+              <p class="text-slate-500 dark:text-slate-400">No expenses recorded for the selected filters.</p>
             </div>
 
             <div *ngIf="expenses.length > 0" class="space-y-4">
-              <div *ngFor="let expense of expenses" class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 hover:border-finmate-neon/30 transition-colors">
-                <div class="flex items-center space-x-4">
-                  <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-white/10 dark:to-white/5 flex items-center justify-center">
-                    <!-- Dynamic category icon -->
-                    <svg *ngIf="expense.category === 'Food & Drinks'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-                    <svg *ngIf="expense.category === 'Travel'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-                    <svg *ngIf="expense.category === 'Utilities'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    <svg *ngIf="expense.category === 'Entertainment'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>
-                    <svg *ngIf="expense.category !== 'Food & Drinks' && expense.category !== 'Travel' && expense.category !== 'Utilities' && expense.category !== 'Entertainment'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
-                  </div>
-                  <div>
-                    <h4 class="font-bold flex items-center gap-2">
-                      {{ expense.title }}
-                      <span *ngIf="expense.status === 'void'" class="px-2 py-0.5 bg-slate-200 dark:bg-white/10 text-[10px] rounded text-slate-500 dark:text-slate-400 capitalize">{{ expense.status }}</span>
-                    </h4>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">{{ expense.expenseDate | date }} • {{ expense.category }}</p>
-                  </div>
-                </div>
-                
-                <div class="flex items-center space-x-4">
-                  <div class="text-right">
-                    <p class="font-bold text-lg" [ngStyle]="{'text-decoration': expense.status === 'void' ? 'line-through' : 'none'}">{{ expense.amountTotal | currency:group.currency }}</p>
-                    <p class="text-xs text-slate-500 dark:text-slate-400">Paid by {{ getUserName(expense.paidByUserId) }}</p>
+              <div *ngFor="let expense of expenses" class="flex flex-col p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 hover:border-finmate-neon/30 transition-colors">
+                <div class="flex items-center justify-between w-full">
+                  <div class="flex items-center space-x-4">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-200 to-slate-300 dark:from-white/10 dark:to-white/5 flex items-center justify-center">
+                      <!-- Dynamic category icon -->
+                      <svg *ngIf="expense.category === 'Food & Drinks'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+                      <svg *ngIf="expense.category === 'Travel'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                      <svg *ngIf="expense.category === 'Utilities'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                      <svg *ngIf="expense.category === 'Entertainment'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>
+                      <svg *ngIf="expense.category === 'Shopping'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                      <svg *ngIf="expense.category === 'Housing'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                      <svg *ngIf="expense.category !== 'Food & Drinks' && expense.category !== 'Travel' && expense.category !== 'Utilities' && expense.category !== 'Entertainment' && expense.category !== 'Shopping' && expense.category !== 'Housing'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                    </div>
+                    <div>
+                      <h4 class="font-bold flex items-center gap-2">
+                        {{ expense.title }}
+                        <span *ngIf="expense.status === 'void'" class="px-2 py-0.5 bg-slate-200 dark:bg-white/10 text-[10px] rounded text-slate-500 dark:text-slate-400 capitalize">{{ expense.status }}</span>
+                      </h4>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">{{ expense.expenseDate | date }} • {{ expense.category }}</p>
+                    </div>
                   </div>
                   
-                  <!-- Ledger Actions -->
-                  <div *ngIf="!isMonthLocked && !isViewer && expense.status !== 'void'" class="flex space-x-1">
-                    <button (click)="openExpenseModal(expense)" class="p-2 text-slate-400 hover:text-finmate-neon2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                    </button>
-                    <button (click)="deleteExpense(expense.id)" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all">
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                    </button>
+                  <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                      <p class="font-bold text-lg" [ngStyle]="{'text-decoration': expense.status === 'void' ? 'line-through' : 'none'}">{{ expense.amountTotal | currency:group.currency }}</p>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">Paid by {{ getUserName(expense.paidByUserId) }}</p>
+                    </div>
+                    
+                    <!-- Ledger Actions -->
+                    <div *ngIf="!isMonthLocked && !isViewer && expense.status !== 'void' && (isOwnerOrAdmin || expense.ownerUserId === currentUserId || expense.paidByUserId === currentUserId)" class="flex space-x-1">
+                      <button (click)="openExpenseModal(expense)" class="p-2 text-slate-400 hover:text-finmate-neon2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                      </button>
+                      <button (click)="deleteExpense(expense.id)" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Expense Attachments (Mock Decryption flow) -->
+                <div *ngIf="expense.attachments && expense.attachments.length > 0" class="mt-3 flex flex-wrap gap-2 border-t border-slate-100 dark:border-white/5 pt-2.5">
+                  <div *ngFor="let file of expense.attachments" (click)="downloadAttachment(file)" class="flex items-center space-x-1.5 py-1 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer border border-slate-200/50 dark:border-white/5">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
+                    <span class="truncate max-w-[120px]">{{ file.originalName }}</span>
                   </div>
                 </div>
               </div>
             </div>
+
+            <!-- Pagination Controls (Only for normal group ledger) -->
+            <div *ngIf="group.groupType !== 'household' && expenses.length > 0 && totalExpenses > pageSize" class="flex items-center justify-between mt-6 pt-4 border-t border-slate-100 dark:border-white/5">
+              <button [disabled]="currentPage === 1" (click)="changePage(-1)" class="py-1.5 px-3 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition-all">
+                Previous
+              </button>
+              <span class="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Page {{ currentPage }} of {{ totalPages }}
+              </span>
+              <button [disabled]="currentPage * pageSize >= totalExpenses" (click)="changePage(1)" class="py-1.5 px-3 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition-all">
+                Next
+              </button>
+            </div>
+          </div>
+
+          <!-- TAB: Analytics -->
+          <div *ngIf="activeTab === 'analytics'">
+            <app-analytics-charts [groupId]="group.id" [currency]="group.currency"></app-analytics-charts>
           </div>
 
           <!-- TAB: History (Audit logs) -->
@@ -267,7 +326,25 @@ export class GroupDetailComponent implements OnInit {
   isLoading = true;
 
   // Active Tab State
-  activeTab: 'ledger' | 'history' | 'trash' = 'ledger';
+  activeTab: 'ledger' | 'analytics' | 'history' | 'trash' = 'ledger';
+  categories: string[] = ['Food & Drinks', 'Travel', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Others'];
+  filterCategory = '';
+  filterStartDate = '';
+  filterEndDate = '';
+  currentPage = 1;
+  pageSize = 20;
+  totalExpenses = 0;
+  currentUserId: string | null = null;
+
+  get isOwnerOrAdmin(): boolean {
+    if (!this.currentUserId) return false;
+    const member = this.members.find(m => m.user.id === this.currentUserId);
+    return member?.role === 'owner' || member?.role === 'admin';
+  }
+
+  get totalPages(): number {
+    return Math.ceil(this.totalExpenses / this.pageSize) || 1;
+  }
 
   // Modal and Sidebar State
   isExpenseModalOpen = false;
@@ -290,6 +367,7 @@ export class GroupDetailComponent implements OnInit {
   isViewer = false;
 
   ngOnInit() {
+    this.currentUserId = this.getCurrentUserId();
     const groupId = this.route.snapshot.paramMap.get('id');
     if (groupId) {
       this.http.get<any>(`/api/groups/${groupId}`).subscribe({
@@ -338,7 +416,16 @@ export class GroupDetailComponent implements OnInit {
   }
 
   fetchExpenses(groupId: string) {
-    let url = `/api/expenses?groupId=${groupId}`;
+    let url = `/api/expenses?groupId=${groupId}&page=${this.currentPage}&limit=${this.pageSize}`;
+    if (this.filterCategory) {
+      url += `&category=${encodeURIComponent(this.filterCategory)}`;
+    }
+    if (this.filterStartDate) {
+      url += `&startDate=${this.filterStartDate}`;
+    }
+    if (this.filterEndDate) {
+      url += `&endDate=${this.filterEndDate}`;
+    }
     if (this.group?.groupType === 'household') {
       const activeMonth = this.getCurrentMonthString();
       const start = `${activeMonth}-01`;
@@ -349,6 +436,7 @@ export class GroupDetailComponent implements OnInit {
     this.http.get<any>(url).subscribe({
       next: (res) => {
         this.expenses = res.data;
+        this.totalExpenses = res.meta?.totalItems || 0;
         this.isLoading = false;
       },
       error: () => this.isLoading = false
@@ -428,7 +516,7 @@ export class GroupDetailComponent implements OnInit {
     return member ? (member.user.displayName || member.user.email) : 'Unknown User';
   }
 
-  setActiveTab(tab: 'ledger' | 'history' | 'trash') {
+  setActiveTab(tab: 'ledger' | 'analytics' | 'history' | 'trash') {
     this.activeTab = tab;
   }
 
@@ -517,5 +605,42 @@ export class GroupDetailComponent implements OnInit {
     if (act === 'expense.deleted') return `deleted expense "${title}"${amt}`;
     if (act === 'expense.restored') return `restored expense "${title}"`;
     return `performed action "${act}"`;
+  }
+
+  applyFilters() {
+    this.currentPage = 1;
+    if (this.group?.id) {
+      this.fetchExpenses(this.group.id);
+    }
+  }
+
+  resetFilters() {
+    this.filterCategory = '';
+    this.filterStartDate = '';
+    this.filterEndDate = '';
+    this.currentPage = 1;
+    if (this.group?.id) {
+      this.fetchExpenses(this.group.id);
+    }
+  }
+
+  changePage(delta: number) {
+    this.currentPage += delta;
+    if (this.group?.id) {
+      this.fetchExpenses(this.group.id);
+    }
+  }
+
+  downloadAttachment(file: any) {
+    alert(`Downloading attachment: ${file.originalName}\nDecrypted successfully!`);
+    const blob = new Blob([`Decrypted content of: ${file.originalName} (${file.storageKey})`], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.originalName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
   }
 }

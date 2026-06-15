@@ -25,6 +25,7 @@ export class CreateExpenseModalComponent implements OnChanges {
   selectedUserIds = new Set<string>();
   isSubmitting = false;
   errorMessage = '';
+  attachedFiles: { name: string; size: string; key: string }[] = [];
 
   expenseForm = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(160)]],
@@ -81,6 +82,17 @@ export class CreateExpenseModalComponent implements OnChanges {
           if (s.participantUserId) {
             this.selectedUserIds.add(s.participantUserId);
           }
+        });
+      }
+
+      this.attachedFiles = [];
+      if (this.expense.attachments) {
+        this.expense.attachments.forEach((a: any) => {
+          this.attachedFiles.push({
+            name: a.originalName,
+            size: (a.sizeBytes / 1024).toFixed(1) + ' KB',
+            key: a.storageKey
+          });
         });
       }
       return;
@@ -165,6 +177,7 @@ export class CreateExpenseModalComponent implements OnChanges {
         paidByUserId: formValue.paidByUserId,
         groupId: this.groupId || null,
         splits: splits,
+        attachmentKeys: this.attachedFiles.map(f => f.key),
         version: this.expense?.version // Send version if updating
       };
 
@@ -184,5 +197,24 @@ export class CreateExpenseModalComponent implements OnChanges {
         }
       });
     }
+  }
+
+  onFileSelected(event: any) {
+    const files: FileList = event.target.files;
+    if (files && files.length > 0) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const randomUuid = Math.random().toString(36).substring(2, 15);
+        this.attachedFiles.push({
+          name: file.name,
+          size: (file.size / 1024).toFixed(1) + ' KB',
+          key: `receipts/${randomUuid}-${file.name}.enc`
+        });
+      }
+    }
+  }
+
+  removeAttachment(index: number) {
+    this.attachedFiles.splice(index, 1);
   }
 }

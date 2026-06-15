@@ -136,6 +136,13 @@ export class ExpensesService {
         throw new ForbiddenException('Viewers cannot modify expenses');
       }
 
+      // Members/spectators can only modify their own expenses (either created or paid by them)
+      if (membership.role === 'member' || membership.role === 'spectator') {
+        if (expense.ownerUser.id !== userId && expense.paidByUser.id !== userId) {
+          throw new ForbiddenException('Members can only modify their own expenses');
+        }
+      }
+
       const group = await this.groupRepository.findOne({ where: { id: expense.group.id } });
       if (!group) {
         throw new NotFoundException('Group not found');

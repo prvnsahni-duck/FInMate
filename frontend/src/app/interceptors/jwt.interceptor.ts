@@ -3,7 +3,7 @@ import { inject } from '@angular/core';
 import { Store } from '@ngxs/store';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
-import { Logout } from '../state/auth.state';
+import { Logout, RefreshTokenSuccess } from '../state/auth.state';
 
 export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const store = inject(Store);
@@ -31,10 +31,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
         if (refreshToken) {
           return authService.refresh(refreshToken).pipe(
             switchMap((res: any) => {
-              localStorage.setItem('finmate_token', res.accessToken);
-              if (res.refreshToken) {
-                localStorage.setItem('finmate_refresh_token', res.refreshToken);
-              }
+              store.dispatch(new RefreshTokenSuccess(res.accessToken, res.refreshToken));
               const retryReq = req.clone({
                 setHeaders: {
                   Authorization: `Bearer ${res.accessToken}`

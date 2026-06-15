@@ -25,11 +25,13 @@ export class EntityEncryptionHolder {
 
 export const encryptionTransformer: ValueTransformer = {
   to(value: number | string | null | undefined): string | null | undefined {
-    if (value === null || value === undefined) return value;
+    if (value === null) return null;
+    if (value === undefined) return undefined;
     return EntityEncryptionHolder.encrypt(String(value));
   },
   from(value: string | null | undefined): number | null | undefined {
-    if (value === null || value === undefined) return value;
+    if (value === null) return null;
+    if (value === undefined) return undefined;
     try {
       const decrypted = EntityEncryptionHolder.decrypt(value);
       return Number(decrypted);

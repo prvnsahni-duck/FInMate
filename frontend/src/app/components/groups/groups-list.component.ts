@@ -24,7 +24,10 @@ export class GroupsListComponent implements OnInit {
   groupForm = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(120)]],
     description: [''],
-    visibility: ['private', [Validators.required]]
+    visibility: ['private', [Validators.required]],
+    currency: ['USD', [Validators.required]],
+    groupType: ['normal', [Validators.required]],
+    carryForwardEnabled: [false]
   });
 
   ngOnInit() {
@@ -50,7 +53,10 @@ export class GroupsListComponent implements OnInit {
     this.groupForm.reset({
       name: '',
       description: '',
-      visibility: 'private'
+      visibility: 'private',
+      currency: 'USD',
+      groupType: 'normal',
+      carryForwardEnabled: false
     });
   }
 

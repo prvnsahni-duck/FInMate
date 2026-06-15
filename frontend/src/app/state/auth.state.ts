@@ -19,6 +19,11 @@ export class Logout {
   static readonly type = '[Auth] Logout';
 }
 
+export class RefreshTokenSuccess {
+  static readonly type = '[Auth] Refresh Token Success';
+  constructor(public accessToken: string, public refreshToken?: string) {}
+}
+
 export interface AuthStateModel {
   token: string | null;
   refreshToken: string | null;
@@ -84,5 +89,18 @@ export class AuthState {
     });
 
     return logout$;
+  }
+
+  @Action(RefreshTokenSuccess)
+  refreshTokenSuccess(ctx: StateContext<AuthStateModel>, action: RefreshTokenSuccess) {
+    localStorage.setItem('finmate_token', action.accessToken);
+    if (action.refreshToken) {
+      localStorage.setItem('finmate_refresh_token', action.refreshToken);
+    }
+    ctx.patchState({
+      token: action.accessToken,
+      refreshToken: action.refreshToken || ctx.getState().refreshToken,
+      user: jwtDecode(action.accessToken)
+    });
   }
 }

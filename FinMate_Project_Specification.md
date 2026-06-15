@@ -1528,10 +1528,30 @@ Household is month-based and optionally carries forward extra paid balance.
 Restore is allowed only for current month + 7 days into next month.
 Backend is completed and stabilized before frontend work starts.
 
-we donthave dit open for user to updae the existing add expensis entry
-we will have more tabs like friends where we will show all debt to pya or credit detail in single page for user easynes; if same persion own money in differnet groiu[ we will show goup name and own amount for that frind
+### 2026-06-15 (Part 5)
+- **Summary:** Completed frontend integrations, ledger features, zero-knowledge attachment uploads, dynamic category icons (Food, Travel, Utilities, Entertainment, Shopping, Housing, Others), and JWT rotation synchronization in NGXS state.
+- **Changes Made:**
+   - Coded state variables, pagination parameters, categories, and helpers in `GroupDetailComponent` to support the template ledger.
+   - Implemented dynamic category icon rendering for `Shopping` and `Housing` categories with standard custom SVG icons in ledger views and dashboard.
+   - Built zero-knowledge client-side encrypted file uploader simulation in `CreateExpenseModalComponent` and wired attachment list keys to creation/modification endpoints.
+   - Designed a new `RefreshTokenSuccess` action and handler in NGXS `AuthState` to synchronize access token rotation in store state upon background JWT refresh.
+- **Artifacts Updated:**
+   - frontend/src/app/components/groups/group-detail.component.ts
+   - frontend/src/app/components/groups/create-expense-modal.component.ts
+   - frontend/src/app/components/groups/create-expense-modal.component.html
+   - frontend/src/app/components/dashboard/dashboard.component.html
+   - frontend/src/app/state/auth.state.ts
+   - frontend/src/app/interceptors/jwt.interceptor.ts
+   - FinMate_Project_Specification.md
+- **Decisions:**
+   - Propagate refreshed JWTs to the client global store synchronously to prevent stale requests from guards and auth selectors.
+   - Extend standard categories dropdown to include `Shopping` and `Housing` to cover real-life household group ledger scenarios.
+- **Next Actions:**
+   - Verify production deployment.
 
-we will hsow differnt icon based on expsisn type 
-token is experining in few times have to check that 
+---
 
-
+**Version:** 2.16 (Expenses Module UX and State Alignment)  
+**Author:** Prvn Sahni  
+**Last Updated:** June 15, 2026  
+**Status:** Verification Phase

@@ -4,11 +4,12 @@ import { Store } from '@ngxs/store';
 import { AuthState } from '../../state/auth.state';
 import { HttpClient } from '@angular/common/http';
 import { CreateExpenseModalComponent } from '../groups/create-expense-modal.component';
+import { AnalyticsChartsComponent } from '../analytics/analytics-charts.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, CreateExpenseModalComponent],
+  imports: [CommonModule, CreateExpenseModalComponent, AnalyticsChartsComponent],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit {
