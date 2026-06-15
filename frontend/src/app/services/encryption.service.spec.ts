@@ -1,5 +1,19 @@
 import { TestBed } from '@angular/core/testing';
 import { ClientEncryptionService } from './encryption.service';
+import { webcrypto } from 'node:crypto';
+
+// Polyfill Web Cryptography API for Jest/Node.js testing environment
+if (typeof globalThis !== 'undefined' && !globalThis.crypto) {
+  Object.defineProperty(globalThis, 'crypto', {
+    value: webcrypto,
+    writable: true,
+  });
+} else if (typeof globalThis !== 'undefined' && globalThis.crypto && !globalThis.crypto.subtle) {
+  Object.defineProperty(globalThis.crypto, 'subtle', {
+    value: webcrypto.subtle,
+    writable: true,
+  });
+}
 
 describe('ClientEncryptionService', () => {
   let service: ClientEncryptionService;

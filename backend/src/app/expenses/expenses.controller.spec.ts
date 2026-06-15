@@ -37,7 +37,7 @@ describe('ExpensesController', () => {
 
     await controller.findAll(undefined, undefined, 'cursor-1', 'group-1', 'Food', 'posted', '2026-06-01', '2026-06-10', {
       user: { id: 'user-1' },
-    });
+    } as any);
 
     expect(service.listExpenses).toHaveBeenCalledWith('user-1', {
       page: 1,
@@ -55,7 +55,7 @@ describe('ExpensesController', () => {
     const dto: any = { title: 'Dinner' };
     service.createExpense.mockResolvedValue({ id: 'exp-1' });
 
-    const result = await controller.create(dto, { user: { id: 'user-1' } });
+    const result = await controller.create(dto, { user: { id: 'user-1' } } as any);
 
     expect(result).toEqual({ id: 'exp-1' });
     expect(service.createExpense).toHaveBeenCalledWith('user-1', dto);
@@ -64,7 +64,7 @@ describe('ExpensesController', () => {
   it('should forward delete call', async () => {
     service.deleteExpense.mockResolvedValue();
 
-    await controller.remove('exp-1', { user: { id: 'user-1' } });
+    await controller.remove('exp-1', { user: { id: 'user-1' } } as any);
 
     expect(service.deleteExpense).toHaveBeenCalledWith('user-1', 'exp-1');
   });
@@ -72,7 +72,7 @@ describe('ExpensesController', () => {
   it('should forward get by id call', async () => {
     service.getExpenseById.mockResolvedValue({ id: 'exp-1' } as any);
 
-    const result = await controller.findOne('exp-1', { user: { id: 'user-1' } });
+    const result = await controller.findOne('exp-1', { user: { id: 'user-1' } } as any);
 
     expect(result).toEqual({ id: 'exp-1' });
     expect(service.getExpenseById).toHaveBeenCalledWith('user-1', 'exp-1');
@@ -83,7 +83,7 @@ describe('ExpensesController', () => {
 
     const result = await controller.update('exp-1', { title: 'Updated', version: 1 } as any, {
       user: { id: 'user-1' },
-    });
+    } as any);
 
     expect(result).toEqual({ id: 'exp-1', title: 'Updated' });
     expect(service.updateExpense).toHaveBeenCalledWith('user-1', 'exp-1', {

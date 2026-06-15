@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, NotFoundException, PreconditionFailedException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { Attachment, Expense, ExpenseSplit, Group, GroupMember, User } from '@finmate/data-models';
+import { Attachment, AuditLog, Expense, ExpenseSplit, Group, GroupMember, User } from '@finmate/data-models';
 import { Repository } from 'typeorm';
 import { ExpensesService } from './expenses.service';
 
@@ -21,6 +21,8 @@ describe('ExpensesService', () => {
       create: jest.fn((data) => data),
       delete: jest.fn(),
       createQueryBuilder: jest.fn(),
+      softRemove: jest.fn((data) => Promise.resolve(data)),
+      restore: jest.fn(() => Promise.resolve()),
     };
 
     const mockSplitRepository = {
@@ -51,6 +53,11 @@ describe('ExpensesService', () => {
       delete: jest.fn(),
     };
 
+    const mockAuditLogRepository = {
+      save: jest.fn(),
+      create: jest.fn((data) => data),
+    };
+
     const mockEntityManager = {
       getRepository: jest.fn((entity) => {
         if (entity === Expense) return mockExpenseRepository;
@@ -59,6 +66,7 @@ describe('ExpensesService', () => {
         if (entity === GroupMember) return mockGroupMemberRepository;
         if (entity === User) return mockUserRepository;
         if (entity === Attachment) return mockAttachmentRepository;
+        if (entity === AuditLog) return mockAuditLogRepository;
       }),
     };
 
@@ -75,6 +83,7 @@ describe('ExpensesService', () => {
         { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepository },
         { provide: getRepositoryToken(User), useValue: mockUserRepository },
         { provide: getRepositoryToken(Attachment), useValue: mockAttachmentRepository },
+        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
         { provide: getDataSourceToken(), useValue: mockDataSource },
       ],
     }).compile();
@@ -293,12 +302,12 @@ describe('ExpensesService', () => {
     } as any;
 
     expenseRepository.findOne.mockResolvedValue(expense);
-    expenseRepository.save.mockResolvedValue(expense);
+    expenseRepository.softRemove.mockResolvedValue(expense);
 
     await service.deleteExpense('caller-id', 'exp-1');
 
     expect(expense.status).toBe('void');
-    expect(expenseRepository.save).toHaveBeenCalledWith(expense);
+    expect(expenseRepository.softRemove).toHaveBeenCalledWith(expense);
   });
 
   it('should hard delete draft expense on delete', async () => {

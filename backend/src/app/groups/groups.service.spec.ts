@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { GroupsService } from './groups.service';
-import { Group, GroupMember, User } from '@finmate/data-models';
+import { Group, GroupMember, User, AuditLog } from '@finmate/data-models';
 import { Repository, DataSource } from 'typeorm';
 import { NotFoundException, ForbiddenException, PreconditionFailedException, ConflictException, BadRequestException } from '@nestjs/common';
 import * as argon2 from 'argon2';
@@ -44,6 +44,19 @@ describe('GroupsService', () => {
       })),
     };
 
+    const mockAuditLogRepository = {
+      save: jest.fn(),
+      create: jest.fn((data) => data),
+      createQueryBuilder: jest.fn(() => ({
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[], 0]),
+      })),
+    };
+
     const mockManager = {
       create: jest.fn((entity, data) => data),
       save: jest.fn(async (entity, data) => data),
@@ -62,6 +75,7 @@ describe('GroupsService', () => {
         if (entity === User) return mockUserRepository;
         if (entity === Group) return mockGroupRepository;
         if (entity === GroupMember) return mockGroupMemberRepository;
+        if (entity === AuditLog) return mockAuditLogRepository;
         return null;
       }),
     };
@@ -71,6 +85,7 @@ describe('GroupsService', () => {
         GroupsService,
         { provide: getRepositoryToken(Group), useValue: mockGroupRepository },
         { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepository },
+        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
