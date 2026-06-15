@@ -16,6 +16,7 @@ describe('ExpensesService', () => {
 
   beforeEach(async () => {
     const mockExpenseRepository = {
+      find: jest.fn(),
       findOne: jest.fn(),
       save: jest.fn(),
       create: jest.fn((data) => data),
@@ -392,4 +393,212 @@ describe('ExpensesService', () => {
       }),
     ).rejects.toThrow(ForbiddenException);
   });
+
+  // ─── Phase 5: Additional Unit Tests ────────────────────────────────────────
+
+  describe('Phase 5 Verification Rules', () => {
+    it('should reject createExpense when currency does not match group base currency', async () => {
+      userRepository.findOne
+        .mockResolvedValueOnce({ id: 'caller-id' } as any)
+        .mockResolvedValueOnce({ id: 'caller-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({
+        id: 'group-id',
+        currency: 'EUR',
+        isArchived: false,
+      } as any);
+
+      await expect(
+        service.createExpense('caller-id', {
+          title: 'Lunch',
+          amountTotal: 100,
+          currency: 'USD', // Mismatch
+          category: 'Food',
+          paidByUserId: 'caller-id',
+          groupId: 'group-id',
+          expenseDate: '2026-06-10',
+          splits: [{ participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 }],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject createExpense splits containing a spectator', async () => {
+      userRepository.findOne
+        .mockResolvedValueOnce({ id: 'caller-id' } as any)
+        .mockResolvedValueOnce({ id: 'caller-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({
+        id: 'group-id',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+
+      // In persistSplits, buildGroupParticipantMaps is called inside transaction
+      // Mock the find method on GroupMember repository inside transaction
+      // Set one of the splits to belong to a spectator
+      const mockSpectatorMember = {
+        id: 'spectator-member-id',
+        role: 'spectator',
+        joinStatus: 'active',
+        user: { id: 'spectator-id' },
+      };
+
+      const mockGroupMemberRepositoryFind = groupMemberRepository.find as jest.Mock;
+      mockGroupMemberRepositoryFind.mockResolvedValueOnce([mockSpectatorMember]);
+
+      await expect(
+        service.createExpense('caller-id', {
+          title: 'Lunch',
+          amountTotal: 100,
+          currency: 'USD',
+          category: 'Food',
+          paidByUserId: 'caller-id',
+          groupId: 'group-id',
+          expenseDate: '2026-06-10',
+          splits: [{ participantUserId: 'spectator-id', splitType: 'equal', shareValue: 1 }],
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject updateExpense on a household group if ledger month is locked', async () => {
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-1',
+        version: 1,
+        title: 'Past Rent',
+        amountTotal: 500,
+        currency: 'USD',
+        category: 'Housing',
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        expenseDate: '2026-05-10',
+        ledgerMonth: '2026-05', // Past month (June 2026 is current)
+        status: 'posted',
+        group: { id: 'group-id' },
+      } as any);
+
+      groupMemberRepository.findOne.mockResolvedValue({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any);
+
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        groupType: 'household',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+
+      await expect(
+        service.updateExpense('caller-id', 'exp-1', {
+          version: 1,
+          title: 'Updated Rent',
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should calculate carry forward balances correctly for a household group', async () => {
+      groupMemberRepository.findOne.mockResolvedValue({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        groupType: 'household',
+        currency: 'USD',
+      } as any);
+
+      // Expenses in the group for 2026-06
+      expenseRepository.find.mockResolvedValue([
+        {
+          id: 'exp-1',
+          amountTotal: 150,
+          currency: 'USD',
+          paidByUser: { id: 'user-a', displayName: 'User A' },
+          ownerUser: { id: 'user-a' },
+        },
+      ] as any);
+
+      // Splits: equal split of 150 between User A and User B (75 each)
+      splitRepository.find.mockResolvedValue([
+        {
+          id: 'split-1',
+          amountOwed: 75,
+          participantGroupMember: { user: { id: 'user-a', displayName: 'User A' } },
+        },
+        {
+          id: 'split-2',
+          amountOwed: 75,
+          participantGroupMember: { user: { id: 'user-b', displayName: 'User B' } },
+        },
+      ] as any);
+
+      const balances = await service.getCarryForwardSummary('caller-id', 'group-id', '2026-06');
+      
+      // User A paid 150, owed 75 => net balance +75
+      // User B paid 0, owed 75 => net balance -75
+      const userABal = balances.find(b => b.userId === 'user-a');
+      const userBBal = balances.find(b => b.userId === 'user-b');
+
+      expect(userABal?.netBalance).toBe(75);
+      expect(userBBal?.netBalance).toBe(-75);
+    });
+
+    it('should reject restoreExpense if restore window has expired', async () => {
+      const pastDeletionDate = new Date();
+      // Set to 2 months ago to be way outside grace period
+      pastDeletionDate.setMonth(pastDeletionDate.getMonth() - 2);
+
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-1',
+        title: 'Old Expense',
+        deletedAt: pastDeletionDate,
+        ownerUser: { id: 'caller-id' },
+        paidByUser: { id: 'caller-id' },
+        group: null,
+      } as any);
+
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+
+      await expect(
+        service.restoreExpense('caller-id', 'exp-1'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow restoreExpense if within restore window', async () => {
+      const recentDeletionDate = new Date();
+      // Set to current month, which is always inside restore window
+      recentDeletionDate.setDate(1);
+
+      const expense = {
+        id: 'exp-1',
+        title: 'Recent Expense',
+        deletedAt: recentDeletionDate,
+        ownerUser: { id: 'caller-id' },
+        paidByUser: { id: 'caller-id' },
+        group: null,
+        status: 'void',
+      } as any;
+
+      expenseRepository.findOne.mockResolvedValue(expense);
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+      splitRepository.find.mockResolvedValue([]);
+      attachmentRepository.find.mockResolvedValue([]);
+
+      const result = await service.restoreExpense('caller-id', 'exp-1');
+
+      expect(result.status).toBe('posted');
+      expect(expenseRepository.restore).toHaveBeenCalledWith({ id: 'exp-1' });
+    });
+  });
 });
+
