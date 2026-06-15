@@ -21,4 +21,8 @@ export class AuthService {
   logout(refreshToken: string): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/logout`, { refreshToken });
   }
+
+  refresh(refreshToken: string): Observable<{ accessToken: string; refreshToken: string }> {
+    return this.http.post<{ accessToken: string; refreshToken: string }>(`${this.baseUrl}/refresh`, { refreshToken });
+  }
 }

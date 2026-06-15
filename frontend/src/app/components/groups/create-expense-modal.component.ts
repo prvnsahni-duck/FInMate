@@ -14,9 +14,10 @@ export class CreateExpenseModalComponent implements OnChanges {
   private http = inject(HttpClient);
   private fb = inject(FormBuilder);
 
-  @Input() groupId!: string;
+  @Input() groupId: string | null = null;
   @Input() groupCurrency!: string;
   @Input() members: any[] = [];
+  @Input() expense?: any; // To support edit mode
 
   @Output() expenseCreated = new EventEmitter<void>();
   @Output() closeModalEvent = new EventEmitter<void>();
@@ -34,6 +35,13 @@ export class CreateExpenseModalComponent implements OnChanges {
     expenseDate: [this.getTodayDateString(), [Validators.required]],
     paidByUserId: ['', [Validators.required]],
   });
+
+  get currencySymbol(): string {
+    const cur = this.expenseForm.get('currency')?.value;
+    if (cur === 'INR') return '₹';
+    if (cur === 'EUR') return '€';
+    return '$';
+  }
 
   getTodayDateString(): string {
     const today = new Date();
@@ -55,10 +63,34 @@ export class CreateExpenseModalComponent implements OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges) {
+    // If edit mode (expense provided)
+    if (changes['expense'] && this.expense) {
+      this.expenseForm.patchValue({
+        title: this.expense.title,
+        description: this.expense.description || '',
+        amountTotal: this.expense.amountTotal,
+        currency: this.expense.currency,
+        category: this.expense.category,
+        expenseDate: this.expense.expenseDate,
+        paidByUserId: this.expense.paidByUserId,
+      });
+
+      this.selectedUserIds.clear();
+      if (this.expense.splits) {
+        this.expense.splits.forEach((s: any) => {
+          if (s.participantUserId) {
+            this.selectedUserIds.add(s.participantUserId);
+          }
+        });
+      }
+      return;
+    }
+
     if (changes['members'] && this.members) {
       this.selectedUserIds.clear();
       this.members.forEach(m => {
-        if (m.joinStatus === 'active' || m.joinStatus === 'invited') {
+        // SPECTATORS are never part of splits
+        if ((m.joinStatus === 'active' || m.joinStatus === 'invited') && m.role !== 'spectator') {
           this.selectedUserIds.add(m.user.id);
         }
       });
@@ -70,8 +102,22 @@ export class CreateExpenseModalComponent implements OnChanges {
         this.expenseForm.patchValue({ paidByUserId: this.members[0].user.id });
       }
     }
+
     if (changes['groupCurrency'] && this.groupCurrency) {
       this.expenseForm.patchValue({ currency: this.groupCurrency });
+    }
+
+    // Personal mode defaulting
+    if (!this.groupId) {
+      const currentUserId = this.getCurrentUserId();
+      if (currentUserId) {
+        this.expenseForm.patchValue({ paidByUserId: currentUserId });
+        this.selectedUserIds.clear();
+        this.selectedUserIds.add(currentUserId);
+      }
+      if (!this.expenseForm.get('currency')?.value) {
+        this.expenseForm.patchValue({ currency: 'USD' });
+      }
     }
   }
 
@@ -88,6 +134,16 @@ export class CreateExpenseModalComponent implements OnChanges {
   }
 
   onSubmit() {
+    // If personal mode, selectedUserIds should contain only the payer (or current user)
+    if (!this.groupId) {
+      const currentUserId = this.getCurrentUserId();
+      if (currentUserId) {
+        this.selectedUserIds.clear();
+        this.selectedUserIds.add(currentUserId);
+        this.expenseForm.patchValue({ paidByUserId: currentUserId });
+      }
+    }
+
     if (this.expenseForm.valid && this.selectedUserIds.size > 0) {
       this.isSubmitting = true;
       this.errorMessage = '';
@@ -107,11 +163,16 @@ export class CreateExpenseModalComponent implements OnChanges {
         category: formValue.category,
         expenseDate: formValue.expenseDate,
         paidByUserId: formValue.paidByUserId,
-        groupId: this.groupId,
-        splits: splits
+        groupId: this.groupId || null,
+        splits: splits,
+        version: this.expense?.version // Send version if updating
       };
 
-      this.http.post<any>('/api/expenses', payload).subscribe({
+      const request$ = this.expense
+        ? this.http.patch<any>(`/api/expenses/${this.expense.id}`, payload)
+        : this.http.post<any>('/api/expenses', payload);
+
+      request$.subscribe({
         next: () => {
           this.isSubmitting = false;
           this.expenseCreated.emit();
@@ -119,7 +180,7 @@ export class CreateExpenseModalComponent implements OnChanges {
         },
         error: (err) => {
           this.isSubmitting = false;
-          this.errorMessage = err.error?.message || 'Failed to create expense. Please try again.';
+          this.errorMessage = err.error?.message || 'Failed to save expense. Please try again.';
         }
       });
     }

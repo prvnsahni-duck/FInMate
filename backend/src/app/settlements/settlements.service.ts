@@ -354,4 +354,100 @@ export class SettlementsService {
 
     return this.settlementRepository.save(settlement);
   }
+
+  /**
+   * Calculate aggregated debts and credits with friends across all active groups.
+   */
+  async calculateFriendsBalances(userId: string) {
+    const memberships = await this.groupMemberRepository.find({
+      where: { user: { id: userId }, joinStatus: 'active' },
+      relations: ['group'],
+    });
+
+    const friendsMap = new Map<string, {
+      friendId: string;
+      displayName: string;
+      email: string;
+      netBalance: number;
+      currencyDetails: {
+        groupId: string;
+        groupName: string;
+        amount: number;
+        currency: string;
+      }[]
+    }>();
+
+    for (const membership of memberships) {
+      const groupId = membership.group.id;
+      const groupName = membership.group.name;
+
+      let result;
+      try {
+        result = await this.calculateGroupBalances(userId, groupId);
+      } catch (err) {
+        continue;
+      }
+
+      const { suggestedSettlements } = result;
+
+      for (const s of suggestedSettlements) {
+        if (s.fromUserId === userId) {
+          const friendId = s.toUserId;
+          let entry = friendsMap.get(friendId);
+          if (!entry) {
+            const friendMember = await this.groupMemberRepository.findOne({
+              where: { group: { id: groupId }, user: { id: friendId } },
+              relations: ['user'],
+            });
+            if (!friendMember) continue;
+            entry = {
+              friendId,
+              displayName: friendMember.user.displayName || friendMember.user.email,
+              email: friendMember.user.email,
+              netBalance: 0,
+              currencyDetails: [],
+            };
+            friendsMap.set(friendId, entry);
+          }
+          entry.currencyDetails.push({
+            groupId,
+            groupName,
+            amount: -s.amount,
+            currency: s.currency,
+          });
+        } else if (s.toUserId === userId) {
+          const friendId = s.fromUserId;
+          let entry = friendsMap.get(friendId);
+          if (!entry) {
+            const friendMember = await this.groupMemberRepository.findOne({
+              where: { group: { id: groupId }, user: { id: friendId } },
+              relations: ['user'],
+            });
+            if (!friendMember) continue;
+            entry = {
+              friendId,
+              displayName: friendMember.user.displayName || friendMember.user.email,
+              email: friendMember.user.email,
+              netBalance: 0,
+              currencyDetails: [],
+            };
+            friendsMap.set(friendId, entry);
+          }
+          entry.currencyDetails.push({
+            groupId,
+            groupName,
+            amount: s.amount,
+            currency: s.currency,
+          });
+        }
+      }
+    }
+
+    for (const friend of friendsMap.values()) {
+      friend.netBalance = friend.currencyDetails.reduce((sum, d) => sum + d.amount, 0);
+      friend.netBalance = Math.round(friend.netBalance * 100) / 100;
+    }
+
+    return Array.from(friendsMap.values());
+  }
 }

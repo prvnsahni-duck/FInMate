@@ -83,6 +83,19 @@ export class GroupsController {
     return this.groupsService.getGroupHistory(req.user.id, id, page, limit);
   }
 
+  /**
+   * List soft-deleted expenses for the group (for group history / restore UI).
+   */
+  @Get(':id/expenses/deleted')
+  async findDeleted(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return this.expensesService.listDeletedExpenses(req.user.id, id, page, limit);
+  }
+
   // ─── Carry-Forward Summary ────────────────────────────────────────────────
 
   /**

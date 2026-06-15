@@ -1327,11 +1327,55 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
    - Address Jest unit test failures in the frontend (mocking Web Crypto and correcting App component test config).
    - Implement backend endpoints for the Notes and Goals modules.
 
+### 2026-06-15
+- **Summary:** Added Rule 7 to AGENT_RULES.md to instruct the agent to ask the user to run terminal commands to save token expenses.
+- **Changes Made:**
+   - Appended Rule 7 to AGENT_RULES.md.
+- **Artifacts Updated:**
+   - AGENT_RULES.md
+   - FinMate_Project_Specification.md
+- **Decisions:**
+   - Instruct the agent to prompt the user to execute heavy or verbose terminal commands rather than running them in the agent's sandbox, reducing token overhead.
+- **Next Actions:**
+    - Proceed with remaining backlog items in backend and frontend.
+
+### 2026-06-15 (Part 2)
+- **Summary:** Implemented all Backend and Frontend outstanding requirements for Expenses.
+- **Changes Made:**
+   - Implemented `calculateFriendsBalances` in `SettlementsService` and exposed `/friends` endpoint via `FriendsController` to aggregate group-wise debts with friends.
+   - Exposed the deleted group expenses endpoint `/api/v1/groups/:id/expenses/deleted` in `GroupsController`.
+   - Updated `ExpensesService.listExpenses` to filter for personal expenses (`groupId === 'personal'`).
+   - Implemented JWT token refreshing in the frontend `jwtInterceptor` to handle token expirations silently.
+   - Built a dedicated Friends Tab with aggregated lists and group-by-group breakdowns.
+   - Designed a full Personal Expenses dashboard view and logging flow.
+   - Enhanced the expense modal with Edit Mode, Personal Mode, spectator exclusions, and dynamic currency icon display.
+   - Enhanced the Group Detail Component with edit/delete actions, collapsible history/trash panels, CSV/XLSX import/export, and household timelines with carry-forward display.
+- **Artifacts Updated:**
+   - backend/src/app/settlements/settlements.service.ts
+   - backend/src/app/settlements/friends.controller.ts
+   - backend/src/app/settlements/settlements.module.ts
+   - backend/src/app/groups/groups.controller.ts
+   - backend/src/app/expenses/expenses.service.ts
+   - frontend/src/app/services/auth.service.ts
+   - frontend/src/app/interceptors/jwt.interceptor.ts
+   - frontend/src/app/app.routes.ts
+   - frontend/src/app/components/friends/friends.component.ts
+   - frontend/src/app/components/dashboard/dashboard.component.ts
+   - frontend/src/app/components/dashboard/dashboard.component.html
+   - frontend/src/app/components/groups/create-expense-modal.component.ts
+   - frontend/src/app/components/groups/create-expense-modal.component.html
+   - frontend/src/app/components/groups/group-detail.component.ts
+- **Decisions:**
+   - Aggregate group-by-group debts on the backend and return standard structures to keep the Friends screen simple and lightweight.
+   - Handle JWT refreshes within the HttpClient interceptor to avoid session disruption on 15m expiration.
+- **Next Actions:**
+   - Verify code compiles and all Jest tests pass.
+
 ---
 
-**Version:** 2.12 (Agent Rules updated and codebase status audited)  
+**Version:** 2.13 (Agent rule added to ask user to run terminal commands)  
 **Author:** Prvn Sahni  
-**Last Updated:** June 14, 2026  
+**Last Updated:** June 15, 2026  
 **Status:** Implementation (Coding) Phase
 
 
@@ -1358,15 +1402,90 @@ There is no button, input, or drag-and-drop component to upload CSV/XLSX spreads
 Analytics Charts:
 No visual charts or graphs for monthly/yearly expense trends.
 
-plan for these pending task
-cehck and update if not cotrrect
-we will keep the curencty update in group setting
-and other basioc thing from grooup setting for groiup
+Plan: Expenses Pending Work (Backend First, Then Frontend)
+Implement this in 2 waves: first lock backend business rules and APIs, then build frontend screens on those stable contracts.
+Your new requirements are included: group-level currency setting, currency icon in amount input, household group type, spectator behavior, group history with restore, and household carry-forward/month-lock rules.
 
-we will show the currency icon to user in front of amount input
+Steps
 
-now we have one more goiupr type house hold expesisn where we will not who shared between as all expesisnt 2will be shared with all those are added in group we can added spectator user as well who will be not part of this expsneis means they can add and and update the espensis but it will not shared with them 
+Phase 1: Rule freeze and contract definition (Backend foundation)
+Finalize behavior in spec/API before coding:
+Single base currency per group (managed in group settings).
+Spectator can add/update expense but is never part of split share.
+Household group has month-based ledger (first day to last day), optional carry-forward toggle.
+Restore allowed in current month and up to 7 days into next month.
+Phase 2: Data model and migrations (depends on 1)
+Add/confirm fields in group settings:
+group_type (normal, household)
+base_currency
+carry_forward_enabled
+month_boundary_mode
+Add/confirm membership role for spectator and split exclusion logic.
+Add month cycle marker for household expenses and past-month immutability rule.
+Add/confirm audit history storage for create/edit/delete/void/restore with actor and metadata.
+Phase 3: Core backend service logic (depends on 2)
+Currency validation in create/update expense against group base_currency.
+Replace hard delete with deleted_at soft-delete flow and status policy.
+Enforce spectator exclusion in split and settlement calculations.
+Household rules:
+Previous-month household expenses become non-editable.
+At month close, carry forward only extra paid balance if carry_forward_enabled is true.
+Keep household tracking isolated to that group only.
+Add restore service command with role + restore-window checks.
+Phase 4: Backend encryption + analytics APIs (parallel with 3 after migration readiness)
+Implement SSE at rest for expense amount_total and expense_split amount_owed.
+Update data access so analytics still work with encrypted-at-rest amounts.
+Add analytics endpoints:
+monthly summary
+yearly summary
+category distribution
+household carry-forward summary
+Add standardized errors for currency mismatch, spectator split violation, month lock, restore-window violation.
+Phase 5: Backend verification and API freeze (depends on 3 and 4)
+Unit tests:
+currency validation
+spectator exclusion
+household month lock
+carry-forward toggle
+soft-delete + restore policy
+Integration/e2e tests for analytics and encrypted amount handling.
+Freeze API contract for frontend.
+Phase 6: Frontend core UX (depends on 5)
+Personal expenses dashboard/list/create/manage flow.
+Ledger edit/void/delete actions with role-based visibility.
+Group history UI with restore button (policy-gated).
+Show currency icon in amount input from group base currency or personal default.
+Phase 7: Frontend import/export + analytics UX (parallel with 6 where API is ready)
+CSV/XLSX import and export actions in group ledger.
+Monthly/yearly trend chart and category distribution chart.
+Household month timeline with carry-forward indicator and previous-month read-only state.
+Phase 8: Frontend verification and rollout (depends on 6 and 7)
+Component/unit tests for dashboard, ledger actions, history restore, import/export, charts.
+E2E coverage for normal groups and household groups with spectator scenarios.
+Relevant files
 
-thjis one is for all group: we will keep an history to the group ehat ever is happn ot group ensponssis for exmaple who added who deleted and all and even edited the thing and provide direct restoire button to that expessis under group setting 
-house expensis will be carry forward to next month under that group and same will be reflect to all members as it is house expensis we will keep track of this expnsisis only in that group not in other type of group and we will not provide any modify option to this expense for previous month expsnsis 
+FinMate_Project_Specification.md - Source of finalized behavior
+openapi.yaml - API contract updates
+API.md - API behavior and error docs
+expenses - Expense business logic
+groups - Group settings, household/spectator policy
+migrations - Schema changes
+backend - Backend integration tests
+components - Screens and UI components
+services - API clients/state integration
+src - End-to-end UI tests
+Decisions captured
+
+Group currency is single base currency from group settings.
+Spectator is never included in splits.
+Household is month-based and optionally carries forward extra paid balance.
+Restore is allowed only for current month + 7 days into next month.
+Backend is completed and stabilized before frontend work starts.
+
+we donthave dit open for user to updae the existing add expensis entry
+we will have more tabs like friends where we will show all debt to pya or credit detail in single page for user easynes; if same persion own money in differnet groiu[ we will show goup name and own amount for that frind
+
+we will hsow differnt icon based on expsisn type 
+token is experining in few times have to check that 
+
 

@@ -476,7 +476,7 @@ export class ExpensesService {
       relations: ['group'],
     })).map((m) => m.group.id);
 
-    if (params.groupId) {
+    if (params.groupId && params.groupId !== 'personal') {
       const allowed = membershipGroupIds.includes(params.groupId);
       if (!allowed) {
         throw new ForbiddenException('You do not have access to this group');
@@ -498,7 +498,11 @@ export class ExpensesService {
       );
 
     if (params.groupId) {
-      query.andWhere('group.id = :groupId', { groupId: params.groupId });
+      if (params.groupId === 'personal') {
+        query.andWhere('group.id IS NULL');
+      } else {
+        query.andWhere('group.id = :groupId', { groupId: params.groupId });
+      }
     }
 
     if (params.category) {

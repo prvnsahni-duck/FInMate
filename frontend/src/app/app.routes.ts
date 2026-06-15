@@ -6,6 +6,7 @@ import { RegisterComponent } from './components/auth/register.component';
 import { DashboardComponent } from './components/dashboard/dashboard.component';
 import { GroupsListComponent } from './components/groups/groups-list.component';
 import { GroupDetailComponent } from './components/groups/group-detail.component';
+import { FriendsComponent } from './components/friends/friends.component';
 import { authGuard } from './guards/auth.guard';
 
 export const appRoutes: Route[] = [
@@ -18,6 +19,7 @@ export const appRoutes: Route[] = [
       { path: 'dashboard', component: DashboardComponent },
       { path: 'groups', component: GroupsListComponent },
       { path: 'groups/:id', component: GroupDetailComponent },
+      { path: 'friends', component: FriendsComponent },
     ]
   },
   {

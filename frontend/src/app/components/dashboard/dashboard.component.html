@@ -1,36 +1,90 @@
-<div class="mb-8">
-  <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
-    Welcome back, <span class="bg-gradient-neon text-transparent bg-clip-text">{{ userName }}</span>
-  </h1>
-  <p class="text-slate-500 dark:text-slate-400 mt-2">Here is an overview of your finances.</p>
+<div class="flex items-center justify-between mb-8">
+  <div>
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
+      Welcome back, <span class="bg-gradient-neon text-transparent bg-clip-text">{{ userName }}</span>
+    </h1>
+    <p class="text-slate-500 dark:text-slate-400 mt-2">Here is an overview of your personal finances.</p>
+  </div>
+  
+  <button (click)="openExpenseModal()" class="py-2.5 px-5 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 transition-all flex items-center space-x-2">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+    <span>Log Expense</span>
+  </button>
 </div>
 
 <!-- Summary Cards -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
   <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 hover:scale-[1.02] transition-transform">
-    <h3 class="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Total Balance</h3>
-    <p class="text-3xl font-bold">$0.00</p>
+    <h3 class="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Total Personal Balance</h3>
+    <p class="text-3xl font-bold">{{ totalBalance | currency:'USD' }}</p>
   </div>
   <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 hover:scale-[1.02] transition-transform">
-    <h3 class="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Monthly Expenses</h3>
-    <p class="text-3xl font-bold text-red-500 dark:text-red-400">$0.00</p>
+    <h3 class="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Monthly Personal Expenses</h3>
+    <p class="text-3xl font-bold text-red-500 dark:text-red-400">{{ monthlyExpenses | currency:'USD' }}</p>
   </div>
   <div class="bg-gradient-dark rounded-3xl p-6 shadow-xl shadow-black/10 hover:scale-[1.02] transition-transform text-white border border-white/10 relative overflow-hidden">
     <div class="absolute top-0 right-0 w-32 h-32 bg-finmate-neon/20 rounded-full blur-[40px]"></div>
     <h3 class="text-white/70 text-sm font-medium mb-1 relative z-10">Active Groups</h3>
-    <p class="text-3xl font-bold relative z-10">0</p>
+    <p class="text-3xl font-bold relative z-10">{{ activeGroupsCount }}</p>
   </div>
 </div>
 
-<!-- Recent Activity -->
+<!-- Recent Personal Activity -->
 <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5">
-  <h2 class="text-xl font-bold mb-4">Recent Activity</h2>
+  <h2 class="text-xl font-bold mb-6">Recent Personal Expenses</h2>
   
-  <div class="flex flex-col items-center justify-center py-12 text-center">
+  <div *ngIf="isLoading" class="space-y-4">
+    <div *ngFor="let i of [1, 2, 3]" class="h-16 bg-slate-200 dark:bg-white/5 rounded-2xl animate-pulse"></div>
+  </div>
+
+  <div *ngIf="!isLoading && personalExpenses.length === 0" class="flex flex-col items-center justify-center py-12 text-center">
     <div class="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
       <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
     </div>
-    <p class="text-slate-500 dark:text-slate-400 font-medium">No recent activity found.</p>
-    <p class="text-sm text-slate-400 dark:text-slate-500 mt-1">Join a group or create an expense to get started.</p>
+    <p class="text-slate-500 dark:text-slate-400 font-medium">No personal expenses found.</p>
+    <p class="text-sm text-slate-400 dark:text-slate-500 mt-1">Log a personal expense to start tracking here.</p>
+  </div>
+
+  <div *ngIf="!isLoading && personalExpenses.length > 0" class="space-y-4">
+    <div *ngFor="let expense of personalExpenses" class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 hover:border-finmate-neon/30 transition-all">
+      <div class="flex items-center space-x-4">
+        <div class="w-10 h-10 rounded-xl bg-slate-200 dark:bg-white/10 flex items-center justify-center">
+          <!-- Dinamic icon based on category -->
+          <svg *ngIf="expense.category === 'Food & Drinks'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
+          <svg *ngIf="expense.category === 'Travel'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+          <svg *ngIf="expense.category === 'Utilities'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+          <svg *ngIf="expense.category === 'Entertainment'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>
+          <svg *ngIf="expense.category !== 'Food & Drinks' && expense.category !== 'Travel' && expense.category !== 'Utilities' && expense.category !== 'Entertainment'" class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+        </div>
+        <div>
+          <h4 class="font-bold text-slate-800 dark:text-white">{{ expense.title }}</h4>
+          <p class="text-xs text-slate-500 dark:text-slate-400">{{ expense.expenseDate | date }} • {{ expense.category }}</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center space-x-4">
+        <div class="text-right">
+          <p class="font-bold text-lg text-slate-800 dark:text-white">{{ expense.amountTotal | currency:expense.currency }}</p>
+        </div>
+        <div class="flex space-x-2">
+          <button (click)="openExpenseModal(expense)" class="p-2 text-slate-400 hover:text-finmate-neon2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+          </button>
+          <button (click)="deleteExpense(expense.id)" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
+
+<app-create-expense-modal
+  *ngIf="isExpenseModalOpen"
+  [groupId]="null"
+  [groupCurrency]="'USD'"
+  [members]="[]"
+  [expense]="selectedExpenseForEdit"
+  (closeModalEvent)="closeExpenseModal()"
+  (expenseCreated)="onExpenseCreated()"
+></app-create-expense-modal>
