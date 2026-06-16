@@ -1,13 +1,7 @@
 import { Route } from '@angular/router';
-import { AuthLayoutComponent } from './components/layouts/auth-layout.component';
-import { MainLayoutComponent } from './components/layouts/main-layout.component';
-import { LoginComponent } from './components/auth/login.component';
-import { RegisterComponent } from './components/auth/register.component';
-import { DashboardComponent } from './components/dashboard/dashboard.component';
-import { GroupsListComponent } from './components/groups/groups-list.component';
-import { GroupDetailComponent } from './components/groups/group-detail.component';
-import { FriendsComponent } from './components/friends/friends.component';
-import { authGuard } from './guards/auth.guard';
+import { AuthLayoutComponent } from './shared/layouts/auth-layout.component';
+import { MainLayoutComponent } from './shared/layouts/main-layout.component';
+import { authGuard } from './core/auth/auth.guard';
 
 export const appRoutes: Route[] = [
   {
@@ -16,20 +10,36 @@ export const appRoutes: Route[] = [
     canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
-      { path: 'dashboard', component: DashboardComponent },
-      { path: 'groups', component: GroupsListComponent },
-      { path: 'groups/:id', component: GroupDetailComponent },
-      { path: 'friends', component: FriendsComponent },
-    ]
+      {
+        path: 'dashboard',
+        loadChildren: () =>
+          import('./features/dashboard/dashboard.routes').then(
+            (m) => m.dashboardRoutes,
+          ),
+      },
+      {
+        path: 'groups',
+        loadChildren: () =>
+          import('./features/groups/groups.routes').then(
+            (m) => m.groupsRoutes,
+          ),
+      },
+      {
+        path: 'friends',
+        loadChildren: () =>
+          import('./features/friends/friends.routes').then(
+            (m) => m.friendsRoutes,
+          ),
+      },
+    ],
   },
   {
     path: 'auth',
     component: AuthLayoutComponent,
-    children: [
-      { path: '', redirectTo: 'login', pathMatch: 'full' },
-      { path: 'login', component: LoginComponent },
-      { path: 'register', component: RegisterComponent },
-    ]
+    loadChildren: () =>
+      import('./features/auth/auth.routes').then(
+        (m) => m.authRoutes,
+      ),
   },
-  { path: '**', redirectTo: '' }
+  { path: '**', redirectTo: '' },
 ];

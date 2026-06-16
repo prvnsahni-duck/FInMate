@@ -1484,10 +1484,85 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 
 ---
 
-**Version:** 2.19 (Resolved 500 Query and Order-By Errors)  
+### 2026-06-15 (Part 8)
+- **Summary:** Replaced browser's native `confirm()` alerts with a reusable custom confirmation modal component.
+- **Changes Made:**
+   - Created standalone [confirm-modal.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/common/confirm-modal.component.ts) with dynamic visual themes (danger, warning, info) and glassmorphism styling.
+   - Refactored [dashboard.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.ts) and [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.html) to confirm personal expense deletions using the new modal.
+   - Refactored [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/groups/group-detail.component.ts) to confirm group expense deletions using the new modal.
+- **Artifacts Updated:**
+   - [confirm-modal.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/common/confirm-modal.component.ts)
+   - [dashboard.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.ts)
+   - [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.html)
+   - [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/groups/group-detail.component.ts)
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Standardize delete alerts onto a common ConfirmModal Component for consistent aesthetics, matching dark/light glass themes.
+- **Next Actions:**
+   - Verify UI changes in local dev environment.
+
+---
+
+### 2026-06-15 (Part 9)
+- **Summary:** Added Rule 8 to AGENT_RULES.md to instruct the agent to output full code files in chat and request the user to write/create them to avoid token write overheads.
+- **Changes Made:**
+   - Appended Rule 8 to [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md).
+- **Artifacts Updated:**
+   - [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md)
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Avoid direct write_to_file calls for large files/components. Present complete code in chat with creation command instructions to manage token expenses.
+- **Next Actions:**
+   - Follow Rule 8 on all future component/file creations.
+
+---
+
+**Version:** 2.22 (Architecture Refactoring: Services, Slicing, Config, and Lazy Loading)  
 **Author:** Antigravity AI  
-**Last Updated:** June 15, 2026  
-**Status:** Rollout and Verification Phase
+**Last Updated:** June 16, 2026  
+**Status:** Verification Phase
+
+### 2026-06-16 (Part 1)
+- **Summary:** Refactored the frontend architecture to isolate HTTP API calls, centralize common components, implement config-driven navigation, use lazy-loaded routes, and update rules.
+- **Changes Made:**
+   - Created dedicated services `GroupsService`, `ExpensesService`, and `FriendsService` in `frontend/src/app/services` to isolate all HTTP calls from components.
+   - Built a reusable `SubmitButtonComponent` under `common/submit-button/` to consistently handle form submission loaders and states.
+   - Centralized `ConflictDiffModalComponent` and `AnalyticsChartsComponent` under `common/` directories, updating imports and relative imports.
+   - Refactored `DashboardComponent`, `GroupsListComponent`, `GroupDetailComponent`, `FriendsComponent`, `LoginComponent`, and `RegisterComponent` to consume the new service layer and submit buttons.
+   - Dynamic nav items loop using `NAV_ITEMS` config introduced in `MainLayoutComponent` desktop/mobile views.
+   - Lazy-loaded leaf components configured in `app.routes.ts` (`loadComponent`).
+   - Added architectural decoupling, slicing, and lazy-loading rules to `AGENT_RULES.md`.
+- **Artifacts Updated:**
+   - `frontend/src/app/services/groups.service.ts`
+   - `frontend/src/app/services/expenses.service.ts`
+   - `frontend/src/app/services/friends.service.ts`
+   - `frontend/src/app/components/common/submit-button/submit-button.component.ts`
+   - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.ts`
+   - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.html`
+   - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.spec.ts`
+   - `frontend/src/app/components/common/analytics-charts/analytics-charts.component.ts`
+   - `frontend/src/app/components/layouts/main-layout.component.ts`
+   - `frontend/src/app/components/layouts/main-layout.component.html`
+   - `frontend/src/app/app.routes.ts`
+   - `frontend/src/app/components/dashboard/dashboard.component.ts`
+   - `frontend/src/app/components/groups/groups-list.component.ts`
+   - `frontend/src/app/components/groups/groups-list.component.html`
+   - `frontend/src/app/components/groups/group-detail.component.ts`
+   - `frontend/src/app/components/groups/create-expense-modal.component.ts`
+   - `frontend/src/app/components/groups/create-expense-modal.component.html`
+   - `frontend/src/app/components/friends/friends.component.ts`
+   - `frontend/src/app/components/auth/register.component.ts`
+   - `frontend/src/app/components/auth/register.component.html`
+   - `frontend/src/app/components/auth/login.component.ts`
+   - `frontend/src/app/components/auth/login.component.html`
+   - `frontend/src/app/interceptors/conflict-modal.service.ts`
+   - `AGENT_RULES.md`
+   - `FinMate_Project_Specification.md`
+- **Decisions:**
+   - Leverage dynamic route loading to speed up initial bundle load.
+   - Decouple all data retrieval onto thin services to facilitate offline-first logic/indexing updates in future.
+- **Next Actions:**
+   - Ask the user to run frontend test suite (`npx nx test frontend`) to verify the refactored code build.
 
 
 

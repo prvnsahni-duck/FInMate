@@ -42,6 +42,9 @@ Upon completing any change, feature, or project step, you MUST update the **"Pro
 To avoid unnecessary token usage and token expenses, the agent must not run heavy, long-running, or highly verbose terminal commands (such as running tests, linting, or building the project) directly using the run command tool.
 Instead, the agent must ask/instruct the user in the chat to run these terminal commands themselves on their own machine and report/paste the result back if needed.
 
+### Rule 8 — Ask User to Create/Write Large Files to Save Tokens
+To minimize token usage and write expenses during code generation, the agent should write the complete component/file code directly in the chat window. The agent must instruct the user to create the file and paste the code themselves, providing any necessary terminal helper commands (e.g., PowerShell commands to create files) rather than executing `write_to_file` directly for large files.
+
 ---
 
 ## 🏗️ Technology Stack (Do Not Deviate Without Asking)
@@ -109,7 +112,12 @@ We use a hybrid approach leveraging **Signals**, **RxJS**, and **NGXS** dependin
 - All new components must be **standalone** (`standalone: true`).
 - Use `inject()` or constructor injection — never use `Injector` directly.
 - Use Angular `HttpClient` for all outbound HTTP in the frontend — no raw `fetch` or `axios`.
+- **Service/UI Decoupling**: Components MUST NOT inject `HttpClient` or make raw HTTP requests directly. Always construct and inject a dedicated service (e.g. `GroupsService`, `ExpensesService`) under `app/services/` for data access.
+- **Common/Shared Components**: Group all components that are shared/reused across multiple modules under the `app/components/common/` namespace.
+- **Config-Driven Menus & Options**: Maintain menus, navigation, categories, and routing lists in configuration structures/constants rather than hardcoding lists directly in HTML templates.
+- **Slicing & Lazy Loading**: Always configure routes in `app.routes.ts` to load components lazily (`loadComponent`) to keep the initial load bundle size minimal. For listing very large datasets, plan to leverage `@angular/cdk/scrolling` virtual scroll to optimize DOM node foot-print.
 - Interceptors must use the functional `HttpInterceptorFn` signature (Angular 15+ style).
+- **Control Flow Syntax** — Use the modern Angular control flow syntax (`@if`, `@else if`, `@else`, `@for`, `@switch`, `@case`) instead of structural directives (`*ngIf`, `*ngFor`, `*ngSwitch`). Avoid importing `CommonModule` in new components; instead, import only specific pipes/directives needed (e.g. `NgClass`, `NgStyle`, `CurrencyPipe`, `DatePipe`).
 
 ### NestJS
 - All protected routes must use `@UseGuards(JwtAuthGuard)`.
