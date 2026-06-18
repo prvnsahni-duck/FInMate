@@ -1,5 +1,4 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
-import { NgClass } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { jwtDecode } from 'jwt-decode';
 import { ExpensesService } from '../../services/expenses.service';
@@ -10,7 +9,7 @@ import { GroupExpense } from '../../pages/group-detail/group-detail.component';
 @Component({
   selector: 'app-create-expense-modal',
   standalone: true,
-  imports: [NgClass, ReactiveFormsModule, SubmitButtonComponent],
+  imports: [ReactiveFormsModule, SubmitButtonComponent],
   templateUrl: './create-expense-modal.component.html'
 })
 export class CreateExpenseModalComponent implements OnChanges {
@@ -20,7 +19,7 @@ export class CreateExpenseModalComponent implements OnChanges {
   @Input() groupId: string | null = null;
   @Input() groupCurrency!: string;
   @Input() members: GroupMember[] = [];
-  @Input() expense?: GroupExpense; // To support edit mode
+  @Input() expense: GroupExpense | null = null; // To support edit mode
 
   @Output() expenseCreated = new EventEmitter<void>();
   @Output() closeModalEvent = new EventEmitter<void>();

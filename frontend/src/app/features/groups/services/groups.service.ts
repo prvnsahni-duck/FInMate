@@ -55,7 +55,7 @@ export class GroupsService {
   /**
    * Create a new group.
    */
-  createGroup(groupData: Partial<Group>): Observable<Group> {
+  createGroup(groupData: any): Observable<Group> {
     return this.http.post<Group>('/api/groups', groupData);
   }
 

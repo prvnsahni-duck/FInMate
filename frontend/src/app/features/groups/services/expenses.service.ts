@@ -47,14 +47,14 @@ export class ExpensesService {
   /**
    * Create a new expense.
    */
-  createExpense(payload: Partial<Expense>): Observable<Expense> {
+  createExpense(payload: any): Observable<Expense> {
     return this.http.post<Expense>('/api/expenses', payload);
   }
 
   /**
    * Update an existing expense.
    */
-  updateExpense(id: string, payload: Partial<Expense>): Observable<Expense> {
+  updateExpense(id: string, payload: any): Observable<Expense> {
     return this.http.patch<Expense>(`/api/expenses/${id}`, payload);
   }
 

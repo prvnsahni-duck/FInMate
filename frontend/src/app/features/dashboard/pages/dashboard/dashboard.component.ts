@@ -50,7 +50,7 @@ export class DashboardComponent implements OnInit {
     // 1. Fetch personal expenses
     this.expensesService.getExpenses('personal').subscribe({
       next: (res) => {
-        this.personalExpenses = res.data || [];
+        this.personalExpenses = (res.data as GroupExpense[]) || [];
         // Personal balance is simply the sum of all personal expenses logged
         this.totalBalance = this.personalExpenses.reduce((sum, e) => sum + Number(e.amountTotal), 0);
         this.isLoading = false;

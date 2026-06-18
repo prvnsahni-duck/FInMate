@@ -19,6 +19,7 @@ import { GroupMembersComponent } from '../../components/group-members/group-memb
 export interface GroupExpense extends Expense {
   paidByUserId: string;
   ownerUserId: string;
+  splits?: any[];
   attachments?: Array<{
     storageKey: string;
     originalName: string;
@@ -384,7 +385,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
   // Categories list
   categories = ['Food & Drinks', 'Travel', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Others'];
-  selectedExpenseForEdit = signal<Expense | null>(null);
+  selectedExpenseForEdit = signal<GroupExpense | null>(null);
 
   isOwnerOrAdmin = computed(() => {
     const userId = this.currentUserId();
@@ -559,7 +560,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     return member ? (member.user.displayName || member.user.email) : 'Unknown User';
   }
 
-  openExpenseModal(expense?: Expense) {
+  openExpenseModal(expense?: GroupExpense) {
     this.selectedExpenseForEdit.set(expense || null);
     this.isExpenseModalOpen.set(true);
   }
