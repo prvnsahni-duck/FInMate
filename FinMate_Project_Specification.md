@@ -1419,4 +1419,29 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
    - Update `expsnsis-module-plan.md` with technical business logic and mathematical descriptions for household contributions and bar graphs.
 
+### 2026-06-18 (Part 4)
+- **Summary:** Implemented group member staged invitations queue, centralized application name, and added optional displayName to backend invite member process.
+- **Changes Made:**
+   - Created [app.constants.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/core/constants/app.constants.ts) to define central app name variable.
+   - Updated [MainLayoutComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts) and [AuthLayoutComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.ts) to bind dynamic app name properties to their respective templates.
+   - Updated `InviteMemberDto` in [group.dto.ts](file:///g:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/group.dto.ts) to support an optional `displayName`.
+   - Updated [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts) to save `displayName` on placeholder invited user creation.
+   - Refactored [GroupMembersComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts) and [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html) to stage invitations in a local queue, support custom search dropdown choices, include an inline "Add New Contact" modal, and bulk submit via `forkJoin`.
+- **Artifacts Updated:**
+   - [app.constants.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/core/constants/app.constants.ts)
+   - [main-layout.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts)
+   - [main-layout.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.html)
+   - [auth-layout.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.ts)
+   - [auth-layout.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.html)
+   - [group.dto.ts](file:///g:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/group.dto.ts)
+   - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
+   - [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts)
+   - [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html)
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Centralize app name for ease of rebranding.
+   - Enforce a staging phase for bulk invitations before calling backend APIs.
+- **Next Actions:**
+   - Prompt the user to run backend and frontend test suites.
+
 

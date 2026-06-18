@@ -232,6 +232,7 @@ export class GroupsService {
           email: input,
           passwordHash: dummyPassword,
           status: 'invited',
+          displayName: dto.displayName,
         });
         targetUser = await this.dataSource.getRepository(User).save(targetUser);
       } else {
@@ -243,6 +244,7 @@ export class GroupsService {
             phoneNumber: input,
             passwordHash: dummyPassword,
             status: 'invited',
+            displayName: dto.displayName,
           });
           targetUser = await this.dataSource.getRepository(User).save(targetUser);
         } else {

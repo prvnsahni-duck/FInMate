@@ -96,6 +96,10 @@ export class InviteMemberDto {
   @IsOptional()
   userId?: string;
 
+  @IsString()
+  @IsOptional()
+  displayName?: string;
+
   /**
    * Role for the invited member.
    * - `spectator`: can create/update expenses but is excluded from all splits.

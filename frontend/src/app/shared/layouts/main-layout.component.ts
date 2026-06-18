@@ -1,6 +1,7 @@
 import { Component, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { APP_NAME } from '../../core/constants/app.constants';
 
 export interface NavItem {
   path: string;
@@ -43,6 +44,7 @@ export const NAV_ITEMS: NavItem[] = [
   templateUrl: './main-layout.component.html'
 })
 export class MainLayoutComponent {
+  appName = APP_NAME;
   isDarkMode = signal(true);
   navItems = NAV_ITEMS;
   desktopNavItems = computed(() => this.navItems.filter(item => item.path !== '/profile'));

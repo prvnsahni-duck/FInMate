@@ -1,9 +1,21 @@
 import { Component, input, output, inject, signal } from '@angular/core';
 import { NgClass, CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { GroupMember } from '@finmate/data-models';
 import { GroupsService } from '../../services/groups.service';
 import { FriendsService } from '../../../friends/services/friends.service';
+import { APP_NAME } from '../../../../core/constants/app.constants';
+
+export interface StagedInvite {
+  id: string;
+  name: string;
+  identifier: string; // Email or phone number
+  role: 'admin' | 'member' | 'viewer' | 'spectator';
+  isRegisteredUser: boolean;
+  userId?: string;
+}
 
 @Component({
   selector: 'app-group-members',
@@ -22,12 +34,22 @@ export class GroupMembersComponent {
 
   memberChanged = output<void>();
 
-  // Invite Form State
-  inviteIdentifier = '';
+  // Invite Form & Centralized Config State
+  appName = APP_NAME;
   inviteRole: 'admin' | 'member' | 'viewer' | 'spectator' = 'member';
   isInviting = false;
   inviteError = '';
   inviteSuccess = '';
+
+  // Staged Invites Queue
+  stagedInvites = signal<StagedInvite[]>([]);
+
+  // "Add New Contact" Modal State
+  isNewContactModalOpen = false;
+  newContactName = '';
+  newContactIdentifier = '';
+  newContactRole: 'admin' | 'member' | 'viewer' | 'spectator' = 'member';
+  newContactError = '';
 
   // QR Modal State
   isQrModalOpen = false;
@@ -39,8 +61,15 @@ export class GroupMembersComponent {
   searchResults: any[] = [];
   isSearching = false;
 
+  isValidEmail(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
+  isValidPhone(phone: string): boolean {
+    return /^\+?[0-9\s-]{7,15}$/.test(phone);
+  }
+
   onSearchChange(query: string) {
-    this.inviteIdentifier = query;
     if (query.trim().length < 2) {
       this.searchResults = [];
       return;
@@ -49,7 +78,8 @@ export class GroupMembersComponent {
     this.friendsService.searchUsers(query).subscribe({
       next: (users) => {
         this.searchResults = users.filter(user => 
-          !this.members().some(m => m.user?.id === user.id)
+          !this.members().some(m => m.user?.id === user.id) &&
+          !this.stagedInvites().some(s => s.userId === user.id || s.identifier === (user.email || user.username || user.phoneNumber))
         );
         this.isSearching = false;
       },
@@ -59,34 +89,139 @@ export class GroupMembersComponent {
     });
   }
 
+  stageUser(invite: Omit<StagedInvite, 'id'>) {
+    const id = Math.random().toString(36).substring(2, 9);
+    this.stagedInvites.update(list => [...list, { ...invite, id }]);
+  }
+
+  removeStagedInvite(id: string) {
+    this.stagedInvites.update(list => list.filter(item => item.id !== id));
+  }
+
   selectUserForInvite(user: any) {
-    this.inviteIdentifier = user.email || user.username || user.phoneNumber;
-    this.searchQuery = this.inviteIdentifier;
+    this.stageUser({
+      name: user.displayName || user.email.split('@')[0],
+      identifier: user.email || user.username || user.phoneNumber,
+      role: this.inviteRole,
+      isRegisteredUser: true,
+      userId: user.id
+    });
+    this.searchQuery = '';
     this.searchResults = [];
   }
 
-  sendInvite() {
-    if (!this.inviteIdentifier.trim()) return;
+  selectCustomInvite() {
+    const query = this.searchQuery.trim();
+    if (!query) return;
+
+    if (this.isValidEmail(query) || this.isValidPhone(query)) {
+      this.stageUser({
+        name: query,
+        identifier: query,
+        role: this.inviteRole,
+        isRegisteredUser: false
+      });
+      this.searchQuery = '';
+      this.searchResults = [];
+    } else {
+      this.openNewContactModal(query);
+    }
+  }
+
+  openNewContactModal(initialName: string = '') {
+    this.newContactName = initialName;
+    this.newContactIdentifier = '';
+    this.newContactRole = this.inviteRole;
+    this.newContactError = '';
+    this.isNewContactModalOpen = true;
+  }
+
+  closeNewContactModal() {
+    this.isNewContactModalOpen = false;
+  }
+
+  confirmAddStagedContact() {
+    this.newContactError = '';
+    const name = this.newContactName.trim();
+    const identifier = this.newContactIdentifier.trim();
+
+    if (!name) {
+      this.newContactError = 'Name is required.';
+      return;
+    }
+    if (!identifier) {
+      this.newContactError = 'Email or phone number is required.';
+      return;
+    }
+
+    if (!this.isValidEmail(identifier) && !this.isValidPhone(identifier)) {
+      this.newContactError = 'Please enter a valid email address or phone number (7-15 digits).';
+      return;
+    }
+
+    const isAlreadyStaged = this.stagedInvites().some(
+      s => s.identifier.toLowerCase() === identifier.toLowerCase()
+    );
+    const isAlreadyMember = this.members().some(
+      m => m.user?.email?.toLowerCase() === identifier.toLowerCase() ||
+           m.user?.phoneNumber === identifier
+    );
+
+    if (isAlreadyStaged || isAlreadyMember) {
+      this.newContactError = 'This person is already added or a group member.';
+      return;
+    }
+
+    this.stageUser({
+      name,
+      identifier,
+      role: this.newContactRole,
+      isRegisteredUser: false
+    });
+
+    this.closeNewContactModal();
+    this.searchQuery = '';
+    this.searchResults = [];
+  }
+
+  sendBulkInvites() {
+    const list = this.stagedInvites();
+    if (list.length === 0) return;
+
     this.isInviting = true;
     this.inviteError = '';
     this.inviteSuccess = '';
 
-    this.groupsService.inviteMember(this.groupId(), {
-      identifier: this.inviteIdentifier,
-      role: this.inviteRole
-    }).subscribe({
-      next: () => {
+    const requests = list.map(invite => 
+      this.groupsService.inviteMember(this.groupId(), {
+        identifier: invite.identifier,
+        role: invite.role,
+        displayName: invite.isRegisteredUser ? undefined : invite.name
+      }).pipe(
+        catchError(err => of({ error: true, invite, message: err.error?.message || 'Failed to send invite.' }))
+      )
+    );
+
+    forkJoin(requests).subscribe({
+      next: (results: any[]) => {
         this.isInviting = false;
-        this.inviteIdentifier = '';
-        this.searchQuery = '';
-        this.searchResults = [];
-        this.inviteSuccess = 'Invitation sent successfully!';
-        this.memberChanged.emit();
-        setTimeout(() => this.inviteSuccess = '', 3000);
+        const failed = results.filter(r => r && r.error);
+
+        if (failed.length === 0) {
+          this.stagedInvites.set([]);
+          this.inviteSuccess = 'All invitations sent successfully!';
+          this.memberChanged.emit();
+          setTimeout(() => this.inviteSuccess = '', 3000);
+        } else {
+          const failedIds = new Set(failed.map(f => f.invite.id));
+          this.stagedInvites.update(staged => staged.filter(item => failedIds.has(item.id)));
+          this.inviteError = `Failed to invite: ${failed.map(f => f.invite.name).join(', ')}`;
+          this.memberChanged.emit();
+        }
       },
-      error: (err) => {
+      error: () => {
         this.isInviting = false;
-        this.inviteError = err.error?.message || 'Failed to send invitation.';
+        this.inviteError = 'An unexpected error occurred.';
       }
     });
   }
