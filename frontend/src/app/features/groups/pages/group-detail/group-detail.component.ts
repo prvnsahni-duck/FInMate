@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
-import { NgClass, CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CreateExpenseModalComponent } from '../../components/create-expense-modal/create-expense-modal.component';
 import { jwtDecode } from 'jwt-decode';
@@ -32,7 +32,6 @@ export interface GroupExpense extends Expense {
   selector: 'app-group-detail',
   standalone: true,
   imports: [
-    NgClass,
     CurrencyPipe,
     DatePipe,
     RouterLink,

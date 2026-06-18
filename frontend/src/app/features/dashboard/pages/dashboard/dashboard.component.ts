@@ -24,6 +24,8 @@ export class DashboardComponent implements OnInit {
   private expensesService = inject(ExpensesService);
   private authService = inject(AuthService);
 
+  protected readonly Math = Math;
+
   userName = 'User';
   totalBalance = 0;
   monthlyExpenses = 0;
