@@ -29,4 +29,9 @@ export class UpdateProfileDto {
   @IsOptional()
   @Min(0, { message: 'Budget limit cannot be negative' })
   monthlyBudget?: number;
+
+  @IsNumber({}, { message: 'Monthly income must be a valid numeric amount' })
+  @IsOptional()
+  @Min(0, { message: 'Monthly income cannot be negative' })
+  monthlyIncome?: number;
 }

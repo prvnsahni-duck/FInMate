@@ -38,6 +38,9 @@ export class Group {
   @ManyToOne(() => User, { nullable: false })
   ownerUser!: User;
 
+  @Column({ type: 'uuid', unique: true, nullable: true })
+  inviteToken?: string;
+
   @Column({ type: 'boolean', default: false })
   isArchived!: boolean;
 

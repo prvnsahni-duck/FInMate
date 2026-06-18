@@ -12,6 +12,35 @@
   </button>
 </div>
 
+<!-- Pending Invitations Banner -->
+@if (pendingInvitations.length > 0) {
+  <div class="bg-gradient-to-r from-finmate-neon/10 to-finmate-neon2/10 border border-finmate-neon/20 rounded-3xl p-6 mb-8 relative overflow-hidden">
+    <div class="absolute top-0 right-0 w-32 h-32 bg-finmate-neon/20 rounded-full blur-[40px]"></div>
+    <h3 class="font-extrabold text-slate-800 dark:text-white text-lg mb-3 flex items-center space-x-2 relative z-10">
+      <svg class="w-5 h-5 text-finmate-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+      <span>Pending Group Invitations ({{ pendingInvitations.length }})</span>
+    </h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+      @for (invite of pendingInvitations; track invite.membershipId) {
+        <div class="bg-white/80 dark:bg-finmate-card/80 backdrop-blur-md border border-slate-200 dark:border-white/5 rounded-2xl p-4 flex justify-between items-center hover:shadow-md transition-shadow">
+          <div>
+            <h4 class="font-bold text-slate-800 dark:text-white">{{ invite.name }}</h4>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Invited by: {{ invite.ownerName }} • {{ invite.groupType }}</p>
+          </div>
+          <div class="flex space-x-2">
+            <button (click)="declineInvitation(invite)" class="py-1.5 px-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white rounded-xl text-xs font-semibold transition-all">
+              Decline
+            </button>
+            <button (click)="acceptInvitation(invite)" class="py-1.5 px-3.5 bg-gradient-neon text-white rounded-xl text-xs font-semibold shadow-md shadow-finmate-neon/10 hover:shadow-finmate-neon/30 transition-all">
+              Accept
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+}
+
 <!-- Summary Cards -->
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
   <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 hover:scale-[1.02] transition-transform">
@@ -26,6 +55,69 @@
     <div class="absolute top-0 right-0 w-32 h-32 bg-finmate-neon/20 rounded-full blur-[40px]"></div>
     <h3 class="text-white/70 text-sm font-medium mb-1 relative z-10">Active Groups</h3>
     <p class="text-3xl font-bold relative z-10">{{ activeGroupsCount }}</p>
+  </div>
+
+  <!-- Personal Income & Budget Tracker Card -->
+  <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 relative overflow-hidden col-span-1 md:col-span-3">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="text-slate-800 dark:text-white font-bold text-lg">Personal Income & Budget Tracker</h3>
+      <button (click)="toggleEditIncome()" class="text-sm font-semibold text-finmate-neon2 hover:text-finmate-neon transition-all flex items-center space-x-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+        <span>{{ isEditingIncome ? 'Cancel' : 'Edit' }}</span>
+      </button>
+    </div>
+
+    @if (isEditingIncome) {
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-slate-50 dark:bg-white/5 p-5 rounded-2xl border border-slate-100 dark:border-white/5">
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Monthly Salary / Income</label>
+          <input type="number" [(ngModel)]="newIncome" class="w-full bg-white dark:bg-finmate-dark border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-finmate-neon/50 text-slate-900 dark:text-white" placeholder="e.g. 5000" />
+        </div>
+        <div>
+          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Monthly Spending Budget</label>
+          <input type="number" [(ngModel)]="newBudget" class="w-full bg-white dark:bg-finmate-dark border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-finmate-neon/50 text-slate-900 dark:text-white" placeholder="e.g. 1500" />
+        </div>
+        <button (click)="saveIncome()" class="py-2.5 px-5 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/20 hover:shadow-finmate-neon/40 transition-all text-sm">
+          Save Settings
+        </button>
+      </div>
+    } @else {
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <!-- Income Spent Progress -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Salary Spent</span>
+            <span class="text-sm font-bold text-slate-800 dark:text-white">
+              {{ monthlyExpenses | currency:'USD' }} / {{ (userProfile?.monthlyIncome || 0) | currency:'USD' }}
+              ({{ incomePercentage }}%)
+            </span>
+          </div>
+          <div class="w-full bg-slate-100 dark:bg-white/5 rounded-full h-3 overflow-hidden">
+            <div class="bg-gradient-neon h-full rounded-full transition-all duration-500" 
+                 [style.width.%]="userProfile?.monthlyIncome ? Math.min((monthlyExpenses / userProfile.monthlyIncome) * 100, 100) : 0">
+            </div>
+          </div>
+        </div>
+
+        <!-- Budget Utilization Progress -->
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Budget Spent</span>
+            <span class="text-sm font-bold text-slate-800 dark:text-white">
+              {{ monthlyExpenses | currency:'USD' }} / {{ (userProfile?.monthlyBudget || 0) | currency:'USD' }}
+              ({{ budgetPercentage }}%)
+            </span>
+          </div>
+          <div class="w-full bg-slate-100 dark:bg-white/5 rounded-full h-3 overflow-hidden">
+            <div class="h-full rounded-full transition-all duration-500" 
+                 [class.bg-red-500]="userProfile?.monthlyBudget && monthlyExpenses > userProfile.monthlyBudget"
+                 [class.bg-gradient-neon]="!userProfile?.monthlyBudget || monthlyExpenses <= userProfile.monthlyBudget"
+                 [style.width.%]="userProfile?.monthlyBudget ? Math.min((monthlyExpenses / userProfile.monthlyBudget) * 100, 100) : 0">
+            </div>
+          </div>
+        </div>
+      </div>
+    }
   </div>
 </div>
 

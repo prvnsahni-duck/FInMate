@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Body, UseGuards, Req, NotFoundException } from '@nestjs/common';
+import { Controller, Get, Patch, Body, UseGuards, Req, NotFoundException, Query } from '@nestjs/common';
 import { UpdateProfileDto } from '@finmate/data-models';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -7,6 +7,12 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('search')
+  async search(@Query('query') query: string, @Req() req: any) {
+    const results = await this.usersService.searchUsers(query || '', req.user.id);
+    return results.map(user => this.serializeUser(user));
+  }
 
   @Get('me')
   async getMe(@Req() req: any) {
@@ -34,6 +40,8 @@ export class UsersController {
     return {
       id: user.id,
       email: user.email,
+      username: user.username,
+      phoneNumber: user.phoneNumber,
       displayName: user.displayName,
       status: user.status,
       lastLoginAt: user.lastLoginAt,

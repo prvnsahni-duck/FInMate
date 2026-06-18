@@ -68,10 +68,16 @@ Should I draft the replacement markdown for these sections?
 - Group-based shared expense tracking.
 - Balance carry-forward and debt simplification.
 - Multi-user expense contribution tracking.
+- **Personal/Group-less Expenses**: Supports personal expenses added from the dashboard and aggregated into a month-end monthly total.
 
 ### B. Shared Group Module
 - Create or join expense groups (public/private).
-- Add members via invite or link.
+- **Multi-Identifier Invites**: Add members by email, username, or phone number, displaying the user's full name to ensure clarity.
+- **QR Code & Link Invites**: Join groups via secure invite links/QR codes, routing to a landing page with group info and a Join/Decline action.
+- **Dashboard Invite Manager**: View and manage all pending invitations directly from the dashboard.
+- **Invite Revocation**: Group owners/admins can revoke pending invitations.
+- **Household Contribution Settings**: Set custom member contribution percentages month-by-month for household groups, with dashboard bar charts comparing expected target budgets to actual spending.
+- **Carry-Forward Settings**: Expose a single toggle inside settings to specify whether monthly surplus/deficit contributions carry forward or reset.
 - Shared ledger with smart settlement.
 - **Export/Import (CSV, XLSX) Support**:
   Enables offline bulk editing and migrations. Exported files MUST align with the import schema, allowing zero-modification re-imports of the exact same records.
@@ -164,6 +170,8 @@ Core entities finalized for schema design:
 ##### User
 - `id: uuid` (PK)
 - `email: varchar(255)` (unique, required)
+- `username: varchar(50)` (unique, nullable)
+- `phone_number: varchar(20)` (unique, nullable)
 - `password_hash: varchar(255)` (required)
 - `display_name: varchar(120)` (nullable)
 - `status: enum(active|disabled|invited)` (default `active`)
@@ -179,6 +187,7 @@ Core entities finalized for schema design:
 - `timezone: varchar(64)` (default `Asia/Kolkata`)
 - `default_currency: char(3)` (required)
 - `monthly_budget: decimal(12,2)` (nullable)
+- `monthly_income: decimal(12,2)` (nullable)
 - `created_at: timestamptz` (required)
 - `updated_at: timestamptz` (required)
 
@@ -188,6 +197,7 @@ Core entities finalized for schema design:
 - `description: text` (nullable)
 - `visibility: enum(private|invite_only|public_readonly)` (default `private`)
 - `owner_user_id: uuid` (FK -> users.id, required)
+- `invite_token: uuid` (unique, nullable)
 - `is_archived: boolean` (default `false`)
 - `created_at: timestamptz` (required)
 - `updated_at: timestamptz` (required)
@@ -196,13 +206,22 @@ Core entities finalized for schema design:
 - `id: uuid` (PK)
 - `group_id: uuid` (FK -> groups.id, required)
 - `user_id: uuid` (FK -> users.id, required)
-- `role: enum(owner|admin|member|viewer)` (required)
+- `role: enum(owner|admin|member|viewer|spectator)` (required)
 - `join_status: enum(invited|active|left|removed)` (required)
 - `joined_at: timestamptz` (nullable)
 - `left_at: timestamptz` (nullable)
 - `created_at: timestamptz` (required)
 - `updated_at: timestamptz` (required)
 - Unique constraint: `(group_id, user_id)`
+
+##### GroupMemberContribution
+- `id: uuid` (PK)
+- `group_member_id: uuid` (FK -> group_members.id, required)
+- `ledger_month: char(7)` (required, format: YYYY-MM)
+- `percentage: decimal(5,2)` (required)
+- `created_at: timestamptz` (required)
+- `updated_at: timestamptz` (required)
+- Unique constraint: `(group_member_id, ledger_month)`
 
 ##### Expense
 - `id: uuid` (PK)
@@ -1383,5 +1402,21 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
    - Keep the main project specification file high-level by moving all detailed expenses and settlement specs into the module plan file.
 - **Next Actions:**
    - Review the planned Group Member Invitation flow on the frontend.
+
+---
+
+### 2026-06-18 (Part 3)
+- **Summary:** Updated specification domain models and core features to include group updates, lookup invitations, QR links, dashboard personal expenses, and household contribution features.
+- **Changes Made:**
+   - Updated `User` domain model in spec to include `username` and `phone_number`.
+   - Updated `Group` domain model in spec to include `invite_token`.
+   - Added new `GroupMemberContribution` domain model in spec.
+   - Added Core Features for multi-identifier invites, QR codes, invite dashboard manager, and household monthly contributions/carry-forward setting.
+- **Artifacts Updated:**
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Expose carry-forward option as a single ON/OFF toggle in settings. Add a progress chart comparison widget to the main Group Dashboard.
+- **Next Actions:**
+   - Update `expsnsis-module-plan.md` with technical business logic and mathematical descriptions for household contributions and bar graphs.
 
 

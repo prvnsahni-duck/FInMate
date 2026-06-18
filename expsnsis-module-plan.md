@@ -155,6 +155,37 @@ export class ExpenseSplit {
 }
 ```
 
+### C. Group Member Contribution Entity (`group-member-contribution.entity.ts`)
+*   **Path**: `shared/data-models/src/lib/group-member-contribution.entity.ts`
+*   **Description**: Stores the custom percentage share of a group member for a given household ledger month. Sum of percentages of all active members in a month must equal exactly 100.00.
+
+```typescript
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Unique, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { GroupMember } from './group-member.entity';
+
+@Entity('group_member_contributions')
+@Unique(['groupMember', 'ledgerMonth'])
+export class GroupMemberContribution {
+  @PrimaryGeneratedColumn('uuid')
+  id!: string;
+
+  @ManyToOne(() => GroupMember, { nullable: false, onDelete: 'CASCADE' })
+  groupMember!: GroupMember;
+
+  @Column({ type: 'char', length: 7 })
+  ledgerMonth!: string; // Format: YYYY-MM
+
+  @Column('decimal', { precision: 5, scale: 2 })
+  percentage!: number; // Percentage value (e.g. 60.00 for 60%)
+
+  @CreateDateColumn()
+  createdAt!: Date;
+
+  @UpdateDateColumn()
+  updatedAt!: Date;
+}
+```
+
 ---
 
 ## 📩 3. Data Transfer Objects (DTOs)
@@ -284,6 +315,28 @@ export class UpdateExpenseDto {
   @IsInt({ message: 'Version must be an integer' })
   @IsNotEmpty({ message: 'Version is required to resolve concurrent edits' })
   version!: number;
+}
+
+export class MemberPercentageInputDto {
+  @IsUUID('4', { message: 'Member ID must be a valid UUID' })
+  @IsNotEmpty({ message: 'Member ID is required' })
+  memberId!: string;
+
+  @IsNumber({}, { message: 'Percentage must be a valid decimal number' })
+  @Min(0, { message: 'Percentage cannot be negative' })
+  percentage!: number;
+}
+
+export class UpdateContributionDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Ledger month is required' })
+  @MaxLength(7)
+  ledgerMonth!: string; // YYYY-MM
+
+  @IsArray({ message: 'Contributions must be an array' })
+  @ValidateNested({ each: true })
+  @Type(() => MemberPercentageInputDto)
+  contributions!: MemberPercentageInputDto[];
 }
 ```
 
@@ -618,6 +671,34 @@ removeMember(groupId: string, memberId: string): Observable<void> {
 
 ---
 
+## 📊 7. Household Monthly Contribution & Carry-Forward Logic
+
+Enables household groups to establish custom monthly spending targets for each user, calculate month-end balances based on these targets, and display relative visual status.
+
+### A. Core Calculations & Target-matching
+In a household group, the total posted expenses $S$ for a ledger month represents the group's monthly expenditure.
+* Each participant $u$'s target contribution is calculated as:
+  $$T_u = S \times \text{percentage}_u$$
+* The actual amount user $u$ contributed (paid) is $P_u$.
+* The status delta is:
+  $$D_u = P_u - T_u$$
+* If $D_u > 0$: User $u$ has over-contributed (spent more than their share) by $+D_u$.
+* If $D_u < 0$: User $u$ has under-contributed by $-D_u$.
+
+### B. Month-End Rollover setting
+* **Single Toggle Settings**: A setting `carryForwardEnabled` (boolean) on the Group entity controls the ledger month closure behavior:
+  * **Enabled (ON)**: At the end of the month, the delta balance $D_u$ is carried forward into the next month's ledger as a system-generated carry-forward expense (amount = $D_u$ underpayer pays overpayer).
+  * **Disabled (OFF)**: Deltas are not rolled over. Members must settle the balances directly using the smart settlement recommendations, resetting starting balances for the new month to 0.
+
+### C. Dashboard Comparison Bar Graph (Visual representation)
+On the main Group Dashboard, a comparison widget renders a progress bar for each active member:
+* **Expected Base**: Shows actual paid amount $P_u$ relative to their expected target $T_u$.
+* **Visual Status Colors**:
+  * If $D_u > 0$ (Over-contributed): The bar is filled up to $T_u$ and the extra segment $+D_u$ is rendered in **green** with a `+` label.
+  * If $D_u < 0$ (Under-contributed): The bar is filled up to $P_u$, and the remaining segment to meet the target $T_u$ is highlighted in **red/orange** with a `-` label indicating the remaining amount left to pay/contribute.
+
+---
+
 ## 📊 8. Import/Export (CSV, XLSX) Support
 
 Enables offline bulk editing and migrations. Exported files align with the import schema, allowing zero-modification re-imports of the exact same records.
@@ -833,7 +914,7 @@ function simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedT
 ## ⚡ 10. Core Business Logic Summary
 
 ### 🛡️ Access Control Policy
-*   **Personal Context**: Governed by individual ownership. Only the user who paid or created the personal expense (`group_id` is null) can access or modify it.
+*   **Personal & Direct Splits**: Governed by individual ownership. Only the creator/payer who added the personal expense (`group_id` is null) can update or delete it. If it is split directly with friends (using `participantUserId` in splits), those friends also gain read access to see the transaction in their history, balance aggregates, and ledger list.
 *   **Shared Group Context**: Enforces Role-Based Access Control (RBAC):
     *   **Owners & Admins**: Can view, edit, delete, or restore any group expense.
     *   **Members**: Can only edit, delete, or restore expenses they authored or paid.
@@ -896,10 +977,29 @@ This section records all completed and outstanding implementation work specifica
 *   **Custom Modals**: Custom confirmation component (`ConfirmModalComponent`) replaces standard browser alerts.
 
 ### 📋 Next Actions / Future Scope
-*   **Group Invitation UI Integration (High Priority)**:
-    - [ ] Add `inviteMember`, `updateMember`, and `removeMember` methods to frontend `GroupsService`.
-    - [ ] Refactor `GroupMembersComponent` to support invite submission, role updates, and kicking members.
-    - [ ] Build a dashboard panel for accepting/declining group invitations.
+*   **Group Setting & Invitation System (Approved Plan)**:
+    - [ ] Create TypeORM migration for user columns, invite token, and contributions table.
+    - [ ] Add search endpoint and lookup/invite service logic on backend.
+    - [ ] Add public invite-link details route and join-by-token API.
+    - [ ] Implement group-member contributions and carry-forward calculation updates.
+    - [ ] Build frontend routes for `/groups/join/:inviteToken`.
+    - [ ] Build Group Settings UI with Carry-Forward toggle and contribution percentages widget.
+    - [ ] Add Dashboard Invitation Manager widget.
+    - [ ] Add Household Dashboard Bar Graph widget.
 *   **Zero-Knowledge Encryption Key Management**: Integrate client-side key derivation (PBKDF2/Argon2) for transaction titles and descriptions.
 *   **Real-time Conflict Interceptor**: Automate client-side merging or display conflict diff modals upon `CON_VERSION_CONFLICT` (412) status codes.
+
+---
+
+## 📝 Change Log
+
+### 2026-06-18 (Part 3)
+- **Summary**: Added detailed schema and math specifications for Group Member invitations, lookup search, join tokens, dashboard personal expenses, household monthly contributions, and direct-friend splits.
+- **Changes Made**:
+  - Inserted `GroupMemberContribution` entity into Database Entities & Models.
+  - Inserted `MemberPercentageInputDto` and `UpdateContributionDto` into DTOs section.
+  - Added Section 7 detailing Household Monthly Contribution, carry-forward roll-overs, and Dashboard comparison bar graph visual logic.
+  - Updated access control definitions for personal direct splits with friends.
+- **Artifacts Updated**:
+  - [expsnsis-module-plan.md](file:///g:/prvn/Projects/FinMate/expsnsis-module-plan.md)
 

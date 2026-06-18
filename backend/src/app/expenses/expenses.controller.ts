@@ -126,4 +126,14 @@ export class ExpensesController {
   ) {
     return this.expensesService.getCategoryDistribution({ userId: req.user.id, groupId, startDate, endDate });
   }
+
+  /** Combined category-level aggregated monthly expenditures (personal + group splits). */
+  @Get('analytics/all-monthly')
+  async allMonthlySummary(
+    @Query('month') month: string | undefined,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const targetMonth = month ?? new Date().toISOString().slice(0, 7);
+    return this.expensesService.getCombinedMonthlyAnalytics(req.user.id, targetMonth);
+  }
 }

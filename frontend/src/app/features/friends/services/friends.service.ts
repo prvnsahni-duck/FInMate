@@ -14,4 +14,11 @@ export class FriendsService {
   getFriends(): Observable<any[]> {
     return this.http.get<any[]>('/api/friends');
   }
+
+  /**
+   * Search for users by email, username, or phone number.
+   */
+  searchUsers(query: string): Observable<any[]> {
+    return this.http.get<any[]>(`/api/users/search?query=${encodeURIComponent(query)}`);
+  }
 }

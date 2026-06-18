@@ -25,6 +25,9 @@ export class Profile {
   @Column('decimal', { precision: 12, scale: 2, nullable: true })
   monthlyBudget?: number;
 
+  @Column('decimal', { precision: 12, scale: 2, nullable: true })
+  monthlyIncome?: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 

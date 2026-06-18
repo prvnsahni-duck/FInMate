@@ -12,7 +12,7 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { CreateGroupDto, UpdateGroupDto } from '@finmate/data-models';
+import { CreateGroupDto, UpdateGroupDto, UpdateContributionDto } from '@finmate/data-models';
 import { GroupsService } from './groups.service';
 import { ExpensesService } from '../expenses/expenses.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -50,6 +50,19 @@ export class GroupsController {
     return this.groupsService.listGroups(req!.user.id, pageNum, limitNum, isArchivedBool);
   }
 
+  @Post('join/:inviteToken')
+  async joinGroupByToken(
+    @Param('inviteToken', ParseUUIDPipe) inviteToken: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return this.groupsService.joinGroupByToken(req.user.id, inviteToken);
+  }
+
+  @Get('invitations/pending')
+  async findPendingInvitations(@Req() req: Request & { user: { id: string } }) {
+    return this.groupsService.getPendingInvitations(req.user.id);
+  }
+
   @Get(':id')
   async findOne(
     @Param('id', ParseUUIDPipe) id: string,
@@ -65,6 +78,14 @@ export class GroupsController {
     @Req() req: Request & { user: { id: string } },
   ) {
     return this.groupsService.updateGroup(req.user.id, id, updateGroupDto);
+  }
+
+  @Post(':id/invite-link/regenerate')
+  async regenerateInviteToken(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return this.groupsService.regenerateInviteToken(req.user.id, id);
   }
 
   // ─── Group History ────────────────────────────────────────────────────────
@@ -111,5 +132,24 @@ export class GroupsController {
     // Default to current month if not provided
     const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
     return this.expensesService.getCarryForwardSummary(req.user.id, id, ledgerMonth);
+  }
+
+  @Get(':id/contributions')
+  async getContributions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('month') month: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
+    return this.groupsService.getContributions(req.user.id, id, ledgerMonth);
+  }
+
+  @Post(':id/contributions')
+  async updateContributions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateContributionDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    return this.groupsService.updateContributions(req.user.id, id, dto);
   }
 }

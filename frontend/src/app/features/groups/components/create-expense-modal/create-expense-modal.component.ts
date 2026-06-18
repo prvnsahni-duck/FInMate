@@ -1,7 +1,9 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormsModule, FormBuilder, Validators } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 import { jwtDecode } from 'jwt-decode';
 import { ExpensesService } from '../../services/expenses.service';
+import { FriendsService } from '../../../../features/friends/services/friends.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 import { GroupMember, Expense } from '@finmate/data-models';
 import { GroupExpense } from '../../pages/group-detail/group-detail.component';
@@ -9,11 +11,12 @@ import { GroupExpense } from '../../pages/group-detail/group-detail.component';
 @Component({
   selector: 'app-create-expense-modal',
   standalone: true,
-  imports: [ReactiveFormsModule, SubmitButtonComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, SubmitButtonComponent],
   templateUrl: './create-expense-modal.component.html'
 })
 export class CreateExpenseModalComponent implements OnChanges {
   private expensesService = inject(ExpensesService);
+  private friendsService = inject(FriendsService);
   private fb = inject(FormBuilder);
 
   @Input() groupId: string | null = null;
@@ -28,6 +31,13 @@ export class CreateExpenseModalComponent implements OnChanges {
   isSubmitting = false;
   errorMessage = '';
   attachedFiles: { name: string; size: string; key: string }[] = [];
+
+  // Direct splits with friends fields
+  splitWithFriend = false;
+  searchQuery = '';
+  searchResults: any[] = [];
+  resolvedFriends: Map<string, { id: string; displayName: string; email: string }> = new Map();
+  isSearching = false;
 
   expenseForm = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(160)]],
@@ -65,6 +75,40 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
   }
 
+  get availablePayers() {
+    if (this.groupId) {
+      return this.members.map(m => ({ id: m.user.id, name: m.user.displayName || m.user.email }));
+    } else {
+      const currentUserId = this.getCurrentUserId();
+      const list = [];
+      if (currentUserId) {
+        list.push({ id: currentUserId, name: 'You' });
+      }
+      for (const friend of this.resolvedFriends.values()) {
+        list.push({ id: friend.id, name: friend.displayName });
+      }
+      return list;
+    }
+  }
+
+  get availableParticipants() {
+    if (this.groupId) {
+      return this.members
+        .filter(m => m.role !== 'spectator')
+        .map(m => ({ id: m.user.id, name: m.user.displayName || m.user.email }));
+    } else {
+      const currentUserId = this.getCurrentUserId();
+      const list = [];
+      if (currentUserId) {
+        list.push({ id: currentUserId, name: 'You' });
+      }
+      for (const friend of this.resolvedFriends.values()) {
+        list.push({ id: friend.id, name: friend.displayName });
+      }
+      return list;
+    }
+  }
+
   ngOnChanges(changes: SimpleChanges) {
     if (changes['expense'] && this.expense) {
       this.expenseForm.patchValue({
@@ -84,6 +128,33 @@ export class CreateExpenseModalComponent implements OnChanges {
             this.selectedUserIds.add(s.participantUserId);
           }
         });
+      }
+
+      // If group-less direct split expense
+      if (!this.groupId && this.expense.splits) {
+        const currentUserId = this.getCurrentUserId();
+        const otherSplits = this.expense.splits.filter((s: any) => s.participantUserId && s.participantUserId !== currentUserId);
+        if (otherSplits.length > 0) {
+          this.splitWithFriend = true;
+          otherSplits.forEach((s: any) => {
+            if (s.participantUser) {
+              const u = s.participantUser;
+              this.resolvedFriends.set(u.id, {
+                id: u.id,
+                displayName: u.displayName || u.email.split('@')[0],
+                email: u.email
+              });
+              this.selectedUserIds.add(u.id);
+            } else if (s.participantUserId) {
+              this.resolvedFriends.set(s.participantUserId, {
+                id: s.participantUserId,
+                displayName: s.participantUserDisplayName || 'Friend',
+                email: ''
+              });
+              this.selectedUserIds.add(s.participantUserId);
+            }
+          });
+        }
       }
 
       this.attachedFiles = [];
@@ -140,12 +211,59 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
   }
 
+  onSplitToggleChange() {
+    const currentUserId = this.getCurrentUserId();
+    if (!this.splitWithFriend) {
+      this.resolvedFriends.clear();
+      this.selectedUserIds.clear();
+      if (currentUserId) {
+        this.selectedUserIds.add(currentUserId);
+        this.expenseForm.patchValue({ paidByUserId: currentUserId });
+      }
+    }
+  }
+
+  onSearchChange(query: string) {
+    if (query.trim().length < 2) {
+      this.searchResults = [];
+      return;
+    }
+    this.isSearching = true;
+    this.friendsService.searchUsers(query).subscribe({
+      next: (users) => {
+        this.searchResults = users;
+        this.isSearching = false;
+      },
+      error: () => {
+        this.isSearching = false;
+      }
+    });
+  }
+
+  addFriendToSplit(user: any) {
+    this.resolvedFriends.set(user.id, {
+      id: user.id,
+      displayName: user.displayName || user.email.split('@')[0],
+      email: user.email
+    });
+    this.selectedUserIds.add(user.id);
+    this.searchQuery = '';
+    this.searchResults = [];
+  }
+
+  removeFriendFromSplit(userId: string) {
+    const currentUserId = this.getCurrentUserId();
+    if (userId === currentUserId) return;
+    this.selectedUserIds.delete(userId);
+    this.resolvedFriends.delete(userId);
+  }
+
   closeModal() {
     this.closeModalEvent.emit();
   }
 
   onSubmit() {
-    if (!this.groupId) {
+    if (!this.groupId && !this.splitWithFriend) {
       const currentUserId = this.getCurrentUserId();
       if (currentUserId) {
         this.selectedUserIds.clear();

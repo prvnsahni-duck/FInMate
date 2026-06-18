@@ -59,6 +59,15 @@ describe('ExpensesService', () => {
       create: jest.fn((data) => data),
     };
 
+    const mockContributionRepository = {
+      createQueryBuilder: jest.fn(() => ({
+        innerJoinAndSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      })),
+    };
+
     const mockEntityManager = {
       getRepository: jest.fn((entity) => {
         if (entity === Expense) return mockExpenseRepository;
@@ -68,11 +77,15 @@ describe('ExpensesService', () => {
         if (entity === User) return mockUserRepository;
         if (entity === Attachment) return mockAttachmentRepository;
         if (entity === AuditLog) return mockAuditLogRepository;
+        if (entity && (entity.name === 'GroupMemberContribution' || (typeof entity === 'function' && entity.name === 'GroupMemberContribution'))) {
+          return mockContributionRepository;
+        }
       }),
     };
 
     const mockDataSource = {
       transaction: jest.fn(async (cb) => await cb(mockEntityManager)),
+      getRepository: jest.fn((entity) => mockEntityManager.getRepository(entity)),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -517,6 +530,11 @@ describe('ExpensesService', () => {
         currency: 'USD',
       } as any);
 
+      groupMemberRepository.find.mockResolvedValue([
+        { id: 'member-a', user: { id: 'user-a', displayName: 'User A' }, joinStatus: 'active' },
+        { id: 'member-b', user: { id: 'user-b', displayName: 'User B' }, joinStatus: 'active' },
+      ] as any);
+
       // Expenses in the group for 2026-06
       expenseRepository.find.mockResolvedValue([
         {
@@ -525,20 +543,6 @@ describe('ExpensesService', () => {
           currency: 'USD',
           paidByUser: { id: 'user-a', displayName: 'User A' },
           ownerUser: { id: 'user-a' },
-        },
-      ] as any);
-
-      // Splits: equal split of 150 between User A and User B (75 each)
-      splitRepository.find.mockResolvedValue([
-        {
-          id: 'split-1',
-          amountOwed: 75,
-          participantGroupMember: { user: { id: 'user-a', displayName: 'User A' } },
-        },
-        {
-          id: 'split-2',
-          amountOwed: 75,
-          participantGroupMember: { user: { id: 'user-b', displayName: 'User B' } },
         },
       ] as any);
 

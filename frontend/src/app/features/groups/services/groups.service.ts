@@ -93,5 +93,75 @@ export class GroupsService {
   getCarryForward(groupId: string, month: string): Observable<any[]> {
     return this.http.get<any[]>(`/api/groups/${groupId}/carry-forward?month=${month}`);
   }
+
+  /**
+   * Update an existing group.
+   */
+  updateGroup(groupId: string, groupData: any): Observable<Group> {
+    return this.http.patch<Group>(`/api/groups/${groupId}`, groupData);
+  }
+
+  /**
+   * Regenerate invite token for a group.
+   */
+  regenerateInviteToken(groupId: string): Observable<Group> {
+    return this.http.post<Group>(`/api/groups/${groupId}/invite-link/regenerate`, {});
+  }
+
+  /**
+   * Join a group using an invite token.
+   */
+  joinGroup(inviteToken: string): Observable<GroupMember> {
+    return this.http.post<GroupMember>(`/api/groups/join/${inviteToken}`, {});
+  }
+
+  /**
+   * Fetch minimal safe metadata for an invite link.
+   */
+  getInviteDetails(inviteToken: string): Observable<any> {
+    return this.http.get<any>(`/api/invite-links/${inviteToken}`);
+  }
+
+  /**
+   * Get custom contribution percentages for a household group ledger month.
+   */
+  getContributions(groupId: string, month: string): Observable<any[]> {
+    return this.http.get<any[]>(`/api/groups/${groupId}/contributions?month=${month}`);
+  }
+
+  /**
+   * Update/save custom contribution percentages for a household group ledger month.
+   */
+  updateContributions(groupId: string, payload: any): Observable<any> {
+    return this.http.post<any>(`/api/groups/${groupId}/contributions`, payload);
+  }
+
+  /**
+   * Invite a user to a group.
+   */
+  inviteMember(groupId: string, payload: { email?: string; identifier?: string; role?: string }): Observable<GroupMember> {
+    return this.http.post<GroupMember>(`/api/groups/${groupId}/members`, payload);
+  }
+
+  /**
+   * Update membership role or join status.
+   */
+  updateMember(groupId: string, memberId: string, payload: { role?: string; joinStatus?: string }): Observable<GroupMember> {
+    return this.http.patch<GroupMember>(`/api/groups/${groupId}/members/${memberId}`, payload);
+  }
+
+  /**
+   * Remove/kick a member or revoke a pending invitation.
+   */
+  removeMember(groupId: string, memberId: string): Observable<void> {
+    return this.http.delete<void>(`/api/groups/${groupId}/members/${memberId}`);
+  }
+
+  /**
+   * Fetch pending invitations for the logged-in user.
+   */
+  getPendingInvitations(): Observable<any[]> {
+    return this.http.get<any[]>('/api/groups/invitations/pending');
+  }
 }
 

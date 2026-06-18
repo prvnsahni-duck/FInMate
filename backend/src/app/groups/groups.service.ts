@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException, PreconditionFailedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Group, GroupMember, User, AuditLog, CreateGroupDto, UpdateGroupDto, InviteMemberDto, UpdateMemberDto } from '@finmate/data-models';
+import { Group, GroupMember, User, AuditLog, CreateGroupDto, UpdateGroupDto, InviteMemberDto, UpdateMemberDto, GroupMemberContribution, UpdateContributionDto } from '@finmate/data-models';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
@@ -28,6 +28,7 @@ export class GroupsService {
         groupType: dto.groupType || 'normal',
         carryForwardEnabled: dto.carryForwardEnabled ?? false,
         ownerUser: owner,
+        inviteToken: randomUUID(),
       });
       const savedGroup = await manager.save(Group, group);
 
@@ -39,6 +40,52 @@ export class GroupsService {
         joinedAt: new Date(),
       });
       await manager.save(GroupMember, member);
+
+      // Invite initial members if provided
+      if (dto.members && dto.members.length > 0) {
+        for (const initialMember of dto.members) {
+          if (!initialMember.identifier) continue;
+          let targetUser = await manager.getRepository(User)
+            .createQueryBuilder('user')
+            .where('user.email = :id OR user.username = :id OR user.phoneNumber = :id', { id: initialMember.identifier })
+            .getOne();
+
+          if (!targetUser) {
+            const isEmail = initialMember.identifier.includes('@');
+            if (isEmail) {
+              const dummyPassword = await argon2.hash(randomUUID());
+              targetUser = manager.getRepository(User).create({
+                email: initialMember.identifier,
+                passwordHash: dummyPassword,
+                status: 'invited',
+              });
+              targetUser = await manager.save(User, targetUser);
+            } else {
+              const hasDigits = /^\+?[0-9\s-]{7,15}$/.test(initialMember.identifier);
+              if (hasDigits) {
+                const dummyPassword = await argon2.hash(randomUUID());
+                targetUser = manager.getRepository(User).create({
+                  email: `${initialMember.identifier}@placeholder.finmate`,
+                  phoneNumber: initialMember.identifier,
+                  passwordHash: dummyPassword,
+                  status: 'invited',
+                });
+                targetUser = await manager.save(User, targetUser);
+              } else {
+                continue; // Skip invalid usernames/identifiers
+              }
+            }
+          }
+
+          const newMember = manager.create(GroupMember, {
+            group: savedGroup,
+            user: targetUser,
+            role: initialMember.role || 'member',
+            joinStatus: 'invited',
+          });
+          await manager.save(GroupMember, newMember);
+        }
+      }
 
       return savedGroup;
     });
@@ -159,16 +206,49 @@ export class GroupsService {
       throw new NotFoundException('Group not found');
     }
 
-    // Resolve email (create placeholder user if not found)
-    let targetUser = await this.dataSource.getRepository(User).findOne({ where: { email: dto.email } });
+    let targetUser: User | null = null;
+
+    if (dto.userId) {
+      targetUser = await this.dataSource.getRepository(User).findOne({ where: { id: dto.userId } });
+    } else if (dto.identifier) {
+      targetUser = await this.dataSource.getRepository(User)
+        .createQueryBuilder('user')
+        .where('user.email = :id OR user.username = :id OR user.phoneNumber = :id', { id: dto.identifier })
+        .getOne();
+    } else if (dto.email) {
+      targetUser = await this.dataSource.getRepository(User).findOne({ where: { email: dto.email } });
+    }
+
     if (!targetUser) {
-      const dummyPassword = await argon2.hash(randomUUID());
-      targetUser = this.dataSource.getRepository(User).create({
-        email: dto.email,
-        passwordHash: dummyPassword,
-        status: 'invited',
-      });
-      targetUser = await this.dataSource.getRepository(User).save(targetUser);
+      const input = dto.identifier || dto.email;
+      if (!input) {
+        throw new BadRequestException('Provide email, username, or phone number to invite');
+      }
+
+      const isEmail = input.includes('@');
+      if (isEmail) {
+        const dummyPassword = await argon2.hash(randomUUID());
+        targetUser = this.dataSource.getRepository(User).create({
+          email: input,
+          passwordHash: dummyPassword,
+          status: 'invited',
+        });
+        targetUser = await this.dataSource.getRepository(User).save(targetUser);
+      } else {
+        const hasDigits = /^\+?[0-9\s-]{7,15}$/.test(input);
+        if (hasDigits) {
+          const dummyPassword = await argon2.hash(randomUUID());
+          targetUser = this.dataSource.getRepository(User).create({
+            email: `${input}@placeholder.finmate`,
+            phoneNumber: input,
+            passwordHash: dummyPassword,
+            status: 'invited',
+          });
+          targetUser = await this.dataSource.getRepository(User).save(targetUser);
+        } else {
+          throw new NotFoundException('User not found by the provided username/identifier');
+        }
+      }
     }
 
     // Check existing membership
@@ -418,5 +498,186 @@ export class GroupsService {
     }));
 
     return paginate(data, total, p, l, `/api/v1/groups/${groupId}/history`, {});
+  }
+
+  async regenerateInviteToken(userId: string, groupId: string): Promise<Group> {
+    const membership = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
+    if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
+      throw new ForbiddenException('Only owners and admins can regenerate the invite token');
+    }
+
+    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
+    group.inviteToken = randomUUID();
+    return this.groupRepository.save(group);
+  }
+
+  async getInviteDetails(inviteToken: string) {
+    const group = await this.groupRepository.findOne({
+      where: { inviteToken },
+      relations: ['ownerUser'],
+    });
+    if (!group) {
+      throw new NotFoundException('Invalid or expired invitation link');
+    }
+    return {
+      id: group.id,
+      name: group.name,
+      description: group.description,
+      currency: group.currency,
+      groupType: group.groupType,
+      ownerName: group.ownerUser.displayName || group.ownerUser.email,
+    };
+  }
+
+  async joinGroupByToken(userId: string, inviteToken: string): Promise<GroupMember> {
+    const group = await this.groupRepository.findOne({ where: { inviteToken } });
+    if (!group) {
+      throw new NotFoundException('Invalid or expired invitation link');
+    }
+
+    const user = await this.dataSource.getRepository(User).findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const existingMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group_id = :groupId', { groupId: group.id })
+      .andWhere('member.user_id = :userId', { userId })
+      .getOne();
+
+    if (existingMember) {
+      if (existingMember.joinStatus === 'active') {
+        return existingMember;
+      }
+      existingMember.joinStatus = 'active';
+      existingMember.joinedAt = new Date();
+      existingMember.leftAt = undefined;
+      return this.groupMemberRepository.save(existingMember);
+    }
+
+    const newMember = this.groupMemberRepository.create({
+      group,
+      user,
+      role: 'member',
+      joinStatus: 'active',
+      joinedAt: new Date(),
+    });
+    return this.groupMemberRepository.save(newMember);
+  }
+
+  async getPendingInvitations(userId: string): Promise<any[]> {
+    const memberships = await this.groupMemberRepository.find({
+      where: { user: { id: userId }, joinStatus: 'invited' },
+      relations: ['group', 'group.ownerUser'],
+    });
+
+    return memberships.map((m) => ({
+      id: m.group.id,
+      membershipId: m.id,
+      name: m.group.name,
+      description: m.group.description,
+      currency: m.group.currency,
+      groupType: m.group.groupType,
+      ownerName: m.group.ownerUser.displayName || m.group.ownerUser.email,
+    }));
+  }
+
+  async getContributions(userId: string, groupId: string, ledgerMonth: string) {
+    const callerMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
+    if (!callerMember) {
+      throw new ForbiddenException('You do not have access to this group');
+    }
+
+    const activeMembers = await this.groupMemberRepository.find({
+      where: { group: { id: groupId }, joinStatus: 'active' },
+      relations: ['user'],
+    });
+
+    const contributions = await this.dataSource.getRepository(GroupMemberContribution)
+      .createQueryBuilder('contribution')
+      .innerJoinAndSelect('contribution.groupMember', 'groupMember')
+      .innerJoinAndSelect('groupMember.user', 'user')
+      .where('groupMember.group_id = :groupId', { groupId })
+      .andWhere('contribution.ledgerMonth = :ledgerMonth', { ledgerMonth })
+      .getMany();
+
+    const contributionsMap = new Map(contributions.map(c => [c.groupMember.id, Number(c.percentage)]));
+
+    const result = activeMembers.map(m => {
+      const percentage = contributionsMap.get(m.id) ?? (100 / activeMembers.length);
+      return {
+        memberId: m.id,
+        userId: m.user.id,
+        displayName: m.user.displayName || m.user.email,
+        percentage: Math.round(percentage * 100) / 100,
+      };
+    });
+
+    return result;
+  }
+
+  async updateContributions(userId: string, groupId: string, dto: UpdateContributionDto) {
+    const callerMember = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
+    if (!callerMember || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
+      throw new ForbiddenException('Only owners and admins can update contribution settings');
+    }
+
+    const totalPercentage = dto.contributions.reduce((sum, c) => sum + Number(c.percentage), 0);
+    if (Math.round(totalPercentage * 100) !== 10000) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Total contribution percentages must sum to exactly 100.00%',
+      });
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const savedContributions: GroupMemberContribution[] = [];
+
+      for (const contributionInput of dto.contributions) {
+        const member = await manager.getRepository(GroupMember).findOne({
+          where: { id: contributionInput.memberId, group: { id: groupId } },
+        });
+        if (!member) {
+          throw new BadRequestException(`Member ID ${contributionInput.memberId} does not belong to this group`);
+        }
+
+        let contribution = await manager.getRepository(GroupMemberContribution).findOne({
+          where: { groupMember: { id: member.id }, ledgerMonth: dto.ledgerMonth },
+        });
+
+        if (contribution) {
+          contribution.percentage = contributionInput.percentage;
+        } else {
+          contribution = manager.getRepository(GroupMemberContribution).create({
+            groupMember: member,
+            ledgerMonth: dto.ledgerMonth,
+            percentage: contributionInput.percentage,
+          });
+        }
+
+        savedContributions.push(await manager.save(GroupMemberContribution, contribution));
+      }
+
+      return savedContributions;
+    });
   }
 }

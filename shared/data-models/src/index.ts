@@ -5,6 +5,7 @@ export * from './lib/expense.entity';
 export * from './lib/expense-split.entity';
 export * from './lib/group.entity';
 export * from './lib/group-member.entity';
+export * from './lib/group-member-contribution.entity';
 export * from './lib/settlement.entity';
 export * from './lib/note.entity';
 export * from './lib/goal.entity';

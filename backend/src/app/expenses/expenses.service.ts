@@ -1009,42 +1009,58 @@ export class ExpensesService {
       withDeleted: false,
     });
 
-    // Get all splits for these expenses
-    const expenseIds = expenses.map((e) => e.id);
-    const splits = expenseIds.length
-      ? await this.expenseSplitRepository.find({
-          where: { expense: { id: In(expenseIds) } },
-          relations: ['participantGroupMember', 'participantGroupMember.user'],
-        })
-      : [];
+    const activeMembers = await this.groupMemberRepository.find({
+      where: { group: { id: groupId }, joinStatus: 'active' },
+      relations: ['user'],
+    });
 
-    // Compute per-user paid vs owed
-    const memberBalances = new Map<string, { displayName: string | null; paid: number; owed: number }>();
+    // Compute total monthly spending S
+    const S = expenses.reduce((sum, exp) => sum + Number(exp.amountTotal), 0);
 
+    // Compute actual paid amounts per active user
+    const paidMap = new Map<string, number>();
+    for (const member of activeMembers) {
+      paidMap.set(member.user.id, 0);
+    }
     for (const exp of expenses) {
       const uid = exp.paidByUser.id;
-      const entry = memberBalances.get(uid) ?? { displayName: exp.paidByUser.displayName ?? null, paid: 0, owed: 0 };
-      entry.paid += Number(exp.amountTotal);
-      memberBalances.set(uid, entry);
+      paidMap.set(uid, (paidMap.get(uid) ?? 0) + Number(exp.amountTotal));
     }
 
-    for (const split of splits) {
-      const member = split.participantGroupMember;
-      if (!member?.user) continue;
-      const uid = member.user.id;
-      const entry = memberBalances.get(uid) ?? { displayName: member.user.displayName ?? null, paid: 0, owed: 0 };
-      entry.owed += Number(split.amountOwed);
-      memberBalances.set(uid, entry);
+    // Look up monthly contribution percentages
+    const { GroupMemberContribution } = require('@finmate/data-models');
+    const contributions = await this.dataSource.getRepository(GroupMemberContribution)
+      .createQueryBuilder('contribution')
+      .innerJoinAndSelect('contribution.groupMember', 'groupMember')
+      .where('groupMember.group_id = :groupId', { groupId })
+      .andWhere('contribution.ledgerMonth = :ledgerMonth', { ledgerMonth })
+      .getMany();
+
+    const contributionMap = new Map<string, number>();
+    for (const c of contributions) {
+      contributionMap.set(c.groupMember.id, Number(c.percentage));
     }
 
     const currency = group.currency;
 
-    return Array.from(memberBalances.entries()).map(([uid, { displayName, paid, owed }]) => ({
-      userId: uid,
-      displayName,
-      netBalance: Math.round((paid - owed) * 100) / 100,
-      currency,
-    }));
+    if (activeMembers.length === 0) {
+      return [];
+    }
+
+    return activeMembers.map((m) => {
+      const pct = contributionMap.get(m.id) ?? (100 / activeMembers.length);
+      const Tu = S * (pct / 100);
+      const Pu = paidMap.get(m.user.id) ?? 0;
+      return {
+        userId: m.user.id,
+        displayName: m.user.displayName || m.user.email,
+        netBalance: Math.round((Pu - Tu) * 100) / 100,
+        currency,
+        paid: Math.round(Pu * 100) / 100,
+        expected: Math.round(Tu * 100) / 100,
+        percentage: pct,
+      };
+    });
   }
 
   /**
@@ -1076,5 +1092,78 @@ export class ExpensesService {
 
     const mapped = await Promise.all(expenses.map((e) => this.mapExpenseResponse(e)));
     return paginate(mapped, total, p, l, `/api/v1/groups/${groupId}/expenses/deleted`, {});
+  }
+
+  /** Combined category-level aggregated monthly expenditures (personal + group splits) */
+  async getCombinedMonthlyAnalytics(userId: string, month: string): Promise<{ category: string; amount: number; currency: string }[]> {
+    // 1. Get all group-less posted expenses paid by the user in this month
+    const paidPersonalExpenses = await this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .where('expense.group IS NULL')
+      .andWhere('paidByUser.id = :userId', { userId })
+      .andWhere('expense.status = :status', { status: 'posted' })
+      .andWhere('expense.expenseDate LIKE :monthPrefix', { monthPrefix: `${month}%` })
+      .getMany();
+
+    // 2. Fetch splits for those personal expenses to identify which are 100% personal vs direct splits
+    const paidPersonalExpenseIds = paidPersonalExpenses.map((e) => e.id);
+    const personalSplits = paidPersonalExpenseIds.length
+      ? await this.expenseSplitRepository.find({
+          where: { expense: { id: In(paidPersonalExpenseIds) } },
+          relations: ['expense'],
+        })
+      : [];
+    const personalExpenseHasSplits = new Set(personalSplits.map((s) => s.expense.id));
+
+    // 3. Get all splits where the user is a participant (either direct user split or group member split)
+    const userSplits = await this.expenseSplitRepository
+      .createQueryBuilder('split')
+      .innerJoinAndSelect('split.expense', 'expense')
+      .leftJoin('split.participantGroupMember', 'groupMember')
+      .where('expense.status = :status', { status: 'posted' })
+      .andWhere('(expense.ledgerMonth = :month OR expense.expenseDate LIKE :monthPrefix)', { month, monthPrefix: `${month}%` })
+      .andWhere(
+        '(split.participantUserId = :userId OR groupMember.user_id = :userId)',
+        { userId }
+      )
+      .getMany();
+
+    const categorySum = new Map<string, { amount: number; currency: string }>();
+
+    // Add 100% personal expenses (paid by user, group is null, no splits exist)
+    for (const exp of paidPersonalExpenses) {
+      if (!personalExpenseHasSplits.has(exp.id)) {
+        const cat = exp.category || 'Other';
+        const amount = Number(exp.amountTotal);
+        const curr = exp.currency || 'USD';
+        const key = `${cat}_${curr}`;
+        const entry = categorySum.get(key) ?? { amount: 0, currency: curr };
+        entry.amount += amount;
+        categorySum.set(key, entry);
+      }
+    }
+
+    // Add split shares (owes) for both group and direct split expenses
+    for (const split of userSplits) {
+      const exp = split.expense;
+      const cat = exp.category || 'Other';
+      const amount = Number(split.amountOwed);
+      const curr = exp.currency || 'USD';
+      const key = `${cat}_${curr}`;
+      const entry = categorySum.get(key) ?? { amount: 0, currency: curr };
+      entry.amount += amount;
+      categorySum.set(key, entry);
+    }
+
+    return Array.from(categorySum.entries()).map(([key, value]) => {
+      const lastUnderscore = key.lastIndexOf('_');
+      const category = key.substring(0, lastUnderscore);
+      return {
+        category,
+        amount: Math.round(value.amount * 100) / 100,
+        currency: value.currency,
+      };
+    });
   }
 }

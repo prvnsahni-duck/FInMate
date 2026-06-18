@@ -1,4 +1,15 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsEnum, IsBoolean, IsInt, IsEmail } from 'class-validator';
+import { IsString, IsNotEmpty, MaxLength, IsOptional, IsEnum, IsBoolean, IsInt, IsEmail, IsArray, ValidateNested, IsNumber, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class GroupInitialMemberDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Member identifier (email, username, or phone) is required' })
+  identifier!: string;
+
+  @IsEnum(['admin', 'member', 'viewer', 'spectator'], { message: 'Invalid member role option' })
+  @IsOptional()
+  role?: 'admin' | 'member' | 'viewer' | 'spectator';
+}
 
 export class CreateGroupDto {
   @IsString()
@@ -31,6 +42,12 @@ export class CreateGroupDto {
   @IsBoolean()
   @IsOptional()
   carryForwardEnabled?: boolean;
+
+  @IsArray({ message: 'Initial members must be an array' })
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => GroupInitialMemberDto)
+  members?: GroupInitialMemberDto[];
 }
 
 export class UpdateGroupDto {
@@ -68,8 +85,16 @@ export class UpdateGroupDto {
 
 export class InviteMemberDto {
   @IsEmail({}, { message: 'Must invite user via a valid email address' })
-  @IsNotEmpty({ message: 'Member email is required' })
-  email!: string;
+  @IsOptional()
+  email?: string;
+
+  @IsString()
+  @IsOptional()
+  identifier?: string; // Username, phone number, or email
+
+  @IsUUID('4', { message: 'User ID must be a valid UUID' })
+  @IsOptional()
+  userId?: string;
 
   /**
    * Role for the invited member.
@@ -88,4 +113,25 @@ export class UpdateMemberDto {
   @IsEnum(['invited', 'active', 'left', 'removed'], { message: 'Invalid member join status option' })
   @IsOptional()
   joinStatus?: 'invited' | 'active' | 'left' | 'removed';
+}
+
+export class MemberPercentageInputDto {
+  @IsUUID('4', { message: 'Member ID must be a valid UUID' })
+  @IsNotEmpty({ message: 'Member ID is required' })
+  memberId!: string;
+
+  @IsNumber({}, { message: 'Percentage must be a valid decimal number' })
+  percentage!: number;
+}
+
+export class UpdateContributionDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Ledger month is required' })
+  @MaxLength(7)
+  ledgerMonth!: string; // YYYY-MM
+
+  @IsArray({ message: 'Contributions must be an array' })
+  @ValidateNested({ each: true })
+  @Type(() => MemberPercentageInputDto)
+  contributions!: MemberPercentageInputDto[];
 }

@@ -113,20 +113,55 @@ export interface GroupExpense extends Expense {
           </div>
         }
 
-        <!-- Household Carry-Forward section -->
+        <!-- Household Carry-Forward Bar Graph Widget -->
         @if (group()!.groupType === 'household' && carryForwardBalances().length > 0) {
-          <div class="bg-blue-500/5 border border-blue-500/10 rounded-3xl p-6 mb-8">
-            <h3 class="text-sm font-bold text-blue-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              Carry-Forward Extra Balances
+          <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 mb-8 shadow-xl shadow-black/5">
+            <h3 class="text-sm font-extrabold text-slate-800 dark:text-white uppercase tracking-wider mb-6 flex items-center gap-2">
+              <svg class="w-5 h-5 text-finmate-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+              Household Target vs. Actual Contribution
             </h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-              @for (m of carryForwardBalances(); track m.displayName) {
-                <div class="p-3 bg-white/50 dark:bg-black/25 rounded-2xl border border-slate-100 dark:border-white/5">
-                  <p class="text-xs text-slate-400 dark:text-slate-500 truncate">{{ m.displayName }}</p>
-                  <p class="text-lg font-bold" [ngClass]="{'text-green-500 dark:text-green-400': m.netBalance > 0, 'text-red-500 dark:text-red-400': m.netBalance < 0, 'text-slate-500': m.netBalance === 0}">
-                    {{ m.netBalance > 0 ? '+' : '' }}{{ m.netBalance | currency:group()!.currency }}
-                  </p>
+
+            <div class="space-y-6">
+              @for (m of carryForwardBalances(); track m.userId) {
+                <div>
+                  <div class="flex justify-between items-center text-xs font-semibold mb-2">
+                    <span class="text-slate-700 dark:text-slate-300 font-bold">{{ m.displayName }}</span>
+                    <span class="text-slate-500 dark:text-slate-400">
+                      Paid: <span class="text-slate-800 dark:text-white font-bold">{{ m.paid | currency:group()!.currency }}</span> 
+                      / Target: <span class="text-slate-800 dark:text-white font-bold">{{ m.expected | currency:group()!.currency }}</span>
+                      ({{ m.percentage }}%)
+                    </span>
+                  </div>
+
+                  <!-- Stacked Bar Graph -->
+                  <div class="w-full bg-slate-100 dark:bg-white/5 rounded-full h-4 overflow-hidden flex">
+                    @if (m.netBalance > 0) {
+                      <!-- Base target segment -->
+                      <div class="bg-gradient-neon h-full transition-all duration-500" 
+                           [style.width.%]="(m.expected / getMaxCarryForwardValue()) * 100">
+                      </div>
+                      <!-- Over-contributed segment (green) -->
+                      <div class="bg-green-500 h-full flex items-center justify-end px-2 text-[9px] font-bold text-white transition-all duration-500" 
+                           [style.width.%]="(m.netBalance / getMaxCarryForwardValue()) * 100">
+                        +{{ m.netBalance | currency:group()!.currency }}
+                      </div>
+                    } @else if (m.netBalance < 0) {
+                      <!-- Paid segment -->
+                      <div class="bg-gradient-neon h-full transition-all duration-500" 
+                           [style.width.%]="(m.paid / getMaxCarryForwardValue()) * 100">
+                      </div>
+                      <!-- Under-contributed segment (red/orange) -->
+                      <div class="bg-orange-500 h-full flex items-center justify-end px-2 text-[9px] font-bold text-white transition-all duration-500" 
+                           [style.width.%]="((m.netBalance < 0 ? -m.netBalance : m.netBalance) / getMaxCarryForwardValue()) * 100">
+                        -{{ (m.netBalance < 0 ? -m.netBalance : m.netBalance) | currency:group()!.currency }}
+                      </div>
+                    } @else {
+                      <!-- Fully met target -->
+                      <div class="bg-gradient-neon h-full transition-all duration-500" 
+                           [style.width.%]="(m.expected / getMaxCarryForwardValue()) * 100">
+                      </div>
+                    }
+                  </div>
                 </div>
               }
             </div>
@@ -139,18 +174,23 @@ export interface GroupExpense extends Expense {
             
             <!-- Tabs Navigation -->
             <div class="flex space-x-1 bg-slate-100 dark:bg-black/20 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5">
-              <button (click)="activeTab.set('ledger')" [class]="activeTab() === 'ledger' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
+              <button (click)="setTab('ledger')" [class]="activeTab() === 'ledger' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
                 Ledger
               </button>
-              <button (click)="activeTab.set('analytics')" [class]="activeTab() === 'analytics' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
+              <button (click)="setTab('analytics')" [class]="activeTab() === 'analytics' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
                 Analytics
               </button>
-              <button (click)="activeTab.set('history')" [class]="activeTab() === 'history' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
+              <button (click)="setTab('history')" [class]="activeTab() === 'history' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
                 History
               </button>
-              <button (click)="activeTab.set('trash')" [class]="activeTab() === 'trash' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
+              <button (click)="setTab('trash')" [class]="activeTab() === 'trash' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
                 Trash
               </button>
+              @if (isOwnerOrAdmin()) {
+                <button (click)="setTab('settings')" [class]="activeTab() === 'settings' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
+                  Settings
+                </button>
+              }
             </div>
 
             <!-- TAB: Ledger -->
@@ -306,6 +346,166 @@ export interface GroupExpense extends Expense {
               ></app-group-trash>
             }
 
+            <!-- TAB: Settings -->
+            @if (activeTab() === 'settings') {
+              <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 space-y-8 animate-fadeIn">
+                <!-- Group Settings Form -->
+                <div>
+                  <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                    <svg class="w-5 h-5 text-finmate-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                    Group Settings
+                  </h2>
+
+                  <form (submit)="saveGroupSettings(); $event.preventDefault()" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Group Name</label>
+                        <input type="text" [(ngModel)]="editGroupName" name="editGroupName" required class="w-full text-sm px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none">
+                      </div>
+
+                      <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Currency</label>
+                        <select [(ngModel)]="editGroupCurrency" name="editGroupCurrency" class="w-full text-sm px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none cursor-pointer">
+                          <option value="USD">USD ($)</option>
+                          <option value="EUR">EUR (€)</option>
+                          <option value="GBP">GBP (£)</option>
+                          <option value="INR">INR (₹)</option>
+                          <option value="CAD">CAD ($)</option>
+                          <option value="AUD">AUD ($)</option>
+                          <option value="JPY">JPY (¥)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Description</label>
+                      <textarea [(ngModel)]="editGroupDescription" name="editGroupDescription" rows="2" class="w-full text-sm px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none resize-none"></textarea>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Visibility</label>
+                        <select [(ngModel)]="editGroupVisibility" name="editGroupVisibility" class="w-full text-sm px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none cursor-pointer">
+                          <option value="private">Private</option>
+                          <option value="invite_only">Invite Only</option>
+                          <option value="public_readonly">Public Read-Only</option>
+                        </select>
+                      </div>
+
+                      <div class="flex items-center pt-5">
+                        <label class="relative flex items-center cursor-pointer select-none">
+                          <input type="checkbox" [(ngModel)]="editGroupCarryForward" name="editGroupCarryForward" class="sr-only peer">
+                          <div class="w-10 h-6 bg-slate-200 dark:bg-white/10 rounded-full peer peer-focus:ring-2 peer-focus:ring-finmate-neon/50 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-finmate-neon"></div>
+                          <span class="ml-3 text-sm font-semibold text-slate-700 dark:text-slate-300">Enable Carry-Forward Roll-overs</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    @if (settingsError) {
+                      <div class="text-xs font-semibold text-red-500 bg-red-500/10 p-3 rounded-xl">
+                        {{ settingsError }}
+                      </div>
+                    }
+
+                    @if (settingsSuccess) {
+                      <div class="text-xs font-semibold text-green-500 bg-green-500/10 p-3 rounded-xl">
+                        {{ settingsSuccess }}
+                      </div>
+                    }
+
+                    <div class="flex justify-end pt-2">
+                      <button type="submit" [disabled]="isSavingSettings" class="py-2 px-6 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 disabled:opacity-50 transition-all flex items-center space-x-2">
+                        @if (isSavingSettings) {
+                          <span>Saving...</span>
+                        } @else {
+                          <span>Save Settings</span>
+                        }
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+                <!-- Monthly Household Contribution Settings -->
+                @if (group()!.groupType === 'household') {
+                  <div class="border-t border-slate-100 dark:border-white/5 pt-8">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                      <div>
+                        <h3 class="text-lg font-bold flex items-center gap-2">
+                          <svg class="w-5 h-5 text-finmate-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+                          Household Target Contributions
+                        </h3>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Configure each member's target monthly contribution share (must total exactly 100%).</p>
+                      </div>
+                      
+                      <div class="flex items-center space-x-2">
+                        <label class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Month</label>
+                        <input type="month" [(ngModel)]="contributionMonth" (ngModelChange)="loadContributionsForMonth()" class="text-xs px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none cursor-pointer">
+                      </div>
+                    </div>
+
+                    @if (isLoadingContributions) {
+                      <div class="flex items-center justify-center py-8">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-finmate-neon"></div>
+                      </div>
+                    } @else {
+                      <div class="space-y-4">
+                        <div class="bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5 rounded-2xl p-4 space-y-3">
+                          @for (contrib of contributionsList; track contrib.memberId) {
+                            <div class="flex items-center justify-between gap-4">
+                              <div class="flex flex-col">
+                                <span class="text-sm font-bold text-slate-800 dark:text-white">{{ contrib.displayName }}</span>
+                                <span class="text-xs text-slate-500 dark:text-slate-400 capitalize">{{ contrib.role }}</span>
+                              </div>
+                              <div class="flex items-center space-x-2">
+                                <input type="number" min="0" max="100" step="0.01" [(ngModel)]="contrib.percentage" class="w-20 text-sm text-right px-2 py-1.5 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none">
+                                <span class="text-sm font-bold text-slate-500">%</span>
+                              </div>
+                            </div>
+                          }
+                        </div>
+
+                        <div class="flex items-center justify-between text-sm px-4">
+                          <span class="font-bold text-slate-500">Total Contribution percentage:</span>
+                          <span [class]="getContributionsSum() === 100 ? 'text-green-500 font-extrabold' : 'text-red-500 font-extrabold'">
+                            {{ getContributionsSum() }}%
+                          </span>
+                        </div>
+
+                        @if (getContributionsSum() !== 100) {
+                          <div class="text-xs font-semibold text-orange-500 bg-orange-500/10 p-3 rounded-xl flex items-center gap-2">
+                            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                            <span>Total contribution percentages must equal exactly 100% (currently {{ getContributionsSum() }}%).</span>
+                          </div>
+                        }
+
+                        @if (contributionError) {
+                          <div class="text-xs font-semibold text-red-500 bg-red-500/10 p-3 rounded-xl">
+                            {{ contributionError }}
+                          </div>
+                        }
+
+                        @if (contributionSuccess) {
+                          <div class="text-xs font-semibold text-green-500 bg-green-500/10 p-3 rounded-xl">
+                            {{ contributionSuccess }}
+                          </div>
+                        }
+
+                        <div class="flex justify-end pt-2">
+                          <button (click)="saveContributions()" [disabled]="isSavingContributions || getContributionsSum() !== 100" class="py-2 px-6 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center space-x-2">
+                            @if (isSavingContributions) {
+                              <span>Saving...</span>
+                            } @else {
+                              <span>Save Contributions</span>
+                            }
+                          </button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            }
+
           </div>
 
           <!-- Sidebar (Balances & Members) -->
@@ -319,6 +519,10 @@ export interface GroupExpense extends Expense {
 
             <app-group-members
               [members]="members()"
+              [groupId]="group()!.id"
+              [isOwnerOrAdmin]="isOwnerOrAdmin()"
+              [inviteToken]="group()!.inviteToken"
+              (memberChanged)="fetchMembers(group()!.id)"
             ></app-group-members>
           </div>
         </div>
@@ -368,7 +572,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
   // Signals for UI state
   isLoading = signal<boolean>(true);
-  activeTab = signal<'ledger' | 'analytics' | 'history' | 'trash'>('ledger');
+  activeTab = signal<'ledger' | 'analytics' | 'history' | 'trash' | 'settings'>('ledger');
   isExpenseModalOpen = signal<boolean>(false);
   isDeleteConfirmOpen = signal<boolean>(false);
   deleteExpenseId = signal<string | null>(null);
@@ -544,6 +748,12 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     });
   }
 
+  getMaxCarryForwardValue(): number {
+    const balances = this.carryForwardBalances();
+    if (balances.length === 0) return 1;
+    return Math.max(...balances.map(b => Math.max(b.paid || 0, b.expected || 0, 1)));
+  }
+
   getCurrentUserId(): string | null {
     const token = localStorage.getItem('finmate_token');
     if (!token) return null;
@@ -696,5 +906,120 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  }
+
+  // Group Settings Form State
+  editGroupName = '';
+  editGroupDescription = '';
+  editGroupVisibility: 'private' | 'invite_only' | 'public_readonly' = 'private';
+  editGroupCurrency = 'USD';
+  editGroupCarryForward = false;
+
+  isSavingSettings = false;
+  settingsError = '';
+  settingsSuccess = '';
+
+  // Contributions State
+  contributionMonth = new Date().toISOString().slice(0, 7);
+  contributionsList: any[] = [];
+  isLoadingContributions = false;
+  isSavingContributions = false;
+  contributionError = '';
+  contributionSuccess = '';
+
+  setTab(tab: 'ledger' | 'analytics' | 'history' | 'trash' | 'settings') {
+    this.activeTab.set(tab);
+    if (tab === 'settings') {
+      const g = this.group();
+      if (g) {
+        this.editGroupName = g.name;
+        this.editGroupDescription = g.description || '';
+        this.editGroupVisibility = g.visibility || 'private';
+        this.editGroupCurrency = g.currency || 'USD';
+        this.editGroupCarryForward = g.carryForwardEnabled || false;
+        this.loadContributionsForMonth();
+      }
+    }
+  }
+
+  saveGroupSettings() {
+    const g = this.group();
+    if (!g) return;
+    this.isSavingSettings = true;
+    this.settingsError = '';
+    this.settingsSuccess = '';
+
+    this.groupsService.updateGroup(g.id, {
+      name: this.editGroupName,
+      description: this.editGroupDescription,
+      visibility: this.editGroupVisibility,
+      currency: this.editGroupCurrency,
+      carryForwardEnabled: this.editGroupCarryForward,
+      version: g.version
+    }).subscribe({
+      next: (res) => {
+        this.group.set(res);
+        this.isSavingSettings = false;
+        this.settingsSuccess = 'Group settings updated successfully!';
+        setTimeout(() => this.settingsSuccess = '', 3000);
+      },
+      error: (err) => {
+        this.isSavingSettings = false;
+        this.settingsError = err.error?.message || 'Failed to update group settings.';
+      }
+    });
+  }
+
+  loadContributionsForMonth() {
+    const g = this.group();
+    if (!g) return;
+    this.isLoadingContributions = true;
+    this.contributionError = '';
+    this.contributionSuccess = '';
+
+    this.groupsService.getContributions(g.id, this.contributionMonth).subscribe({
+      next: (res) => {
+        this.contributionsList = res;
+        this.isLoadingContributions = false;
+      },
+      error: (err) => {
+        this.contributionError = err.error?.message || 'Failed to load contributions.';
+        this.isLoadingContributions = false;
+      }
+    });
+  }
+
+  getContributionsSum(): number {
+    const sum = this.contributionsList.reduce((acc, c) => acc + Number(c.percentage || 0), 0);
+    return Math.round(sum * 100) / 100;
+  }
+
+  saveContributions() {
+    const g = this.group();
+    if (!g) return;
+    this.isSavingContributions = true;
+    this.contributionError = '';
+    this.contributionSuccess = '';
+
+    const payload = {
+      ledgerMonth: this.contributionMonth,
+      contributions: this.contributionsList.map(c => ({
+        memberId: c.memberId,
+        percentage: Number(c.percentage)
+      }))
+    };
+
+    this.groupsService.updateContributions(g.id, payload).subscribe({
+      next: () => {
+        this.isSavingContributions = false;
+        this.contributionSuccess = 'Contribution percentages saved successfully!';
+        this.fetchCarryForward(g.id);
+        setTimeout(() => this.contributionSuccess = '', 3000);
+      },
+      error: (err) => {
+        this.isSavingContributions = false;
+        this.contributionError = err.error?.message || 'Failed to save contributions.';
+      }
+    });
   }
 }

@@ -1,37 +1,126 @@
-import { Component, input } from '@angular/core';
-import { NgClass } from '@angular/common';
+import { Component, input, output, inject, signal } from '@angular/core';
+import { NgClass, CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { GroupMember } from '@finmate/data-models';
+import { GroupsService } from '../../services/groups.service';
+import { FriendsService } from '../../../friends/services/friends.service';
 
 @Component({
   selector: 'app-group-members',
   standalone: true,
-  imports: [NgClass],
-  template: `
-    @if (members().length > 0) {
-      <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5">
-        <h2 class="text-xl font-bold mb-4">Group Members</h2>
-        <div class="space-y-4">
-          @for (member of members(); track member.user.id) {
-            <div class="flex items-center justify-between">
-              <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-xs">
-                  {{ (member.user.displayName || member.user.email).substring(0, 2).toUpperCase() }}
-                </div>
-                <div>
-                  <h4 class="font-semibold text-sm">{{ member.user.displayName || member.user.email }}</h4>
-                  <p class="text-xs text-slate-500 dark:text-slate-400 capitalize">{{ member.role }}</p>
-                </div>
-              </div>
-              <span class="text-xs font-semibold px-2 py-0.5 rounded-full" [ngClass]="{'bg-green-500/10 text-green-500': member.joinStatus === 'active', 'bg-yellow-500/10 text-yellow-500': member.joinStatus === 'invited'}">
-                {{ member.joinStatus }}
-              </span>
-            </div>
-          }
-        </div>
-      </div>
-    }
-  `
+  imports: [CommonModule, NgClass, FormsModule],
+  templateUrl: './group-members.component.html'
 })
 export class GroupMembersComponent {
+  private groupsService = inject(GroupsService);
+  private friendsService = inject(FriendsService);
+
   members = input.required<GroupMember[]>();
+  groupId = input.required<string>();
+  isOwnerOrAdmin = input.required<boolean>();
+  inviteToken = input<string>();
+
+  memberChanged = output<void>();
+
+  // Invite Form State
+  inviteIdentifier = '';
+  inviteRole: 'admin' | 'member' | 'viewer' | 'spectator' = 'member';
+  isInviting = false;
+  inviteError = '';
+  inviteSuccess = '';
+
+  // QR Modal State
+  isQrModalOpen = false;
+  qrCodeUrl = '';
+  joinUrl = '';
+
+  // User Lookup / Auto-suggest state
+  searchQuery = '';
+  searchResults: any[] = [];
+  isSearching = false;
+
+  onSearchChange(query: string) {
+    this.inviteIdentifier = query;
+    if (query.trim().length < 2) {
+      this.searchResults = [];
+      return;
+    }
+    this.isSearching = true;
+    this.friendsService.searchUsers(query).subscribe({
+      next: (users) => {
+        this.searchResults = users.filter(user => 
+          !this.members().some(m => m.user?.id === user.id)
+        );
+        this.isSearching = false;
+      },
+      error: () => {
+        this.isSearching = false;
+      }
+    });
+  }
+
+  selectUserForInvite(user: any) {
+    this.inviteIdentifier = user.email || user.username || user.phoneNumber;
+    this.searchQuery = this.inviteIdentifier;
+    this.searchResults = [];
+  }
+
+  sendInvite() {
+    if (!this.inviteIdentifier.trim()) return;
+    this.isInviting = true;
+    this.inviteError = '';
+    this.inviteSuccess = '';
+
+    this.groupsService.inviteMember(this.groupId(), {
+      identifier: this.inviteIdentifier,
+      role: this.inviteRole
+    }).subscribe({
+      next: () => {
+        this.isInviting = false;
+        this.inviteIdentifier = '';
+        this.searchQuery = '';
+        this.searchResults = [];
+        this.inviteSuccess = 'Invitation sent successfully!';
+        this.memberChanged.emit();
+        setTimeout(() => this.inviteSuccess = '', 3000);
+      },
+      error: (err) => {
+        this.isInviting = false;
+        this.inviteError = err.error?.message || 'Failed to send invitation.';
+      }
+    });
+  }
+
+  removeOrRevokeMember(member: GroupMember) {
+    if (confirm(`Are you sure you want to remove ${member.user?.displayName || member.user?.email}?`)) {
+      this.groupsService.removeMember(this.groupId(), member.id).subscribe({
+        next: () => {
+          this.memberChanged.emit();
+        },
+        error: (err) => {
+          alert(err.error?.message || 'Failed to remove member.');
+        }
+      });
+    }
+  }
+
+  openQrModal() {
+    const token = this.inviteToken();
+    if (!token) return;
+    
+    const host = window.location.origin;
+    this.joinUrl = `${host}/groups/join/${token}`;
+    this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(this.joinUrl)}`;
+    this.isQrModalOpen = true;
+  }
+
+  closeQrModal() {
+    this.isQrModalOpen = false;
+  }
+
+  copyJoinUrl() {
+    navigator.clipboard.writeText(this.joinUrl).then(() => {
+      alert('Invite link copied to clipboard!');
+    });
+  }
 }

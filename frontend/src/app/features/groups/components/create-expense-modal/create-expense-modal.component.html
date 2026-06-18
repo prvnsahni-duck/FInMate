@@ -107,42 +107,90 @@
         </div>
       </div>
   
-      <!-- Hide Paid By and Splits checklist in personal mode (no groupId) -->
-      @if (groupId) {
+      <!-- Toggle: Split with Friend (visible only in personal mode, i.e., no groupId) -->
+      @if (!groupId) {
+        <div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5">
+          <div>
+            <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">Split with Friends</span>
+            <p class="text-xs text-slate-500">Share this expense directly with friends</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" [(ngModel)]="splitWithFriend" [ngModelOptions]="{standalone: true}" (change)="onSplitToggleChange()" class="sr-only peer">
+            <div class="w-11 h-6 bg-slate-200 dark:bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-finmate-neon"></div>
+          </label>
+        </div>
+      }
+
+      <!-- Search & Manage Friends (visible if personal mode AND splitWithFriend is active) -->
+      @if (!groupId && splitWithFriend) {
+        <div class="space-y-2 relative">
+          <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300">Add Friends to Split</label>
+          <div class="relative">
+            <input 
+              type="text" 
+              [(ngModel)]="searchQuery" 
+              [ngModelOptions]="{standalone: true}"
+              (ngModelChange)="onSearchChange($event)"
+              placeholder="Search by email, username, or phone number" 
+              class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
+            >
+            @if (isSearching) {
+              <div class="absolute right-4 top-3.5 w-5 h-5 border-2 border-finmate-neon border-t-transparent rounded-full animate-spin"></div>
+            }
+          </div>
+
+          <!-- Search Results Dropdown -->
+          @if (searchResults.length > 0) {
+            <div class="absolute z-50 w-full mt-1 bg-white dark:bg-finmate-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto">
+              @for (user of searchResults; track user.id) {
+                <button type="button" (click)="addFriendToSplit(user)" class="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/5 flex flex-col transition-colors">
+                  <span class="font-bold text-slate-800 dark:text-white text-sm">{{ user.displayName || user.email.split('@')[0] }}</span>
+                  <span class="text-xs text-slate-500">{{ user.email }} • {{ user.username || 'No username' }}</span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+      }
+
+      <!-- Paid By Select (visible if group mode OR direct split mode) -->
+      @if (groupId || splitWithFriend) {
         <div>
           <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Paid By *</label>
           <select 
             formControlName="paidByUserId" 
             class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all cursor-pointer"
           >
-            @for (member of members; track member.user.id) {
-              <option [value]="member.user.id">
-                {{ member.user.displayName || member.user.email }}@if (member.role === 'spectator') { (Spectator)}
+            @for (payer of availablePayers; track payer.id) {
+              <option [value]="payer.id">
+                {{ payer.name }}
               </option>
             }
           </select>
         </div>
-      }
-  
-      @if (groupId) {
+
         <div>
           <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Split Equally Among</label>
           <div class="space-y-2 max-h-40 overflow-y-auto p-3 bg-slate-50 dark:bg-black/10 rounded-2xl border border-slate-200/50 dark:border-white/5">
-            @for (member of members; track member.user.id) {
-              <!-- Exclude spectators from split options -->
-              @if (member.role !== 'spectator') {
-                <label class="flex items-center space-x-3 cursor-pointer p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+            @for (participant of availableParticipants; track participant.id) {
+              <label class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                <span class="flex items-center space-x-3 cursor-pointer">
                   <input 
                     type="checkbox" 
-                    [checked]="selectedUserIds.has(member.user.id)" 
-                    (change)="toggleParticipant(member.user.id)" 
+                    [checked]="selectedUserIds.has(participant.id)" 
+                    (change)="toggleParticipant(participant.id)" 
                     class="w-5 h-5 rounded-lg border-slate-300 text-finmate-neon focus:ring-finmate-neon cursor-pointer"
                   >
                   <span class="text-sm font-medium text-slate-800 dark:text-slate-200">
-                    {{ member.user.displayName || member.user.email }}
+                    {{ participant.name }}
                   </span>
-                </label>
-              }
+                </span>
+                @if (!groupId && participant.id !== getCurrentUserId()) {
+                  <button type="button" (click)="removeFriendFromSplit(participant.id)" class="text-slate-400 hover:text-red-500 text-sm">
+                    Remove
+                  </button>
+                }
+              </label>
             }
           </div>
           @if (selectedUserIds.size === 0) {

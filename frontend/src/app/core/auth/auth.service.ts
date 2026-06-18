@@ -25,4 +25,12 @@ export class AuthService {
   refresh(refreshToken: string): Observable<{ accessToken: string; refreshToken: string }> {
     return this.http.post<{ accessToken: string; refreshToken: string }>(`${this.baseUrl}/refresh`, { refreshToken });
   }
+
+  getMe(): Observable<{ user: any; profile: any }> {
+    return this.http.get<{ user: any; profile: any }>('/api/users/me');
+  }
+
+  updateProfile(profileData: any): Observable<{ user: any; profile: any }> {
+    return this.http.patch<{ user: any; profile: any }>('/api/users/me', profileData);
+  }
 }

@@ -96,6 +96,9 @@ export class UsersService {
     if (data.monthlyBudget !== undefined) {
       profile.monthlyBudget = data.monthlyBudget;
     }
+    if (data.monthlyIncome !== undefined) {
+      profile.monthlyIncome = data.monthlyIncome;
+    }
     if (data.avatarUrl !== undefined) {
       profile.avatarUrl = data.avatarUrl ? this.encryptionService.encrypt(data.avatarUrl) : undefined;
     }
@@ -117,5 +120,21 @@ export class UsersService {
       }
     }
     return profile;
+  }
+
+  async searchUsers(query: string, currentUserId: string): Promise<User[]> {
+    if (!query || query.trim() === '') {
+      return [];
+    }
+    const sanitizedQuery = `%${query.trim()}%`;
+    return this.userRepository
+      .createQueryBuilder('user')
+      .where('user.id != :currentUserId', { currentUserId })
+      .andWhere(
+        '(user.email ILIKE :query OR user.username ILIKE :query OR user.phoneNumber ILIKE :query)',
+        { query: sanitizedQuery },
+      )
+      .limit(10)
+      .getMany();
   }
 }
