@@ -38,9 +38,9 @@ After each major feature is finished and tests pass, produce a conventional comm
 ### Rule 6 — Always Update the Progress Log in the Project Specification File
 Upon completing any change, feature, or project step, you MUST update the **"Progress Log"** section at the bottom of [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md) with a new date-stamped entry. Follow the established dated format (Date, Summary, Changes Made, Artifacts Updated, Decisions, Next Actions) to keep it as the single, long-term project source of truth.
 
-### Rule 7 — Ask User to Run Terminal Commands to Save Token Expenses
-To avoid unnecessary token usage and token expenses, the agent must not run heavy, long-running, or highly verbose terminal commands (such as running tests, linting, or building the project) directly using the run command tool.
-Instead, the agent must ask/instruct the user in the chat to run these terminal commands themselves on their own machine and report/paste the result back if needed.
+### Rule 7 — Ask User to Run Terminal Commands (Always Ask User)
+To avoid unnecessary token usage and token expenses, the agent must not run any terminal commands directly using the run command tool.
+Instead, for all use cases, the agent must ask/instruct the user in the chat to run these terminal commands themselves on their own machine and report/paste the result back.
 
 ### Rule 8 — Ask User to Create/Write Large Files to Save Tokens
 To minimize token usage and write expenses during code generation, the agent should write the complete component/file code directly in the chat window. The agent must instruct the user to create the file and paste the code themselves, providing any necessary terminal helper commands (e.g., PowerShell commands to create files) rather than executing `write_to_file` directly for large files.

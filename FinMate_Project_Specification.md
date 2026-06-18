@@ -1564,5 +1564,16 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
    - Ask the user to run frontend test suite (`npx nx test frontend`) to verify the refactored code build.
 
+---
 
-
+### 2026-06-18 (Part 1)
+- **Summary:** Updated Agent Working Rules to enforce requesting the user to run terminal commands for all use cases to save token expenses.
+- **Changes Made:**
+   - Modified Rule 7 in [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md) to require the agent to ask the user to execute all terminal commands rather than running them directly.
+- **Artifacts Updated:**
+   - [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md)
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Enforced a stricter policy on command execution where all terminal commands must be run by the user.
+- **Next Actions:**
+   - Prompt the user to run commands as needed.
