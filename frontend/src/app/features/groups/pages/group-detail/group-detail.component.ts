@@ -521,6 +521,7 @@ export interface GroupExpense extends Expense {
               [groupId]="group()!.id"
               [isOwnerOrAdmin]="isOwnerOrAdmin()"
               [inviteToken]="group()!.inviteToken"
+              [groupName]="group()!.name"
               (memberChanged)="fetchMembers(group()!.id)"
             ></app-group-members>
           </div>

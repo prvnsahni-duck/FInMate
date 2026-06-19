@@ -7,9 +7,14 @@ import { MembersController } from './members.controller';
 import { InviteController } from './invite.controller';
 import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
 import { ExpensesModule } from '../expenses/expenses.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Group, GroupMember, GroupMemberContribution, AuditLog]), ExpensesModule],
+  imports: [
+    TypeOrmModule.forFeature([Group, GroupMember, GroupMemberContribution, AuditLog]),
+    ExpensesModule,
+    EmailModule,
+  ],
   controllers: [GroupsController, MembersController, InviteController],
   providers: [GroupsService, GroupRolesGuard],
   exports: [GroupsService],

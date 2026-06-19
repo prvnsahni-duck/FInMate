@@ -31,6 +31,7 @@ export class GroupMembersComponent {
   groupId = input.required<string>();
   isOwnerOrAdmin = input.required<boolean>();
   inviteToken = input<string>();
+  groupName = input<string>('');
 
   memberChanged = output<void>();
 
@@ -55,6 +56,10 @@ export class GroupMembersComponent {
   isQrModalOpen = false;
   qrCodeUrl = '';
   joinUrl = '';
+
+  // Mobile/Messenger Share Modal State
+  isMobileShareModalOpen = false;
+  justInvitedPhoneContacts: StagedInvite[] = [];
 
   // User Lookup / Auto-suggest state
   searchQuery = '';
@@ -208,10 +213,17 @@ export class GroupMembersComponent {
         const failed = results.filter(r => r && r.error);
 
         if (failed.length === 0) {
+          const phoneInvites = list.filter(invite => this.isValidPhone(invite.identifier));
           this.stagedInvites.set([]);
           this.inviteSuccess = 'All invitations sent successfully!';
           this.memberChanged.emit();
-          setTimeout(() => this.inviteSuccess = '', 3000);
+          
+          if (phoneInvites.length > 0) {
+            this.justInvitedPhoneContacts = phoneInvites;
+            this.isMobileShareModalOpen = true;
+          } else {
+            setTimeout(() => this.inviteSuccess = '', 3000);
+          }
         } else {
           const failedIds = new Set(failed.map(f => f.invite.id));
           this.stagedInvites.update(staged => staged.filter(item => failedIds.has(item.id)));
@@ -257,5 +269,39 @@ export class GroupMembersComponent {
     navigator.clipboard.writeText(this.joinUrl).then(() => {
       alert('Invite link copied to clipboard!');
     });
+  }
+
+  getPhoneNumber(member: GroupMember): string | null {
+    if (member.user?.phoneNumber) {
+      return member.user.phoneNumber;
+    }
+    if (member.user?.email && member.user.email.endsWith('@placeholder.finmate')) {
+      return member.user.email.split('@')[0];
+    }
+    return null;
+  }
+
+  getWhatsAppShareUrl(phoneNumber: string, displayName: string): string {
+    const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
+    const host = window.location.origin;
+    const joinUrl = `${host}/groups/join/${this.inviteToken()}`;
+    const text = `Hey ${displayName}! I've invited you to join our group "${this.groupName()}" on FinMate. Use this link to join and track split expenses: ${joinUrl}`;
+    
+    if (cleanPhone) {
+      return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
+    }
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  }
+
+  getSmsShareUrl(phoneNumber: string, displayName: string): string {
+    const host = window.location.origin;
+    const joinUrl = `${host}/groups/join/${this.inviteToken()}`;
+    const text = `Hey ${displayName}! I've invited you to join our group "${this.groupName()}" on FinMate. Join here: ${joinUrl}`;
+    return `sms:${phoneNumber}?body=${encodeURIComponent(text)}`;
+  }
+
+  closeMobileShareModal() {
+    this.isMobileShareModalOpen = false;
+    this.justInvitedPhoneContacts = [];
   }
 }

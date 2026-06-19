@@ -5,6 +5,8 @@ import { Group, GroupMember, User, AuditLog } from '@finmate/data-models';
 import { Repository, DataSource } from 'typeorm';
 import { NotFoundException, ForbiddenException, PreconditionFailedException, ConflictException, BadRequestException } from '@nestjs/common';
 import * as argon2 from 'argon2';
+import { ConfigService } from '@nestjs/config';
+import { EmailService } from '../email/email.service';
 
 jest.mock('argon2');
 
@@ -80,6 +82,20 @@ describe('GroupsService', () => {
       }),
     };
 
+    const mockConfigService = {
+      get: jest.fn((key: string) => {
+        if (key === 'FRONTEND_URL') return 'http://localhost:4200';
+        return null;
+      }),
+    };
+
+    const mockEmailService = {
+      sendInviteEmail: jest.fn().mockResolvedValue(undefined),
+      logger: {
+        error: jest.fn(),
+      },
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GroupsService,
@@ -87,6 +103,8 @@ describe('GroupsService', () => {
         { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepository },
         { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
         { provide: DataSource, useValue: mockDataSource },
+        { provide: ConfigService, useValue: mockConfigService },
+        { provide: EmailService, useValue: mockEmailService },
       ],
     }).compile();
 

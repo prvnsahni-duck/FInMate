@@ -17,6 +17,7 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { SettlementsModule } from './settlements/settlements.module';
 import { ImportModule } from './import/import.module';
 import { AiModule } from './ai/ai.module';
+import { EmailModule } from './email/email.module';
 import { Note, Goal, AuditLog } from '@finmate/data-models';
 
 @Module({
@@ -53,6 +54,7 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
     SettlementsModule,
     ImportModule,
     AiModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

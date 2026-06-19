@@ -5,6 +5,8 @@ import { Group, GroupMember, User, AuditLog, CreateGroupDto, UpdateGroupDto, Inv
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
+import { ConfigService } from '@nestjs/config';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class GroupsService {
@@ -16,6 +18,8 @@ export class GroupsService {
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
+    private readonly emailService: EmailService,
   ) {}
 
   async createGroup(owner: User, dto: CreateGroupDto): Promise<Group> {
@@ -76,7 +80,6 @@ export class GroupsService {
               }
             }
           }
-
           const newMember = manager.create(GroupMember, {
             group: savedGroup,
             user: targetUser,
@@ -84,6 +87,14 @@ export class GroupsService {
             joinStatus: 'invited',
           });
           await manager.save(GroupMember, newMember);
+
+          if (targetUser && targetUser.email && !targetUser.email.endsWith('@placeholder.finmate')) {
+            const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200';
+            const inviteUrl = `${frontendUrl}/groups/join/${savedGroup.inviteToken}`;
+            const inviterName = owner.displayName || owner.email;
+            this.emailService.sendInviteEmail(targetUser.email, savedGroup.name, inviteUrl, inviterName)
+              .catch(err => this.emailService['logger'].error(`Failed to send invite email to ${targetUser.email} during group creation:`, err));
+          }
         }
       }
 
@@ -193,6 +204,7 @@ export class GroupsService {
   async inviteMember(userId: string, groupId: string, dto: InviteMemberDto): Promise<GroupMember> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
+      .leftJoinAndSelect('member.user', 'user')
       .where('member.group_id = :groupId', { groupId })
       .andWhere('member.user_id = :userId', { userId })
       .andWhere('member.joinStatus = :status', { status: 'active' })
@@ -261,6 +273,8 @@ export class GroupsService {
       .andWhere('member.user_id = :targetUserId', { targetUserId: targetUser.id })
       .getOne();
 
+    let savedMember: GroupMember;
+
     if (existingMember) {
       if (existingMember.joinStatus === 'active' || existingMember.joinStatus === 'invited') {
         throw new ConflictException({
@@ -273,17 +287,26 @@ export class GroupsService {
       existingMember.role = dto.role || 'member';
       existingMember.joinedAt = undefined;
       existingMember.leftAt = undefined;
-      return this.groupMemberRepository.save(existingMember);
+      savedMember = await this.groupMemberRepository.save(existingMember);
+    } else {
+      const newMember = this.groupMemberRepository.create({
+        group,
+        user: targetUser,
+        role: dto.role || 'member',
+        joinStatus: 'invited',
+      });
+      savedMember = await this.groupMemberRepository.save(newMember);
     }
 
-    const newMember = this.groupMemberRepository.create({
-      group,
-      user: targetUser,
-      role: dto.role || 'member',
-      joinStatus: 'invited',
-    });
+    if (targetUser && targetUser.email && !targetUser.email.endsWith('@placeholder.finmate')) {
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200';
+      const inviteUrl = `${frontendUrl}/groups/join/${group.inviteToken}`;
+      const inviterName = callerMember.user.displayName || callerMember.user.email;
+      this.emailService.sendInviteEmail(targetUser.email, group.name, inviteUrl, inviterName)
+        .catch(err => this.emailService['logger'].error(`Failed to send invite email to ${targetUser.email}:`, err));
+    }
 
-    return this.groupMemberRepository.save(newMember);
+    return savedMember;
   }
 
   async listMembers(userId: string, groupId: string): Promise<GroupMember[]> {
