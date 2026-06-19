@@ -4,7 +4,6 @@ import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { GroupMember } from '@finmate/data-models';
-import { jwtDecode } from 'jwt-decode';
 import { GroupsService } from '../../services/groups.service';
 import { FriendsService } from '../../../friends/services/friends.service';
 import { APP_NAME } from '../../../../core/constants/app.constants';
@@ -249,86 +248,6 @@ export class GroupMembersComponent {
           alert(err.error?.message || 'Failed to remove member.');
         }
       });
-    }
-  }
-
-  getCurrentUserId(): string | null {
-    const token = localStorage.getItem('finmate_token');
-    if (!token) return null;
-    try {
-      const decoded = jwtDecode<any>(token);
-      return decoded.userId || null;
-    } catch {
-      return null;
-    }
-  }
-
-  getCallerRole(): string | null {
-    const myId = this.getCurrentUserId();
-    if (!myId) return null;
-    const myMember = this.members().find(m => m.user?.id === myId);
-    return myMember?.role || null;
-  }
-
-  canChangeRole(member: GroupMember): boolean {
-    const myId = this.getCurrentUserId();
-    if (!myId || !this.isOwnerOrAdmin()) return false;
-    
-    // Cannot change own role
-    if (member.user?.id === myId) return false;
-    
-    // Owner is special
-    if ((member.role as string) === 'owner') return false;
-
-    const myRole = this.getCallerRole();
-    if (myRole === 'admin') {
-      // Admins cannot change roles of other admins or the owner
-      return (member.role as string) !== 'admin' && (member.role as string) !== 'owner';
-    }
-
-    return myRole === 'owner';
-  }
-
-  canRemoveMember(member: GroupMember): boolean {
-    const myId = this.getCurrentUserId();
-    if (!myId || !this.isOwnerOrAdmin()) return false;
-
-    // Cannot remove self
-    if (member.user?.id === myId) return false;
-
-    // Cannot remove owner
-    if ((member.role as string) === 'owner') return false;
-
-    const myRole = this.getCallerRole();
-    if (myRole === 'admin') {
-      // Admins cannot remove other admins or the owner
-      return (member.role as string) !== 'admin' && (member.role as string) !== 'owner';
-    }
-
-    return myRole === 'owner';
-  }
-
-  updateMemberRole(member: GroupMember, event: any) {
-    const newRole = event.target.value as any;
-    if (!newRole || newRole === member.role) return;
-
-    let confirmMsg = `Are you sure you want to change ${member.user?.displayName || member.user?.email}'s role to ${newRole}?`;
-    if (newRole === 'owner') {
-      confirmMsg = `Are you sure you want to transfer ownership of the group to ${member.user?.displayName || member.user?.email}? You will be demoted to Admin.`;
-    }
-
-    if (confirm(confirmMsg)) {
-      this.groupsService.updateMember(this.groupId(), member.id, { role: newRole }).subscribe({
-        next: () => {
-          this.memberChanged.emit();
-        },
-        error: (err) => {
-          alert(err.error?.message || 'Failed to update member role.');
-          event.target.value = member.role;
-        }
-      });
-    } else {
-      event.target.value = member.role;
     }
   }
 

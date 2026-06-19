@@ -18,20 +18,8 @@
             {{ (member.user.displayName || member.user.email).substring(0, 2).toUpperCase() }}
           </div>
           <div>
-            <h4 class="font-semibold text-sm truncate max-w-[130px]" [title]="member.user.displayName || member.user.email">{{ member.user.displayName || member.user.email }}</h4>
-            @if (canChangeRole(member)) {
-              <select [value]="member.role" (change)="updateMemberRole(member, $event)" class="text-[10px] mt-0.5 px-1 py-0.5 rounded bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 outline-none cursor-pointer text-slate-600 dark:text-slate-300">
-                <option value="member">Contributor</option>
-                <option value="admin">Admin</option>
-                <option value="spectator">Spectator</option>
-                <option value="viewer">Viewer</option>
-                @if (getCallerRole() === 'owner') {
-                  <option value="owner">Transfer Owner</option>
-                }
-              </select>
-            } @else {
-              <p class="text-[10px] text-slate-500 dark:text-slate-400 capitalize">{{ member.role === 'member' ? 'Contributor' : member.role }}</p>
-            }
+            <h4 class="font-semibold text-sm truncate max-w-[130px]">{{ member.user.displayName || member.user.email }}</h4>
+            <p class="text-[10px] text-slate-500 dark:text-slate-400 capitalize">{{ member.role }}</p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
@@ -51,7 +39,7 @@
           }
 
           <!-- Kick / Revoke Actions (Owners/Admins only) -->
-          @if (canRemoveMember(member)) {
+          @if (isOwnerOrAdmin() && member.role !== 'owner') {
             <button (click)="removeOrRevokeMember(member)" class="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors" [title]="member.joinStatus === 'invited' ? 'Revoke Invite' : 'Remove Member'">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
             </button>
