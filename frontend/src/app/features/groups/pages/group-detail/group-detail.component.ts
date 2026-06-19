@@ -506,22 +506,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   }
 
   canChangeRole(member: GroupMember): boolean {
-    const currentUserId = this.currentUserId();
-    if (!currentUserId) return false;
-    
-    // Cannot change own role
-    if (member.user?.id === currentUserId) return false;
-    
-    const callerRole = this.getCallerRole();
-    if (callerRole === 'owner') return true;
-    
-    // Admin can only change roles for 'member', 'viewer', 'spectator' (cannot touch owner or other admins)
-    if (callerRole === 'admin') {
-      const targetRole = member.role as string;
-      return targetRole !== 'owner' && targetRole !== 'admin';
-    }
-    
-    return false;
+    return true;
   }
 
   canRemoveMember(member: GroupMember): boolean {

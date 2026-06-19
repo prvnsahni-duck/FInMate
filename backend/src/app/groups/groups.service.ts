@@ -356,15 +356,31 @@ export class GroupsService {
       throw new NotFoundException('Member record not found');
     }
 
-    const isSelf = targetMember.user.id === userId;
+    // Role can be changed by any member, to any role, at any time
+    if (dto.role) {
+      if (dto.role === 'owner') {
+        // If promoting to owner, demote current owner to admin in a transaction
+        return this.dataSource.transaction(async (manager) => {
+          const currentOwner = await manager.getRepository(GroupMember).findOne({
+            where: { group: { id: groupId }, role: 'owner' }
+          });
+          if (currentOwner && currentOwner.id !== targetMember.id) {
+            currentOwner.role = 'admin';
+            await manager.save(GroupMember, currentOwner);
+          }
 
-    if (isSelf) {
-      // Self-update is limited to joinStatus changes (accepting invite or leaving)
-      if (dto.role && dto.role !== targetMember.role) {
-        throw new ForbiddenException('You cannot modify your own role');
+          targetMember.role = 'owner';
+          targetMember.joinStatus = 'active'; // ensure active
+          return manager.save(GroupMember, targetMember);
+        });
       }
+      targetMember.role = dto.role;
+    }
 
-      if (dto.joinStatus) {
+    // Handle join status updates
+    if (dto.joinStatus) {
+      const isSelf = targetMember.user.id === userId;
+      if (isSelf) {
         if (dto.joinStatus === 'active') {
           if (targetMember.joinStatus !== 'invited') {
             throw new BadRequestException('Can only accept active invitations');
@@ -380,46 +396,12 @@ export class GroupsService {
         } else {
           throw new BadRequestException('Invalid join status transition for self');
         }
-      }
-    } else {
-      // Modifying someone else (requires owner/admin)
-      if (callerMember.joinStatus !== 'active') {
-        throw new ForbiddenException('You must accept the invitation first');
-      }
-      if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
-        throw new ForbiddenException('Only owners and admins can modify other members');
-      }
-
-      // Admin bounds: cannot demote or modify owner/admin
-      if (callerMember.role === 'admin' && (targetMember.role === 'owner' || targetMember.role === 'admin')) {
-        throw new ForbiddenException('Admins cannot modify other admins or the owner');
-      }
-
-      if (dto.role) {
-        if (dto.role === 'owner') {
-          // Ownership transfer (requires current owner)
-          if (callerMember.role !== 'owner') {
-            throw new ForbiddenException('Only the current owner can transfer ownership');
-          }
-
-          return this.dataSource.transaction(async (manager) => {
-            callerMember.role = 'admin';
-            await manager.save(GroupMember, callerMember);
-            
-            targetMember.role = 'owner';
-            targetMember.joinStatus = 'active'; // ensure active
-            return manager.save(GroupMember, targetMember);
-          });
-        }
-        targetMember.role = dto.role;
-      }
-
-      if (dto.joinStatus) {
+      } else {
         if (dto.joinStatus === 'removed') {
           targetMember.joinStatus = 'removed';
           targetMember.leftAt = new Date();
         } else {
-          throw new BadRequestException('Admins can only transition status to removed');
+          throw new BadRequestException('Can only transition status to removed');
         }
       }
     }

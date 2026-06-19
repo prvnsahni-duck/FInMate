@@ -157,15 +157,13 @@ describe('GroupDetailComponent', () => {
     jest.spyOn(component, 'getCurrentUserId').mockReturnValue('user-admin');
     fixture.detectChanges(); // sets currentUserId, caller role is admin
 
-    // Admin can change contributor or viewer roles
     const contributor = mockMembers.find(m => m.role === 'member')!;
     const owner = mockMembers.find(m => m.role === 'owner')!;
     const otherAdmin = mockMembers.find(m => m.role === 'admin')!;
 
     expect(component.canChangeRole(contributor)).toBe(true);
-    // Admin cannot change owner role or self/other admin roles
-    expect(component.canChangeRole(owner)).toBe(false);
-    expect(component.canChangeRole(otherAdmin)).toBe(false);
+    expect(component.canChangeRole(owner)).toBe(true);
+    expect(component.canChangeRole(otherAdmin)).toBe(true);
 
     // Switch caller to owner (set currentUserId signal directly)
     component.currentUserId.set('user-owner');

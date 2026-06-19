@@ -138,11 +138,9 @@
           <button (click)="setTab('trash')" [class]="activeTab() === 'trash' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
             Trash
           </button>
-          @if (isOwnerOrAdmin()) {
-            <button (click)="setTab('settings')" [class]="activeTab() === 'settings' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
-              Settings
-            </button>
-          }
+          <button (click)="setTab('settings')" [class]="activeTab() === 'settings' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
+            Settings
+          </button>
         </div>
 
         <!-- TAB: Ledger -->
@@ -531,9 +529,7 @@
                           <option value="admin">Admin</option>
                           <option value="spectator">Spectator</option>
                           <option value="viewer">Viewer</option>
-                          @if (getCallerRole() === 'owner') {
-                            <option value="owner">Transfer Owner</option>
-                          }
+                          <option value="owner">Transfer Owner</option>
                         </select>
                       } @else {
                         <span class="text-xs font-semibold px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-xl capitalize">
