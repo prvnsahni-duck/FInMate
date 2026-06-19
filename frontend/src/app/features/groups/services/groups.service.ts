@@ -139,7 +139,7 @@ export class GroupsService {
   /**
    * Invite a user to a group.
    */
-  inviteMember(groupId: string, payload: { email?: string; identifier?: string; role?: string }): Observable<GroupMember> {
+  inviteMember(groupId: string, payload: { email?: string; identifier?: string; role?: string; displayName?: string }): Observable<GroupMember> {
     return this.http.post<GroupMember>(`/api/groups/${groupId}/members`, payload);
   }
 

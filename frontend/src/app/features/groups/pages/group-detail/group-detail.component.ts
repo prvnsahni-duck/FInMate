@@ -433,7 +433,7 @@ export interface GroupExpense extends Expense {
                           <svg class="w-5 h-5 text-finmate-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
                           Household Target Contributions
                         </h3>
-                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Configure each member's target monthly contribution share (must total exactly 100%).</p>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Configure each member's target monthly contribution amount. Percentages are auto-calculated.</p>
                       </div>
                       
                       <div class="flex items-center space-x-2">
@@ -456,24 +456,25 @@ export interface GroupExpense extends Expense {
                                 <span class="text-xs text-slate-500 dark:text-slate-400 capitalize">{{ contrib.role }}</span>
                               </div>
                               <div class="flex items-center space-x-2">
-                                <input type="number" min="0" max="100" step="0.01" [(ngModel)]="contrib.percentage" class="w-20 text-sm text-right px-2 py-1.5 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none">
-                                <span class="text-sm font-bold text-slate-500">%</span>
+                                <span class="text-xs font-bold text-slate-400 dark:text-slate-500">{{ group()!.currency }}</span>
+                                <input type="number" min="0" step="1" [(ngModel)]="contrib.amount" (ngModelChange)="onAmountChange()" class="w-28 text-sm text-right px-2 py-1.5 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none">
+                                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 w-16 text-left">({{ contrib.percentage || 0 }}%)</span>
                               </div>
                             </div>
                           }
                         </div>
 
                         <div class="flex items-center justify-between text-sm px-4">
-                          <span class="font-bold text-slate-500">Total Contribution percentage:</span>
-                          <span [class]="getContributionsSum() === 100 ? 'text-green-500 font-extrabold' : 'text-red-500 font-extrabold'">
-                            {{ getContributionsSum() }}%
+                          <span class="font-bold text-slate-500">Total Contribution Target:</span>
+                          <span class="text-slate-800 dark:text-white font-extrabold">
+                            {{ getContributionsAmountSum() | currency:group()!.currency }}
                           </span>
                         </div>
 
-                        @if (getContributionsSum() !== 100) {
+                        @if (getContributionsAmountSum() <= 0) {
                           <div class="text-xs font-semibold text-orange-500 bg-orange-500/10 p-3 rounded-xl flex items-center gap-2">
                             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                            <span>Total contribution percentages must equal exactly 100% (currently {{ getContributionsSum() }}%).</span>
+                            <span>Please specify target contribution amounts greater than 0.</span>
                           </div>
                         }
 
@@ -490,7 +491,7 @@ export interface GroupExpense extends Expense {
                         }
 
                         <div class="flex justify-end pt-2">
-                          <button (click)="saveContributions()" [disabled]="isSavingContributions || getContributionsSum() !== 100" class="py-2 px-6 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center space-x-2">
+                          <button (click)="saveContributions()" [disabled]="isSavingContributions || getContributionsAmountSum() <= 0" class="py-2 px-6 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center space-x-2">
                             @if (isSavingContributions) {
                               <span>Saving...</span>
                             } @else {
@@ -979,7 +980,10 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
     this.groupsService.getContributions(g.id, this.contributionMonth).subscribe({
       next: (res) => {
-        this.contributionsList = res;
+        this.contributionsList = res.map((c: any) => ({
+          ...c,
+          amount: Number(c.percentage || 0) // Initialize amount to percentage
+        }));
         this.isLoadingContributions = false;
       },
       error: (err) => {
@@ -989,14 +993,62 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  getContributionsSum(): number {
-    const sum = this.contributionsList.reduce((acc, c) => acc + Number(c.percentage || 0), 0);
+  onAmountChange() {
+    this.calculatePercentagesFromAmounts();
+  }
+
+  calculatePercentagesFromAmounts() {
+    const totalAmount = this.contributionsList.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+    if (totalAmount <= 0) {
+      this.contributionsList.forEach(c => c.percentage = 0);
+      return;
+    }
+
+    let sum = 0;
+    this.contributionsList.forEach(c => {
+      const rawPct = ((Number(c.amount) || 0) / totalAmount) * 100;
+      c.percentage = Math.round(rawPct * 100) / 100;
+      sum += c.percentage;
+    });
+
+    let diff = 100 - sum;
+    diff = Math.round(diff * 100) / 100;
+
+    if (diff !== 0 && this.contributionsList.length > 0) {
+      let targetMember = this.contributionsList[0];
+      let maxAmount = -1;
+      for (const c of this.contributionsList) {
+        const amt = Number(c.amount) || 0;
+        if (amt > maxAmount) {
+          maxAmount = amt;
+          targetMember = c;
+        }
+      }
+      if (targetMember) {
+        targetMember.percentage = Math.round((targetMember.percentage + diff) * 100) / 100;
+      }
+    }
+  }
+
+  getContributionsAmountSum(): number {
+    const sum = this.contributionsList.reduce((acc, c) => acc + Number(c.amount || 0), 0);
     return Math.round(sum * 100) / 100;
   }
 
   saveContributions() {
     const g = this.group();
     if (!g) return;
+
+    // Run calculation once more to be completely sure percentages are correct
+    this.calculatePercentagesFromAmounts();
+
+    const sum = this.contributionsList.reduce((acc, c) => acc + Number(c.percentage || 0), 0);
+    const roundedSum = Math.round(sum * 100) / 100;
+    if (roundedSum !== 100 && this.getContributionsAmountSum() > 0) {
+      this.contributionError = 'Internal calculation failed to distribute exactly 100%';
+      return;
+    }
+
     this.isSavingContributions = true;
     this.contributionError = '';
     this.contributionSuccess = '';
@@ -1012,7 +1064,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     this.groupsService.updateContributions(g.id, payload).subscribe({
       next: () => {
         this.isSavingContributions = false;
-        this.contributionSuccess = 'Contribution percentages saved successfully!';
+        this.contributionSuccess = 'Contribution amounts saved successfully!';
         this.fetchCarryForward(g.id);
         setTimeout(() => this.contributionSuccess = '', 3000);
       },

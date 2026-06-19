@@ -1462,4 +1462,21 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
    - Ask the user to run backend tests again and check if everything passes.
 
+### 2026-06-19 (Part 2)
+- **Summary:** Switched Household Target Contributions inputs to direct amounts (auto-calculating percentages with rounding adjustment) and added member role management settings.
+- **Changes Made:**
+   - Modified [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/group-detail/group-detail.component.ts) to display target monthly contribution amount inputs instead of percentage inputs, and implemented `calculatePercentagesFromAmounts` to dynamically compute percentages and distribute the rounding remainder so that they sum to exactly 100.00%.
+   - Updated [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts) to decode current user JWT and implement privilege checking helper methods (`canChangeRole`, `canRemoveMember`).
+   - Modified [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html) to render `<select>` dropdowns for changing roles or transferring ownership, and restricted member kicking to authorized users only.
+- **Artifacts Updated:**
+   - [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/group-detail/group-detail.component.ts)
+   - [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts)
+   - [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html)
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Target monthly contributions are entered as money amounts in settings, but are calculated and stored as percentages summing to 100.00%.
+   - Role updates (Admin, Contributor/Member, Spectator, Viewer) and kick permissions are checked against standard member hierarchies (Admins cannot modify other Admins/Owners).
+- **Next Actions:**
+   - Ask the user to run frontend build commands to verify build health.
+
 
