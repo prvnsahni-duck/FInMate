@@ -220,7 +220,11 @@ describe('GroupsService', () => {
     });
 
     it('should create placeholder user if target email does not exist', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-id', role: 'owner' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-id',
+        role: 'owner',
+        user: { id: 'owner-id', email: 'owner@example.com', displayName: 'Owner' },
+      } as any);
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
       userRepository.findOne.mockResolvedValueOnce(null);
       (argon2.hash as jest.Mock).mockResolvedValue('hashed-dummy-pass');
@@ -237,7 +241,11 @@ describe('GroupsService', () => {
     });
 
     it('should throw ConflictException if user is already a member', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-id', role: 'owner' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-id',
+        role: 'owner',
+        user: { id: 'owner-id', email: 'owner@example.com', displayName: 'Owner' },
+      } as any);
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
       userRepository.findOne.mockResolvedValueOnce({ id: 'target-user-id' } as any);
       groupMemberRepository.findOne.mockResolvedValueOnce({
@@ -252,14 +260,18 @@ describe('GroupsService', () => {
     });
 
     it('should re-invite user if they had left/been removed', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-id', role: 'owner' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-id',
+        role: 'owner',
+        user: { id: 'owner-id', email: 'owner@example.com', displayName: 'Owner' },
+      } as any);
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
-      userRepository.findOne.mockResolvedValueOnce({ id: 'target-user-id' } as any);
+      userRepository.findOne.mockResolvedValueOnce({ id: 'target-user-id', email: 'target@example.com' } as any);
       
       const existingMember = {
         id: 'existing-member-id',
         joinStatus: 'left',
-        user: { id: 'target-user-id' },
+        user: { id: 'target-user-id', email: 'target@example.com' },
       } as any;
       groupMemberRepository.findOne.mockResolvedValueOnce(existingMember);
       groupMemberRepository.save.mockResolvedValueOnce(existingMember);

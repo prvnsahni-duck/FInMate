@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, PreconditionFailedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Group, GroupMember, User, AuditLog, CreateGroupDto, UpdateGroupDto, InviteMemberDto, UpdateMemberDto, GroupMemberContribution, UpdateContributionDto } from '@finmate/data-models';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import * as argon2 from 'argon2';
@@ -552,6 +552,12 @@ export class GroupsService {
     if (!group) {
       throw new NotFoundException('Invalid or expired invitation link');
     }
+
+    const members = await this.groupMemberRepository.find({
+      where: { group: { id: group.id }, joinStatus: In(['active', 'invited']) },
+      relations: ['user'],
+    });
+
     return {
       id: group.id,
       name: group.name,
@@ -559,6 +565,13 @@ export class GroupsService {
       currency: group.currency,
       groupType: group.groupType,
       ownerName: group.ownerUser.displayName || group.ownerUser.email,
+      members: members.map((m) => ({
+        displayName: m.user.displayName || null,
+        email: m.user.email.endsWith('@placeholder.finmate') ? null : m.user.email,
+        phoneNumber: m.user.phoneNumber || null,
+        role: m.role,
+        joinStatus: m.joinStatus,
+      })),
     };
   }
 
@@ -605,15 +618,32 @@ export class GroupsService {
       relations: ['group', 'group.ownerUser'],
     });
 
-    return memberships.map((m) => ({
-      id: m.group.id,
-      membershipId: m.id,
-      name: m.group.name,
-      description: m.group.description,
-      currency: m.group.currency,
-      groupType: m.group.groupType,
-      ownerName: m.group.ownerUser.displayName || m.group.ownerUser.email,
-    }));
+    const results = [];
+    for (const m of memberships) {
+      const members = await this.groupMemberRepository.find({
+        where: { group: { id: m.group.id }, joinStatus: In(['active', 'invited']) },
+        relations: ['user'],
+      });
+
+      results.push({
+        id: m.group.id,
+        membershipId: m.id,
+        name: m.group.name,
+        description: m.group.description,
+        currency: m.group.currency,
+        groupType: m.group.groupType,
+        ownerName: m.group.ownerUser.displayName || m.group.ownerUser.email,
+        members: members.map((member) => ({
+          displayName: member.user.displayName || null,
+          email: member.user.email.endsWith('@placeholder.finmate') ? null : member.user.email,
+          phoneNumber: member.user.phoneNumber || null,
+          role: member.role,
+          joinStatus: member.joinStatus,
+        })),
+      });
+    }
+
+    return results;
   }
 
   async getContributions(userId: string, groupId: string, ledgerMonth: string) {

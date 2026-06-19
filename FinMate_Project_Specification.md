@@ -1444,4 +1444,22 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
    - Prompt the user to run backend and frontend test suites.
 
+### 2026-06-19
+- **Summary:** Added members list display to group invitations and pending dashboard invitations, and fixed groups service unit tests.
+- **Changes Made:**
+   - Modified `getInviteDetails` and `getPendingInvitations` in `groups.service.ts` to retrieve the active/invited group members list (mapping display names, clean emails, phone numbers, roles, and join status).
+   - Rendered the group members list on the frontend join group landing page (`join-group.component.html`) and inside the dashboard pending invitations banner (`dashboard.component.html`).
+   - Fixed `groups.service.spec.ts` unit tests by adding mock `user` objects to mock group members, preventing TypeError exceptions on `displayName` property checks.
+- **Artifacts Updated:**
+   - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
+   - [groups.service.spec.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.spec.ts)
+   - [join-group.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/join-group/join-group.component.html)
+   - [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html)
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Retrieve basic group member details (hiding dummy/placeholder email prefixes to ensure user privacy) so that invitees can review existing group members before deciding to accept.
+   - Standardize invitation details on both the direct link joining screen and the user's home dashboard banner.
+- **Next Actions:**
+   - Ask the user to run backend tests again and check if everything passes.
+
 
