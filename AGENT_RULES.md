@@ -6,6 +6,18 @@ This document is the single source of truth for AI agent behavior in this reposi
 
 It applies to Claude Code, Cursor, Codex, Roo Code, Cline, OpenHands, GitHub Copilot, Antigravity IDE, and similar coding agents.
 
+### 🗺️ Project Documentation Map
+Before planning or implementing any feature, agents MUST reference the appropriate blueprint files:
+- **Product Overview & Features**: Check [PRD.md](./PRD.md)
+- **Architecture & Technology Decisions**: Check [TRD.md](./TRD.md)
+- **User Journey & Screen Layouts**: Check [APP_FLOW.md](./APP_FLOW.md)
+- **Design Guidelines, Colors & UI Rules**: Check [UI_UX_BRIEF.md](./UI_UX_BRIEF.md)
+- **DB Entities, Relations & Security Rules**: Check [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md)
+- **REST Endpoints & DTO Contracts**: Check [API_SPECIFICATION.md](./API_SPECIFICATION.md)
+- **Build Phases & Execution Roadmap**: Check [implementation_plan.md](./implementation_plan.md)
+- **Detailed Expenses Module Specifications**: Check [expsnsis-module-plan.md](./expsnsis-module-plan.md)
+- **Master Design Overview & Dated Progress Log**: Check [FinMate_Project_Specification.md](./FinMate_Project_Specification.md) for dated implementation diaries, historical decisions, and system specifications.
+
 Primary goals, in order:
 
 1. Correctness
@@ -528,9 +540,13 @@ New services and interceptors must have unit tests.
 
 ---
 
-## Progress Log Requirement
+## Progress Log & Blueprint Update Rules
 
-Upon completing any change, feature, or project step, update the "Progress Log" section at the bottom of `FinMate_Project_Specification.md`.
+### 1. Blueprint Updates (On Change Only)
+The blueprint files (`PRD.md`, `TRD.md`, `APP_FLOW.md`, `UI_UX_BRIEF.md`, `DATABASE_SCHEMA.md`, `API_SPECIFICATION.md`) are **not** updated for simple work status tracking. They are **only** modified when a feature requirement, design rule, DB structure, or API endpoint contract actually changes.
+
+### 2. Dated Progress Log (On Every Task/Update)
+The **only** document that MUST be updated at the end of every completed task, change, or update is the "Progress Log" section at the bottom of `FinMate_Project_Specification.md`.
 
 Use the established dated format:
 

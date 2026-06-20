@@ -2,8 +2,8 @@
 
 ## 📌 References & Design Source
 The style guidelines, color systems, layouts, and components specified in this document are directly referenced from:
-1. The design mockup image: [UI_UX_MOCKUP.jpg](file:///d:/prvn/Projects/FinMate/UI_UX_MOCKUP.jpg)
-2. The core system style requirements described in [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+1. The design mockup image: [UI_UX_MOCKUP.jpg](./UI_UX_MOCKUP.jpg)
+2. The core system style requirements described in [FinMate_Project_Specification.md](./FinMate_Project_Specification.md)
 
 ## 💎 Design Language & Personality
 - **Design Language**: Sleek, modern, and premium dark/light mode experience utilizing glassmorphism overlays, Harmonious HSL-derived colors, and subtle micro-animations for high-fidelity interactive feedback.
