@@ -92,7 +92,7 @@ describe('DashboardComponent', () => {
     fixture.detectChanges(); // triggers ngOnInit
 
     expect(mockStore.selectSnapshot).toHaveBeenCalled();
-    expect(component.userName).toBe('John Doe');
+    expect(component.userName).toBe('john');
     expect(component.totalBalance).toBe(1350);
     expect(component.monthlyExpenses).toBe(1350);
     expect(component.activeGroupsCount).toBe(3);
