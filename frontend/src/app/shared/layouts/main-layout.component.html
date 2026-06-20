@@ -8,17 +8,10 @@
     </div>
     <button (click)="toggleTheme()" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
       @if (isDarkMode()) {
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z">
-        </path>
-      </svg>
+      <app-icon [path]="themeIcons.light" className="w-6 h-6"></app-icon>
       }
       @if (!isDarkMode()) {
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-          d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-      </svg>
+      <app-icon [path]="themeIcons.dark" className="w-6 h-6"></app-icon>
       }
     </button>
   </header>
@@ -35,9 +28,7 @@
         @for (item of desktopNavItems(); track item.path) {
           <a [routerLink]="item.path" routerLinkActive="bg-black/5 dark:bg-white/10 text-finmate-neon2 font-semibold"
             class="flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all hover:bg-black/5 dark:hover:bg-white/5">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" [attr.d]="item.iconPath"></path>
-            </svg>
+            <app-icon [path]="item.iconPath" className="w-6 h-6"></app-icon>
             <span>{{ item.label }}</span>
           </a>
         }
@@ -73,9 +64,7 @@
     @for (item of navItems; track item.path) {
       <a [routerLink]="item.path" routerLinkActive="text-finmate-neon2"
         class="flex flex-col items-center p-2 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" [attr.d]="item.iconPath"></path>
-        </svg>
+        <app-icon [path]="item.iconPath" className="w-6 h-6 mb-1"></app-icon>
         <span class="text-xs font-medium">{{ item.mobileLabel }}</span>
       </a>
     }

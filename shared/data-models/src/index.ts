@@ -12,6 +12,7 @@ export * from './lib/goal.entity';
 export * from './lib/attachment.entity';
 export * from './lib/audit-log.entity';
 export * from './lib/encryption.transformer';
+export * from './lib/api-responses';
 
 // Shared validation DTOs
 export * from './lib/dto/auth.dto';

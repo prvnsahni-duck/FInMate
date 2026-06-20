@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Store } from '@ngxs/store';
 import { Register } from '../../../../core/auth/auth.state';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
+import { RegisterDto } from '@finmate/data-models';
 
 @Component({
   selector: 'app-register',
@@ -35,7 +36,14 @@ export class RegisterComponent {
       this.isLoading = true;
       this.errorMessage = '';
       
-      this.store.dispatch(new Register(this.registerForm.value as any)).subscribe({
+      const value = this.registerForm.getRawValue();
+      const payload: RegisterDto = {
+        displayName: value.displayName ?? undefined,
+        email: value.email ?? '',
+        password: value.password ?? '',
+      };
+
+      this.store.dispatch(new Register(payload)).subscribe({
         next: () => {
           this.isLoading = false;
           this.successMessage = 'Account created successfully! Please sign in.';

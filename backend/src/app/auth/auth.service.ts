@@ -8,6 +8,7 @@ import { User } from '@finmate/data-models';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import { generateSecret, verifyTotp } from './utils/totp.util';
+import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
 @Injectable()
 export class AuthService {
@@ -21,8 +22,18 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly encryptionService: EncryptionService,
   ) {
-    this.jwtSecret = this.configService.get<string>('JWT_SECRET') || 'default_jwt_secret';
-    this.jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET') || 'default_jwt_refresh_secret';
+    const jwtSecret = this.configService.get<string>('JWT_SECRET');
+    const jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET environment variable is required');
+    }
+    if (!jwtRefreshSecret) {
+      throw new Error('JWT_REFRESH_SECRET environment variable is required');
+    }
+
+    this.jwtSecret = jwtSecret;
+    this.jwtRefreshSecret = jwtRefreshSecret;
   }
 
   async register(email: string, passwordPlain: string, displayName?: string) {
@@ -142,13 +153,13 @@ export class AuthService {
   }
 
   async refresh(refreshToken: string) {
-    let payload: any;
+    let payload: JwtPayload;
     try {
       payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.jwtRefreshSecret,
       });
-    } catch (err: any) {
-      if (err?.name === 'TokenExpiredError') {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Token expired');
       }
       throw new UnauthorizedException('Invalid token');
@@ -191,9 +202,10 @@ export class AuthService {
   }
 
   async logout(refreshToken: string, currentUserId: string) {
-    let payload: any;
+    let payload: JwtPayload | null = null;
     try {
-      payload = this.jwtService.decode(refreshToken) as any;
+      const decoded = this.jwtService.decode(refreshToken);
+      payload = typeof decoded === 'object' && decoded !== null ? decoded as JwtPayload : null;
     } catch (err) {
       // ignore parsing error
     }

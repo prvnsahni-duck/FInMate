@@ -1,14 +1,14 @@
 import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, Req, HttpCode, HttpStatus, ParseUUIDPipe } from '@nestjs/common';
-import { InviteMemberDto, UpdateMemberDto } from '@finmate/data-models';
-import { GroupsService } from './groups.service';
+import { InviteMemberDto, UpdateMemberDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
 import { GroupRoles } from '../auth/decorators/group-roles.decorator';
+import { GroupsMembershipService } from './services';
 
 @Controller('groups/:id/members')
 @UseGuards(JwtAuthGuard, GroupRolesGuard)
 export class MembersController {
-  constructor(private readonly groupsService: GroupsService) {}
+  constructor(private readonly groupsMembershipService: GroupsMembershipService) {}
 
   @Post()
   @GroupRoles('owner', 'admin')
@@ -17,13 +17,13 @@ export class MembersController {
     @Body() inviteMemberDto: InviteMemberDto,
     @Req() req: any,
   ) {
-    return this.groupsService.inviteMember(req.user.id, id, inviteMemberDto);
+    return this.groupsMembershipService.inviteMember(req.user.id, id, inviteMemberDto);
   }
 
   @Get()
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async findAll(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
-    return this.groupsService.listMembers(req.user.id, id);
+    return this.groupsMembershipService.listMembers(req.user.id, id);
   }
 
   @Patch(':memberId')
@@ -34,7 +34,7 @@ export class MembersController {
     @Body() updateMemberDto: UpdateMemberDto,
     @Req() req: any,
   ) {
-    return this.groupsService.updateMember(req.user.id, id, memberId, updateMemberDto);
+    return this.groupsMembershipService.updateMember(req.user.id, id, memberId, updateMemberDto);
   }
 
   @Delete(':memberId')
@@ -45,6 +45,6 @@ export class MembersController {
     @Param('memberId', ParseUUIDPipe) memberId: string,
     @Req() req: any,
   ) {
-    await this.groupsService.removeMember(req.user.id, id, memberId);
+    await this.groupsMembershipService.removeMember(req.user.id, id, memberId);
   }
 }

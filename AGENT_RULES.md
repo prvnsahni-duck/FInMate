@@ -56,6 +56,22 @@ Do not perform repository-wide discovery when the user can provide the missing i
 
 ---
 
+## Repository Exploration Rules
+
+Read only files directly related to the task.
+
+Avoid:
+
+* Repository-wide scans
+* Reading unrelated directories
+* Loading large numbers of files
+* Repeated searches
+* Rereading known information
+
+Every file read must have a clear reason tied to the task.
+
+---
+
 ## Scope Control
 
 Do not expand scope automatically.
@@ -75,6 +91,32 @@ Use the smallest effective change that solves the requested problem.
 
 ---
 
+## Approval Requirements
+
+Request approval before:
+
+* Installing packages
+* Adding new dependencies
+* Running database migrations
+* Deleting files
+* Renaming files or folders
+* Making architecture changes
+* Modifying more than 5 files
+* Creating large boilerplate structures
+* Introducing new frameworks or libraries
+
+The agent may do the following without approval when scoped to the task:
+
+* Read relevant files
+* Search relevant files
+* Analyze code
+* Create implementation plans
+* Propose diffs
+
+These are additional approval gates. Stricter project-specific planning, implementation, dependency, and progress-log rules still apply.
+
+---
+
 ## Token Efficiency Rules
 
 Prefer:
@@ -88,15 +130,8 @@ Prefer:
 
 Avoid:
 
-* Repository-wide scans
-* Reading unrelated files
-* Loading large file sets
-* Repeated searches
-* Rereading known context
 * Unnecessary planning
 * Opportunistic refactoring
-
-Every file read must have a clear reason tied to the task.
 
 ---
 
@@ -114,34 +149,131 @@ Do not repeatedly rediscover information already known from the current task or 
 
 ---
 
-## Terminal Command Policy
+## Command Execution Policy
 
-Do not completely prohibit command execution.
+Default state:
 
-When information is missing, prefer asking the user to run the smallest relevant command and provide summarized output.
+DO NOT EXECUTE TERMINAL COMMANDS.
+
+For diagnostics, investigation, information gathering, debugging, and repository analysis:
+
+The agent MUST ask the user to run commands and provide the output.
 
 Examples:
 
-```bash
-npm run build
-npm test path/to/test
-pytest path/to/test.py
-pnpm lint path/to/file
-git diff
-```
+* `npm run build`
+* `npm test`
+* `pytest`
+* `git diff`
+* `nx test`
+* `nx build`
+* `pnpm lint`
 
 Request only:
 
-* First relevant error
-* Failing tests
-* Relevant stack trace
-* Minimal command output
+* first relevant error
+* failing test output
+* relevant stack trace
+* minimal command output
 
-Avoid requesting full logs unless absolutely necessary.
+Do not request full logs unless absolutely necessary.
 
-If sufficient information already exists, continue without requesting additional commands.
+The agent MUST NOT execute commands solely for:
 
-When running commands directly is appropriate, run only the minimum verification or inspection command needed for the affected surface.
+* information gathering
+* debugging
+* repository exploration
+* dependency discovery
+* build investigation
+* test investigation
+
+Instead, ask the user to run the command and provide the result.
+
+---
+
+## Allowed Command Execution Cases
+
+The agent may execute commands only when ALL of the following are true:
+
+1. The user explicitly instructs the agent to run the command.
+
+OR
+
+2. The user explicitly approves command execution.
+
+OR
+
+3. An implementation plan has already been approved and command execution is required for final verification of the approved work.
+
+If none of the above conditions are met:
+
+The agent must not execute commands.
+
+---
+
+## User-Provided Information Preference
+
+When information can be obtained from either:
+
+* user-provided output
+* agent-executed commands
+
+Always prefer user-provided output.
+
+Ask:
+
+"Can the user provide this information faster than I can discover it?"
+
+If yes:
+
+Request the information from the user first.
+
+---
+
+## Investigation Rules
+
+Before running any command, the agent must check whether the user can provide:
+
+* affected file
+* error message
+* stack trace
+* failing test
+* command output
+* reproduction steps
+
+If any of these are missing and required:
+
+Request them from the user before attempting command execution.
+
+---
+
+## Verification Rules
+
+After implementation approval:
+
+The agent may recommend commands for verification.
+
+Prefer asking the user to run:
+
+* affected test
+* affected package test
+* affected build target
+
+instead of executing commands directly.
+
+---
+
+## Final Priority Rule
+
+User-provided information is preferred over command execution.
+
+Reading relevant files is preferred over command execution.
+
+Command execution should be the last option, not the first option.
+
+The agent must minimize unnecessary command execution to reduce cost, token usage, and unintended side effects.
+
+Ensure this policy has higher priority than generic investigation behavior and repository exploration behavior.
 
 ---
 
@@ -221,7 +353,7 @@ Before using a package in code:
 2. Confirm the dependency is installed.
 3. If it is missing and needed, ask the user before adding it or relying on it.
 
-Never install a new npm package without telling the user first and receiving approval when required.
+Never install a new npm package without telling the user first and receiving approval.
 
 ---
 
@@ -455,10 +587,12 @@ Do not continue with opportunistic improvements unless explicitly requested.
 
 ## Never Do These
 
-* Never install a new npm package without telling the user first and receiving approval when required.
+* Never install a new npm package without telling the user first and receiving approval.
 * Never use `any` types in TypeScript.
 * Never use `axios` or raw `fetch` in Angular frontend code.
 * Never write raw SCSS when Tailwind can cover the requirement.
 * Never start non-trivial implementation before the required plan is approved.
 * Never skip unit tests for new services or interceptors.
+* Never delete or rename files without approval.
+* Never make architecture changes without approval.
 * Never fix unrelated issues unless explicitly requested.

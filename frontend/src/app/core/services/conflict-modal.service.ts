@@ -30,7 +30,7 @@ export class ConflictModalService {
       const hostElement = document.createElement('div');
       document.body.appendChild(hostElement);
 
-      const componentRef: ComponentRef<ConflictDiffModalComponent<any>> =
+      const componentRef: ComponentRef<ConflictDiffModalComponent<Record<string, unknown>>> =
         createComponent(ConflictDiffModalComponent, {
           environmentInjector: this.environmentInjector,
           hostElement,
@@ -40,7 +40,7 @@ export class ConflictModalService {
       this.appRef.attachView(componentRef.hostView);
       componentRef.changeDetectorRef.detectChanges();
 
-      const sub = componentRef.instance.resolved.subscribe((resolution: any) => {
+      const sub = componentRef.instance.resolved.subscribe((resolution) => {
         subscriber.next(resolution);
         subscriber.complete();
         cleanup();

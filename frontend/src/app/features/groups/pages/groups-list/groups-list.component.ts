@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { GroupsService } from '../../services/groups.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
-import { Group } from '@finmate/data-models';
+import { CreateGroupDto, Group } from '@finmate/data-models';
 
 @Component({
   selector: 'app-groups-list',
@@ -72,7 +72,17 @@ export class GroupsListComponent implements OnInit {
       this.isSubmitting = true;
       this.errorMessage = '';
 
-      this.groupsService.createGroup(this.groupForm.value).subscribe({
+      const value = this.groupForm.getRawValue();
+      const payload: CreateGroupDto = {
+        name: value.name ?? '',
+        description: value.description ?? undefined,
+        visibility: (value.visibility ?? 'private') as CreateGroupDto['visibility'],
+        currency: value.currency ?? 'USD',
+        groupType: (value.groupType ?? 'normal') as CreateGroupDto['groupType'],
+        carryForwardEnabled: value.carryForwardEnabled ?? false,
+      };
+
+      this.groupsService.createGroup(payload).subscribe({
         next: () => {
           this.isSubmitting = false;
           this.isModalOpen = false;

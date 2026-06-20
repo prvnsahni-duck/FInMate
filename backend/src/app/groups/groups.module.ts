@@ -8,6 +8,12 @@ import { InviteController } from './invite.controller';
 import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
 import { ExpensesModule } from '../expenses/expenses.module';
 import { EmailModule } from '../email/email.module';
+import {
+  GroupsAuditService,
+  GroupsContributionsService,
+  GroupsCrudService,
+  GroupsMembershipService,
+} from './services';
 
 @Module({
   imports: [
@@ -16,7 +22,20 @@ import { EmailModule } from '../email/email.module';
     EmailModule,
   ],
   controllers: [GroupsController, MembersController, InviteController],
-  providers: [GroupsService, GroupRolesGuard],
-  exports: [GroupsService],
+  providers: [
+    GroupsService,
+    GroupsAuditService,
+    GroupsContributionsService,
+    GroupsCrudService,
+    GroupsMembershipService,
+    GroupRolesGuard,
+  ],
+  exports: [
+    GroupsService,
+    GroupsAuditService,
+    GroupsContributionsService,
+    GroupsCrudService,
+    GroupsMembershipService,
+  ],
 })
 export class GroupsModule {}

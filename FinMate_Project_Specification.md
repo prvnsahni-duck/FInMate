@@ -1067,6 +1067,20 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
    - Immediate next step
 
+### 2026-06-20
+- **Summary:** Fixed backend test harness regressions in the expenses controller and groups service specs.
+- **Changes Made:**
+   - Updated `backend/src/app/expenses/expenses.controller.spec.ts` to use explicit mock service bindings that Nest resolves reliably.
+   - Extended `backend/src/app/groups/groups.service.spec.ts` transaction mocking to support the ownership-transfer path and imported the missing contribution entity.
+- **Artifacts Updated:**
+   - `backend/src/app/expenses/expenses.controller.spec.ts`
+   - `backend/src/app/groups/groups.service.spec.ts`
+   - `FinMate_Project_Specification.md`
+- **Decisions:**
+   - Kept the fix scoped to test setup instead of changing controller or service logic.
+- **Next Actions:**
+   - None.
+
 ### 2026-06-08
 - **Summary:** Established Linear-first project coordination approach and consolidated the active planning record format.
 - **Changes Made:**
@@ -1494,4 +1508,94 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
    - Use `agent_rules.md` for future agent workflow, planning, implementation, and verification decisions.
 
+### 2026-06-20 (Part 2)
+- **Summary:** Completed architecture remediation cleanup items from `task.md` for Angular module imports, frontend service typing, backend auth typing, and expense-service import hygiene.
+- **Changes Made:**
+   - Replaced production `CommonModule` imports with specific Angular imports in standalone frontend components.
+   - Added shared API response contracts in `@finmate/data-models` and applied them to auth, friends, groups, expenses, dashboard, group detail, invite, and conflict-resolution flows.
+   - Added backend `RequestWithUser` and `JwtPayload` interfaces and removed `any` typing from backend auth controller, strategy, guard, and token handling.
+   - Removed JWT fallback secrets from auth startup paths and replaced the expense service runtime `require()` with a top-level import.
+   - Deleted the stale `frontend/src/app/nx-welcome.ts` component.
+- **Artifacts Updated:**
+   - [api-responses.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/lib/api-responses.ts)
+   - [index.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/index.ts)
+   - [auth.service.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/auth.service.ts)
+   - [auth.controller.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/auth.controller.ts)
+   - [jwt.strategy.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/strategies/jwt.strategy.ts)
+   - [jwt-auth.guard.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/guards/jwt-auth.guard.ts)
+   - [request-with-user.interface.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/common/interfaces/request-with-user.interface.ts)
+   - [jwt-payload.interface.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/common/interfaces/jwt-payload.interface.ts)
+   - [expenses.service.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts)
+   - [task.md](file:///d:/prvn/Projects/FinMate/task.md)
+- **Decisions:**
+   - Treat full `ExpensesService` and `GroupsService` decomposition as a separate architecture refactor because it is larger than the focused cleanup pass.
+   - Leave remaining test mock casts for a separate test-hardening pass since production type-safety targets are clean.
+- **Next Actions:**
+   - Implement Phase 3 service decomposition and frontend `ErrorInterceptor` in a dedicated approved task.
 
+### 2026-06-20 (Part 3)
+- **Summary:** Implemented the remaining Phase 3 architecture remediation tasks from `task.md`.
+- **Changes Made:**
+   - Added focused expense services for CRUD, analytics, carry-forward/deleted-expense access, and access helpers, then wired expense controllers to the focused services.
+   - Added focused group services for CRUD, membership/invites, audit history, and household contributions, then wired group controllers to those services.
+   - Added a backend groups `dto/` barrel for local controller DTO imports.
+   - Added a global Angular `errorInterceptor`, registered it in `app.config.ts`, and added a focused unit test for structured API error events.
+   - Persisted the main layout theme preference in `localStorage`.
+   - Added a reusable `IconComponent` and moved main layout navigation/theme SVG path rendering through it.
+   - Marked the remaining Phase 3 tasks complete in `task.md`.
+- **Artifacts Updated:**
+   - [expenses/services](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/services)
+   - [groups/services](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/services)
+   - [groups/dto/index.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/dto/index.ts)
+   - [error.interceptor.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/interceptors/error.interceptor.ts)
+   - [error.interceptor.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/interceptors/error.interceptor.spec.ts)
+   - [icon.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/icon/icon.component.ts)
+   - [main-layout.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts)
+   - [main-layout.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.html)
+   - [task.md](file:///d:/prvn/Projects/FinMate/task.md)
+- **Decisions:**
+   - Preserve the existing broad backend service APIs as compatibility facades while routing controllers through focused services to reduce route-level responsibility coupling safely.
+   - Emit normalized frontend HTTP errors as a browser event so UI notification handling can subscribe without coupling the interceptor to a specific toast implementation.
+- **Next Actions:**
+   - Continue migrating internal logic from the compatibility facades into the focused backend services in smaller follow-up changes if deeper service-size reduction is required.
+
+### 2026-06-20 (Part 4)
+- **Summary:** Updated repository agent rules with explicit efficiency, approval, exploration, and scope-control guidance.
+- **Changes Made:**
+   - Added a dedicated approval requirements section covering package installs, dependencies, migrations, deletions, renames, architecture changes, large edits, boilerplate, and new frameworks.
+   - Added a dedicated repository exploration section requiring targeted file reads with clear task relevance.
+   - Removed duplicate exploration bullets from token-efficiency guidance and tightened dependency approval wording.
+- **Artifacts Updated:**
+   - [agent_rules.md](file:///d:/prvn/Projects/FinMate/agent_rules.md)
+   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Preserve existing FinMate stack, coding standards, architecture decisions, implementation approval workflow, and progress-log requirements.
+   - Keep project-specific workflow rules higher priority than generic efficiency guidance.
+- **Next Actions:**
+   - Use `agent_rules.md` as the authoritative source for future agent behavior.
+
+### 2026-06-20 (Part 5)
+- **Summary:** Fixed the dashboard greeting to prefer the authenticated user's display name over the email prefix.
+- **Changes Made:**
+   - Updated `DashboardComponent` to set `userName` from `user.displayName` when available, falling back to the email local-part only when no display name exists.
+- **Artifacts Updated:**
+   - [frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts)
+   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Keep the change localized to the dashboard instead of broadening auth state or test data shapes.
+- **Next Actions:**
+   - Re-run the focused dashboard unit test to confirm the expectation now matches the component behavior.
+
+### 2026-06-20 (Part 6)
+- **Summary:** Restored backend test compatibility after the expenses service split and groups transaction refactor.
+- **Changes Made:**
+   - Updated `ExpensesController` unit test providers to mock `ExpensesCrudService` and `ExpensesAnalyticsService` instead of the pre-split aggregate service.
+   - Added a `getRepository()` stub to the mocked TypeORM transaction manager used by the groups service ownership-transfer test.
+- **Artifacts Updated:**
+   - [backend/src/app/expenses/expenses.controller.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.controller.spec.ts)
+   - [backend/src/app/groups/groups.service.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.spec.ts)
+   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Keep the fix confined to test scaffolding rather than changing controller/service behavior.
+- **Next Actions:**
+   - Re-run `npx.cmd nx test backend` to verify both previously failing suites pass.

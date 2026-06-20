@@ -1,5 +1,5 @@
 import { Component, Input, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { CurrencyPipe, NgFor, NgIf, PercentPipe } from '@angular/common';
 import { ExpensesService } from '../../services/expenses.service';
 
 interface MonthlyData {
@@ -35,7 +35,7 @@ interface ProcessedMonth {
 @Component({
   selector: 'app-analytics-charts',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CurrencyPipe, NgFor, NgIf, PercentPipe],
   template: `
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
       

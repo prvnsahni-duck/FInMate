@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { FriendBalanceResponse, UserSearchResult } from '@finmate/data-models';
 
 @Injectable({
   providedIn: 'root'
@@ -11,14 +12,14 @@ export class FriendsService {
   /**
    * Fetch aggregated friends balances.
    */
-  getFriends(): Observable<any[]> {
-    return this.http.get<any[]>('/api/friends');
+  getFriends(): Observable<FriendBalanceResponse[]> {
+    return this.http.get<FriendBalanceResponse[]>('/api/friends');
   }
 
   /**
    * Search for users by email, username, or phone number.
    */
-  searchUsers(query: string): Observable<any[]> {
-    return this.http.get<any[]>(`/api/users/search?query=${encodeURIComponent(query)}`);
+  searchUsers(query: string): Observable<UserSearchResult[]> {
+    return this.http.get<UserSearchResult[]>(`/api/users/search?query=${encodeURIComponent(query)}`);
   }
 }

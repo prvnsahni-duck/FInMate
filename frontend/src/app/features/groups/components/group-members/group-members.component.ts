@@ -1,9 +1,9 @@
 import { Component, input, output, inject, signal } from '@angular/core';
-import { NgClass, CommonModule } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { forkJoin, of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { GroupMember } from '@finmate/data-models';
+import { GroupMember, UserSearchResult } from '@finmate/data-models';
 import { GroupsService } from '../../services/groups.service';
 import { FriendsService } from '../../../friends/services/friends.service';
 import { APP_NAME } from '../../../../core/constants/app.constants';
@@ -17,10 +17,20 @@ export interface StagedInvite {
   userId?: string;
 }
 
+interface FailedInviteResult {
+  error: true;
+  invite: StagedInvite;
+  message: string;
+}
+
+function isFailedInviteResult(result: GroupMember | FailedInviteResult): result is FailedInviteResult {
+  return 'error' in result && result.error;
+}
+
 @Component({
   selector: 'app-group-members',
   standalone: true,
-  imports: [CommonModule, NgClass, FormsModule],
+  imports: [NgClass, FormsModule],
   templateUrl: './group-members.component.html'
 })
 export class GroupMembersComponent {
@@ -63,7 +73,7 @@ export class GroupMembersComponent {
 
   // User Lookup / Auto-suggest state
   searchQuery = '';
-  searchResults: any[] = [];
+  searchResults: UserSearchResult[] = [];
   isSearching = false;
 
   isValidEmail(email: string): boolean {
@@ -103,10 +113,10 @@ export class GroupMembersComponent {
     this.stagedInvites.update(list => list.filter(item => item.id !== id));
   }
 
-  selectUserForInvite(user: any) {
+  selectUserForInvite(user: UserSearchResult) {
     this.stageUser({
       name: user.displayName || user.email.split('@')[0],
-      identifier: user.email || user.username || user.phoneNumber,
+      identifier: user.email || user.username || user.phoneNumber || user.id,
       role: this.inviteRole,
       isRegisteredUser: true,
       userId: user.id
@@ -203,14 +213,14 @@ export class GroupMembersComponent {
         role: invite.role,
         displayName: invite.isRegisteredUser ? undefined : invite.name
       }).pipe(
-        catchError(err => of({ error: true, invite, message: err.error?.message || 'Failed to send invite.' }))
+        catchError(err => of({ error: true, invite, message: err.error?.message || 'Failed to send invite.' } satisfies FailedInviteResult))
       )
     );
 
     forkJoin(requests).subscribe({
-      next: (results: any[]) => {
+      next: (results) => {
         this.isInviting = false;
-        const failed = results.filter(r => r && r.error);
+        const failed = results.filter(isFailedInviteResult);
 
         if (failed.length === 0) {
           const phoneInvites = list.filter(invite => this.isValidPhone(invite.identifier));

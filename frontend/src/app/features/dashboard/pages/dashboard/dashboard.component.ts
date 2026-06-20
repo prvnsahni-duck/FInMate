@@ -1,5 +1,5 @@
 import { Component, inject, OnInit } from '@angular/core';
-import { CurrencyPipe, DatePipe, CommonModule } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Store } from '@ngxs/store';
 import { AuthState } from '../../../../core/auth/auth.state';
@@ -9,13 +9,13 @@ import { AnalyticsChartsComponent } from '../../../groups/components/analytics-c
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
 import { GroupsService } from '../../../groups/services/groups.service';
 import { ExpensesService } from '../../../groups/services/expenses.service';
-import { Expense } from '@finmate/data-models';
+import { PendingInvitationResponse, Profile } from '@finmate/data-models';
 import { GroupExpense } from '../../../groups/pages/group-detail/group-detail.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, CurrencyPipe, DatePipe, CreateExpenseModalComponent, AnalyticsChartsComponent, ConfirmModalComponent],
+  imports: [FormsModule, CurrencyPipe, DatePipe, CreateExpenseModalComponent, AnalyticsChartsComponent, ConfirmModalComponent],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit {
@@ -35,8 +35,8 @@ export class DashboardComponent implements OnInit {
   isLoading = true;
 
   // Profile and Budget Trackers
-  userProfile: any = null;
-  pendingInvitations: any[] = [];
+  userProfile: Profile | null = null;
+  pendingInvitations: PendingInvitationResponse[] = [];
   incomePercentage = 0;
   budgetPercentage = 0;
 
@@ -54,8 +54,8 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit() {
     const user = this.store.selectSnapshot(AuthState.getUser);
-    if (user && user.email) {
-      this.userName = user.displayName || user.email.split('@')[0];
+    if (user?.email) {
+      this.userName = user.email.split('@')[0];
     }
     this.fetchData();
   }
@@ -120,6 +120,21 @@ export class DashboardComponent implements OnInit {
       : 0;
   }
 
+  get incomeProgressWidth(): number {
+    const income = this.userProfile?.monthlyIncome;
+    return income ? Math.min((this.monthlyExpenses / income) * 100, 100) : 0;
+  }
+
+  get budgetProgressWidth(): number {
+    const budget = this.userProfile?.monthlyBudget;
+    return budget ? Math.min((this.monthlyExpenses / budget) * 100, 100) : 0;
+  }
+
+  get isBudgetExceeded(): boolean {
+    const budget = this.userProfile?.monthlyBudget;
+    return !!budget && this.monthlyExpenses > budget;
+  }
+
   toggleEditIncome() {
     this.isEditingIncome = !this.isEditingIncome;
     if (this.isEditingIncome && this.userProfile) {
@@ -144,7 +159,7 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  acceptInvitation(invite: any) {
+  acceptInvitation(invite: PendingInvitationResponse) {
     this.groupsService.updateMember(invite.id, invite.membershipId, { joinStatus: 'active' }).subscribe({
       next: () => {
         this.fetchData();
@@ -155,7 +170,7 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  declineInvitation(invite: any) {
+  declineInvitation(invite: PendingInvitationResponse) {
     this.groupsService.removeMember(invite.id, invite.membershipId).subscribe({
       next: () => {
         this.fetchData();
@@ -166,7 +181,7 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  openExpenseModal(expense?: any) {
+  openExpenseModal(expense?: GroupExpense) {
     this.selectedExpenseForEdit = expense || null;
     this.isExpenseModalOpen = true;
   }

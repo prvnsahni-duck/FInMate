@@ -1,12 +1,13 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { GroupsService } from '../../services/groups.service';
-import { CommonModule } from '@angular/common';
+import { NgClass } from '@angular/common';
+import { InviteDetailsResponse } from '@finmate/data-models';
 
 @Component({
   selector: 'app-join-group',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [NgClass, RouterLink],
   templateUrl: './join-group.component.html'
 })
 export class JoinGroupComponent implements OnInit {
@@ -15,7 +16,7 @@ export class JoinGroupComponent implements OnInit {
   private groupsService = inject(GroupsService);
 
   inviteToken = '';
-  groupDetails: any = null;
+  groupDetails: InviteDetailsResponse | null = null;
   isLoading = true;
   isJoining = false;
   errorMessage = '';
@@ -50,7 +51,9 @@ export class JoinGroupComponent implements OnInit {
       next: () => {
         this.isJoining = false;
         // Redirect to the group detail page
-        this.router.navigate(['/groups', this.groupDetails.id]);
+        if (this.groupDetails) {
+          this.router.navigate(['/groups', this.groupDetails.id]);
+        }
       },
       error: (err) => {
         this.isJoining = false;

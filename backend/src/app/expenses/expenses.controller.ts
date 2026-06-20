@@ -16,19 +16,22 @@ import {
   DefaultValuePipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto';
+import { ExpensesAnalyticsService, ExpensesCrudService } from './services';
 
 @Controller('expenses')
 @UseGuards(JwtAuthGuard)
 export class ExpensesController {
-  constructor(private readonly expensesService: ExpensesService) {}
+  constructor(
+    private readonly expensesCrudService: ExpensesCrudService,
+    private readonly expensesAnalyticsService: ExpensesAnalyticsService,
+  ) {}
 
   // ─── CRUD ─────────────────────────────────────────────────────────────────
 
   @Post()
   async create(@Body() dto: CreateExpenseDto, @Req() req: Request & { user: { id: string } }) {
-    return this.expensesService.createExpense(req.user.id, dto);
+    return this.expensesCrudService.createExpense(req.user.id, dto);
   }
 
   @Get()
@@ -46,7 +49,7 @@ export class ExpensesController {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 20;
 
-    return this.expensesService.listExpenses(req!.user.id, {
+    return this.expensesCrudService.listExpenses(req!.user.id, {
       page: pageNum,
       limit: limitNum,
       cursor,
@@ -63,7 +66,7 @@ export class ExpensesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.expensesService.getExpenseById(req.user.id, id);
+    return this.expensesCrudService.getExpenseById(req.user.id, id);
   }
 
   @Patch(':id')
@@ -72,7 +75,7 @@ export class ExpensesController {
     @Body() dto: UpdateExpenseDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.expensesService.updateExpense(req.user.id, id, dto);
+    return this.expensesCrudService.updateExpense(req.user.id, id, dto);
   }
 
   @Delete(':id')
@@ -81,7 +84,7 @@ export class ExpensesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ): Promise<void> {
-    await this.expensesService.deleteExpense(req.user.id, id);
+    await this.expensesCrudService.deleteExpense(req.user.id, id);
   }
 
   // ─── Restore ──────────────────────────────────────────────────────────────
@@ -92,7 +95,7 @@ export class ExpensesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.expensesService.restoreExpense(req.user.id, id);
+    return this.expensesCrudService.restoreExpense(req.user.id, id);
   }
 
   // ─── Analytics ────────────────────────────────────────────────────────────
@@ -104,7 +107,7 @@ export class ExpensesController {
     @Query('groupId') groupId: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.expensesService.getMonthlySummary({ userId: req.user.id, groupId, year });
+    return this.expensesAnalyticsService.getMonthlySummary({ userId: req.user.id, groupId, year });
   }
 
   /** Yearly expense totals across all years. */
@@ -113,7 +116,7 @@ export class ExpensesController {
     @Query('groupId') groupId: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.expensesService.getYearlySummary({ userId: req.user.id, groupId });
+    return this.expensesAnalyticsService.getYearlySummary({ userId: req.user.id, groupId });
   }
 
   /** Category distribution totals, optionally filtered by date range. */
@@ -124,7 +127,7 @@ export class ExpensesController {
     @Query('endDate') endDate: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.expensesService.getCategoryDistribution({ userId: req.user.id, groupId, startDate, endDate });
+    return this.expensesAnalyticsService.getCategoryDistribution({ userId: req.user.id, groupId, startDate, endDate });
   }
 
   /** Combined category-level aggregated monthly expenditures (personal + group splits). */
@@ -134,6 +137,6 @@ export class ExpensesController {
     @Req() req: Request & { user: { id: string } },
   ) {
     const targetMonth = month ?? new Date().toISOString().slice(0, 7);
-    return this.expensesService.getCombinedMonthlyAnalytics(req.user.id, targetMonth);
+    return this.expensesAnalyticsService.getCombinedMonthlyAnalytics(req.user.id, targetMonth);
   }
 }

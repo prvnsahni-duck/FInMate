@@ -100,16 +100,17 @@ export class ClientEncryptionService {
       throw new Error('Web Cryptography API (SubtleCrypto) is not available');
     }
 
+    const ivBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength) as ArrayBuffer;
     const ciphertextBuffer = await subtle.encrypt(
       {
         name: 'AES-GCM',
-        iv: iv as any,
+        iv: ivBuffer,
       },
       key,
       encodedPlaintext
     );
 
-    const ivBase64 = arrayBufferToBase64(iv.buffer as ArrayBuffer);
+    const ivBase64 = arrayBufferToBase64(ivBuffer);
     const ciphertextBase64 = arrayBufferToBase64(ciphertextBuffer);
 
     return `${ivBase64}:${ciphertextBase64}`;
@@ -130,12 +131,13 @@ export class ClientEncryptionService {
 
     const subtle = this.getSubtleCrypto();
     const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
+    const ivBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength) as ArrayBuffer;
     const ciphertextBuffer = base64ToArrayBuffer(parts[1]);
 
     const decryptedBuffer = await subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv: iv as any,
+        iv: ivBuffer,
       },
       key,
       ciphertextBuffer

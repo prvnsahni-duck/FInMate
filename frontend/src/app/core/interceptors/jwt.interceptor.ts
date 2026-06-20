@@ -4,6 +4,7 @@ import { Store } from '@ngxs/store';
 import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../auth/auth.service';
 import { Logout, RefreshTokenSuccess } from '../auth/auth.state';
+import { RefreshTokenResponse } from '@finmate/data-models';
 
 export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const store = inject(Store);
@@ -30,7 +31,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
         const refreshToken = localStorage.getItem('finmate_refresh_token');
         if (refreshToken) {
           return authService.refresh(refreshToken).pipe(
-            switchMap((res: any) => {
+            switchMap((res: RefreshTokenResponse) => {
               store.dispatch(new RefreshTokenSuccess(res.accessToken, res.refreshToken));
               const retryReq = req.clone({
                 setHeaders: {

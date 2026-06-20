@@ -2,6 +2,8 @@ import { Controller, Post, Body, UseGuards, Req, HttpCode, HttpStatus } from '@n
 import { RegisterDto, LoginDto, RefreshTokenDto, Verify2FaDto } from '@finmate/data-models';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { RequestWithUser } from '../common/interfaces/request-with-user.interface';
+import { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
@@ -17,7 +19,7 @@ export class AuthController {
   }
 
   @Post('login')
-  async login(@Body() loginDto: LoginDto, @Req() req: any) {
+  async login(@Body() loginDto: LoginDto, @Req() req: Request) {
     const mfaCode = req.headers['x-mfa-code'] as string | undefined;
     return this.authService.login(loginDto.email, loginDto.password, mfaCode);
   }
@@ -30,26 +32,26 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@Body() refreshTokenDto: RefreshTokenDto, @Req() req: any) {
+  async logout(@Body() refreshTokenDto: RefreshTokenDto, @Req() req: RequestWithUser) {
     await this.authService.logout(refreshTokenDto.refreshToken, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/enable')
-  async enable2Fa(@Req() req: any) {
+  async enable2Fa(@Req() req: RequestWithUser) {
     return this.authService.enable2Fa(req.user);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/verify')
-  async verify2Fa(@Body() verify2FaDto: Verify2FaDto, @Req() req: any) {
+  async verify2Fa(@Body() verify2FaDto: Verify2FaDto, @Req() req: RequestWithUser) {
     return this.authService.verify2Fa(req.user, verify2FaDto.code);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/disable')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async disable2Fa(@Body() verify2FaDto: Verify2FaDto, @Req() req: any) {
+  async disable2Fa(@Body() verify2FaDto: Verify2FaDto, @Req() req: RequestWithUser) {
     return this.authService.disable2Fa(req.user, verify2FaDto.code);
   }
 }

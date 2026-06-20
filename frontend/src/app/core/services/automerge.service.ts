@@ -21,7 +21,7 @@ export class AutomergeService {
 
   /**
    * Merges local edits onto the latest server state for non-overlapping fields.
-   * Takes all keys from `serverState` as the base, then overwrites with any
+   * Takes all keys from `serverState` as the base, then overwrites with matching
    * keys from `localPayload` that do NOT appear in `overlappingFields`.
    */
   merge<T extends Record<string, unknown>>(

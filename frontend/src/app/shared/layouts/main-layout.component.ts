@@ -1,7 +1,9 @@
 import { Component, signal, computed } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { APP_NAME } from '../../core/constants/app.constants';
+import { IconComponent } from '../components/icon/icon.component';
+
+const THEME_STORAGE_KEY = 'finmate_theme';
 
 export interface NavItem {
   path: string;
@@ -37,31 +39,41 @@ export const NAV_ITEMS: NavItem[] = [
   }
 ];
 
+export const THEME_ICONS = {
+  light: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z',
+  dark: 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z',
+};
+
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, IconComponent],
   templateUrl: './main-layout.component.html'
 })
 export class MainLayoutComponent {
   appName = APP_NAME;
   isDarkMode = signal(true);
   navItems = NAV_ITEMS;
+  themeIcons = THEME_ICONS;
   desktopNavItems = computed(() => this.navItems.filter(item => item.path !== '/profile'));
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const isDark = document.documentElement.classList.contains('dark');
+      const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+      const isDark = storedTheme
+        ? storedTheme === 'dark'
+        : document.documentElement.classList.contains('dark');
       this.isDarkMode.set(isDark);
+      document.documentElement.classList.toggle('dark', isDark);
     }
   }
 
   toggleTheme() {
     this.isDarkMode.update(v => !v);
-    if (this.isDarkMode()) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    const isDark = this.isDarkMode();
+    document.documentElement.classList.toggle('dark', isDark);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(THEME_STORAGE_KEY, isDark ? 'dark' : 'light');
     }
   }
 }

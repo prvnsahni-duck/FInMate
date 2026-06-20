@@ -115,7 +115,7 @@
           </div>
           <div class="w-full bg-slate-100 dark:bg-white/5 rounded-full h-3 overflow-hidden">
             <div class="bg-gradient-neon h-full rounded-full transition-all duration-500" 
-                 [style.width.%]="userProfile?.monthlyIncome ? Math.min((monthlyExpenses / userProfile.monthlyIncome) * 100, 100) : 0">
+                 [style.width.%]="incomeProgressWidth">
             </div>
           </div>
         </div>
@@ -131,9 +131,9 @@
           </div>
           <div class="w-full bg-slate-100 dark:bg-white/5 rounded-full h-3 overflow-hidden">
             <div class="h-full rounded-full transition-all duration-500" 
-                 [class.bg-red-500]="userProfile?.monthlyBudget && monthlyExpenses > userProfile.monthlyBudget"
-                 [class.bg-gradient-neon]="!userProfile?.monthlyBudget || monthlyExpenses <= userProfile.monthlyBudget"
-                 [style.width.%]="userProfile?.monthlyBudget ? Math.min((monthlyExpenses / userProfile.monthlyBudget) * 100, 100) : 0">
+                 [class.bg-red-500]="isBudgetExceeded"
+                 [class.bg-gradient-neon]="!isBudgetExceeded"
+                 [style.width.%]="budgetProgressWidth">
             </div>
           </div>
         </div>

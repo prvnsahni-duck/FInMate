@@ -12,17 +12,25 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
 } from '@nestjs/common';
-import { CreateGroupDto, UpdateGroupDto, UpdateContributionDto } from '@finmate/data-models';
-import { GroupsService } from './groups.service';
-import { ExpensesService } from '../expenses/expenses.service';
+import { CreateGroupDto, UpdateContributionDto, UpdateGroupDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ExpensesCarryForwardService } from '../expenses/services';
+import {
+  GroupsAuditService,
+  GroupsContributionsService,
+  GroupsCrudService,
+  GroupsMembershipService,
+} from './services';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard)
 export class GroupsController {
   constructor(
-    private readonly groupsService: GroupsService,
-    private readonly expensesService: ExpensesService,
+    private readonly groupsCrudService: GroupsCrudService,
+    private readonly groupsMembershipService: GroupsMembershipService,
+    private readonly groupsAuditService: GroupsAuditService,
+    private readonly groupsContributionsService: GroupsContributionsService,
+    private readonly expensesCarryForwardService: ExpensesCarryForwardService,
   ) {}
 
   @Post()
@@ -32,7 +40,7 @@ export class GroupsController {
   ) {
     // req.user is typed narrowly by JwtAuthGuard; cast to User is safe here
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return this.groupsService.createGroup(req.user as unknown as Parameters<typeof this.groupsService.createGroup>[0], createGroupDto);
+    return this.groupsCrudService.createGroup(req.user as unknown as Parameters<typeof this.groupsCrudService.createGroup>[0], createGroupDto);
   }
 
 
@@ -47,7 +55,7 @@ export class GroupsController {
     const limitNum = limit ? parseInt(limit, 10) : 20;
     const isArchivedBool = isArchived === 'true' ? true : isArchived === 'false' ? false : undefined;
 
-    return this.groupsService.listGroups(req!.user.id, pageNum, limitNum, isArchivedBool);
+    return this.groupsCrudService.listGroups(req!.user.id, pageNum, limitNum, isArchivedBool);
   }
 
   @Post('join/:inviteToken')
@@ -55,12 +63,12 @@ export class GroupsController {
     @Param('inviteToken', ParseUUIDPipe) inviteToken: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsService.joinGroupByToken(req.user.id, inviteToken);
+    return this.groupsMembershipService.joinGroupByToken(req.user.id, inviteToken);
   }
 
   @Get('invitations/pending')
   async findPendingInvitations(@Req() req: Request & { user: { id: string } }) {
-    return this.groupsService.getPendingInvitations(req.user.id);
+    return this.groupsMembershipService.getPendingInvitations(req.user.id);
   }
 
   @Get(':id')
@@ -68,7 +76,7 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsService.findGroupById(req.user.id, id);
+    return this.groupsCrudService.findGroupById(req.user.id, id);
   }
 
   @Patch(':id')
@@ -77,7 +85,7 @@ export class GroupsController {
     @Body() updateGroupDto: UpdateGroupDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsService.updateGroup(req.user.id, id, updateGroupDto);
+    return this.groupsCrudService.updateGroup(req.user.id, id, updateGroupDto);
   }
 
   @Post(':id/invite-link/regenerate')
@@ -85,7 +93,7 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsService.regenerateInviteToken(req.user.id, id);
+    return this.groupsCrudService.regenerateInviteToken(req.user.id, id);
   }
 
   // ─── Group History ────────────────────────────────────────────────────────
@@ -101,7 +109,7 @@ export class GroupsController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsService.getGroupHistory(req.user.id, id, page, limit);
+    return this.groupsAuditService.getGroupHistory(req.user.id, id, page, limit);
   }
 
   /**
@@ -114,7 +122,7 @@ export class GroupsController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.expensesService.listDeletedExpenses(req.user.id, id, page, limit);
+    return this.expensesCarryForwardService.listDeletedExpenses(req.user.id, id, page, limit);
   }
 
   // ─── Carry-Forward Summary ────────────────────────────────────────────────
@@ -131,7 +139,7 @@ export class GroupsController {
   ) {
     // Default to current month if not provided
     const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
-    return this.expensesService.getCarryForwardSummary(req.user.id, id, ledgerMonth);
+    return this.expensesCarryForwardService.getCarryForwardSummary(req.user.id, id, ledgerMonth);
   }
 
   @Get(':id/contributions')
@@ -141,7 +149,7 @@ export class GroupsController {
     @Req() req: Request & { user: { id: string } },
   ) {
     const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
-    return this.groupsService.getContributions(req.user.id, id, ledgerMonth);
+    return this.groupsContributionsService.getContributions(req.user.id, id, ledgerMonth);
   }
 
   @Post(':id/contributions')
@@ -150,6 +158,6 @@ export class GroupsController {
     @Body() dto: UpdateContributionDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsService.updateContributions(req.user.id, id, dto);
+    return this.groupsContributionsService.updateContributions(req.user.id, id, dto);
   }
 }

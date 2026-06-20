@@ -1,17 +1,16 @@
-import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges, inject } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, inject } from '@angular/core';
 import { ReactiveFormsModule, FormsModule, FormBuilder, Validators } from '@angular/forms';
-import { CommonModule } from '@angular/common';
 import { jwtDecode } from 'jwt-decode';
 import { ExpensesService } from '../../services/expenses.service';
 import { FriendsService } from '../../../../features/friends/services/friends.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
-import { GroupMember, Expense } from '@finmate/data-models';
+import { CreateExpenseDto, ExpenseSplitInputDto, GroupMember, JwtPayload, UpdateExpenseDto, UserSearchResult } from '@finmate/data-models';
 import { GroupExpense } from '../../pages/group-detail/group-detail.component';
 
 @Component({
   selector: 'app-create-expense-modal',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, SubmitButtonComponent],
+  imports: [ReactiveFormsModule, FormsModule, SubmitButtonComponent],
   templateUrl: './create-expense-modal.component.html'
 })
 export class CreateExpenseModalComponent implements OnChanges {
@@ -35,8 +34,8 @@ export class CreateExpenseModalComponent implements OnChanges {
   // Direct splits with friends fields
   splitWithFriend = false;
   searchQuery = '';
-  searchResults: any[] = [];
-  resolvedFriends: Map<string, { id: string; displayName: string; email: string }> = new Map();
+  searchResults: UserSearchResult[] = [];
+  resolvedFriends: Map<string, UserSearchResult> = new Map();
   isSearching = false;
 
   expenseForm = this.fb.group({
@@ -68,7 +67,7 @@ export class CreateExpenseModalComponent implements OnChanges {
     const token = localStorage.getItem('finmate_token');
     if (!token) return null;
     try {
-      const decoded = jwtDecode<any>(token);
+      const decoded = jwtDecode<JwtPayload>(token);
       return decoded.userId || null;
     } catch {
       return null;
@@ -123,7 +122,7 @@ export class CreateExpenseModalComponent implements OnChanges {
 
       this.selectedUserIds.clear();
       if (this.expense.splits) {
-        this.expense.splits.forEach((s: any) => {
+        this.expense.splits.forEach((s) => {
           if (s.participantUserId) {
             this.selectedUserIds.add(s.participantUserId);
           }
@@ -133,10 +132,10 @@ export class CreateExpenseModalComponent implements OnChanges {
       // If group-less direct split expense
       if (!this.groupId && this.expense.splits) {
         const currentUserId = this.getCurrentUserId();
-        const otherSplits = this.expense.splits.filter((s: any) => s.participantUserId && s.participantUserId !== currentUserId);
+        const otherSplits = this.expense.splits.filter((s) => s.participantUserId && s.participantUserId !== currentUserId);
         if (otherSplits.length > 0) {
           this.splitWithFriend = true;
-          otherSplits.forEach((s: any) => {
+          otherSplits.forEach((s) => {
             if (s.participantUser) {
               const u = s.participantUser;
               this.resolvedFriends.set(u.id, {
@@ -159,7 +158,7 @@ export class CreateExpenseModalComponent implements OnChanges {
 
       this.attachedFiles = [];
       if (this.expense.attachments) {
-        this.expense.attachments.forEach((a: any) => {
+        this.expense.attachments.forEach((a) => {
           this.attachedFiles.push({
             name: a.originalName,
             size: (a.sizeBytes / 1024).toFixed(1) + ' KB',
@@ -240,7 +239,7 @@ export class CreateExpenseModalComponent implements OnChanges {
     });
   }
 
-  addFriendToSplit(user: any) {
+  addFriendToSplit(user: UserSearchResult) {
     this.resolvedFriends.set(user.id, {
       id: user.id,
       displayName: user.displayName || user.email.split('@')[0],
@@ -277,28 +276,41 @@ export class CreateExpenseModalComponent implements OnChanges {
       this.errorMessage = '';
 
       const formValue = this.expenseForm.value;
-      const splits = Array.from(this.selectedUserIds).map(userId => ({
+      const splits: ExpenseSplitInputDto[] = Array.from(this.selectedUserIds).map(userId => ({
         participantUserId: userId,
         splitType: 'equal' as const,
         shareValue: 1
       }));
 
-      const payload = {
-        title: formValue.title,
-        description: formValue.description,
-        amountTotal: formValue.amountTotal,
-        currency: formValue.currency,
-        category: formValue.category,
-        expenseDate: formValue.expenseDate,
-        paidByUserId: formValue.paidByUserId,
-        groupId: this.groupId || null,
-        splits: splits,
+      const title = formValue.title;
+      const amountTotal = formValue.amountTotal;
+      const currency = formValue.currency;
+      const category = formValue.category;
+      const expenseDate = formValue.expenseDate;
+      const paidByUserId = formValue.paidByUserId;
+
+      if (!title || amountTotal === null || amountTotal === undefined || !currency || !category || !expenseDate || !paidByUserId) {
+        return;
+      }
+
+      const payload: CreateExpenseDto = {
+        title,
+        description: formValue.description ?? undefined,
+        amountTotal,
+        currency,
+        category,
+        expenseDate,
+        paidByUserId,
+        groupId: this.groupId ?? undefined,
+        splits,
         attachmentKeys: this.attachedFiles.map(f => f.key),
-        version: this.expense?.version
       };
 
       const request$ = this.expense
-        ? this.expensesService.updateExpense(this.expense.id, payload)
+        ? this.expensesService.updateExpense(this.expense.id, {
+            ...payload,
+            version: this.expense.version,
+          } satisfies UpdateExpenseDto)
         : this.expensesService.createExpense(payload);
 
       request$.subscribe({
@@ -315,8 +327,9 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
   }
 
-  onFileSelected(event: any) {
-    const files: FileList = event.target.files;
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
     if (files && files.length > 0) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];

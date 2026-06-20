@@ -3,7 +3,7 @@ import { State, Action, StateContext, Selector } from '@ngxs/store';
 import { jwtDecode } from 'jwt-decode';
 import { AuthService } from './auth.service';
 import { tap } from 'rxjs/operators';
-import { LoginDto, RegisterDto } from '@finmate/data-models';
+import { JwtPayload, LoginDto, LoginResponse, RegisterDto } from '@finmate/data-models';
 
 export class Login {
   static readonly type = '[Auth] Login';
@@ -27,7 +27,7 @@ export class RefreshTokenSuccess {
 export interface AuthStateModel {
   token: string | null;
   refreshToken: string | null;
-  user: any | null;
+  user: JwtPayload | null;
 }
 
 @State<AuthStateModel>({
@@ -35,7 +35,7 @@ export interface AuthStateModel {
   defaults: {
     token: localStorage.getItem('finmate_token'),
     refreshToken: localStorage.getItem('finmate_refresh_token'),
-    user: localStorage.getItem('finmate_token') ? jwtDecode(localStorage.getItem('finmate_token') as string) : null
+    user: localStorage.getItem('finmate_token') ? jwtDecode<JwtPayload>(localStorage.getItem('finmate_token') as string) : null
   }
 })
 @Injectable()
@@ -48,14 +48,14 @@ export class AuthState {
   }
 
   @Selector()
-  static getUser(state: AuthStateModel): any {
+  static getUser(state: AuthStateModel): JwtPayload | null {
     return state.user;
   }
 
   @Action(Login)
   login(ctx: StateContext<AuthStateModel>, action: Login) {
     return this.authService.login(action.payload).pipe(
-      tap((result: any) => {
+      tap((result: LoginResponse) => {
         localStorage.setItem('finmate_token', result.accessToken);
         if (result.refreshToken) {
           localStorage.setItem('finmate_refresh_token', result.refreshToken);
@@ -63,7 +63,7 @@ export class AuthState {
         ctx.patchState({
           token: result.accessToken,
           refreshToken: result.refreshToken,
-          user: jwtDecode(result.accessToken)
+          user: jwtDecode<JwtPayload>(result.accessToken)
         });
       })
     );
@@ -100,7 +100,7 @@ export class AuthState {
     ctx.patchState({
       token: action.accessToken,
       refreshToken: action.refreshToken || ctx.getState().refreshToken,
-      user: jwtDecode(action.accessToken)
+      user: jwtDecode<JwtPayload>(action.accessToken)
     });
   }
 }

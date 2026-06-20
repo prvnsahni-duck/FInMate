@@ -7,7 +7,7 @@ import {
   signal,
   computed,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ConflictContext, ConflictResolution } from '../../../../shared/models/conflict.types';
 
@@ -21,7 +21,7 @@ interface DiffLine {
 @Component({
   selector: 'app-conflict-diff-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [NgClass, FormsModule],
   templateUrl: './conflict-diff-modal.component.html',
   styleUrl: './conflict-diff-modal.component.scss',
 })
@@ -71,19 +71,19 @@ export class ConflictDiffModalComponent<T extends Record<string, unknown>> imple
     const newVersion = (this.context.serverState['version'] as number) ?? 1;
 
     if (strategy === 'keep-mine') {
-      const mergedPayload: any = {
+      const mergedPayload = {
         ...this.context.localPayload,
         version: newVersion,
       };
       this.resolved.emit({ strategy: 'keep-mine', mergedPayload, newVersion });
     } else if (strategy === 'keep-theirs') {
-      const mergedPayload: any = {
+      const mergedPayload = {
         version: newVersion,
-      };
+      } as unknown as Partial<T>;
       this.resolved.emit({ strategy: 'keep-theirs', mergedPayload, newVersion });
     } else {
       const field = this.primaryField() as keyof T;
-      const mergedPayload: any = {
+      const mergedPayload = {
         ...this.context.localPayload,
         [field]: this.manualText(),
         version: newVersion,

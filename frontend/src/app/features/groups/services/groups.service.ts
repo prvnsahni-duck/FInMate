@@ -1,36 +1,22 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Group, GroupMember, Expense } from '@finmate/data-models';
-
-export interface GroupBalancesResponse {
-  balances: Array<{
-    userId: string;
-    currency: string;
-    netBalance: number;
-  }>;
-  suggestedSettlements: Array<{
-    fromUserId: string;
-    toUserId: string;
-    amount: number;
-    currency: string;
-  }>;
-}
-
-export interface GroupAuditLogResponse {
-  data: Array<{
-    id: string;
-    action: string;
-    actorDisplayName?: string;
-    metadata?: {
-      title?: string;
-      newTitle?: string;
-      amountTotal?: number;
-      currency?: string;
-    };
-    createdAt: string | Date;
-  }>;
-}
+import {
+  CarryForwardBalance,
+  CreateGroupDto,
+  Expense,
+  Group,
+  GroupAuditLogResponse,
+  GroupBalancesResponse,
+  GroupContributionResponse,
+  GroupMember,
+  InviteDetailsResponse,
+  PaginatedResponse,
+  PendingInvitationResponse,
+  UpdateContributionDto,
+  UpdateContributionsPayload,
+  UpdateGroupDto,
+} from '@finmate/data-models';
 
 @Injectable({
   providedIn: 'root'
@@ -41,8 +27,8 @@ export class GroupsService {
   /**
    * Fetch all active groups.
    */
-  getGroups(): Observable<{ data: Group[]; meta?: { totalItems: number } }> {
-    return this.http.get<{ data: Group[]; meta?: { totalItems: number } }>('/api/groups');
+  getGroups(): Observable<PaginatedResponse<Group>> {
+    return this.http.get<PaginatedResponse<Group>>('/api/groups');
   }
 
   /**
@@ -55,7 +41,7 @@ export class GroupsService {
   /**
    * Create a new group.
    */
-  createGroup(groupData: any): Observable<Group> {
+  createGroup(groupData: CreateGroupDto): Observable<Group> {
     return this.http.post<Group>('/api/groups', groupData);
   }
 
@@ -90,14 +76,14 @@ export class GroupsService {
   /**
    * Fetch carry-forward details for a specific month.
    */
-  getCarryForward(groupId: string, month: string): Observable<any[]> {
-    return this.http.get<any[]>(`/api/groups/${groupId}/carry-forward?month=${month}`);
+  getCarryForward(groupId: string, month: string): Observable<CarryForwardBalance[]> {
+    return this.http.get<CarryForwardBalance[]>(`/api/groups/${groupId}/carry-forward?month=${month}`);
   }
 
   /**
    * Update an existing group.
    */
-  updateGroup(groupId: string, groupData: any): Observable<Group> {
+  updateGroup(groupId: string, groupData: UpdateGroupDto): Observable<Group> {
     return this.http.patch<Group>(`/api/groups/${groupId}`, groupData);
   }
 
@@ -118,22 +104,22 @@ export class GroupsService {
   /**
    * Fetch minimal safe metadata for an invite link.
    */
-  getInviteDetails(inviteToken: string): Observable<any> {
-    return this.http.get<any>(`/api/invite-links/${inviteToken}`);
+  getInviteDetails(inviteToken: string): Observable<InviteDetailsResponse> {
+    return this.http.get<InviteDetailsResponse>(`/api/invite-links/${inviteToken}`);
   }
 
   /**
    * Get custom contribution percentages for a household group ledger month.
    */
-  getContributions(groupId: string, month: string): Observable<any[]> {
-    return this.http.get<any[]>(`/api/groups/${groupId}/contributions?month=${month}`);
+  getContributions(groupId: string, month: string): Observable<GroupContributionResponse[]> {
+    return this.http.get<GroupContributionResponse[]>(`/api/groups/${groupId}/contributions?month=${month}`);
   }
 
   /**
    * Update/save custom contribution percentages for a household group ledger month.
    */
-  updateContributions(groupId: string, payload: any): Observable<any> {
-    return this.http.post<any>(`/api/groups/${groupId}/contributions`, payload);
+  updateContributions(groupId: string, payload: UpdateContributionDto | UpdateContributionsPayload): Observable<GroupContributionResponse[]> {
+    return this.http.post<GroupContributionResponse[]>(`/api/groups/${groupId}/contributions`, payload);
   }
 
   /**
@@ -160,8 +146,8 @@ export class GroupsService {
   /**
    * Fetch pending invitations for the logged-in user.
    */
-  getPendingInvitations(): Observable<any[]> {
-    return this.http.get<any[]>('/api/groups/invitations/pending');
+  getPendingInvitations(): Observable<PendingInvitationResponse[]> {
+    return this.http.get<PendingInvitationResponse[]>('/api/groups/invitations/pending');
   }
 }
 

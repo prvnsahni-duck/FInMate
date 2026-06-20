@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Store } from '@ngxs/store';
 import { Login } from '../../../../core/auth/auth.state';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
+import { LoginDto } from '@finmate/data-models';
 
 @Component({
   selector: 'app-login',
@@ -29,7 +30,13 @@ export class LoginComponent {
       this.isLoading = true;
       this.errorMessage = '';
       
-      this.store.dispatch(new Login(this.loginForm.value as any)).subscribe({
+      const value = this.loginForm.getRawValue();
+      const payload: LoginDto = {
+        email: value.email ?? '',
+        password: value.password ?? '',
+      };
+
+      this.store.dispatch(new Login(payload)).subscribe({
         next: () => {
           this.router.navigate(['/dashboard']);
         },

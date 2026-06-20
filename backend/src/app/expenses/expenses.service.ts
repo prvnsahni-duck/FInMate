@@ -6,7 +6,7 @@ import {
   PreconditionFailedException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Attachment, AuditLog, Expense, ExpenseSplit, Group, GroupMember, User } from '@finmate/data-models';
+import { Attachment, AuditLog, Expense, ExpenseSplit, Group, GroupMember, GroupMemberContribution, User } from '@finmate/data-models';
 import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import { calculateDeterministicSplits } from './split-calculator.util';
@@ -1028,7 +1028,6 @@ export class ExpensesService {
     }
 
     // Look up monthly contribution percentages
-    const { GroupMemberContribution } = require('@finmate/data-models');
     const contributions = await this.dataSource.getRepository(GroupMemberContribution)
       .createQueryBuilder('contribution')
       .innerJoinAndSelect('contribution.groupMember', 'groupMember')

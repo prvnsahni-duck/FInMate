@@ -1,12 +1,12 @@
 import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
-import { GroupsService } from './groups.service';
+import { GroupsMembershipService } from './services';
 
 @Controller('invite-links')
 export class InviteController {
-  constructor(private readonly groupsService: GroupsService) {}
+  constructor(private readonly groupsMembershipService: GroupsMembershipService) {}
 
   @Get(':inviteToken')
   async getDetails(@Param('inviteToken', ParseUUIDPipe) inviteToken: string) {
-    return this.groupsService.getInviteDetails(inviteToken);
+    return this.groupsMembershipService.getInviteDetails(inviteToken);
   }
 }

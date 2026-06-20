@@ -9,7 +9,16 @@ import { ConfirmModalComponent } from '../../../../shared/components/confirm-mod
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
 import { Subscription } from 'rxjs';
-import { Group, GroupMember, Expense } from '@finmate/data-models';
+import {
+  BalanceEntry,
+  CarryForwardBalance,
+  Expense,
+  ExpenseSplitInputDto,
+  Group,
+  GroupContributionResponse,
+  GroupMember,
+  JwtPayload,
+} from '@finmate/data-models';
 
 import { GroupHistoryLogComponent, GroupAuditLog } from '../../components/group-history-log/group-history-log.component';
 import { GroupTrashComponent } from '../../components/group-trash/group-trash.component';
@@ -19,12 +28,19 @@ import { GroupMembersComponent } from '../../components/group-members/group-memb
 export interface GroupExpense extends Expense {
   paidByUserId: string;
   ownerUserId: string;
-  splits?: any[];
+  splits?: Array<ExpenseSplitInputDto & {
+    participantUser?: {
+      id: string;
+      email: string;
+      displayName?: string;
+    };
+    participantUserDisplayName?: string;
+  }>;
   attachments?: Array<{
     storageKey: string;
     originalName: string;
     mimeType: string;
-    sizeBytes: string;
+    sizeBytes: number;
   }>;
 }
 
@@ -58,12 +74,12 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   group = signal<Group | null>(null);
   expenses = signal<GroupExpense[]>([]);
   members = signal<GroupMember[]>([]);
-  balances = signal<any[]>([]);
+  balances = signal<BalanceEntry[]>([]);
   userBalance = signal<number>(0);
   suggestedSettlements = signal<SuggestedSettlement[]>([]);
   historyLogs = signal<GroupAuditLog[]>([]);
   deletedExpenses = signal<Expense[]>([]);
-  carryForwardBalances = signal<any[]>([]);
+  carryForwardBalances = signal<CarryForwardBalance[]>([]);
 
   // Signals for UI state
   isLoading = signal<boolean>(true);
@@ -209,7 +225,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         this.suggestedSettlements.set(res.suggestedSettlements);
 
         const currentUserId = this.currentUserId();
-        const myBalanceEntry = res.balances.find((b: any) => b.userId === currentUserId && b.currency === g.currency);
+        const myBalanceEntry = res.balances.find((b) => b.userId === currentUserId && b.currency === g.currency);
         this.userBalance.set(myBalanceEntry ? myBalanceEntry.netBalance : 0);
       },
       error: () => { }
@@ -253,7 +269,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     const token = localStorage.getItem('finmate_token');
     if (!token) return null;
     try {
-      const decoded = jwtDecode<any>(token);
+      const decoded = jwtDecode<JwtPayload>(token);
       return decoded.userId || null;
     } catch {
       return null;
@@ -344,10 +360,11 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     });
   }
 
-  onImportFileSelected(event: any) {
+  onImportFileSelected(event: Event) {
     const g = this.group();
     if (!g) return;
-    const file: File = event.target.files[0];
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (file) {
       const formData = new FormData();
       formData.append('file', file);
@@ -390,7 +407,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     }
   }
 
-  downloadAttachment(file: any) {
+  downloadAttachment(file: NonNullable<GroupExpense['attachments']>[number]) {
     alert(`Downloading attachment: ${file.originalName}\nDecrypted successfully!`);
     const blob = new Blob([`Decrypted content of: ${file.originalName} (${file.storageKey})`], { type: 'text/plain' });
     const url = window.URL.createObjectURL(blob);
@@ -416,7 +433,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
   // Contributions State
   contributionMonth = new Date().toISOString().slice(0, 7);
-  contributionsList: any[] = [];
+  contributionsList: GroupContributionResponse[] = [];
   isLoadingContributions = false;
   isSavingContributions = false;
   contributionError = '';
@@ -474,7 +491,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
     this.groupsService.getContributions(g.id, this.contributionMonth).subscribe({
       next: (res) => {
-        this.contributionsList = res.map((c: any) => ({
+        this.contributionsList = res.map((c) => ({
           ...c,
           amount: Number(c.percentage || 0) // Initialize amount to percentage
         }));
@@ -528,8 +545,9 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     return false;
   }
 
-  updateMemberRole(member: GroupMember, event: any) {
-    const newRole = event.target.value;
+  updateMemberRole(member: GroupMember, event: Event) {
+    const target = event.target as HTMLSelectElement;
+    const newRole = target.value as GroupMember['role'];
     const g = this.group();
     if (!g) return;
 

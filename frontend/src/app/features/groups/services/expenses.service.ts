@@ -1,14 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Expense } from '@finmate/data-models';
-
-export interface GetExpensesResponse {
-  data: Expense[];
-  meta?: {
-    totalItems: number;
-  };
-}
+import {
+  CategoryAnalyticsPoint,
+  CreateExpenseDto,
+  Expense,
+  GetExpensesResponse,
+  MonthlyAnalyticsPoint,
+  UpdateExpenseDto,
+} from '@finmate/data-models';
 
 @Injectable({
   providedIn: 'root'
@@ -47,14 +47,14 @@ export class ExpensesService {
   /**
    * Create a new expense.
    */
-  createExpense(payload: any): Observable<Expense> {
+  createExpense(payload: CreateExpenseDto): Observable<Expense> {
     return this.http.post<Expense>('/api/expenses', payload);
   }
 
   /**
    * Update an existing expense.
    */
-  updateExpense(id: string, payload: any): Observable<Expense> {
+  updateExpense(id: string, payload: UpdateExpenseDto): Observable<Expense> {
     return this.http.patch<Expense>(`/api/expenses/${id}`, payload);
   }
 
@@ -75,23 +75,23 @@ export class ExpensesService {
   /**
    * Fetch monthly summaries for analytics.
    */
-  getMonthlyAnalytics(groupId?: string): Observable<any[]> {
+  getMonthlyAnalytics(groupId?: string): Observable<MonthlyAnalyticsPoint[]> {
     let url = '/api/expenses/analytics/monthly';
     if (groupId && groupId !== 'personal') {
       url += `?groupId=${groupId}`;
     }
-    return this.http.get<any[]>(url);
+    return this.http.get<MonthlyAnalyticsPoint[]>(url);
   }
 
   /**
    * Fetch category analytics.
    */
-  getCategoryAnalytics(groupId?: string): Observable<any[]> {
+  getCategoryAnalytics(groupId?: string): Observable<CategoryAnalyticsPoint[]> {
     let url = '/api/expenses/analytics/categories';
     if (groupId && groupId !== 'personal') {
       url += `?groupId=${groupId}`;
     }
-    return this.http.get<any[]>(url);
+    return this.http.get<CategoryAnalyticsPoint[]>(url);
   }
 
   /**
