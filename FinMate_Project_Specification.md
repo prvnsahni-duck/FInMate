@@ -1479,4 +1479,19 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
    - Ask the user to run frontend build commands to verify build health.
 
+### 2026-06-20
+- **Summary:** Consolidated project agent instructions into a single repository rule file.
+- **Changes Made:**
+   - Merged the existing project-specific agent rules with token-efficiency and information-first guidance.
+   - Resolved conflicting terminal-command guidance by allowing targeted command execution while preferring user-provided minimal output when information is missing.
+   - Preserved project-specific technology stack, coding standards, planning approval workflow, dependency verification, progress log, and verification requirements.
+- **Artifacts Updated:**
+   - [agent_rules.md](file:///g:/prvn/Projects/FinMate/agent_rules.md)
+   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Use `agent_rules.md` as the single source of truth for AI agent behavior across Codex, Claude Code, Cursor, Roo Code, Cline, OpenHands, Copilot, and similar tools.
+   - Remove duplicate root rule files to avoid conflicting instructions.
+- **Next Actions:**
+   - Use `agent_rules.md` for future agent workflow, planning, implementation, and verification decisions.
+
 
