@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
 import {
   CurrentUserResponse,
   LoginDto,
@@ -16,7 +17,7 @@ import {
 })
 export class AuthService {
   private http = inject(HttpClient);
-  private baseUrl = '/api/auth';
+  private baseUrl = `${environment.apiBaseUrl}/auth`;
 
   login(credentials: LoginDto): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.baseUrl}/login`, credentials);
@@ -35,10 +36,10 @@ export class AuthService {
   }
 
   getMe(): Observable<CurrentUserResponse> {
-    return this.http.get<CurrentUserResponse>('/api/users/me');
+    return this.http.get<CurrentUserResponse>(`${environment.apiBaseUrl}/users/me`);
   }
 
   updateProfile(profileData: UpdateProfileDto): Observable<CurrentUserResponse> {
-    return this.http.patch<CurrentUserResponse>('/api/users/me', profileData);
+    return this.http.patch<CurrentUserResponse>(`${environment.apiBaseUrl}/users/me`, profileData);
   }
 }

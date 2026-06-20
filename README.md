@@ -9,6 +9,8 @@ FinMate is an Nx monorepo that contains:
 
 This README is written for new developers and explains every setup command from start to finish.
 
+See also: [ARCHITECTURE.md](./ARCHITECTURE.md) | [CONTRIBUTING.md](./CONTRIBUTING.md) | [AGENT_RULES.md](./AGENT_RULES.md)
+
 ## Prerequisites
 
 Install these tools first:
@@ -77,17 +79,7 @@ What this does:
 - Creates Nest app `backend`
 - Adds backend project targets in Nx (serve/build/test/lint)
 
-### 5) Install Fastify platform for Nest
-
-```bash
-npm install @nestjs/platform-fastify
-```
-
-What this does:
-
-- Adds Fastify adapter package so backend can run on Fastify
-
-### 6) Generate shared models library
+### 5) Generate shared models library
 
 ```bash
 npx nx g @nx/js:lib shared/data-models --bundler=tsc
@@ -300,5 +292,46 @@ Nx task failures after dependency updates:
 ## Important Notes
 
 - Do not commit real secrets to git
-- Keep `.env.dev` local-only for development values
+- Copy `.env.example` to `.env` and fill in your values
+- Keep `.env` local-only; it is gitignored
 - Run Docker services before starting the backend
+- See [ARCHITECTURE.md](./ARCHITECTURE.md) for system design details
+- See [CONTRIBUTING.md](./CONTRIBUTING.md) for branching, commit, and PR guidelines
+
+## Environment Variables
+
+All environment variables are documented in [.env.example](./.env.example). Copy this file:
+
+```bash
+cp .env.example .env
+```
+
+Then fill in your local values. Key variables:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `REDIS_URL` | ✅ | Redis connection string |
+| `JWT_SECRET` | ✅ | JWT signing secret |
+| `JWT_REFRESH_SECRET` | ✅ | Refresh token secret |
+| `ENCRYPTION_KEY` | ✅ | AES-256 encryption key |
+| `FRONTEND_URL` | ✅ | Frontend origin for CORS + invite links |
+
+## Mobile & PWA
+
+### Capacitor (Native iOS/Android)
+
+```bash
+npm install @capacitor/core @capacitor/cli
+npx cap init FinMate app.finmate.app --web-dir dist/frontend/browser
+npx cap add ios
+npx cap add android
+```
+
+### PWA (Progressive Web App)
+
+```bash
+npx ng add @angular/pwa --project frontend
+```
+
+This generates `manifest.webmanifest` and `ngsw-config.json` for offline support.

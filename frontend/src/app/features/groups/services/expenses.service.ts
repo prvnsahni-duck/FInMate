@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../../../environments/environment';
 import {
   CategoryAnalyticsPoint,
   CreateExpenseDto,
@@ -15,6 +16,7 @@ import {
 })
 export class ExpensesService {
   private http = inject(HttpClient);
+  private baseUrl = environment.apiBaseUrl;
 
   /**
    * Fetch expenses for a group or personal dashboard.
@@ -41,42 +43,42 @@ export class ExpensesService {
       params = params.set('endDate', options.endDate);
     }
 
-    return this.http.get<GetExpensesResponse>('/api/expenses', { params });
+    return this.http.get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params });
   }
 
   /**
    * Create a new expense.
    */
   createExpense(payload: CreateExpenseDto): Observable<Expense> {
-    return this.http.post<Expense>('/api/expenses', payload);
+    return this.http.post<Expense>(`${this.baseUrl}/expenses`, payload);
   }
 
   /**
    * Update an existing expense.
    */
   updateExpense(id: string, payload: UpdateExpenseDto): Observable<Expense> {
-    return this.http.patch<Expense>(`/api/expenses/${id}`, payload);
+    return this.http.patch<Expense>(`${this.baseUrl}/expenses/${id}`, payload);
   }
 
   /**
    * Delete an expense.
    */
   deleteExpense(id: string): Observable<void> {
-    return this.http.delete<void>(`/api/expenses/${id}`);
+    return this.http.delete<void>(`${this.baseUrl}/expenses/${id}`);
   }
 
   /**
    * Restore a deleted expense.
    */
   restoreExpense(id: string): Observable<Expense> {
-    return this.http.post<Expense>(`/api/expenses/${id}/restore`, {});
+    return this.http.post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {});
   }
 
   /**
    * Fetch monthly summaries for analytics.
    */
   getMonthlyAnalytics(groupId?: string): Observable<MonthlyAnalyticsPoint[]> {
-    let url = '/api/expenses/analytics/monthly';
+    let url = `${this.baseUrl}/expenses/analytics/monthly`;
     if (groupId && groupId !== 'personal') {
       url += `?groupId=${groupId}`;
     }
@@ -87,7 +89,7 @@ export class ExpensesService {
    * Fetch category analytics.
    */
   getCategoryAnalytics(groupId?: string): Observable<CategoryAnalyticsPoint[]> {
-    let url = '/api/expenses/analytics/categories';
+    let url = `${this.baseUrl}/expenses/analytics/categories`;
     if (groupId && groupId !== 'personal') {
       url += `?groupId=${groupId}`;
     }
@@ -98,7 +100,7 @@ export class ExpensesService {
    * Export expenses ledger.
    */
   exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> {
-    return this.http.get(`/api/export/expenses?groupId=${groupId}&format=${format}`, {
+    return this.http.get(`${this.baseUrl}/export/expenses?groupId=${groupId}&format=${format}`, {
       responseType: 'blob'
     });
   }
@@ -107,7 +109,6 @@ export class ExpensesService {
    * Import expenses.
    */
   importExpenses(formData: FormData): Observable<void> {
-    return this.http.post<void>('/api/import/expenses', formData);
+    return this.http.post<void>(`${this.baseUrl}/import/expenses`, formData);
   }
 }
-

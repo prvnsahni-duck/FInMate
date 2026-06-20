@@ -384,9 +384,40 @@ Do not deviate from these decisions without asking the user.
 | Frontend State | Signals, RxJS, and NGXS | Follow the state management strategy below |
 | Frontend Encryption | Web Crypto API `SubtleCrypto` | PBKDF2 + AES-256-GCM; no third-party crypto libraries |
 | Backend Encryption | Node.js `crypto` | AES-256-GCM; see `EncryptionService` |
+| Backend Security | Helmet + `@nestjs/throttler` | Security headers and rate limiting |
 | Spreadsheet I/O | SheetJS `xlsx` | Already installed |
 | Testing | Jest via `npx nx test <project>` | New services and interceptors must have unit tests |
 | Monorepo | Nx workspace | Run targets via `npx nx <target> <project>` |
+| Mobile Native | Capacitor | Bridge to iOS/Android; `capacitor.config.ts` in root |
+| PWA | `@angular/pwa` | Service worker via `ngsw-config.json`; manifest in `frontend/src/` |
+
+---
+
+## Environment Variables Rules
+
+* All backend environment variables must be documented in `.env.example`.
+* Never commit `.env` or `.env.*` files (they are gitignored; `.env.example` is tracked).
+* Frontend services must never hardcode API base URLs. Always use `environment.apiBaseUrl` from `frontend/src/environments/environment.ts`.
+* The `environment.ts` and `environment.prod.ts` files define `apiBaseUrl` and `production` flag.
+* Backend services access env vars via `@nestjs/config` `ConfigService`, not `process.env` directly (except `main.ts` and `ormconfig.ts`).
+* CORS origins are configured via `CORS_ORIGINS` env var (comma-separated) or default to `FRONTEND_URL`.
+
+## PWA Rules
+
+* The service worker configuration lives in `frontend/ngsw-config.json`.
+* The web app manifest lives in `frontend/src/manifest.webmanifest`.
+* All static assets that must work offline must be listed in `ngsw-config.json` asset groups.
+* API data caching strategy should use `performance` mode for frequently accessed data and `freshness` for real-time data.
+* Do not bypass the service worker for API calls unless explicitly needed.
+
+## Capacitor Rules
+
+* Capacitor config lives in `capacitor.config.ts` at the workspace root.
+* Web build output directory is `dist/frontend/browser`.
+* After any frontend build change, sync with `npx cap sync` before testing on native.
+* Platform-specific code must be behind capability checks, never `if (iOS)` style conditionals.
+* Use `@capacitor/` official plugins when available before reaching for community plugins.
+* Safe area CSS variables (`--safe-area-inset-*`) are defined in `styles.scss` for iOS notch handling.
 
 ---
 

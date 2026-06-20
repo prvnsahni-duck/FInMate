@@ -1,14 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { InitialSchema1717977600000 } from '../migrations/1717977600000-InitialSchema';
-import { AddTwoFactorAuth1718000000000 } from '../migrations/1718000000000-AddTwoFactorAuth';
-import { AddGroupCurrencyAndExpenseSoftDelete1718100000000 } from '../migrations/1718100000000-AddGroupCurrencyAndExpenseSoftDelete';
-import { AddGroupTypeAndSpectatorAndHousehold1718200000000 } from '../migrations/1718200000000-AddGroupTypeAndSpectatorAndHousehold';
-import { EncryptExpenseAmounts1718300000000 } from '../migrations/1718300000000-EncryptExpenseAmounts';
-import { AddUserPhoneAndGroupInviteToken1718400000000 } from '../migrations/1718400000000-AddUserPhoneAndGroupInviteToken';
+import * as Migrations from '../migrations';
 import { SnakeNamingStrategy } from './common/snake-naming-strategy';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
@@ -22,6 +19,7 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '.env.dev'],
@@ -34,14 +32,7 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
         url: configService.get<string>('DATABASE_URL'),
         autoLoadEntities: true,
         synchronize: false, // never true in production
-        migrations: [
-          InitialSchema1717977600000,
-          AddTwoFactorAuth1718000000000,
-          AddGroupCurrencyAndExpenseSoftDelete1718100000000,
-          AddGroupTypeAndSpectatorAndHousehold1718200000000,
-          EncryptExpenseAmounts1718300000000,
-          AddUserPhoneAndGroupInviteToken1718400000000,
-        ],
+        migrations: [...Object.values(Migrations)],
         migrationsRun: true,
         namingStrategy: new SnakeNamingStrategy(),
       }),
@@ -57,6 +48,9 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
     EmailModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule {}
