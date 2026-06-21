@@ -1,0 +1,25 @@
+# Dependencies (re-installed inside container)
+node_modules
+
+# Build outputs (rebuilt inside container)
+dist
+tmp
+.angular
+
+# Git & IDE
+.git
+.vscode
+.nx
+
+# Test & CI artifacts
+coverage
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Mockup images (not needed in containers)
+*.jpg
+*.png
+!frontend/public/**

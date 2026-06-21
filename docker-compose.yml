@@ -1,5 +1,5 @@
-version: '3.8'
 services:
+  # ── Infrastructure ────────────────────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
@@ -27,6 +27,42 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  # ── Application ───────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .                          # workspace root (Nx needs the full monorepo)
+      dockerfile: backend/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://finmate_user:finmate_password@postgres:5432/finmate_dev
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_me}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev_refresh_secret_change_me}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      FRONTEND_URL: http://localhost:8080
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      FROM_EMAIL: ${FROM_EMAIL:-noreply@finmate.app}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .                          # workspace root (Nx needs the full monorepo)
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+    restart: unless-stopped
 
 volumes:
   postgres_data:
