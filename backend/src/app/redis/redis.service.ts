@@ -8,7 +8,19 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client!: RedisClientType;
 
   constructor(private readonly configService: ConfigService) {
-    const url = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
+    let url = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
+    
+    // Clean up surrounding quotes and whitespace
+    url = url.trim().replace(/^['"]|['"]$/g, '');
+    
+    // Auto-prefix protocol if missing
+    if (!url.startsWith('redis://') && !url.startsWith('rediss://')) {
+      url = `redis://${url}`;
+    }
+    
+    const maskedUrl = url.replace(/:[^:@\s]+@/, ':****@');
+    this.logger.log(`Initializing Redis client with URL: ${maskedUrl}`);
+    
     this.client = createClient({ url });
     
     this.client.on('error', (err) => {
