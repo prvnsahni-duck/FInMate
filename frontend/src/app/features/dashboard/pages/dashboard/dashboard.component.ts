@@ -1,4 +1,5 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Store } from '@ngxs/store';
@@ -11,6 +12,7 @@ import { GroupsService } from '../../../groups/services/groups.service';
 import { ExpensesService } from '../../../groups/services/expenses.service';
 import { PendingInvitationResponse, Profile } from '@finmate/data-models';
 import { GroupExpense } from '../../../groups/pages/group-detail/group-detail.component';
+import { AiService } from '../../services/ai.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -18,21 +20,42 @@ import { GroupExpense } from '../../../groups/pages/group-detail/group-detail.co
   imports: [FormsModule, CurrencyPipe, DatePipe, CreateExpenseModalComponent, AnalyticsChartsComponent, ConfirmModalComponent],
   templateUrl: './dashboard.component.html'
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
+  private destroy$ = new Subscription();
+  categoryAnalytics: { category: string; amount: number; percentage: number }[] = [];
+  quickLogCategory = 'Food & Drinks';
   private store = inject(Store);
   private groupsService = inject(GroupsService);
   private expensesService = inject(ExpensesService);
   private authService = inject(AuthService);
+  private aiService = inject(AiService);
+
+  get activeTab(): string {
+    return this.expensesService.activeTab();
+  }
 
   protected readonly Math = Math;
 
   userName = 'User';
+  userEmail = 'N/A';
   totalBalance = 0;
   monthlyExpenses = 0;
   activeGroupsCount = 0;
   personalExpenses: GroupExpense[] = [];
-  isExpenseModalOpen = false;
+  get isExpenseModalOpen(): boolean {
+    return this.expensesService.showCreateExpenseModal();
+  }
+  set isExpenseModalOpen(val: boolean) {
+    this.expensesService.showCreateExpenseModal.set(val);
+  }
   isLoading = true;
+
+  // AI Chat Bot State
+  isAiChatOpen = false;
+  aiOptIn = false;
+  aiMessages: { sender: 'user' | 'ai'; text: string; time: Date }[] = [];
+  aiInput = '';
+  isAiLoading = false;
 
   // Profile and Budget Trackers
   userProfile: Profile | null = null;
@@ -56,8 +79,19 @@ export class DashboardComponent implements OnInit {
     const user = this.store.selectSnapshot(AuthState.getUser);
     if (user?.email) {
       this.userName = user.email.split('@')[0];
+      this.userEmail = user.email;
     }
+    this.aiOptIn = localStorage.getItem('finmate_ai_opt_in') === 'true';
     this.fetchData();
+
+    const sub = this.expensesService.expenseCreated$.subscribe(() => {
+      this.fetchData();
+    });
+    this.destroy$.add(sub);
+  }
+
+  ngOnDestroy() {
+    this.destroy$.unsubscribe();
   }
 
   fetchData() {
@@ -106,6 +140,19 @@ export class DashboardComponent implements OnInit {
     this.groupsService.getPendingInvitations().subscribe({
       next: (res) => {
         this.pendingInvitations = res;
+      },
+      error: () => { }
+    });
+
+    // 6. Fetch category analytics
+    this.expensesService.getCategoryAnalytics('personal').subscribe({
+      next: (res) => {
+        const total = res.reduce((sum, item) => sum + Number(item.total), 0);
+        this.categoryAnalytics = res.map(item => ({
+          category: item.category,
+          amount: Number(item.total),
+          percentage: total > 0 ? Math.round((Number(item.total) / total) * 100) : 0
+        })).sort((a, b) => b.amount - a.amount);
       },
       error: () => { }
     });
@@ -181,8 +228,14 @@ export class DashboardComponent implements OnInit {
     });
   }
 
-  openExpenseModal(expense?: GroupExpense) {
-    this.selectedExpenseForEdit = expense || null;
+  openExpenseModal(expense?: GroupExpense, category?: string) {
+    if (category) {
+      this.quickLogCategory = category;
+      this.selectedExpenseForEdit = null;
+    } else {
+      this.quickLogCategory = expense ? expense.category : 'Food & Drinks';
+      this.selectedExpenseForEdit = expense || null;
+    }
     this.isExpenseModalOpen = true;
   }
 
@@ -220,5 +273,95 @@ export class DashboardComponent implements OnInit {
   onDeleteCancelled() {
     this.isDeleteConfirmOpen = false;
     this.deleteExpenseId = null;
+  }
+
+  // AI Chat Bot Methods
+  toggleAiChat() {
+    this.isAiChatOpen = !this.isAiChatOpen;
+    if (this.isAiChatOpen && this.aiOptIn && this.aiMessages.length === 0) {
+      this.initAiGreeting();
+    }
+  }
+
+  toggleAiOptIn(event: any) {
+    this.aiOptIn = event.target.checked;
+    localStorage.setItem('finmate_ai_opt_in', this.aiOptIn ? 'true' : 'false');
+    if (this.aiOptIn && this.aiMessages.length === 0) {
+      this.initAiGreeting();
+    }
+  }
+
+  initAiGreeting() {
+    this.aiMessages = [
+      {
+        sender: 'ai',
+        text: `Hi ${this.userName}! I'm your FinMate AI financial assistant. I can see you've spent ${this.monthlyExpenses} USD of your ${this.userProfile?.monthlyBudget || 0} USD monthly budget. Ask me anything about your categories or how to optimize your spending!`,
+        time: new Date()
+      }
+    ];
+  }
+
+  sendAiMessage(customPrompt?: string) {
+    const prompt = (customPrompt || this.aiInput).trim();
+    if (!prompt) return;
+
+    // Add user message
+    this.aiMessages.push({
+      sender: 'user',
+      text: prompt,
+      time: new Date()
+    });
+
+    if (!customPrompt) {
+      this.aiInput = '';
+    }
+
+    this.isAiLoading = true;
+
+    // Construct the context-aware system instruction
+    const budget = this.userProfile?.monthlyBudget || 0;
+    const income = this.userProfile?.monthlyIncome || 0;
+    const systemInstruction = `You are FinMate's personal financial AI companion. The current user is ${this.userName}. ` +
+      `Their current monthly personal spending is ${this.monthlyExpenses} USD, relative to a monthly budget of ${budget} USD (${this.budgetPercentage}% utilization) and a monthly salary of ${income} USD. ` +
+      `Their current total balance of personal logged expenses is ${this.totalBalance} USD. ` +
+      `Answer in a concise, friendly, and professional tone (max 3-4 sentences). Do not mention database IDs, keys, or technical jargon. Give actionable financial tips.`;
+
+    this.aiService.sendMessage(prompt, systemInstruction).subscribe({
+      next: (res) => {
+        this.aiMessages.push({
+          sender: 'ai',
+          text: res.text,
+          time: new Date()
+        });
+        this.isAiLoading = false;
+      },
+      error: (err) => {
+        this.aiMessages.push({
+          sender: 'ai',
+          text: `Sorry, I encountered an error: ${err.error?.message || 'Failed to contact AI service.'}`,
+          time: new Date()
+        });
+        this.isAiLoading = false;
+      }
+    });
+  }
+
+  getCategoryBadgeClass(category: string): string {
+    switch (category) {
+      case 'Food & Drinks':
+        return 'bg-success/10 text-success border border-success/20';
+      case 'Travel':
+        return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20';
+      case 'Utilities':
+        return 'bg-accent/10 text-accent border border-accent/20';
+      case 'Entertainment':
+        return 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20';
+      case 'Shopping':
+        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
+      case 'Housing':
+        return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20';
+      default:
+        return 'bg-secondary/10 text-secondary/75 border border-secondary/20';
+    }
   }
 }

@@ -35,6 +35,8 @@ export interface GroupExpense extends Expense {
       displayName?: string;
     };
     participantUserDisplayName?: string;
+    participantUserEmail?: string;
+    shareAmount?: number;
   }>;
   attachments?: Array<{
     storageKey: string;
@@ -101,6 +103,35 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   // Categories list
   categories = ['Food & Drinks', 'Travel', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Others'];
   selectedExpenseForEdit = signal<GroupExpense | null>(null);
+
+  // Error Banner & Cooldown State
+  ledgerError = signal<boolean>(false);
+  retryCooldown = signal<number>(0);
+  expandedExpenseIds = signal<Record<string, boolean>>({});
+
+  toggleExpenseExpand(expenseId: string) {
+    this.expandedExpenseIds.update(ids => ({
+      ...ids,
+      [expenseId]: !ids[expenseId]
+    }));
+  }
+
+  retryLoadLedger() {
+    if (this.retryCooldown() > 0) return;
+    
+    this.retryCooldown.set(5);
+    const interval = setInterval(() => {
+      this.retryCooldown.update(c => c - 1);
+      if (this.retryCooldown() <= 0) {
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    const g = this.group();
+    if (g?.id) {
+      this.fetchExpenses(g.id);
+    }
+  }
 
   isOwnerOrAdmin = computed(() => {
     const userId = this.currentUserId();
@@ -195,11 +226,53 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
       endDate: end
     }).subscribe({
       next: (res) => {
-        this.expenses.set(res.data as GroupExpense[]);
+        const mappedExpenses = (res.data as any[]).map(expense => {
+          const mappedSplits = (expense.splits || []).map((split: any) => {
+            let email = split.participantUserEmail;
+            let displayName = split.participantUserDisplayName;
+            let participantUser = split.participantUser;
+
+            if (!email || !displayName || !participantUser) {
+              if (split.participantUserId) {
+                const member = this.members().find(m => m.user?.id === split.participantUserId);
+                if (member) {
+                  email = member.user.email;
+                  displayName = member.user.displayName;
+                  participantUser = member.user;
+                }
+              } else if (split.participantGroupMemberId) {
+                const member = this.members().find(m => m.id === split.participantGroupMemberId);
+                if (member) {
+                  email = member.user?.email;
+                  displayName = member.user?.displayName;
+                  participantUser = member.user;
+                }
+              }
+            }
+
+            return {
+              ...split,
+              shareAmount: split.amountOwed,
+              participantUserEmail: email,
+              participantUserDisplayName: displayName,
+              participantUser
+            };
+          });
+
+          return {
+            ...expense,
+            splits: mappedSplits
+          } as GroupExpense;
+        });
+        this.expenses.set(mappedExpenses);
         this.totalExpenses.set(res.meta?.totalItems || 0);
         this.isLoading.set(false);
+        this.ledgerError.set(false);
       },
-      error: () => this.isLoading.set(false)
+      error: () => {
+        this.isLoading.set(false);
+        this.ledgerError.set(true);
+      }
     });
   }
 

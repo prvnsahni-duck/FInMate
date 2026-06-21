@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, Subject } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import {
   CategoryAnalyticsPoint,
@@ -10,6 +10,7 @@ import {
   MonthlyAnalyticsPoint,
   UpdateExpenseDto,
 } from '@finmate/data-models';
+import { signal } from '@angular/core';
 
 @Injectable({
   providedIn: 'root'
@@ -17,6 +18,10 @@ import {
 export class ExpensesService {
   private http = inject(HttpClient);
   private baseUrl = environment.apiBaseUrl;
+
+  showCreateExpenseModal = signal<boolean>(false);
+  expenseCreated$ = new Subject<void>();
+  activeTab = signal<string>('Home');
 
   /**
    * Fetch expenses for a group or personal dashboard.

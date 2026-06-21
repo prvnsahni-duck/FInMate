@@ -22,6 +22,7 @@ export class CreateExpenseModalComponent implements OnChanges {
   @Input() groupCurrency!: string;
   @Input() members: GroupMember[] = [];
   @Input() expense: GroupExpense | null = null; // To support edit mode
+  @Input() defaultCategory: string = 'Food & Drinks';
 
   @Output() expenseCreated = new EventEmitter<void>();
   @Output() closeModalEvent = new EventEmitter<void>();
@@ -109,6 +110,10 @@ export class CreateExpenseModalComponent implements OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges) {
+    if (!this.expense && changes['defaultCategory'] && this.defaultCategory) {
+      this.expenseForm.patchValue({ category: this.defaultCategory });
+    }
+
     if (changes['expense'] && this.expense) {
       this.expenseForm.patchValue({
         title: this.expense.title,

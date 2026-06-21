@@ -13,16 +13,13 @@ The style guidelines, color systems, layouts, and components specified in this d
 
 ## 🎨 Color System
 
-| Palette Role | Theme | Light Mode HEX | Dark Mode HEX | Tailored Purpose |
-| :--- | :--- | :--- | :--- | :--- |
-| **Primary** | Dark Slate / Indigo | `#4F46E5` | `#6366F1` | Brand actions, active states |
-| **Secondary** | Cool Grey / Slate | `#475569` | `#94A3B8` | Subtitles, inactive borders |
-| **Accent** | Violet / Purple | `#7C3AED` | `#A78BFA` | Special analytics indicators, highlights |
-| **Success** | Emerald Green | `#10B981` | `#34D399` | Net positive balances, settlements confirmed |
-| **Warning** | Amber / Orange | `#F59E0B` | `#FBBF24` | Carry-forward closures, pending actions |
-| **Error** | Rose Red | `#EF4444` | `#FB7185` | Net negative balances, voided transaction labels |
-| **Neutral Background** | Dark / Light Slate | `#F8FAFC` | `#0F172A` | Global background canvas |
-| **Neutral Card** | Glass Border Slate | `#FFFFFF` | `#1E293B` | Ledger cards, lists, detail panes |
+| Palette Role | Theme | HEX Color | Tailored Purpose |
+| :--- | :--- | :--- | :--- |
+| **Primary** | Green | `#006241` | Brand actions, active states, filled buttons |
+| **Secondary** | Cream | `#F2EDE6` | Global app background, inactive borders |
+| **Accent** | Gold | `#D4A017` | Warning states, special highlights, pending indicators |
+| **Text** | Dark | `#1E1E1E` | Primary text, typography, headings |
+| **Card / Container** | White | `#FFFFFF` | Ledger cards, lists, detail panes, inputs |
 
 ---
 

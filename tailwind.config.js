@@ -1,19 +1,23 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     './frontend/src/**/*.{html,ts,scss}',
   ],
   theme: {
     extend: {
       colors: {
-        // FinMate brand palette
-        surface: {
-          DEFAULT: 'rgba(15, 16, 28, 0.97)',
-          muted:   'rgba(255, 255, 255, 0.03)',
-        },
-        border: {
-          glass: 'rgba(255, 255, 255, 0.08)',
-        },
+        // Dynamic brand palette mapping to CSS variables
+        primary: 'rgb(var(--color-primary) / <alpha-value>)',
+        secondary: 'rgb(var(--color-secondary) / <alpha-value>)',
+        accent: 'rgb(var(--color-accent) / <alpha-value>)',
+        success: 'rgb(var(--color-success) / <alpha-value>)',
+        warning: 'rgb(var(--color-warning) / <alpha-value>)',
+        error: 'rgb(var(--color-error) / <alpha-value>)',
+        'finmate-bg': 'rgb(var(--color-bg) / <alpha-value>)',
+        'finmate-card': 'rgb(var(--color-card) / <alpha-value>)',
+
+        // Keeping backward compatibility fallback
         conflict: {
           local:  '#f87171',   // red-400   — "mine"
           server: '#34d399',   // emerald-400 — "theirs"
@@ -21,7 +25,7 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
+        sans: ['Outfit', 'Inter', 'Segoe UI', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'Consolas', 'monospace'],
       },
       backdropBlur: {
@@ -45,3 +49,4 @@ module.exports = {
   },
   plugins: [],
 };
+

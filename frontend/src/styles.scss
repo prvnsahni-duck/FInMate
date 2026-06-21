@@ -1,11 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Theme Color System Variables */
+:root {
+  --color-primary: 0 98 65;       /* #006241 - Deep Green */
+  --color-secondary: 30 30 30;    /* #1E1E1E - Dark text/foreground */
+  --color-accent: 212 160 23;     /* #D4A017 - Gold */
+  --color-success: 16 185 129;    /* #10B981 */
+  --color-warning: 245 158 11;    /* #F59E0B */
+  --color-error: 239 68 68;       /* #EF4444 */
+  --color-bg: 242 237 230;        /* #F2EDE6 - Cream Background */
+  --color-card: 255 255 255;      /* #FFFFFF - White Card */
+}
+
+.dark {
+  --color-primary: 0 179 122;     /* #00B37A - Vibrant Green */
+  --color-secondary: 242 237 230; /* #F2EDE6 - Light text/foreground */
+  --color-accent: 255 204 77;     /* #FFCC4D - Bright Gold */
+  --color-success: 52 211 153;    /* #34D399 */
+  --color-warning: 251 191 36;    /* #FBBF24 */
+  --color-error: 251 113 133;     /* #FB7185 */
+  --color-bg: 18 18 18;           /* #121212 - Dark Background */
+  --color-card: 30 30 30;         /* #1E1E1E - Dark Card */
+}
+
 /* Global base overrides */
 @layer base {
   html {
-    font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Outfit', 'Inter', 'Segoe UI', system-ui, sans-serif;
   }
 }
 
@@ -21,3 +46,27 @@ body {
   padding-top: var(--safe-area-inset-top);
   padding-bottom: var(--safe-area-inset-bottom);
 }
+
+/* Premium utility classes */
+@layer utilities {
+  .btn-premium-primary {
+    @apply bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20;
+  }
+  .btn-premium-secondary {
+    @apply border border-secondary/30 text-secondary font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:bg-secondary/5 active:scale-95;
+  }
+  .card-glass {
+    @apply bg-white dark:bg-finmate-card/75 dark:backdrop-blur-md border border-secondary/15 rounded-3xl shadow-xl shadow-black/5 dark:shadow-black/20;
+  }
+  .skeleton-shimmer {
+    background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+

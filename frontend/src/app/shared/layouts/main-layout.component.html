@@ -1,71 +1,116 @@
-<div
-  class="min-h-screen bg-finmate-light dark:bg-finmate-dark text-slate-800 dark:text-slate-200 transition-colors duration-300 flex flex-col md:flex-row">
-  <!-- Mobile Top Bar -->
+<div class="min-h-screen bg-finmate-bg text-secondary transition-colors duration-300 flex flex-col lg:flex-row">
+  <!-- Mobile & Tablet Header Top Bar (Hidden on Desktop) -->
   <header
-    class="md:hidden flex items-center justify-between p-4 bg-white/50 dark:bg-finmate-card/50 backdrop-blur-md sticky top-0 z-50 border-b border-black/5 dark:border-white/5">
-    <div class="font-bold text-xl bg-gradient-neon text-transparent bg-clip-text">
+    class="lg:hidden flex items-center justify-between p-4 bg-white dark:bg-finmate-card/50 dark:backdrop-blur-md sticky top-0 z-40 border-b border-secondary/10 w-full">
+    <div class="font-extrabold text-xl bg-gradient-neon text-transparent bg-clip-text">
       {{ appName }}
     </div>
-    <button (click)="toggleTheme()" class="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5">
-      @if (isDarkMode()) {
-      <app-icon [path]="themeIcons.light" className="w-6 h-6"></app-icon>
-      }
-      @if (!isDarkMode()) {
-      <app-icon [path]="themeIcons.dark" className="w-6 h-6"></app-icon>
-      }
-    </button>
+    <!-- Quick Theme Toggle on Mobile/Tablet Top Bar -->
+    <div class="flex items-center p-1 bg-secondary/5 dark:bg-black/20 rounded-xl border border-secondary/15">
+      <button (click)="setTheme('light')" 
+        [class.bg-white]="themeState() === 'light'" 
+        [class.dark:bg-transparent]="themeState() === 'light'"
+        [class.shadow-sm]="themeState() === 'light'"
+        [class.text-primary]="themeState() === 'light'"
+        [class.text-secondary/70]="themeState() !== 'light'"
+        class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer">
+        ☀️
+      </button>
+      <button (click)="setTheme('dark')" 
+        [class.bg-finmate-card]="themeState() === 'dark'" 
+        [class.shadow-sm]="themeState() === 'dark'"
+        [class.text-white]="themeState() === 'dark'"
+        [class.text-secondary/70]="themeState() !== 'dark'"
+        class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer">
+        🌙
+      </button>
+    </div>
   </header>
 
-  <!-- Desktop Sidebar -->
+  <!-- Desktop Sidebar (Hidden on Mobile & Tablet) -->
   <aside
-    class="hidden md:flex flex-col w-64 bg-white/50 dark:bg-finmate-card/50 backdrop-blur-md border-r border-black/5 dark:border-white/5 h-screen sticky top-0 z-40">
-    <div class="p-6">
+    class="hidden lg:flex flex-col w-64 bg-white dark:bg-finmate-card/50 dark:backdrop-blur-md border-r border-secondary/10 h-screen sticky top-0 z-40">
+    <div class="p-6 flex flex-col h-full">
       <div class="font-extrabold text-3xl bg-gradient-neon text-transparent bg-clip-text tracking-tight mb-10">
         {{ appName }}
       </div>
 
+      <!-- Sidebar Navigation Links -->
       <nav class="space-y-2 flex-1">
-        @for (item of desktopNavItems(); track item.path) {
-          <a [routerLink]="item.path" routerLinkActive="bg-black/5 dark:bg-white/10 text-finmate-neon2 font-semibold"
-            class="flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all hover:bg-black/5 dark:hover:bg-white/5">
-            <app-icon [path]="item.iconPath" className="w-6 h-6"></app-icon>
+        @for (item of navItems; track item.label) {
+          <a [routerLink]="item.path" (click)="selectTab(item)"
+             [class]="activeTab() === item.label ? 'bg-primary text-white font-semibold shadow-md shadow-primary/20' : 'hover:bg-secondary/5 text-secondary/70'"
+             class="flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer">
+            <span class="text-xl">{{ item.icon }}</span>
             <span>{{ item.label }}</span>
           </a>
         }
       </nav>
-    </div>
 
-    <div class="mt-auto p-6">
-      <button (click)="toggleTheme()"
-        class="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-2xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-all mb-3">
-        <span>Profile</span>
-      </button>
-      <button (click)="toggleTheme()"
-        class="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-2xl border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-all">
-        <span>{{ isDarkMode() ? 'Light Mode' : 'Dark Mode' }}</span>
-      </button>
+      <!-- Sidebar Footer -->
+      <div class="mt-auto space-y-4">
+        <!-- Sidebar Log Expense capsule button -->
+        <button (click)="openExpenseModal()"
+          class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 w-full py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-2 text-sm font-bold tracking-tight cursor-pointer">
+          <span>➕ Log Expense</span>
+        </button>
+
+        <!-- Sidebar Theme Switcher -->
+        <div class="flex items-center justify-between p-1 bg-secondary/5 dark:bg-black/20 rounded-2xl border border-secondary/15">
+          <button (click)="setTheme('light')" 
+            [class.bg-finmate-card]="themeState() === 'light'" 
+            [class.shadow-sm]="themeState() === 'light'"
+            [class.text-primary]="themeState() === 'light'"
+            [class.text-secondary/70]="themeState() !== 'light'"
+            class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer">
+            <span>☀️</span> <span>Light</span>
+          </button>
+          <button (click)="setTheme('dark')" 
+            [class.bg-finmate-card]="themeState() === 'dark'" 
+            [class.shadow-sm]="themeState() === 'dark'"
+            [class.text-white]="themeState() === 'dark'"
+            [class.text-secondary/70]="themeState() !== 'dark'"
+            class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer">
+            <span>🌙</span> <span>Dark</span>
+          </button>
+        </div>
+      </div>
     </div>
   </aside>
 
   <!-- Main Content Area -->
-  <main class="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-8 relative">
-    <!-- Background decorative blobs -->
+  <main class="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-28 lg:pb-8 relative">
+    <!-- Decorative Blob -->
     <div
-      class="fixed top-0 right-0 w-[600px] h-[600px] rounded-full bg-finmate-neon/10 blur-[150px] pointer-events-none z-0">
+      class="fixed top-0 right-0 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[150px] pointer-events-none z-0">
     </div>
     <div class="relative z-10 max-w-5xl mx-auto">
       <router-outlet></router-outlet>
     </div>
   </main>
 
-  <!-- Mobile Bottom Nav -->
+  <!-- Mobile Bottom Nav (Standard full-width bottom bar, shown ONLY on Mobile < md) -->
   <nav
-    class="md:hidden fixed bottom-0 w-full bg-white/80 dark:bg-finmate-card/80 backdrop-blur-xl border-t border-black/5 dark:border-white/5 z-50 flex justify-around p-3 pb-safe">
-    @for (item of navItems; track item.path) {
-      <a [routerLink]="item.path" routerLinkActive="text-finmate-neon2"
-        class="flex flex-col items-center p-2 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors">
-        <app-icon [path]="item.iconPath" className="w-6 h-6 mb-1"></app-icon>
-        <span class="text-xs font-medium">{{ item.mobileLabel }}</span>
+    class="md:hidden fixed bottom-0 w-full bg-white dark:bg-finmate-card/90 dark:backdrop-blur-xl border-t border-secondary/10 z-50 flex justify-around p-2 pb-safe">
+    @for (item of navItems; track item.label) {
+      <a [routerLink]="item.path" (click)="selectTab(item)"
+         [class]="activeTab() === item.label ? 'text-primary font-bold' : 'text-secondary/70'"
+         class="flex flex-col items-center p-2 px-3 transition-all cursor-pointer">
+        <span class="text-xl mb-0.5">{{ item.icon }}</span>
+        <span class="text-[10px] font-semibold">{{ item.mobileLabel }}</span>
+      </a>
+    }
+  </nav>
+
+  <!-- Tablet Bottom Nav (Floating Dock capsule, shown ONLY on Tablet md to lg/xl) -->
+  <nav
+    class="hidden md:flex lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-white/95 dark:bg-finmate-card/95 backdrop-blur-xl border border-secondary/10 z-50 justify-around p-1.5 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/35">
+    @for (item of navItems; track item.label) {
+      <a [routerLink]="item.path" (click)="selectTab(item)"
+         [class]="activeTab() === item.label ? 'text-white bg-primary font-bold shadow-md shadow-primary/20' : 'text-secondary/70 hover:bg-secondary/5'"
+         class="flex flex-col items-center p-2 px-3.5 rounded-xl transition-all cursor-pointer min-w-[56px]">
+        <span class="text-xl mb-0.5">{{ item.icon }}</span>
+        <span class="text-[9px] font-semibold tracking-tight">{{ item.mobileLabel }}</span>
       </a>
     }
   </nav>

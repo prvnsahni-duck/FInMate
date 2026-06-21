@@ -1,221 +1,525 @@
-<div class="flex items-center justify-between mb-8">
-  <div>
-    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">
-      Welcome back, <span class="bg-gradient-neon text-transparent bg-clip-text">{{ userName }}</span>
-    </h1>
-    <p class="text-slate-500 dark:text-slate-400 mt-2">Here is an overview of your personal finances.</p>
-  </div>
+<div class="space-y-8 animate-fade-in">
   
-  <button (click)="openExpenseModal()" class="py-2.5 px-5 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 transition-all flex items-center space-x-2">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
-    <span>Log Expense</span>
-  </button>
-</div>
+  <!-- HOME TAB VIEW -->
+  @if (activeTab === 'Home') {
+    <!-- Greeting Header -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
+          Welcome back, <span class="bg-gradient-neon text-transparent bg-clip-text">{{ userName }}</span>
+        </h1>
+        <p class="text-secondary/60 mt-1 font-medium">Here is an overview of your personal finance space.</p>
+      </div>
+      
+      <button (click)="openExpenseModal()" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-2xl flex items-center space-x-2 text-sm cursor-pointer">
+        <span>➕ Log Expense</span>
+      </button>
+    </div>
 
-<!-- Pending Invitations Banner -->
-@if (pendingInvitations.length > 0) {
-  <div class="bg-gradient-to-r from-finmate-neon/10 to-finmate-neon2/10 border border-finmate-neon/20 rounded-3xl p-6 mb-8 relative overflow-hidden">
-    <div class="absolute top-0 right-0 w-32 h-32 bg-finmate-neon/20 rounded-full blur-[40px]"></div>
-    <h3 class="font-extrabold text-slate-800 dark:text-white text-lg mb-3 flex items-center space-x-2 relative z-10">
-      <svg class="w-5 h-5 text-finmate-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-      <span>Pending Group Invitations ({{ pendingInvitations.length }})</span>
-    </h3>
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
-      @for (invite of pendingInvitations; track invite.membershipId) {
-        <div class="bg-white/80 dark:bg-finmate-card/80 backdrop-blur-md border border-slate-200 dark:border-white/5 rounded-2xl p-5 flex flex-col hover:shadow-md transition-shadow">
-          <div class="flex justify-between items-start mb-3">
-            <div>
-              <h4 class="font-bold text-slate-800 dark:text-white text-base">{{ invite.name }}</h4>
-              <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Invited by: {{ invite.ownerName }} • {{ invite.groupType }}</p>
+    <!-- Key Statistics Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <!-- Card 1: Balance -->
+      <div class="card-glass p-6 relative overflow-hidden hover:scale-[1.01] transition-all duration-300">
+        <div class="flex justify-between items-center">
+          <div>
+            <h3 class="text-secondary/50 text-[11px] font-extrabold uppercase tracking-wider mb-1">Total Personal Balance</h3>
+            <p class="text-3xl font-extrabold text-secondary tracking-tight">{{ totalBalance | currency:'USD' }}</p>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shadow-sm shadow-primary/5">
+            <span class="text-2xl">💰</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Spent -->
+      <div class="card-glass p-6 relative overflow-hidden hover:scale-[1.01] transition-all duration-300">
+        <div class="flex justify-between items-center">
+          <div>
+            <h3 class="text-secondary/50 text-[11px] font-extrabold uppercase tracking-wider mb-1">Monthly Spent</h3>
+            <p class="text-3xl font-extrabold text-error tracking-tight">{{ monthlyExpenses | currency:'USD' }}</p>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-error/10 text-error flex items-center justify-center border border-error/20 shadow-sm shadow-error/5">
+            <span class="text-2xl">💳</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: Groups -->
+      <div class="card-glass p-6 relative overflow-hidden hover:scale-[1.01] transition-all duration-300">
+        <div class="flex justify-between items-center">
+          <div>
+            <h3 class="text-secondary/50 text-[11px] font-extrabold uppercase tracking-wider mb-1">Active Groups</h3>
+            <p class="text-3xl font-extrabold text-secondary tracking-tight">{{ activeGroupsCount }}</p>
+          </div>
+          <div class="w-12 h-12 rounded-2xl bg-accent/10 text-accent flex items-center justify-center border border-accent/20 shadow-sm shadow-accent/5">
+            <span class="text-2xl">👥</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Expected vs Actual Budget Utilization Tracker -->
+    <div class="card-glass p-6 space-y-6">
+      <div class="flex justify-between items-center">
+        <h3 class="text-secondary font-extrabold text-lg tracking-tight">Monthly Budget Utilization</h3>
+        <button (click)="toggleEditIncome()" class="text-xs font-bold text-primary hover:brightness-110 transition-all flex items-center space-x-1 cursor-pointer">
+          <span>⚙️</span>
+          <span>{{ isEditingIncome ? 'Cancel' : 'Configure Limits' }}</span>
+        </button>
+      </div>
+
+      @if (isEditingIncome) {
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-secondary/5 p-5 rounded-2xl border border-secondary/10">
+          <div>
+            <label class="block text-[10px] font-extrabold uppercase text-secondary/60 mb-1">Monthly Salary / Income</label>
+            <input type="number" [(ngModel)]="newIncome" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-2.5 text-xs outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 5000" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-extrabold uppercase text-secondary/60 mb-1">Monthly Budget Limit</label>
+            <input type="number" [(ngModel)]="newBudget" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-2.5 text-xs outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 1500" />
+          </div>
+          <button (click)="saveIncome()" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-5 rounded-xl text-xs font-bold cursor-pointer">
+            Save Settings
+          </button>
+        </div>
+      } @else {
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <!-- Salary Spent Tracker -->
+          <div class="space-y-2.5">
+            <div class="flex justify-between items-center text-xs font-semibold">
+              <span class="text-secondary/60 font-medium">Income Spent</span>
+              <span class="text-secondary font-bold">
+                {{ monthlyExpenses | currency:'USD' }} / {{ (userProfile?.monthlyIncome || 0) | currency:'USD' }}
+                <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary/10 text-secondary/85 font-extrabold">{{ incomePercentage }}%</span>
+              </span>
             </div>
-            <div class="flex space-x-2">
-              <button (click)="declineInvitation(invite)" class="py-1.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white rounded-xl text-xs font-semibold transition-all">
-                Decline
-              </button>
-              <button (click)="acceptInvitation(invite)" class="py-1.5 px-3 bg-gradient-neon text-white rounded-xl text-xs font-semibold shadow-md shadow-finmate-neon/10 hover:shadow-finmate-neon/30 transition-all">
-                Accept
-              </button>
+            <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
+              <div class="bg-gradient-to-r from-primary to-accent h-3 rounded-full transition-all duration-500 shadow-sm shadow-primary/20" 
+                   [style.width.%]="incomeProgressWidth">
+              </div>
             </div>
           </div>
 
-          <!-- Members list inside invitation card -->
-          @if (invite.members && invite.members.length > 0) {
-            <div class="border-t border-slate-100 dark:border-white/5 pt-3 mt-1">
-              <p class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">Members ({{ invite.members.length }})</p>
-              <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                @for (member of invite.members; track member.email || member.phoneNumber) {
-                  <div class="flex items-center space-x-1.5 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 px-2 py-1 rounded-xl text-xs">
-                    <div class="w-4 h-4 rounded-md bg-finmate-neon/10 text-finmate-neon flex items-center justify-center font-bold text-[9px] capitalize">
-                      {{ (member.displayName || member.email || member.phoneNumber || '?').substring(0, 1) }}
-                    </div>
-                    <span class="text-slate-700 dark:text-slate-300 truncate max-w-[100px] font-medium" [title]="member.displayName || member.email || member.phoneNumber">
-                      {{ member.displayName || member.email || member.phoneNumber }}
-                    </span>
-                  </div>
-                }
+          <!-- Budget Utilization Tracker -->
+          <div class="space-y-2.5">
+            <div class="flex justify-between items-center text-xs font-semibold">
+              <span class="text-secondary/60 font-medium">Budget Limits</span>
+              <span class="text-secondary font-bold">
+                {{ monthlyExpenses | currency:'USD' }} / {{ (userProfile?.monthlyBudget || 0) | currency:'USD' }}
+                <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded font-extrabold"
+                      [class.bg-error/15]="isBudgetExceeded"
+                      [class.text-error]="isBudgetExceeded"
+                      [class.bg-success/15]="!isBudgetExceeded"
+                      [class.text-success]="!isBudgetExceeded">
+                  {{ budgetPercentage }}%
+                </span>
+              </span>
+            </div>
+            <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
+              <div class="h-3 rounded-full transition-all duration-500 shadow-sm" 
+                   [class.bg-error]="isBudgetExceeded"
+                   [class.shadow-error/20]="isBudgetExceeded"
+                   [class.bg-gradient-to-r]="!isBudgetExceeded"
+                   [class.from-primary]="!isBudgetExceeded"
+                   [class.to-success]="!isBudgetExceeded"
+                   [class.shadow-primary/20]="!isBudgetExceeded"
+                   [style.width.%]="budgetProgressWidth">
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- Quick Log Expense (Category grid) -->
+    <div class="card-glass p-6">
+      <h3 class="text-secondary font-extrabold text-lg tracking-tight mb-4">Quick Log Expense</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4">
+        <button (click)="openExpenseModal(undefined, 'Food & Drinks')" 
+          class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
+          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🍔</span>
+          <span class="text-xs font-semibold text-secondary/80">Food & Drinks</span>
+        </button>
+        <button (click)="openExpenseModal(undefined, 'Travel')" 
+          class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
+          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🚗</span>
+          <span class="text-xs font-semibold text-secondary/80">Travel</span>
+        </button>
+        <button (click)="openExpenseModal(undefined, 'Utilities')" 
+          class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
+          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">⚡</span>
+          <span class="text-xs font-semibold text-secondary/80">Utilities</span>
+        </button>
+        <button (click)="openExpenseModal(undefined, 'Entertainment')" 
+          class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
+          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🎬</span>
+          <span class="text-xs font-semibold text-secondary/80">Entertainment</span>
+        </button>
+        <button (click)="openExpenseModal(undefined, 'Shopping')" 
+          class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
+          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🛍️</span>
+          <span class="text-xs font-semibold text-secondary/80">Shopping</span>
+        </button>
+        <button (click)="openExpenseModal(undefined, 'Housing')" 
+          class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
+          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🏠</span>
+          <span class="text-xs font-semibold text-secondary/80">Housing</span>
+        </button>
+        <button (click)="openExpenseModal(undefined, 'Others')" 
+          class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 col-span-2 sm:col-span-1 cursor-pointer">
+          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">✨</span>
+          <span class="text-xs font-semibold text-secondary/80">Others</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Group Invitations Queue -->
+    @if (pendingInvitations.length > 0) {
+      <div class="card-glass p-6 border border-warning/20 bg-gradient-to-br from-warning/5 to-transparent relative overflow-hidden">
+        <h3 class="font-extrabold text-secondary text-lg mb-4 flex items-center space-x-2">
+          <span>🔔</span>
+          <span>Group Invitations ({{ pendingInvitations.length }})</span>
+        </h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          @for (invite of pendingInvitations; track invite.membershipId) {
+            <div class="bg-white dark:bg-finmate-card/50 border border-secondary/10 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+              <div>
+                <h4 class="font-bold text-secondary text-sm truncate">{{ invite.name }}</h4>
+                <p class="text-[11px] text-secondary/60 mt-0.5">Invited by: {{ invite.ownerName }}</p>
+              </div>
+              
+              <div class="flex space-x-2 pt-2">
+                <button (click)="declineInvitation(invite)" class="flex-1 py-2 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-xl text-xs font-bold transition-all cursor-pointer">
+                  Decline
+                </button>
+                <button (click)="acceptInvitation(invite)" class="flex-1 bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2 rounded-xl text-xs font-bold cursor-pointer">
+                  Accept
+                </button>
               </div>
             </div>
           }
         </div>
-      }
-    </div>
-  </div>
-}
-
-<!-- Summary Cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-  <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 hover:scale-[1.02] transition-transform">
-    <h3 class="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Total Personal Balance</h3>
-    <p class="text-3xl font-bold">{{ totalBalance | currency:'USD' }}</p>
-  </div>
-  <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 hover:scale-[1.02] transition-transform">
-    <h3 class="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Monthly Personal Expenses</h3>
-    <p class="text-3xl font-bold text-red-500 dark:text-red-400">{{ monthlyExpenses | currency:'USD' }}</p>
-  </div>
-  <div class="bg-gradient-dark rounded-3xl p-6 shadow-xl shadow-black/10 hover:scale-[1.02] transition-transform text-white border border-white/10 relative overflow-hidden">
-    <div class="absolute top-0 right-0 w-32 h-32 bg-finmate-neon/20 rounded-full blur-[40px]"></div>
-    <h3 class="text-white/70 text-sm font-medium mb-1 relative z-10">Active Groups</h3>
-    <p class="text-3xl font-bold relative z-10">{{ activeGroupsCount }}</p>
-  </div>
-
-  <!-- Personal Income & Budget Tracker Card -->
-  <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 relative overflow-hidden col-span-1 md:col-span-3">
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="text-slate-800 dark:text-white font-bold text-lg">Personal Income & Budget Tracker</h3>
-      <button (click)="toggleEditIncome()" class="text-sm font-semibold text-finmate-neon2 hover:text-finmate-neon transition-all flex items-center space-x-1">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-        <span>{{ isEditingIncome ? 'Cancel' : 'Edit' }}</span>
-      </button>
-    </div>
-
-    @if (isEditingIncome) {
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-slate-50 dark:bg-white/5 p-5 rounded-2xl border border-slate-100 dark:border-white/5">
-        <div>
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Monthly Salary / Income</label>
-          <input type="number" [(ngModel)]="newIncome" class="w-full bg-white dark:bg-finmate-dark border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-finmate-neon/50 text-slate-900 dark:text-white" placeholder="e.g. 5000" />
-        </div>
-        <div>
-          <label class="block text-xs font-semibold uppercase text-slate-500 mb-1">Monthly Spending Budget</label>
-          <input type="number" [(ngModel)]="newBudget" class="w-full bg-white dark:bg-finmate-dark border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 text-sm outline-none focus:border-finmate-neon/50 text-slate-900 dark:text-white" placeholder="e.g. 1500" />
-        </div>
-        <button (click)="saveIncome()" class="py-2.5 px-5 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/20 hover:shadow-finmate-neon/40 transition-all text-sm">
-          Save Settings
-        </button>
-      </div>
-    } @else {
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <!-- Income Spent Progress -->
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Salary Spent</span>
-            <span class="text-sm font-bold text-slate-800 dark:text-white">
-              {{ monthlyExpenses | currency:'USD' }} / {{ (userProfile?.monthlyIncome || 0) | currency:'USD' }}
-              ({{ incomePercentage }}%)
-            </span>
-          </div>
-          <div class="w-full bg-slate-100 dark:bg-white/5 rounded-full h-3 overflow-hidden">
-            <div class="bg-gradient-neon h-full rounded-full transition-all duration-500" 
-                 [style.width.%]="incomeProgressWidth">
-            </div>
-          </div>
-        </div>
-
-        <!-- Budget Utilization Progress -->
-        <div>
-          <div class="flex justify-between items-center mb-2">
-            <span class="text-sm font-medium text-slate-500 dark:text-slate-400">Budget Spent</span>
-            <span class="text-sm font-bold text-slate-800 dark:text-white">
-              {{ monthlyExpenses | currency:'USD' }} / {{ (userProfile?.monthlyBudget || 0) | currency:'USD' }}
-              ({{ budgetPercentage }}%)
-            </span>
-          </div>
-          <div class="w-full bg-slate-100 dark:bg-white/5 rounded-full h-3 overflow-hidden">
-            <div class="h-full rounded-full transition-all duration-500" 
-                 [class.bg-red-500]="isBudgetExceeded"
-                 [class.bg-gradient-neon]="!isBudgetExceeded"
-                 [style.width.%]="budgetProgressWidth">
-            </div>
-          </div>
-        </div>
       </div>
     }
-  </div>
-</div>
 
-<!-- Personal Analytics Trends & Categories -->
-<app-analytics-charts [groupId]="null" [currency]="'USD'"></app-analytics-charts>
-
-<!-- Recent Personal Activity -->
-<div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5">
-  <h2 class="text-xl font-bold mb-6">Recent Personal Expenses</h2>
-  
-  @if (isLoading) {
-    <div class="space-y-4">
-      @for (i of [1, 2, 3]; track i) {
-        <div class="h-16 bg-slate-200 dark:bg-white/5 rounded-2xl animate-pulse"></div>
-      }
-    </div>
-  } @else if (personalExpenses.length === 0) {
-    <div class="flex flex-col items-center justify-center py-12 text-center">
-      <div class="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mb-4">
-        <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-      </div>
-      <p class="text-slate-500 dark:text-slate-400 font-medium">No personal expenses found.</p>
-      <p class="text-sm text-slate-400 dark:text-slate-500 mt-1">Log a personal expense to start tracking here.</p>
-    </div>
-  } @else {
-    <div class="space-y-4">
-      @for (expense of personalExpenses; track expense.id) {
-        <div class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 hover:border-finmate-neon/30 transition-all">
-          <div class="flex items-center space-x-4">
-            <div class="w-10 h-10 rounded-xl bg-slate-200 dark:bg-white/10 flex items-center justify-center">
-              @if (expense.category === 'Food & Drinks') {
-                <svg class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>
-              } @else if (expense.category === 'Travel') {
-                <svg class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
-              } @else if (expense.category === 'Utilities') {
-                <svg class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-              } @else if (expense.category === 'Entertainment') {
-                <svg class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>
-              } @else if (expense.category === 'Shopping') {
-                <svg class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
-              } @else if (expense.category === 'Housing') {
-                <svg class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
-              } @else {
-                <svg class="w-5 h-5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-              }
-            </div>
-            <div>
-              <h4 class="font-bold text-slate-800 dark:text-white">{{ expense.title }}</h4>
-              <p class="text-xs text-slate-500 dark:text-slate-400">{{ expense.expenseDate | date }} • {{ expense.category }}</p>
-            </div>
+    <!-- Split grid with transactions list on left and category breakdown on right -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      
+      <!-- Recent transactions (2/3 width) -->
+      <div class="lg:col-span-2 card-glass p-6 space-y-6">
+        <h2 class="text-lg font-extrabold text-secondary tracking-tight">Recent Personal Expenses</h2>
+        
+        @if (isLoading) {
+          <div class="space-y-4">
+            @for (i of [1, 2, 3]; track i) {
+              <div class="h-16 w-full rounded-2xl skeleton-shimmer bg-secondary/5 animate-pulse"></div>
+            }
           </div>
-          
-          <div class="flex items-center space-x-4">
-            <div class="text-right">
-              <p class="font-bold text-lg text-slate-800 dark:text-white">{{ expense.amountTotal | currency:expense.currency }}</p>
+        } @else if (personalExpenses.length === 0) {
+          <div class="flex flex-col items-center justify-center py-12 text-center">
+            <div class="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mb-6">
+              <span class="text-4xl">📭</span>
             </div>
-            <div class="flex space-x-2">
-              <button (click)="openExpenseModal(expense)" class="p-2 text-slate-400 hover:text-finmate-neon2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-              </button>
-              <button (click)="confirmDeleteExpense(expense.id)" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-              </button>
+            <p class="text-secondary font-bold text-base mb-1">Create your first expense</p>
+            <p class="text-xs text-secondary/50 max-w-xs mb-6">Aggregate and track your personal expenditures with absolute zero-knowledge privacy.</p>
+            <button (click)="openExpenseModal()" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-xl text-xs font-bold shadow-md shadow-primary/20 cursor-pointer">
+              Log Transaction
+            </button>
+          </div>
+        } @else {
+          <div class="space-y-4 max-h-[480px] overflow-y-auto pr-1">
+            @for (expense of personalExpenses; track expense.id) {
+              <div class="flex items-center justify-between p-4 rounded-2xl bg-secondary/5 border border-secondary/5 hover:border-primary/25 hover:bg-secondary/10 transition-all duration-300 group">
+                <div class="flex items-center space-x-4">
+                  <!-- Category Icon Emoji -->
+                  <div class="w-10 h-10 rounded-xl bg-finmate-card flex items-center justify-center text-primary shadow-sm border border-secondary/10 group-hover:scale-105 transition-all text-xl">
+                    @if (expense.category === 'Food & Drinks') { 🍔 }
+                    @else if (expense.category === 'Travel') { 🚗 }
+                    @else if (expense.category === 'Utilities') { ⚡ }
+                    @else if (expense.category === 'Entertainment') { 🎬 }
+                    @else if (expense.category === 'Shopping') { 🛍️ }
+                    @else if (expense.category === 'Housing') { 🏠 }
+                    @else { ✨ }
+                  </div>
+                  <div>
+                    <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2">
+                      <span>{{ expense.title }}</span>
+                      <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider" [class]="getCategoryBadgeClass(expense.category)">
+                        {{ expense.category }}
+                      </span>
+                    </h4>
+                    <p class="text-[10px] text-secondary/55 mt-0.5 font-medium">{{ expense.expenseDate | date:'mediumDate' }}</p>
+                  </div>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                  <p class="font-extrabold text-base text-secondary tracking-tight">{{ expense.amountTotal | currency:expense.currency }}</p>
+                  <div class="flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-250">
+                    <button (click)="openExpenseModal(expense)" class="p-2 text-secondary/40 hover:text-primary hover:bg-secondary/15 rounded-xl transition-all cursor-pointer">
+                      ✏️
+                    </button>
+                    <button (click)="confirmDeleteExpense(expense.id)" class="p-2 text-secondary/40 hover:text-error hover:bg-error/15 rounded-xl transition-all cursor-pointer">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Spending by Category Breakdown (1/3 width) -->
+      <div class="card-glass p-6 space-y-6">
+        <h2 class="text-lg font-extrabold text-secondary tracking-tight">Spending by Category</h2>
+        
+        @if (isLoading) {
+          <div class="space-y-4">
+            @for (i of [1, 2, 3]; track i) {
+              <div class="h-12 w-full rounded-2xl skeleton-shimmer bg-secondary/5 animate-pulse"></div>
+            }
+          </div>
+        } @else if (categoryAnalytics.length === 0) {
+          <div class="flex flex-col items-center justify-center py-12 text-center text-secondary/50">
+            <span class="text-3xl mb-2">📊</span>
+            <p class="text-xs font-semibold">No category insights yet.</p>
+          </div>
+        } @else {
+          <div class="space-y-5">
+            @for (cat of categoryAnalytics; track cat.category) {
+              <div class="space-y-1.5">
+                <div class="flex justify-between items-center text-xs">
+                  <span class="font-bold text-secondary flex items-center space-x-1.5">
+                    <span>
+                      @if (cat.category === 'Food & Drinks') { 🍔 }
+                      @else if (cat.category === 'Travel') { 🚗 }
+                      @else if (cat.category === 'Utilities') { ⚡ }
+                      @else if (cat.category === 'Entertainment') { 🎬 }
+                      @else if (cat.category === 'Shopping') { 🛍️ }
+                      @else if (cat.category === 'Housing') { 🏠 }
+                      @else { ✨ }
+                    </span>
+                    <span>{{ cat.category }}</span>
+                  </span>
+                  <span class="font-extrabold text-secondary/80">
+                    {{ cat.amount | currency:'USD' }}
+                    <span class="ml-1 text-[10px] text-secondary/50 font-normal">({{ cat.percentage }}%)</span>
+                  </span>
+                </div>
+                <div class="w-full bg-secondary/10 rounded-full h-2">
+                  <div class="bg-primary h-2 rounded-full transition-all duration-500" 
+                       [style.width.%]="cat.percentage">
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ANALYTICS TAB VIEW -->
+  @if (activeTab === 'Analytics') {
+    <div class="flex flex-col gap-4">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
+          Personal Expenses Analytics
+        </h1>
+        <p class="text-secondary/60 mt-1 font-medium">Detailed trends, category weightings, and historical logging logs.</p>
+      </div>
+
+      <div class="card-glass p-6">
+        <app-analytics-charts [groupId]="null" [currency]="'USD'"></app-analytics-charts>
+      </div>
+    </div>
+  }
+
+  <!-- GOALS TAB VIEW -->
+  @if (activeTab === 'Goals') {
+    <div class="space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
+            Personal Savings Goals
+          </h1>
+          <p class="text-secondary/60 mt-1 font-medium">Track your budgeting constraints and reach milestones efficiently.</p>
+        </div>
+        <button class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2 px-5 rounded-xl text-xs font-bold cursor-pointer">
+          + Add Goal
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <!-- Goal 1 -->
+        <div class="card-glass p-6 space-y-4 hover:scale-[1.01] transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-3xl">🚗</span>
+            <span class="text-xs font-bold text-success bg-success/15 px-2.5 py-0.5 rounded-full">On Track</span>
+          </div>
+          <div>
+            <h4 class="font-extrabold text-secondary text-sm">Buy New Car</h4>
+            <p class="text-[10px] text-secondary/60 mt-0.5">Target: Dec 2026</p>
+          </div>
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-secondary/60">Saved</span>
+              <span class="text-secondary">$15,000 / $25,000</span>
+            </div>
+            <div class="w-full bg-secondary/10 rounded-full h-2.5">
+              <div class="bg-primary h-2.5 rounded-full" style="width: 60%"></div>
             </div>
           </div>
         </div>
-      }
+
+        <!-- Goal 2 -->
+        <div class="card-glass p-6 space-y-4 hover:scale-[1.01] transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-3xl">✈️</span>
+            <span class="text-xs font-bold text-success bg-success/15 px-2.5 py-0.5 rounded-full">On Track</span>
+          </div>
+          <div>
+            <h4 class="font-extrabold text-secondary text-sm">Europe Summer Trip</h4>
+            <p class="text-[10px] text-secondary/60 mt-0.5">Target: Jul 2026</p>
+          </div>
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-secondary/60">Saved</span>
+              <span class="text-secondary">$4,500 / $5,000</span>
+            </div>
+            <div class="w-full bg-secondary/10 rounded-full h-2.5">
+              <div class="bg-primary h-2.5 rounded-full" style="width: 90%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Goal 3 -->
+        <div class="card-glass p-6 space-y-4 hover:scale-[1.01] transition-all">
+          <div class="flex justify-between items-start">
+            <span class="text-3xl">🏠</span>
+            <span class="text-xs font-bold text-warning bg-warning/15 px-2.5 py-0.5 rounded-full">Delayed</span>
+          </div>
+          <div>
+            <h4 class="font-extrabold text-secondary text-sm">House Downpayment</h4>
+            <p class="text-[10px] text-secondary/60 mt-0.5">Target: Mar 2027</p>
+          </div>
+          <div class="space-y-1.5">
+            <div class="flex justify-between text-xs font-semibold">
+              <span class="text-secondary/60">Saved</span>
+              <span class="text-secondary">$22,000 / $80,000</span>
+            </div>
+            <div class="w-full bg-secondary/10 rounded-full h-2.5">
+              <div class="bg-accent h-2.5 rounded-full" style="width: 27%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   }
+
+  <!-- SETTINGS TAB VIEW -->
+  @if (activeTab === 'Settings') {
+    <div class="space-y-6">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
+          Personal Finance Settings
+        </h1>
+        <p class="text-secondary/60 mt-1 font-medium">Configure monthly limit alarms, salary inputs, and AI integrations.</p>
+      </div>
+
+      <div class="card-glass p-6 space-y-6">
+        <!-- Budget thresholds config -->
+        <div class="space-y-6 bg-secondary/5 p-6 rounded-2xl border border-secondary/10">
+          <h4 class="font-bold text-sm text-secondary">Income & Budgeting Limits</h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Salary / Income ($)</label>
+              <input type="number" [(ngModel)]="newIncome" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 5000" />
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Budget Limit ($)</label>
+              <input type="number" [(ngModel)]="newBudget" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 1500" />
+            </div>
+          </div>
+          <div class="flex justify-end pt-4">
+            <button (click)="saveIncome()" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-3 px-6 rounded-xl text-sm font-bold cursor-pointer">
+              Save Configuration
+            </button>
+          </div>
+        </div>
+
+        <!-- Privacy / AI Security -->
+        <div class="bg-secondary/5 p-6 rounded-2xl border border-secondary/10 space-y-4">
+          <h4 class="font-bold text-sm text-secondary">ZK Security & Privacy Preferences</h4>
+          <div class="flex items-center justify-between text-sm px-2">
+            <div>
+              <span class="text-secondary font-semibold">Enable Zero-Knowledge AI Forecasting</span>
+              <p class="text-xs text-secondary/55 mt-0.5">Encrypt descriptions locally and only evaluate transaction amounts securely.</p>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" [checked]="aiOptIn" (change)="toggleAiOptIn($event)" class="sr-only peer" />
+              <div class="w-11 h-6 bg-secondary/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- PROFILE TAB VIEW -->
+  @if (activeTab === 'Profile') {
+    <div class="space-y-6">
+      <div>
+        <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
+          My Space Profile
+        </h1>
+        <p class="text-secondary/60 mt-1 font-medium">Verify login statistics, profile configurations, and data integrity.</p>
+      </div>
+
+      <div class="card-glass p-6 space-y-6">
+        <div class="flex items-center space-x-6">
+          <div class="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center text-4xl shadow-inner shadow-primary/5">
+            👤
+          </div>
+          <div>
+            <h3 class="text-2xl font-extrabold text-secondary">{{ userName }}</h3>
+            <span class="text-xs font-bold text-success bg-success/15 px-3 py-1 rounded-full uppercase tracking-wider mt-1.5 inline-block">Active Ledger User</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+          <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
+            <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Email Address</span>
+            <p class="text-sm font-semibold text-secondary truncate">{{ userEmail }}</p>
+          </div>
+          <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
+            <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Default Currency</span>
+            <p class="text-sm font-semibold text-secondary">USD ($)</p>
+          </div>
+          <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
+            <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Expenses Tracked</span>
+            <p class="text-lg font-bold text-secondary">{{ personalExpenses.length }} logged</p>
+          </div>
+          <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
+            <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Income Limit Ratio</span>
+            <p class="text-lg font-bold text-secondary">{{ incomePercentage }}% spent</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+
 </div>
 
+<!-- Modal Components -->
 @if (isExpenseModalOpen) {
   <app-create-expense-modal
     [groupId]="null"
     [groupCurrency]="'USD'"
     [members]="[]"
     [expense]="selectedExpenseForEdit"
+    [defaultCategory]="quickLogCategory"
     (closeModalEvent)="closeExpenseModal()"
     (expenseCreated)="onExpenseCreated()"
   ></app-create-expense-modal>
@@ -231,3 +535,46 @@
     (cancel)="onDeleteCancelled()"
   ></app-confirm-modal>
 }
+
+<!-- Floating AI Assistant Button (Commented Out)
+<div class="fixed bottom-24 md:bottom-6 right-6 z-50">
+  <button class="w-14 h-14 bg-gradient-to-tr from-primary to-accent hover:brightness-110 active:scale-95 text-white rounded-full flex items-center justify-center shadow-lg shadow-primary/20 transition-all duration-300 relative group cursor-pointer">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+    </svg>
+    <span class="absolute right-16 bg-finmate-card border border-secondary/15 text-secondary text-xs px-3 py-1.5 rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 whitespace-nowrap shadow-md">
+      FinMate AI Assistant
+    </span>
+  </button>
+</div>
+-->
+
+<!-- Floating AI Chat Widget Drawer (Commented Out)
+<div class="fixed bottom-40 md:bottom-24 right-6 w-[360px] max-w-[calc(100vw-2rem)] h-[480px] max-h-[calc(100vh-8rem)] z-50 card-glass p-0 flex flex-col overflow-hidden animate-slide-in shadow-2xl shadow-primary/10">
+  <div class="p-4 bg-gradient-to-r from-primary/10 to-accent/10 border-b border-secondary/10 flex justify-between items-center">
+    <div class="flex items-center space-x-2.5">
+      <div class="w-8.5 h-8.5 bg-gradient-to-tr from-primary to-accent rounded-full flex items-center justify-center text-white shadow-sm shadow-primary/10">
+        <svg class="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+        </svg>
+      </div>
+      <div>
+        <h4 class="font-extrabold text-secondary text-sm">FinMate AI Assistant</h4>
+        <p class="text-[10px] text-secondary/60">Secure Opt-in Insights</p>
+      </div>
+    </div>
+  </div>
+  <div class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
+    <div class="w-16 h-16 bg-primary/5 rounded-full flex items-center justify-center text-primary border border-primary/10">
+      <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+      </svg>
+    </div>
+    <h4 class="font-extrabold text-secondary text-sm">Unlock Smart AI Forecasting</h4>
+    <p class="text-xs text-secondary/60 max-w-xs leading-relaxed font-medium">
+      To preserve your absolute zero-knowledge privacy, only numeric amounts and metadata are analyzed. Transaction descriptions and notes remain strictly encrypted on your device.
+    </p>
+  </div>
+</div>
+-->
+
