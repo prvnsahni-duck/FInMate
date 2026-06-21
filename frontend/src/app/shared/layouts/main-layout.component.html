@@ -14,7 +14,7 @@
         [class.text-primary]="themeState() === 'light'"
         [class.text-secondary/70]="themeState() !== 'light'"
         class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer">
-        ☀️
+        <app-icon [path]="sunIconPath" className="w-4 h-4"></app-icon>
       </button>
       <button (click)="setTheme('dark')" 
         [class.bg-finmate-card]="themeState() === 'dark'" 
@@ -22,7 +22,7 @@
         [class.text-white]="themeState() === 'dark'"
         [class.text-secondary/70]="themeState() !== 'dark'"
         class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer">
-        🌙
+        <app-icon [path]="moonIconPath" className="w-4 h-4"></app-icon>
       </button>
     </div>
   </header>
@@ -41,7 +41,7 @@
           <a [routerLink]="item.path" (click)="selectTab(item)"
              [class]="activeTab() === item.label ? 'bg-primary text-white font-semibold shadow-md shadow-primary/20' : 'hover:bg-secondary/5 text-secondary/70'"
              class="flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer">
-            <span class="text-xl">{{ item.icon }}</span>
+            <app-icon [path]="item.icon" className="w-5 h-5"></app-icon>
             <span>{{ item.label }}</span>
           </a>
         }
@@ -52,7 +52,7 @@
         <!-- Sidebar Log Expense capsule button -->
         <button (click)="openExpenseModal()"
           class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 w-full py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-2 text-sm font-bold tracking-tight cursor-pointer">
-          <span>➕ Log Expense</span>
+          <span>+ Log Expense</span>
         </button>
 
         <!-- Sidebar Theme Switcher -->
@@ -63,7 +63,7 @@
             [class.text-primary]="themeState() === 'light'"
             [class.text-secondary/70]="themeState() !== 'light'"
             class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer">
-            <span>☀️</span> <span>Light</span>
+            <app-icon [path]="sunIconPath" className="w-4 h-4 mr-1"></app-icon> <span>Light</span>
           </button>
           <button (click)="setTheme('dark')" 
             [class.bg-finmate-card]="themeState() === 'dark'" 
@@ -71,7 +71,7 @@
             [class.text-white]="themeState() === 'dark'"
             [class.text-secondary/70]="themeState() !== 'dark'"
             class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer">
-            <span>🌙</span> <span>Dark</span>
+            <app-icon [path]="moonIconPath" className="w-4 h-4 mr-1"></app-icon> <span>Dark</span>
           </button>
         </div>
       </div>
@@ -96,7 +96,7 @@
       <a [routerLink]="item.path" (click)="selectTab(item)"
          [class]="activeTab() === item.label ? 'text-primary font-bold' : 'text-secondary/70'"
          class="flex flex-col items-center p-2 px-3 transition-all cursor-pointer">
-        <span class="text-xl mb-0.5">{{ item.icon }}</span>
+        <app-icon [path]="item.icon" className="w-5 h-5 mb-0.5"></app-icon>
         <span class="text-[10px] font-semibold">{{ item.mobileLabel }}</span>
       </a>
     }
@@ -109,7 +109,7 @@
       <a [routerLink]="item.path" (click)="selectTab(item)"
          [class]="activeTab() === item.label ? 'text-white bg-primary font-bold shadow-md shadow-primary/20' : 'text-secondary/70 hover:bg-secondary/5'"
          class="flex flex-col items-center p-2 px-3.5 rounded-xl transition-all cursor-pointer min-w-[56px]">
-        <span class="text-xl mb-0.5">{{ item.icon }}</span>
+        <app-icon [path]="item.icon" className="w-5 h-5 mb-0.5"></app-icon>
         <span class="text-[9px] font-semibold tracking-tight">{{ item.mobileLabel }}</span>
       </a>
     }

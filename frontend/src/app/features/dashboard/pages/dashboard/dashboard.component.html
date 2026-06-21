@@ -12,7 +12,7 @@
       </div>
       
       <button (click)="openExpenseModal()" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-2xl flex items-center space-x-2 text-sm cursor-pointer">
-        <span>➕ Log Expense</span>
+        <span>+ Log Expense</span>
       </button>
     </div>
 
@@ -20,22 +20,22 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <app-stats-card
         title="Total Personal Balance"
-        [value]="totalBalance | currency:'USD'"
-        icon="💰"
+        [value]="(totalBalance | currency:'USD') ?? ''"
+        [icon]="bankIconPath"
         type="primary"
       ></app-stats-card>
 
       <app-stats-card
         title="Monthly Spent"
-        [value]="monthlyExpenses | currency:'USD'"
-        icon="💳"
+        [value]="(monthlyExpenses | currency:'USD') ?? ''"
+        [icon]="creditCardIconPath"
         type="error"
       ></app-stats-card>
 
       <app-stats-card
         title="Active Groups"
         [value]="activeGroupsCount"
-        icon="👥"
+        [icon]="usersIconPath"
         type="accent"
       ></app-stats-card>
     </div>
@@ -45,7 +45,7 @@
       <div class="flex justify-between items-center">
         <h3 class="text-secondary font-extrabold text-lg tracking-tight">Monthly Budget Utilization</h3>
         <button (click)="toggleEditIncome()" class="text-xs font-bold text-primary hover:brightness-110 transition-all flex items-center space-x-1 cursor-pointer">
-          <span>⚙️</span>
+          <app-icon [path]="cogIconPath" className="w-3.5 h-3.5"></app-icon>
           <span>{{ isEditingIncome ? 'Cancel' : 'Configure Limits' }}</span>
         </button>
       </div>
@@ -119,37 +119,37 @@
       <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4">
         <button (click)="openExpenseModal(undefined, 'Food & Drinks')" 
           class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🍔</span>
+          <app-icon [path]="getCategoryIconPath('Food & Drinks')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
           <span class="text-xs font-semibold text-secondary/80">Food & Drinks</span>
         </button>
         <button (click)="openExpenseModal(undefined, 'Travel')" 
           class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🚗</span>
+          <app-icon [path]="getCategoryIconPath('Travel')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
           <span class="text-xs font-semibold text-secondary/80">Travel</span>
         </button>
         <button (click)="openExpenseModal(undefined, 'Utilities')" 
           class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">⚡</span>
+          <app-icon [path]="getCategoryIconPath('Utilities')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
           <span class="text-xs font-semibold text-secondary/80">Utilities</span>
         </button>
         <button (click)="openExpenseModal(undefined, 'Entertainment')" 
           class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🎬</span>
+          <app-icon [path]="getCategoryIconPath('Entertainment')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
           <span class="text-xs font-semibold text-secondary/80">Entertainment</span>
         </button>
         <button (click)="openExpenseModal(undefined, 'Shopping')" 
           class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🛍️</span>
+          <app-icon [path]="getCategoryIconPath('Shopping')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
           <span class="text-xs font-semibold text-secondary/80">Shopping</span>
         </button>
         <button (click)="openExpenseModal(undefined, 'Housing')" 
           class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">🏠</span>
+          <app-icon [path]="getCategoryIconPath('Housing')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
           <span class="text-xs font-semibold text-secondary/80">Housing</span>
         </button>
         <button (click)="openExpenseModal(undefined, 'Others')" 
           class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 col-span-2 sm:col-span-1 cursor-pointer">
-          <span class="text-3xl mb-2 group-hover:scale-110 transition-all">✨</span>
+          <app-icon [path]="getCategoryIconPath('Others')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
           <span class="text-xs font-semibold text-secondary/80">Others</span>
         </button>
       </div>
@@ -159,7 +159,7 @@
     @if (pendingInvitations.length > 0) {
       <div class="card-glass p-6 border border-warning/20 bg-gradient-to-br from-warning/5 to-transparent relative overflow-hidden">
         <h3 class="font-extrabold text-secondary text-lg mb-4 flex items-center space-x-2">
-          <span>🔔</span>
+          <app-icon [path]="bellIconPath" className="w-5 h-5 text-warning"></app-icon>
           <span>Group Invitations ({{ pendingInvitations.length }})</span>
         </h3>
         
@@ -201,7 +201,7 @@
         } @else if (personalExpenses.length === 0) {
           <div class="flex flex-col items-center justify-center py-12 text-center">
             <div class="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mb-6">
-              <span class="text-4xl">📭</span>
+              <app-icon [path]="inboxIconPath" className="w-10 h-10 text-primary"></app-icon>
             </div>
             <p class="text-secondary font-bold text-base mb-1">Create your first expense</p>
             <p class="text-xs text-secondary/50 max-w-xs mb-6">Aggregate and track your personal expenditures with absolute zero-knowledge privacy.</p>
@@ -214,15 +214,9 @@
             @for (expense of personalExpenses; track expense.id) {
               <div class="flex items-center justify-between p-4 rounded-2xl bg-secondary/5 border border-secondary/5 hover:border-primary/25 hover:bg-secondary/10 transition-all duration-300 group">
                 <div class="flex items-center space-x-4">
-                  <!-- Category Icon Emoji -->
-                  <div class="w-10 h-10 rounded-xl bg-finmate-card flex items-center justify-center text-primary shadow-sm border border-secondary/10 group-hover:scale-105 transition-all text-xl">
-                    @if (expense.category === 'Food & Drinks') { 🍔 }
-                    @else if (expense.category === 'Travel') { 🚗 }
-                    @else if (expense.category === 'Utilities') { ⚡ }
-                    @else if (expense.category === 'Entertainment') { 🎬 }
-                    @else if (expense.category === 'Shopping') { 🛍️ }
-                    @else if (expense.category === 'Housing') { 🏠 }
-                    @else { ✨ }
+                  <!-- Category Icon -->
+                  <div class="w-10 h-10 rounded-xl bg-finmate-card flex items-center justify-center text-primary shadow-sm border border-secondary/10 group-hover:scale-105 transition-all">
+                    <app-icon [path]="getCategoryIconPath(expense.category)" className="w-5 h-5"></app-icon>
                   </div>
                   <div>
                     <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2">
@@ -273,15 +267,7 @@
               <div class="space-y-1.5">
                 <div class="flex justify-between items-center text-xs">
                   <span class="font-bold text-secondary flex items-center space-x-1.5">
-                    <span>
-                      @if (cat.category === 'Food & Drinks') { 🍔 }
-                      @else if (cat.category === 'Travel') { 🚗 }
-                      @else if (cat.category === 'Utilities') { ⚡ }
-                      @else if (cat.category === 'Entertainment') { 🎬 }
-                      @else if (cat.category === 'Shopping') { 🛍️ }
-                      @else if (cat.category === 'Housing') { 🏠 }
-                      @else { ✨ }
-                    </span>
+                    <app-icon [path]="getCategoryIconPath(cat.category)" className="w-4 h-4"></app-icon>
                     <span>{{ cat.category }}</span>
                   </span>
                   <span class="font-extrabold text-secondary/80">

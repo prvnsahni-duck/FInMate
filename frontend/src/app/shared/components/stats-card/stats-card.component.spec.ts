@@ -21,7 +21,7 @@ describe('StatsCardComponent', () => {
   it('should render inputs correctly', () => {
     fixture.componentRef.setInput('title', 'Total Balance');
     fixture.componentRef.setInput('value', '$1,000.00');
-    fixture.componentRef.setInput('icon', '💰');
+    fixture.componentRef.setInput('icon', 'M3 22h18');
     fixture.componentRef.setInput('type', 'primary');
 
     fixture.detectChanges();
@@ -29,6 +29,6 @@ describe('StatsCardComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('h3')?.textContent?.trim()).toBe('Total Balance');
     expect(compiled.querySelector('p')?.textContent?.trim()).toBe('$1,000.00');
-    expect(compiled.querySelector('.text-2xl')?.textContent?.trim()).toBe('💰');
+    expect(compiled.querySelector('path')?.getAttribute('d')).toBe('M3 22h18');
   });
 });
