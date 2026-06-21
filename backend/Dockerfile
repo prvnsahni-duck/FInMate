@@ -26,7 +26,7 @@ WORKDIR /usr/src/app
 COPY --from=builder /app/dist/backend ./
 
 # Install only production dependencies from the generated package.json
-RUN npm ci --only=production --ignore-scripts
+RUN npm install --omit=dev --ignore-scripts --no-audit --no-fund
 
 ENV NODE_ENV=production
 EXPOSE 3000
