@@ -502,120 +502,142 @@ export const calculateDeterministicSplits = (
 
 ## 🔌 5. Frontend Service Layer
 *   **Path**: `frontend/src/app/features/groups/services/expenses.service.ts`
-*   **Description**: Relocated HTTP client wrapper for components to query backend API controllers.
+*   **Description**: HTTP client wrapper for components to query backend API controllers. Integrates with `ClientEncryptionService` and `AuthState` to transparently encrypt outgoing `title`/`description` fields and decrypt them on retrieval.
+
+**Key integration points:**
+1.  Injects `Store` (NGXS) and `ClientEncryptionService`.
+2.  `encryptPayload(payload)` — private helper that loads the master key from `sessionStorage` via `loadKeyFromSession(email)` and encrypts `title`/`description` before HTTP transmission.
+3.  Outgoing `createExpense` / `updateExpense` — pipes through `from(encryptPayload(...))` → `mergeMap` HTTP call → async decrypt response.
+4.  Incoming `getExpenses` / `restoreExpense` — decrypts each expense's `title`/`description` after HTTP response via `mergeMap` + `Promise.all`. Decryption failures silently return the original (ciphertext) expense to avoid breaking the UI.
 
 ```typescript
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { Expense } from '@finmate/data-models';
-
-export interface GetExpensesResponse {
-  data: Expense[];
-  meta?: {
-    totalItems: number;
-  };
-}
+import { from, Observable, Subject } from 'rxjs';
+import { mergeMap } from 'rxjs/operators';
+import { environment } from '../../../../environments/environment';
+import { Store } from '@ngxs/store';
+import { AuthState } from '../../../core/auth/auth.state';
+import { ClientEncryptionService } from '../../../core/services/encryption.service';
+import {
+  CategoryAnalyticsPoint,
+  CreateExpenseDto,
+  Expense,
+  GetExpensesResponse,
+  MonthlyAnalyticsPoint,
+  UpdateExpenseDto,
+} from '@finmate/data-models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ExpensesService {
   private http = inject(HttpClient);
+  private store = inject(Store);
+  private encryptionService = inject(ClientEncryptionService);
+  private baseUrl = environment.apiBaseUrl;
+
+  showCreateExpenseModal = signal<boolean>(false);
+  expenseCreated$ = new Subject<void>();
+  activeTab = signal<string>('Home');
 
   /**
-   * Fetch expenses for a group or personal dashboard.
+   * Encrypts CreateExpenseDto or UpdateExpenseDto outgoing payloads.
    */
+  private async encryptPayload(payload: CreateExpenseDto | UpdateExpenseDto): Promise<any> {
+    const user = this.store.selectSnapshot(AuthState.getUser);
+    const email = user?.email;
+    if (email) {
+      const key = await this.encryptionService.loadKeyFromSession(email);
+      if (key) {
+        const encrypted = { ...payload };
+        if (payload.title) {
+          encrypted.title = await this.encryptionService.encrypt(payload.title, key);
+        }
+        if (payload.description) {
+          encrypted.description = await this.encryptionService.encrypt(payload.description, key);
+        }
+        return encrypted;
+      }
+    }
+    return payload;
+  }
+
   getExpenses(
     groupId: string,
     options: { page?: number; limit?: number; category?: string; startDate?: string; endDate?: string } = {}
   ): Observable<GetExpensesResponse> {
     let params = new HttpParams().set('groupId', groupId);
-    
-    if (options.page !== undefined) {
-      params = params.set('page', options.page.toString());
-    }
-    if (options.limit !== undefined) {
-      params = params.set('limit', options.limit.toString());
-    }
-    if (options.category) {
-      params = params.set('category', options.category);
-    }
-    if (options.startDate) {
-      params = params.set('startDate', options.startDate);
-    }
-    if (options.endDate) {
-      params = params.set('endDate', options.endDate);
-    }
+    // ... param assembly omitted for brevity ...
 
-    return this.http.get<GetExpensesResponse>('/api/expenses', { params });
+    return this.http.get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params }).pipe(
+      mergeMap(async (res) => {
+        const user = this.store.selectSnapshot(AuthState.getUser);
+        const email = user?.email;
+        if (email && res.data) {
+          const key = await this.encryptionService.loadKeyFromSession(email);
+          if (key) {
+            res.data = await Promise.all(
+              res.data.map(async (expense) => {
+                try {
+                  return await this.encryptionService.decryptExpense(expense as any, key) as any;
+                } catch (e) {
+                  return expense; // Graceful fallback
+                }
+              })
+            );
+          }
+        }
+        return res;
+      })
+    );
   }
 
-  /**
-   * Create a new expense.
-   */
-  createExpense(payload: any): Observable<Expense> {
-    return this.http.post<Expense>('/api/expenses', payload);
+  createExpense(payload: CreateExpenseDto): Observable<Expense> {
+    return from(this.encryptPayload(payload)).pipe(
+      mergeMap((encryptedPayload) =>
+        this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload)
+      ),
+      mergeMap(async (expense) => {
+        // Decrypt the returned expense for immediate UI display
+        const user = this.store.selectSnapshot(AuthState.getUser);
+        const email = user?.email;
+        if (email) {
+          const key = await this.encryptionService.loadKeyFromSession(email);
+          if (key) {
+            try { return await this.encryptionService.decryptExpense(expense as any, key) as any; } catch (e) {}
+          }
+        }
+        return expense;
+      })
+    );
   }
 
-  /**
-   * Update an existing expense.
-   */
-  updateExpense(id: string, payload: any): Observable<Expense> {
-    return this.http.patch<Expense>(`/api/expenses/${id}`, payload);
+  updateExpense(id: string, payload: UpdateExpenseDto): Observable<Expense> {
+    return from(this.encryptPayload(payload)).pipe(
+      mergeMap((encryptedPayload) =>
+        this.http.patch<Expense>(`${this.baseUrl}/expenses/${id}`, encryptedPayload)
+      ),
+      mergeMap(async (expense) => {
+        const user = this.store.selectSnapshot(AuthState.getUser);
+        const email = user?.email;
+        if (email) {
+          const key = await this.encryptionService.loadKeyFromSession(email);
+          if (key) {
+            try { return await this.encryptionService.decryptExpense(expense as any, key) as any; } catch (e) {}
+          }
+        }
+        return expense;
+      })
+    );
   }
 
-  /**
-   * Delete an expense.
-   */
-  deleteExpense(id: string): Observable<void> {
-    return this.http.delete<void>(`/api/expenses/${id}`);
-  }
-
-  /**
-   * Restore a deleted expense.
-   */
-  restoreExpense(id: string): Observable<Expense> {
-    return this.http.post<Expense>(`/api/expenses/${id}/restore`, {});
-  }
-
-  /**
-   * Fetch monthly summaries for analytics.
-   */
-  getMonthlyAnalytics(groupId?: string): Observable<any[]> {
-    let url = '/api/expenses/analytics/monthly';
-    if (groupId && groupId !== 'personal') {
-      url += `?groupId=${groupId}`;
-    }
-    return this.http.get<any[]>(url);
-  }
-
-  /**
-   * Fetch category analytics.
-   */
-  getCategoryAnalytics(groupId?: string): Observable<any[]> {
-    let url = '/api/expenses/analytics/categories';
-    if (groupId && groupId !== 'personal') {
-      url += `?groupId=${groupId}`;
-    }
-    return this.http.get<any[]>(url);
-  }
-
-  /**
-   * Export expenses ledger.
-   */
-  exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> {
-    return this.http.get(`/api/export/expenses?groupId=${groupId}&format=${format}`, {
-      responseType: 'blob'
-    });
-  }
-
-  /**
-   * Import expenses.
-   */
-  importExpenses(formData: FormData): Observable<void> {
-    return this.http.post<void>('/api/import/expenses', formData);
-  }
+  deleteExpense(id: string): Observable<void> { /* unchanged */ }
+  restoreExpense(id: string): Observable<Expense> { /* same decrypt pattern as createExpense */ }
+  getMonthlyAnalytics(groupId?: string): Observable<MonthlyAnalyticsPoint[]> { /* unchanged */ }
+  getCategoryAnalytics(groupId?: string): Observable<CategoryAnalyticsPoint[]> { /* unchanged */ }
+  exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> { /* unchanged */ }
+  importExpenses(formData: FormData): Observable<void> { /* unchanged */ }
 }
 ```
 
@@ -975,6 +997,7 @@ This section records all completed and outstanding implementation work specifica
 *   **Interactive Ledger Timeline**: Main page (`GroupDetailComponent`) groups expenses, displays category icons, filters by category/dates, and manages pagination.
 *   **Ledger Import/Export**: Integrated client-side Excel (`xlsx`) / CSV file upload and ledger exports.
 *   **Custom Modals**: Custom confirmation component (`ConfirmModalComponent`) replaces standard browser alerts.
+*   **Zero-Knowledge Encryption Integration**: Integrated transparent client-side PBKDF2 + AES-256-GCM encryption/decryption of expense `title` and `description` fields in `ExpensesService`. Master key derived on login via `AuthState`, cached in `sessionStorage` (JWK format) scoped per user email, and cleared on logout. Decryption failures gracefully return original data.
 
 ### 📋 Next Actions / Future Scope
 *   **Group Setting & Invitation System (Approved Plan)**:
@@ -986,12 +1009,21 @@ This section records all completed and outstanding implementation work specifica
     - [ ] Build Group Settings UI with Carry-Forward toggle and contribution percentages widget.
     - [ ] Add Dashboard Invitation Manager widget.
     - [ ] Add Household Dashboard Bar Graph widget.
-*   **Zero-Knowledge Encryption Key Management**: Integrate client-side key derivation (PBKDF2/Argon2) for transaction titles and descriptions.
+*   ~~**Zero-Knowledge Encryption Key Management**~~: ✅ Completed (2026-06-21). See "Completed Frontend Tasks" above.
 *   **Real-time Conflict Interceptor**: Automate client-side merging or display conflict diff modals upon `CON_VERSION_CONFLICT` (412) status codes.
 
 ---
 
 ## 📝 Change Log
+
+### 2026-06-21
+- **Summary**: Integrated zero-knowledge client-side encryption into the Expenses Module frontend service layer.
+- **Changes Made**:
+  - Updated Section 5 (Frontend Service Layer) code reference to reflect encryption integration with `Store`, `AuthState`, and `ClientEncryptionService`.
+  - Moved "Zero-Knowledge Encryption Key Management" from Next Actions to Completed Frontend Tasks.
+  - Added `encryptPayload` helper documentation and encrypt/decrypt flow descriptions for all CRUD methods.
+- **Artifacts Updated**:
+  - [expsnsis-module-plan.md](file:///d:/prvn/Projects/FinMate/expsnsis-module-plan.md)
 
 ### 2026-06-18 (Part 3)
 - **Summary**: Added detailed schema and math specifications for Group Member invitations, lookup search, join tokens, dashboard personal expenses, household monthly contributions, and direct-friend splits.
@@ -1001,5 +1033,5 @@ This section records all completed and outstanding implementation work specifica
   - Added Section 7 detailing Household Monthly Contribution, carry-forward roll-overs, and Dashboard comparison bar graph visual logic.
   - Updated access control definitions for personal direct splits with friends.
 - **Artifacts Updated**:
-  - [expsnsis-module-plan.md](file:///g:/prvn/Projects/FinMate/expsnsis-module-plan.md)
+  - [expsnsis-module-plan.md](file:///d:/prvn/Projects/FinMate/expsnsis-module-plan.md)
 

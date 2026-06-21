@@ -23,6 +23,13 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   providedIn: 'root',
 })
 export class ClientEncryptionService {
+  private key: CryptoKey | null = null;
+
+  /** Returns the current in-memory master key, or null if not yet derived. */
+  getKey(): CryptoKey | null {
+    return this.key;
+  }
+
   private getSubtleCrypto(): SubtleCrypto {
     if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
       return window.crypto.subtle;
@@ -72,9 +79,69 @@ export class ClientEncryptionService {
         name: 'AES-GCM',
         length: 256,
       },
-      false, // Key must not be extractable
+      true, // Key must be extractable for session caching
       ['encrypt', 'decrypt']
     );
+  }
+
+  /**
+   * Derives a key and caches it in memory and sessionStorage in JWK format.
+   */
+  async deriveAndStoreKey(password: string, email: string): Promise<CryptoKey> {
+    const derivedKey = await this.deriveMasterKey(password, email);
+    this.key = derivedKey;
+
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        const jwk = await window.crypto.subtle.exportKey('jwk', derivedKey);
+        sessionStorage.setItem(`finmate_crypto_key_${email.toLowerCase()}`, JSON.stringify(jwk));
+      } catch (e) {
+        console.error('Failed to export key to sessionStorage', e);
+      }
+    }
+
+    return derivedKey;
+  }
+
+  /**
+   * Loads key from sessionStorage if it exists.
+   */
+  async loadKeyFromSession(email: string): Promise<CryptoKey | null> {
+    if (this.key) {
+      return this.key;
+    }
+
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      const storedJwk = sessionStorage.getItem(`finmate_crypto_key_${email.toLowerCase()}`);
+      if (storedJwk) {
+        try {
+          const jwk = JSON.parse(storedJwk);
+          const subtle = this.getSubtleCrypto();
+          this.key = await subtle.importKey(
+            'jwk',
+            jwk,
+            { name: 'AES-GCM', length: 256 },
+            true,
+            ['encrypt', 'decrypt']
+          );
+          return this.key;
+        } catch (e) {
+          console.error('Failed to import key from sessionStorage', e);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Clears the cached key from memory and sessionStorage.
+   */
+  clearKey(email: string): void {
+    this.key = null;
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      sessionStorage.removeItem(`finmate_crypto_key_${email.toLowerCase()}`);
+    }
   }
 
   /**

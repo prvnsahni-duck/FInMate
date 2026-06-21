@@ -1,7 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, Subject } from 'rxjs';
+import { from, Observable, Subject } from 'rxjs';
+import { mergeMap } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
+import { Store } from '@ngxs/store';
+import { AuthState } from '../../../core/auth/auth.state';
+import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import {
   CategoryAnalyticsPoint,
   CreateExpenseDto,
@@ -17,11 +21,35 @@ import { signal } from '@angular/core';
 })
 export class ExpensesService {
   private http = inject(HttpClient);
+  private store = inject(Store);
+  private encryptionService = inject(ClientEncryptionService);
   private baseUrl = environment.apiBaseUrl;
 
   showCreateExpenseModal = signal<boolean>(false);
   expenseCreated$ = new Subject<void>();
   activeTab = signal<string>('Home');
+
+  /**
+   * Encrypts CreateExpenseDto or UpdateExpenseDto outgoing payloads.
+   */
+  private async encryptPayload(payload: CreateExpenseDto | UpdateExpenseDto): Promise<any> {
+    const user = this.store.selectSnapshot(AuthState.getUser);
+    const email = user?.email;
+    if (email) {
+      const key = await this.encryptionService.loadKeyFromSession(email);
+      if (key) {
+        const encrypted = { ...payload };
+        if (payload.title) {
+          encrypted.title = await this.encryptionService.encrypt(payload.title, key);
+        }
+        if (payload.description) {
+          encrypted.description = await this.encryptionService.encrypt(payload.description, key);
+        }
+        return encrypted;
+      }
+    }
+    return payload;
+  }
 
   /**
    * Fetch expenses for a group or personal dashboard.
@@ -48,21 +76,75 @@ export class ExpensesService {
       params = params.set('endDate', options.endDate);
     }
 
-    return this.http.get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params });
+    return this.http.get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params }).pipe(
+      mergeMap(async (res) => {
+        const user = this.store.selectSnapshot(AuthState.getUser);
+        const email = user?.email;
+        if (email && res.data) {
+          const key = await this.encryptionService.loadKeyFromSession(email);
+          if (key) {
+            res.data = await Promise.all(
+              res.data.map(async (expense) => {
+                try {
+                  return await this.encryptionService.decryptExpense(expense as any, key) as any;
+                } catch (e) {
+                  return expense;
+                }
+              })
+            );
+          }
+        }
+        return res;
+      })
+    );
   }
 
   /**
    * Create a new expense.
    */
   createExpense(payload: CreateExpenseDto): Observable<Expense> {
-    return this.http.post<Expense>(`${this.baseUrl}/expenses`, payload);
+    return from(this.encryptPayload(payload)).pipe(
+      mergeMap((encryptedPayload) =>
+        this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload)
+      ),
+      mergeMap(async (expense) => {
+        const user = this.store.selectSnapshot(AuthState.getUser);
+        const email = user?.email;
+        if (email) {
+          const key = await this.encryptionService.loadKeyFromSession(email);
+          if (key) {
+            try {
+              return await this.encryptionService.decryptExpense(expense as any, key) as any;
+            } catch (e) {}
+          }
+        }
+        return expense;
+      })
+    );
   }
 
   /**
    * Update an existing expense.
    */
   updateExpense(id: string, payload: UpdateExpenseDto): Observable<Expense> {
-    return this.http.patch<Expense>(`${this.baseUrl}/expenses/${id}`, payload);
+    return from(this.encryptPayload(payload)).pipe(
+      mergeMap((encryptedPayload) =>
+        this.http.patch<Expense>(`${this.baseUrl}/expenses/${id}`, encryptedPayload)
+      ),
+      mergeMap(async (expense) => {
+        const user = this.store.selectSnapshot(AuthState.getUser);
+        const email = user?.email;
+        if (email) {
+          const key = await this.encryptionService.loadKeyFromSession(email);
+          if (key) {
+            try {
+              return await this.encryptionService.decryptExpense(expense as any, key) as any;
+            } catch (e) {}
+          }
+        }
+        return expense;
+      })
+    );
   }
 
   /**
@@ -76,7 +158,21 @@ export class ExpensesService {
    * Restore a deleted expense.
    */
   restoreExpense(id: string): Observable<Expense> {
-    return this.http.post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {});
+    return this.http.post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {}).pipe(
+      mergeMap(async (expense) => {
+        const user = this.store.selectSnapshot(AuthState.getUser);
+        const email = user?.email;
+        if (email) {
+          const key = await this.encryptionService.loadKeyFromSession(email);
+          if (key) {
+            try {
+              return await this.encryptionService.decryptExpense(expense as any, key) as any;
+            } catch (e) {}
+          }
+        }
+        return expense;
+      })
+    );
   }
 
   /**

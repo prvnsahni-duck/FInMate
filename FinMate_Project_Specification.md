@@ -1641,4 +1641,27 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
    - Separate component code templates and require testing `.spec.ts` files to ensure robust testing coverage in the frontend suite.
    - Restrict custom form component wrappers to complex dropdowns and status-aware buttons, preferring CSS classes/Tailwind on native inputs to avoid ControlValueAccessor boilerplate.
 - **Next Actions:**
-   - Verify frontend build and run frontend tests.
+    - Verify frontend build and run frontend tests.
+
+---
+
+### 2026-06-21 (Part 3)
+- **Summary:** Integrated zero-knowledge client-side encryption into the Expenses Module. Transaction titles and descriptions are now encrypted locally before transmission and decrypted locally on retrieval, keeping them private from the backend.
+- **Changes Made:**
+   - Added key caching (`deriveAndStoreKey`, `loadKeyFromSession`, `clearKey`, `getKey`) with `sessionStorage` persistence in JWK format to [encryption.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.ts).
+   - Set derived key `extractable: true` for JWK export/import across page refreshes.
+   - Integrated master key derivation on login and clearance on logout in [auth.state.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/auth/auth.state.ts).
+   - Added `encryptPayload` helper and transparent encrypt/decrypt in `createExpense`, `updateExpense`, `getExpenses`, and `restoreExpense` in [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts).
+   - Fixed relative import paths in `expenses.service.ts` (4-level → 3-level for `core/` imports).
+   - Added unit tests for key caching lifecycle in [encryption.service.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.spec.ts).
+- **Artifacts Updated:**
+   - [encryption.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.ts)
+   - [encryption.service.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.spec.ts)
+   - [auth.state.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/auth/auth.state.ts)
+   - [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts)
+   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Store derived key in `sessionStorage` (JWK format) scoped per user email to survive page refreshes within a tab session without re-prompting for password.
+   - Encryption failures in `getExpenses` silently return the original (encrypted) expense to avoid breaking the UI when decryption keys are unavailable.
+- **Next Actions:**
+   - Manual verification: login, create expense, confirm encrypted payloads in Network tab, and verify decrypted display in UI.

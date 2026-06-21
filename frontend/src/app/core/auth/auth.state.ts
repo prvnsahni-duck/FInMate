@@ -4,6 +4,7 @@ import { jwtDecode } from 'jwt-decode';
 import { AuthService } from './auth.service';
 import { tap } from 'rxjs/operators';
 import { JwtPayload, LoginDto, LoginResponse, RegisterDto } from '@finmate/data-models';
+import { ClientEncryptionService } from '../services/encryption.service';
 
 export class Login {
   static readonly type = '[Auth] Login';
@@ -41,6 +42,7 @@ export interface AuthStateModel {
 @Injectable()
 export class AuthState {
   private authService = inject(AuthService);
+  private encryptionService = inject(ClientEncryptionService);
 
   @Selector()
   static isAuthenticated(state: AuthStateModel): boolean {
@@ -65,6 +67,11 @@ export class AuthState {
           refreshToken: result.refreshToken,
           user: jwtDecode<JwtPayload>(result.accessToken)
         });
+
+        // Derive and store key client-side asynchronously
+        this.encryptionService.deriveAndStoreKey(action.payload.password, action.payload.email).catch(err => {
+          console.error('Failed to derive master key on login', err);
+        });
       })
     );
   }
@@ -79,6 +86,10 @@ export class AuthState {
     const state = ctx.getState();
     const logout$ = state.refreshToken ? this.authService.logout(state.refreshToken) : null;
     
+    if (state.user?.email) {
+      this.encryptionService.clearKey(state.user.email);
+    }
+
     // Clear local storage and state regardless of API success to ensure client safety
     localStorage.removeItem('finmate_token');
     localStorage.removeItem('finmate_refresh_token');
