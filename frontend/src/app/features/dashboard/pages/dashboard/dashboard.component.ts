@@ -8,6 +8,7 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { CreateExpenseModalComponent } from '../../../groups/components/create-expense-modal/create-expense-modal.component';
 import { AnalyticsChartsComponent } from '../../../groups/components/analytics-charts/analytics-charts.component';
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
+import { StatsCardComponent } from '../../../../shared/components/stats-card/stats-card.component';
 import { GroupsService } from '../../../groups/services/groups.service';
 import { ExpensesService } from '../../../groups/services/expenses.service';
 import { PendingInvitationResponse, Profile } from '@finmate/data-models';
@@ -17,7 +18,7 @@ import { AiService } from '../../services/ai.service';
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [FormsModule, CurrencyPipe, DatePipe, CreateExpenseModalComponent, AnalyticsChartsComponent, ConfirmModalComponent],
+  imports: [FormsModule, CurrencyPipe, DatePipe, CreateExpenseModalComponent, AnalyticsChartsComponent, ConfirmModalComponent, StatsCardComponent],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, OnDestroy {

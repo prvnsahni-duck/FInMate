@@ -2,6 +2,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { NgClass, CurrencyPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FriendsService } from '../../services/friends.service';
+import { StatsCardComponent } from '../../../../shared/components/stats-card/stats-card.component';
 
 interface CurrencyDetail {
   groupId: string;
@@ -22,7 +23,7 @@ interface FriendBalance {
 @Component({
   selector: 'app-friends',
   standalone: true,
-  imports: [NgClass, CurrencyPipe, RouterLink],
+  imports: [NgClass, CurrencyPipe, RouterLink, StatsCardComponent],
   template: `
     <div class="mb-8">
       <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">Friends & Balances</h1>
@@ -31,14 +32,17 @@ interface FriendBalance {
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-      <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5">
-        <h3 class="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Total You Are Owed</h3>
-        <p class="text-3xl font-bold text-green-500 dark:text-green-400">+{{ totalOwed | currency:'USD' }}</p>
-      </div>
-      <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5">
-        <h3 class="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Total You Owe</h3>
-        <p class="text-3xl font-bold text-red-500 dark:text-red-400">-{{ totalOwes | currency:'USD' }}</p>
-      </div>
+      <app-stats-card
+        title="Total You Are Owed"
+        [value]="'+' + (totalOwed | currency:'USD')"
+        type="success"
+      ></app-stats-card>
+
+      <app-stats-card
+        title="Total You Owe"
+        [value]="'-' + (totalOwes | currency:'USD')"
+        type="error"
+      ></app-stats-card>
       <div class="bg-gradient-dark rounded-3xl p-6 shadow-xl shadow-black/10 text-white border border-white/10 relative overflow-hidden">
         <div class="absolute top-0 right-0 w-32 h-32 bg-finmate-neon/20 rounded-full blur-[40px]"></div>
         <h3 class="text-white/70 text-sm font-medium mb-1 relative z-10">Net Balance</h3>

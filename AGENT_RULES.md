@@ -485,7 +485,13 @@ Use the latest stable syntax and features from the chosen libraries when officia
 * Do not use raw `fetch` or `axios` in Angular frontend code.
 * Components must not inject `HttpClient` or make raw HTTP requests directly.
 * Use dedicated services under `app/services/` for data access.
-* Shared reusable components belong under `app/components/common/`.
+* Shared reusable components belong under `app/shared/components/`.
+* Always keep HTML templates separate in their own `.component.html` files. Do not write inline templates. Separate style (`.component.scss`) and testing (`.component.spec.ts`) files as necessary.
+* Follow the Rule of Three for UI components: Extract a component into a shared/common component (under `app/shared/components/`) only if it is reused in 3 or more places. For 1 or 2 occurrences, keep the markup/logic inline or local to avoid premature/over-engineered abstractions. If a Card layout is repeated 3 or more times across different components, extract it as a shared common component to guarantee styling and design consistency.
+* For form controls:
+  - Do not create wrapper components for simple Inputs and Selects; instead, use standard HTML elements styled with CSS/Tailwind utility classes (e.g., classes on native HTML elements or a class `.finmate-input` in `styles.scss`) to avoid ControlValueAccessor boilerplate.
+  - Create common components for Buttons that handle loading or state indicators (e.g., `app-submit-button`).
+  - Create common components for complex Selects/Dropdowns that include search filtering, multi-select tag listing, or autocomplete.
 * Keep menus, navigation, categories, and routing lists in config structures or constants.
 * Configure routes in `app.routes.ts` to load components lazily with `loadComponent`.
 * For very large datasets, plan to use `@angular/cdk/scrolling` virtual scroll.

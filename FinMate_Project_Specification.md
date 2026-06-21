@@ -1599,3 +1599,46 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
    - Keep the fix confined to test scaffolding rather than changing controller/service behavior.
 - **Next Actions:**
    - Re-run `npx.cmd nx test backend` to verify both previously failing suites pass.
+
+---
+
+### 2026-06-21 (Part 1)
+- **Summary:** Updated repository agent rules with UI component reuse guidelines (Rule of Three & Card layouts) and corrected the shared components directory path.
+- **Changes Made:**
+   - Updated component reuse guidelines under Angular coding standards in [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md) to explicitly require common shared components when any card layout is repeated 3 or more times across different components.
+- **Artifacts Updated:**
+   - [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md)
+   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Enforce the "Rule of Three" and card layout replication threshold of 3+ times to guarantee visual/behavioral consistency across different pages/features.
+- **Next Actions:**
+   - Adhere to the updated component and card reuse rules in future UI implementations.
+
+---
+
+### 2026-06-21 (Part 2)
+- **Summary:** Extracted repeated statistics card elements into a reusable shared component, split into separate TS/HTML/Spec files, fixed dashboard unit tests, added form controls reuse guidelines, and updated PWA meta capability tags in index.html.
+- **Changes Made:**
+   - Created standalone [StatsCardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.ts) leveraging Signal inputs, separating its template into [stats-card.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.html) and adding unit tests in [stats-card.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.spec.ts).
+   - Refactored [DashboardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts) and [dashboard.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html) to bind stats cards to `<app-stats-card>`.
+   - Refactored [FriendsComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/friends/pages/friends/friends.component.ts) to bind summary cards to `<app-stats-card>`.
+   - Updated [dashboard.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.spec.ts) to mock `activeTab`, `showCreateExpenseModal`, and `expenseCreated$` to fix unit test failures.
+   - Appended mobile web-app capability `<meta>` tag to [index.html](file:///d:/prvn/Projects/FinMate/frontend/src/index.html).
+   - Added guidelines for form controls reuse (button, input, select) to [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md).
+- **Artifacts Updated:**
+   - [StatsCardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.ts) [NEW]
+   - [stats-card.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.html) [NEW]
+   - [stats-card.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.spec.ts) [NEW]
+   - [dashboard.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts)
+   - [dashboard.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html)
+   - [dashboard.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.spec.ts)
+   - [friends.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/friends/pages/friends/friends.component.ts)
+   - [index.html](file:///d:/prvn/Projects/FinMate/frontend/src/index.html)
+   - [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md)
+   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Standardize summary metrics onto `StatsCardComponent` to keep styling and layouts uniform.
+   - Separate component code templates and require testing `.spec.ts` files to ensure robust testing coverage in the frontend suite.
+   - Restrict custom form component wrappers to complex dropdowns and status-aware buttons, preferring CSS classes/Tailwind on native inputs to avoid ControlValueAccessor boilerplate.
+- **Next Actions:**
+   - Verify frontend build and run frontend tests.

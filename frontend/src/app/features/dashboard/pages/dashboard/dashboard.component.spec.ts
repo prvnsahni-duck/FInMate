@@ -1,4 +1,5 @@
 import { TestBed, ComponentFixture } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { DashboardComponent } from './dashboard.component';
 import { Store } from '@ngxs/store';
 import { GroupsService } from '../../../groups/services/groups.service';
@@ -15,7 +16,7 @@ describe('DashboardComponent', () => {
   let fixture: ComponentFixture<DashboardComponent>;
   let mockStore: jest.Mocked<Store>;
   let mockGroupsService: jest.Mocked<GroupsService>;
-  let mockExpensesService: jest.Mocked<ExpensesService>;
+  let mockExpensesService: any;
   let mockAuthService: jest.Mocked<AuthService>;
 
   const mockUser = {
@@ -56,8 +57,11 @@ describe('DashboardComponent', () => {
       getExpenses: jest.fn().mockReturnValue(of({ data: mockExpenses })),
       getMonthlyAnalytics: jest.fn().mockReturnValue(of(mockAnalytics)),
       getCategoryAnalytics: jest.fn().mockReturnValue(of([])),
-      deleteExpense: jest.fn().mockReturnValue(of({}))
-    } as any;
+      deleteExpense: jest.fn().mockReturnValue(of({})),
+      expenseCreated$: of(),
+      activeTab: signal('Home'),
+      showCreateExpenseModal: signal(false)
+    };
 
     mockAuthService = {
       getMe: jest.fn().mockReturnValue(of(mockProfile)),
