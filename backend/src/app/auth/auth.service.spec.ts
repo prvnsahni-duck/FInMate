@@ -1,13 +1,16 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { AuditLog } from '@finmate/data-models';
 import { UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { generateTotp } from './utils/totp.util';
+import { createHash } from 'crypto';
 
 jest.mock('argon2');
 
@@ -51,6 +54,11 @@ describe('AuthService', () => {
       decrypt: jest.fn((val) => val.replace('encrypted:', '')),
     };
 
+    const mockAuditLogRepository = {
+      save: jest.fn(),
+      create: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -59,6 +67,7 @@ describe('AuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: EncryptionService, useValue: mockEncryptionService },
+        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
       ],
     }).compile();
 
@@ -309,7 +318,9 @@ describe('AuthService', () => {
 
     it('should rotate tokens and store new session in Redis if token is valid', async () => {
       jwtService.verifyAsync.mockResolvedValue({ userId: 'user-id', refreshId: 'ref-id' });
-      redisService.get.mockResolvedValue('active');
+      redisService.get.mockResolvedValue('some-argon-hash');
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+      (argon2.hash as jest.Mock).mockResolvedValue('new-argon-hash');
       
       const mockUser = {
         id: 'user-id',
@@ -322,7 +333,8 @@ describe('AuthService', () => {
 
       const result = await service.refresh('old-token');
 
-      expect(redisService.del).toHaveBeenCalledWith('refresh_token:user-id:ref-id');
+      const expectedKey = `refresh_token:user-id:${createHash('sha256').update('ref-id').digest('hex')}`;
+      expect(redisService.del).toHaveBeenCalledWith(expectedKey);
       expect(redisService.set).toHaveBeenCalled();
       expect(result).toEqual({
         accessToken: 'new-access-token',
@@ -337,7 +349,8 @@ describe('AuthService', () => {
 
       await service.logout('some-token', 'user-id');
 
-      expect(redisService.del).toHaveBeenCalledWith('refresh_token:user-id:ref-id');
+      const expectedKey = `refresh_token:user-id:${createHash('sha256').update('ref-id').digest('hex')}`;
+      expect(redisService.del).toHaveBeenCalledWith(expectedKey);
     });
 
     it('should throw ForbiddenException if user attempts to log out another user', async () => {

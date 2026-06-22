@@ -166,7 +166,7 @@ describe('ClientEncryptionService', () => {
     expect(decryptedSettlement.note).toBe(settlement.note);
   });
 
-  it('should derive, store, load, and clear master key from sessionStorage', async () => {
+  it('should derive, store, load, and clear master key in memory only', async () => {
     const password = 'testPassword!';
     const email = 'user-spec@example.com';
 
@@ -175,25 +175,18 @@ describe('ClientEncryptionService', () => {
     expect(key).toBeDefined();
     expect(service.getKey()).toBe(key);
 
-    // Verify it is in sessionStorage
+    // Verify it is NOT in sessionStorage
     const stored = sessionStorage.getItem(`finmate_crypto_key_${email.toLowerCase()}`);
-    expect(stored).toBeDefined();
-    expect(JSON.parse(stored!)).toBeDefined();
+    expect(stored).toBeNull();
 
     // 2. Clear key from memory
     service.clearKey(email);
     expect(service.getKey()).toBeNull();
-    expect(sessionStorage.getItem(`finmate_crypto_key_${email.toLowerCase()}`)).toBeNull();
 
     // 3. Re-store and test loadKeyFromSession
     await service.deriveAndStoreKey(password, email);
-    // Set memory reference to null manually to test reload
-    (service as any).key = null;
-    expect(service.getKey()).toBeNull();
-
-    const reloadedKey = await service.loadKeyFromSession(email);
-    expect(reloadedKey).toBeDefined();
-    expect(service.getKey()).toBe(reloadedKey);
+    const loadedKey = await service.loadKeyFromSession(email);
+    expect(loadedKey).toBe(key);
     
     // Cleanup
     service.clearKey(email);

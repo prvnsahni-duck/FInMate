@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager, Brackets, In } from 'typeorm';
-import { Group, GroupMember, Expense, ExpenseSplit, User } from '@finmate/data-models';
+import { Group, GroupMember, Expense, ExpenseSplit, User, AuditLog } from '@finmate/data-models';
 import * as XLSX from 'xlsx';
+import { createHash } from 'crypto';
 
 export interface ImportErrorDetail {
   row: number;
@@ -32,8 +33,46 @@ export class ImportService {
     private readonly expenseRepository: Repository<Expense>,
     @InjectRepository(ExpenseSplit)
     private readonly expenseSplitRepository: Repository<ExpenseSplit>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepository: Repository<AuditLog>,
     private readonly dataSource: DataSource,
   ) {}
+
+  private getIpHash(ip?: string): string | undefined {
+    if (!ip) return undefined;
+    return createHash('sha256').update(ip).digest('hex');
+  }
+
+  private async writeAuditLog(opts: {
+    actorUser: User;
+    action: string;
+    entityId: string;
+    groupId?: string;
+    metadata?: Record<string, unknown>;
+    ip?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    try {
+      const meta = { ...opts.metadata };
+      if (opts.userAgent) {
+        meta.userAgent = opts.userAgent;
+      }
+      await this.auditLogRepository.save(
+        this.auditLogRepository.create({
+          actorUser: opts.actorUser,
+          action: opts.action,
+          entityType: 'import',
+          entityId: opts.entityId,
+          scope: opts.groupId ? 'group' : 'personal',
+          group: opts.groupId ? ({ id: opts.groupId } as Group) : undefined,
+          metadataJson: meta,
+          ipHash: this.getIpHash(opts.ip),
+        }),
+      );
+    } catch {
+      // Audit log failures should never block primary operations
+    }
+  }
 
   private roundHalfUp(val: number): number {
     return Math.round((val + Number.EPSILON) * 100) / 100;
@@ -43,6 +82,7 @@ export class ImportService {
     userId: string,
     groupId: string,
     file: Express.Multer.File,
+    context?: { ip?: string; userAgent?: string }
   ): Promise<{ successCount: number; errorCount: number; errors: ImportErrorDetail[] }> {
     if (!file || !file.buffer) {
       throw new BadRequestException('No file uploaded or file buffer is empty');
@@ -95,7 +135,7 @@ export class ImportService {
     }
 
     // Wrap execution inside a single database transaction rollback boundary
-    return this.dataSource.transaction(async (manager: EntityManager) => {
+    const { successCount, errorCount, errors, callerUser, group } = await this.dataSource.transaction(async (manager: EntityManager) => {
       // 1. Validate Group
       const group = await manager.findOne(Group, {
         where: { id: groupId },
@@ -453,8 +493,26 @@ export class ImportService {
         successCount: validatedRowsData.length,
         errorCount: 0,
         errors: [],
+        callerUser,
+        group,
       };
     });
+
+    void this.writeAuditLog({
+      actorUser: callerUser,
+      action: 'group.expenses_imported',
+      entityId: group.id,
+      groupId: group.id,
+      metadata: {
+        successCount,
+        filename: file.originalname,
+        fileSize: file.size,
+      },
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
+
+    return { successCount, errorCount, errors };
   }
 
   async exportExpenses(

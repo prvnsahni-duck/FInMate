@@ -603,6 +603,115 @@ describe('ExpensesService', () => {
       expect(result.status).toBe('posted');
       expect(expenseRepository.restore).toHaveBeenCalledWith({ id: 'exp-1' });
     });
+
+    describe('closeMonth', () => {
+      it('should throw ForbiddenException if caller is not owner/admin', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+
+        await expect(
+          service.closeMonth('caller-id', 'group-id', '2026-06'),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('should throw BadRequestException if group is not household', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'admin',
+          joinStatus: 'active',
+        } as any);
+
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'normal',
+          currency: 'USD',
+        } as any);
+
+        await expect(
+          service.closeMonth('caller-id', 'group-id', '2026-06'),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw BadRequestException if month is in the future', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'admin',
+          joinStatus: 'active',
+        } as any);
+
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        await expect(
+          service.closeMonth('caller-id', 'group-id', '2099-12'),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should throw BadRequestException if month is already closed', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'admin',
+          joinStatus: 'active',
+        } as any);
+
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        expenseRepository.count = jest.fn().mockResolvedValue(1);
+
+        await expect(
+          service.closeMonth('caller-id', 'group-id', '2026-06'),
+        ).rejects.toThrow(BadRequestException);
+      });
+
+      it('should create system carry-forward expenses if carryForwardEnabled is true', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'admin',
+          user: { id: 'caller-id', displayName: 'Admin User' },
+          joinStatus: 'active',
+        } as any);
+
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+          carryForwardEnabled: true,
+        } as any);
+
+        expenseRepository.count = jest.fn().mockResolvedValue(0);
+
+        groupMemberRepository.find.mockResolvedValue([
+          { id: 'member-a', user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' }, joinStatus: 'active' },
+          { id: 'member-b', user: { id: 'user-b', displayName: 'User B', email: 'b@finmate.com' }, joinStatus: 'active' },
+        ] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 100,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByUser: { id: 'user-a', displayName: 'User A' },
+            ownerUser: { id: 'user-a' },
+          },
+        ] as any);
+
+        const result = await service.closeMonth('caller-id', 'group-id', '2026-06');
+
+        expect(result.nextLedgerMonth).toBe('2026-07');
+        expect(result.carryForwardExpenseCount).toBe(1);
+      });
+    });
   });
 });
 

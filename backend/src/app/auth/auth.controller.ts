@@ -23,7 +23,11 @@ export class AuthController {
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Req() req: Request) {
     const mfaCode = req.headers['x-mfa-code'] as string | undefined;
-    const result = await this.authService.login(loginDto.email, loginDto.password, mfaCode);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.authService.login(loginDto.email, loginDto.password, mfaCode, context);
     return new SuccessResponse('Login successful', result);
   }
 
@@ -44,14 +48,22 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('2fa/enable')
   async enable2Fa(@Req() req: RequestWithUser) {
-    const result = await this.authService.enable2Fa(req.user);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.authService.enable2Fa(req.user, context);
     return new SuccessResponse('2FA setup initiated', result);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/verify')
   async verify2Fa(@Body() verify2FaDto: Verify2FaDto, @Req() req: RequestWithUser) {
-    const result = await this.authService.verify2Fa(req.user, verify2FaDto.code);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.authService.verify2Fa(req.user, verify2FaDto.code, context);
     return new SuccessResponse('2FA verified and enabled successfully', result);
   }
 
@@ -59,7 +71,11 @@ export class AuthController {
   @Post('2fa/disable')
   @HttpCode(HttpStatus.OK)
   async disable2Fa(@Body() verify2FaDto: Verify2FaDto, @Req() req: RequestWithUser) {
-    await this.authService.disable2Fa(req.user, verify2FaDto.code);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    await this.authService.disable2Fa(req.user, verify2FaDto.code, context);
     return new SuccessResponse('2FA disabled successfully', {});
   }
 }

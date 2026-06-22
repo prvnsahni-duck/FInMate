@@ -25,7 +25,11 @@ export class SettlementsController {
     @Body() proposeSettlementDto: ProposeSettlementDto,
     @Req() req: any,
   ) {
-    const result = await this.settlementsService.proposeSettlement(req.user.id, groupId, proposeSettlementDto);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.settlementsService.proposeSettlement(req.user.id, groupId, proposeSettlementDto, context);
     return new SuccessResponse('Settlement proposed successfully', result);
   }
 
@@ -53,7 +57,11 @@ export class SettlementsController {
     @Body() updateSettlementDto: UpdateSettlementDto,
     @Req() req: any,
   ) {
-    const result = await this.settlementsService.updateSettlement(req.user.id, groupId, id, updateSettlementDto);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.settlementsService.updateSettlement(req.user.id, groupId, id, updateSettlementDto, context);
     return new SuccessResponse('Settlement updated successfully', result);
   }
 }

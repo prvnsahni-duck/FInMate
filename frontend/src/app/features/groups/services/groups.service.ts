@@ -151,4 +151,14 @@ export class GroupsService {
   getPendingInvitations(): Observable<PendingInvitationResponse[]> {
     return this.http.get<PendingInvitationResponse[]>(`${this.baseUrl}/groups/invitations/pending`);
   }
+
+  /**
+   * Close a ledger billing month and roll over carry-forward balances.
+   */
+  closeMonth(groupId: string, ledgerMonth: string): Observable<{ nextLedgerMonth: string; carryForwardExpenseCount: number }> {
+    return this.http.post<{ nextLedgerMonth: string; carryForwardExpenseCount: number }>(
+      `${this.baseUrl}/groups/${groupId}/close-month`,
+      { ledgerMonth }
+    );
+  }
 }

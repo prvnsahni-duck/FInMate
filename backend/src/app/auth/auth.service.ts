@@ -1,12 +1,14 @@
 import { Injectable, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { EncryptionService } from '../encryption/encryption.service';
-import { User } from '@finmate/data-models';
+import { User, AuditLog } from '@finmate/data-models';
 import * as argon2 from 'argon2';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash } from 'crypto';
 import { generateSecret, verifyTotp } from './utils/totp.util';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
@@ -21,6 +23,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly encryptionService: EncryptionService,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepository: Repository<AuditLog>,
   ) {
     const jwtSecret = this.configService.get<string>('JWT_SECRET');
     const jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
@@ -36,12 +40,46 @@ export class AuthService {
     this.jwtRefreshSecret = jwtRefreshSecret;
   }
 
+  private getIpHash(ip?: string): string | undefined {
+    if (!ip) return undefined;
+    return createHash('sha256').update(ip).digest('hex');
+  }
+
+  private async writeAuditLog(opts: {
+    actorUser: User;
+    action: string;
+    entityId: string;
+    metadata?: Record<string, unknown>;
+    ip?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    try {
+      const meta = { ...opts.metadata };
+      if (opts.userAgent) {
+        meta.userAgent = opts.userAgent;
+      }
+      await this.auditLogRepository.save(
+        this.auditLogRepository.create({
+          actorUser: opts.actorUser,
+          action: opts.action,
+          entityType: 'auth',
+          entityId: opts.entityId,
+          scope: 'personal',
+          metadataJson: meta,
+          ipHash: this.getIpHash(opts.ip),
+        }),
+      );
+    } catch {
+      // Audit log failures should never block primary operations
+    }
+  }
+
   async register(email: string, passwordPlain: string, displayName?: string) {
     const savedUser = await this.usersService.createUser(email, passwordPlain, displayName);
     return this.serializeUser(savedUser);
   }
 
-  async login(email: string, passwordPlain: string, mfaCode?: string) {
+  async login(email: string, passwordPlain: string, mfaCode?: string, context?: { ip?: string; userAgent?: string }) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -79,13 +117,27 @@ export class AuthService {
     const accessToken = this.generateAccessToken(user.id, user.email);
     const refreshToken = this.generateRefreshToken(user.id, refreshId);
 
+    // Hash active refresh token IDs stored in Redis using Argon2 before check/saving
+    const sha256Id = createHash('sha256').update(refreshId).digest('hex');
+    const redisKey = `refresh_token:${user.id}:${sha256Id}`;
+    const argonHash = await argon2.hash(refreshId);
+
     // Save active session in Redis (7 days TTL)
     const sevenDaysInSeconds = 7 * 24 * 60 * 60;
-    await this.redisService.set(`refresh_token:${user.id}:${refreshId}`, 'active', sevenDaysInSeconds);
+    await this.redisService.set(redisKey, argonHash, sevenDaysInSeconds);
 
     // Update last login
     user.lastLoginAt = new Date();
     await this.usersService.updateUser(user);
+
+    void this.writeAuditLog({
+      actorUser: user,
+      action: 'auth.login_success',
+      entityId: user.id,
+      metadata: { email: user.email },
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
 
     return {
       accessToken,
@@ -94,11 +146,19 @@ export class AuthService {
     };
   }
 
-  async enable2Fa(user: User) {
+  async enable2Fa(user: User, context?: { ip?: string; userAgent?: string }) {
     const secret = generateSecret();
     user.twoFactorSecret = this.encryptionService.encrypt(secret);
     user.isTwoFactorEnabled = false; // pending verification
     await this.usersService.updateUser(user);
+
+    void this.writeAuditLog({
+      actorUser: user,
+      action: 'auth.mfa_enabled_pending',
+      entityId: user.id,
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
 
     const qrCodeUrl = `otpauth://totp/FinMate:${user.email}?secret=${secret}&issuer=FinMate`;
     return {
@@ -107,7 +167,7 @@ export class AuthService {
     };
   }
 
-  async verify2Fa(user: User, code: string) {
+  async verify2Fa(user: User, code: string, context?: { ip?: string; userAgent?: string }) {
     if (!user.twoFactorSecret) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
@@ -126,10 +186,19 @@ export class AuthService {
 
     user.isTwoFactorEnabled = true;
     await this.usersService.updateUser(user);
+
+    void this.writeAuditLog({
+      actorUser: user,
+      action: 'auth.mfa_verified',
+      entityId: user.id,
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
+
     return { success: true };
   }
 
-  async disable2Fa(user: User, code: string) {
+  async disable2Fa(user: User, code: string, context?: { ip?: string; userAgent?: string }) {
     if (!user.isTwoFactorEnabled || !user.twoFactorSecret) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
@@ -149,6 +218,15 @@ export class AuthService {
     user.isTwoFactorEnabled = false;
     user.twoFactorSecret = undefined;
     await this.usersService.updateUser(user);
+
+    void this.writeAuditLog({
+      actorUser: user,
+      action: 'auth.mfa_disabled',
+      entityId: user.id,
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
+
     return { success: true };
   }
 
@@ -170,10 +248,16 @@ export class AuthService {
     }
 
     const { userId, refreshId } = payload;
-    const redisKey = `refresh_token:${userId}:${refreshId}`;
-    const status = await this.redisService.get(redisKey);
+    const sha256Id = createHash('sha256').update(refreshId).digest('hex');
+    const redisKey = `refresh_token:${userId}:${sha256Id}`;
+    const storedHash = await this.redisService.get(redisKey);
 
-    if (status !== 'active') {
+    if (!storedHash) {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const isTokenValid = await argon2.verify(storedHash, refreshId);
+    if (!isTokenValid) {
       throw new UnauthorizedException('Invalid token');
     }
 
@@ -192,8 +276,11 @@ export class AuthService {
     const newRefreshToken = this.generateRefreshToken(user.id, newRefreshId);
 
     // Store new active refresh token
+    const newSha256Id = createHash('sha256').update(newRefreshId).digest('hex');
+    const newRedisKey = `refresh_token:${user.id}:${newSha256Id}`;
+    const newArgonHash = await argon2.hash(newRefreshId);
     const sevenDaysInSeconds = 7 * 24 * 60 * 60;
-    await this.redisService.set(`refresh_token:${user.id}:${newRefreshId}`, 'active', sevenDaysInSeconds);
+    await this.redisService.set(newRedisKey, newArgonHash, sevenDaysInSeconds);
 
     return {
       accessToken: newAccessToken,
@@ -214,7 +301,8 @@ export class AuthService {
       if (payload.userId !== currentUserId) {
         throw new ForbiddenException('Cannot log out another user session');
       }
-      await this.redisService.del(`refresh_token:${payload.userId}:${payload.refreshId}`);
+      const sha256Id = createHash('sha256').update(payload.refreshId).digest('hex');
+      await this.redisService.del(`refresh_token:${payload.userId}:${sha256Id}`);
     }
   }
 

@@ -7,8 +7,8 @@ import { GroupsService } from '../groups.service';
 export class GroupsCrudService {
   constructor(private readonly groupsService: GroupsService) {}
 
-  async createGroup(owner: User, dto: CreateGroupDto): Promise<Group> {
-    return this.groupsService.createGroup(owner, dto);
+  async createGroup(owner: User, dto: CreateGroupDto, context?: { ip?: string; userAgent?: string }): Promise<Group> {
+    return this.groupsService.createGroup(owner, dto, context);
   }
 
   async listGroups(
@@ -24,8 +24,8 @@ export class GroupsCrudService {
     return this.groupsService.findGroupById(userId, groupId);
   }
 
-  async updateGroup(userId: string, groupId: string, dto: UpdateGroupDto): Promise<Group> {
-    return this.groupsService.updateGroup(userId, groupId, dto);
+  async updateGroup(userId: string, groupId: string, dto: UpdateGroupDto, context?: { ip?: string; userAgent?: string }): Promise<Group> {
+    return this.groupsService.updateGroup(userId, groupId, dto, context);
   }
 
   async regenerateInviteToken(userId: string, groupId: string): Promise<Group> {

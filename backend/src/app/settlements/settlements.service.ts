@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, PreconditionFailedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { Group, GroupMember, Expense, ExpenseSplit, Settlement, ProposeSettlementDto, UpdateSettlementDto } from '@finmate/data-models';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, In, DataSource, EntityManager } from 'typeorm';
+import { Group, GroupMember, Expense, ExpenseSplit, Settlement, ProposeSettlementDto, UpdateSettlementDto, AuditLog, User } from '@finmate/data-models';
+import { createHash } from 'crypto';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 
 export interface MemberBalance {
@@ -29,7 +30,47 @@ export class SettlementsService {
     private readonly expenseSplitRepository: Repository<ExpenseSplit>,
     @InjectRepository(Settlement)
     private readonly settlementRepository: Repository<Settlement>,
+    @InjectRepository(AuditLog)
+    private readonly auditLogRepository: Repository<AuditLog>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
+
+  private getIpHash(ip?: string): string | undefined {
+    if (!ip) return undefined;
+    return createHash('sha256').update(ip).digest('hex');
+  }
+
+  private async writeAuditLog(opts: {
+    actorUser: User;
+    action: string;
+    entityId: string;
+    groupId?: string;
+    metadata?: Record<string, unknown>;
+    ip?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    try {
+      const meta = { ...opts.metadata };
+      if (opts.userAgent) {
+        meta.userAgent = opts.userAgent;
+      }
+      await this.auditLogRepository.save(
+        this.auditLogRepository.create({
+          actorUser: opts.actorUser,
+          action: opts.action,
+          entityType: 'settlement',
+          entityId: opts.entityId,
+          scope: opts.groupId ? 'group' : 'personal',
+          group: opts.groupId ? ({ id: opts.groupId } as Group) : undefined,
+          metadataJson: meta,
+          ipHash: this.getIpHash(opts.ip),
+        }),
+      );
+    } catch {
+      // Audit log failures should never block primary operations
+    }
+  }
 
   simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedTransaction[] {
     // 1. Filter out users with zero balances (within a 0.01 tolerance)
@@ -233,7 +274,7 @@ export class SettlementsService {
     };
   }
 
-  async proposeSettlement(userId: string, groupId: string, dto: ProposeSettlementDto): Promise<Settlement> {
+  async proposeSettlement(userId: string, groupId: string, dto: ProposeSettlementDto, context?: { ip?: string; userAgent?: string }): Promise<Settlement> {
     // 1. Validate caller active membership in group
     const callerMember = await this.groupMemberRepository.findOne({
       where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
@@ -257,18 +298,43 @@ export class SettlementsService {
       throw new BadRequestException('Recipient is not a member of this group');
     }
 
-    // Proposer is the fromUser (caller)
-    const settlement = this.settlementRepository.create({
-      group,
-      fromUser: callerMember.user,
-      toUser: recipientMember.user,
-      amount: dto.amount,
-      currency: dto.currency,
-      status: 'proposed',
-      note: dto.note,
+    // Currency check
+    if (group.currency && dto.currency.toUpperCase() !== group.currency.toUpperCase()) {
+      throw new BadRequestException({
+        errorCode: 'SETTLE_CURRENCY_MISMATCH',
+        message: `Settlement currency must match the group's base currency (${group.currency})`,
+      });
+    }
+
+    const savedSettlement = await this.dataSource.transaction(async (manager) => {
+      const settlement = manager.create(Settlement, {
+        group,
+        fromUser: callerMember.user,
+        toUser: recipientMember.user,
+        amount: dto.amount,
+        currency: dto.currency.toUpperCase(),
+        status: 'proposed',
+        note: dto.note,
+      });
+
+      return manager.save(Settlement, settlement);
     });
 
-    return this.settlementRepository.save(settlement);
+    void this.writeAuditLog({
+      actorUser: callerMember.user,
+      action: 'settlement.proposed',
+      entityId: savedSettlement.id,
+      groupId: group.id,
+      metadata: {
+        toUserId: recipientMember.user.id,
+        amount: Number(savedSettlement.amount),
+        currency: savedSettlement.currency,
+      },
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
+
+    return savedSettlement;
   }
 
   async listSettlements(
@@ -306,53 +372,81 @@ export class SettlementsService {
     groupId: string,
     id: string,
     dto: UpdateSettlementDto,
+    context?: { ip?: string; userAgent?: string }
   ): Promise<Settlement> {
-    // Validate caller active membership
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
-    });
-    if (!callerMember) {
-      throw new ForbiddenException('You do not have access to this group');
-    }
+    const { savedSettlement, callerUser, action } = await this.dataSource.transaction(async (manager) => {
+      // Validate caller active membership
+      const callerMember = await manager.findOne(GroupMember, {
+        where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+        relations: ['user'],
+      });
+      if (!callerMember) {
+        throw new ForbiddenException('You do not have access to this group');
+      }
 
-    const settlement = await this.settlementRepository.findOne({
-      where: { id, group: { id: groupId } },
-      relations: ['fromUser', 'toUser'],
-    });
-    if (!settlement) {
-      throw new NotFoundException('Settlement not found');
-    }
+      const settlement = await manager.findOne(Settlement, {
+        where: { id, group: { id: groupId } },
+        relations: ['fromUser', 'toUser'],
+      });
+      if (!settlement) {
+        throw new NotFoundException('Settlement not found');
+      }
 
-    // Concurrency control: verify version matches
-    if (settlement.version !== dto.version) {
-      throw new PreconditionFailedException({
-        errorCode: 'CON_VERSION_CONFLICT',
-        message: 'Version conflict: the resource has been modified by another request',
+      // Concurrency control: verify version matches
+      if (settlement.version !== dto.version) {
+        throw new PreconditionFailedException({
+          errorCode: 'CON_VERSION_CONFLICT',
+          message: 'Version conflict: the resource has been modified by another request',
+        });
+      }
+
+      let auditAction = '';
+      if (dto.status === 'confirmed') {
+        // ONLY the creditor (toUser) can confirm receipt
+        if (settlement.toUser.id !== userId) {
+          throw new ForbiddenException({
+            errorCode: 'RES_FORBIDDEN',
+            message: 'Only the creditor can confirm receipt of the settlement',
+          });
+        }
+        settlement.status = 'confirmed';
+        settlement.settledOn = dto.settledOn || new Date().toISOString().split('T')[0];
+        auditAction = 'settlement.confirmed';
+      } else if (dto.status === 'cancelled') {
+        // Either debtor (fromUser) or creditor (toUser) can cancel
+        if (settlement.fromUser.id !== userId && settlement.toUser.id !== userId) {
+          throw new ForbiddenException({
+            errorCode: 'RES_FORBIDDEN',
+            message: 'Only the debtor or creditor can cancel the settlement',
+          });
+        }
+        settlement.status = 'cancelled';
+        auditAction = 'settlement.cancelled';
+      }
+
+      const updated = await manager.save(Settlement, settlement);
+      return { savedSettlement: updated, callerUser: callerMember.user, action: auditAction };
+    });
+
+    if (action) {
+      void this.writeAuditLog({
+        actorUser: callerUser,
+        action,
+        entityId: savedSettlement.id,
+        groupId,
+        metadata: {
+          toUserId: savedSettlement.toUser.id,
+          fromUserId: savedSettlement.fromUser.id,
+          amount: Number(savedSettlement.amount),
+          currency: savedSettlement.currency,
+          status: savedSettlement.status,
+        },
+        ip: context?.ip,
+        userAgent: context?.userAgent,
       });
     }
 
-    if (dto.status === 'confirmed') {
-      // ONLY the creditor (toUser) can confirm receipt
-      if (settlement.toUser.id !== userId) {
-        throw new ForbiddenException({
-          errorCode: 'RES_FORBIDDEN',
-          message: 'Only the creditor can confirm receipt of the settlement',
-        });
-      }
-      settlement.status = 'confirmed';
-      settlement.settledOn = dto.settledOn || new Date().toISOString().split('T')[0];
-    } else if (dto.status === 'cancelled') {
-      // Either debtor (fromUser) or creditor (toUser) can cancel
-      if (settlement.fromUser.id !== userId && settlement.toUser.id !== userId) {
-        throw new ForbiddenException({
-          errorCode: 'RES_FORBIDDEN',
-          message: 'Only the debtor or creditor can cancel the settlement',
-        });
-      }
-      settlement.status = 'cancelled';
-    }
-
-    return this.settlementRepository.save(settlement);
+    return savedSettlement;
   }
 
   /**
@@ -391,52 +485,34 @@ export class SettlementsService {
       const { suggestedSettlements } = result;
 
       for (const s of suggestedSettlements) {
-        if (s.fromUserId === userId) {
-          const friendId = s.toUserId;
-          let entry = friendsMap.get(friendId);
+        if (s.fromUserId === userId || s.toUserId === userId) {
+          const isDebtor = s.fromUserId === userId;
+          const friendId = isDebtor ? s.toUserId : s.fromUserId;
+          const key = `${friendId}_${s.currency.toUpperCase()}`;
+
+          let entry = friendsMap.get(key);
           if (!entry) {
             const friendMember = await this.groupMemberRepository.findOne({
               where: { group: { id: groupId }, user: { id: friendId } },
               relations: ['user'],
             });
             if (!friendMember || !friendMember.user) continue;
+
+            const rawDisplayName = friendMember.user.displayName || friendMember.user.email;
             entry = {
-              friendId,
-              displayName: friendMember.user.displayName || friendMember.user.email,
+              friendId: key,
+              displayName: `${rawDisplayName} (${s.currency.toUpperCase()})`,
               email: friendMember.user.email,
               netBalance: 0,
               currencyDetails: [],
             };
-            friendsMap.set(friendId, entry);
+            friendsMap.set(key, entry);
           }
+
           entry.currencyDetails.push({
             groupId,
             groupName,
-            amount: -s.amount,
-            currency: s.currency,
-          });
-        } else if (s.toUserId === userId) {
-          const friendId = s.fromUserId;
-          let entry = friendsMap.get(friendId);
-          if (!entry) {
-            const friendMember = await this.groupMemberRepository.findOne({
-              where: { group: { id: groupId }, user: { id: friendId } },
-              relations: ['user'],
-            });
-            if (!friendMember || !friendMember.user) continue;
-            entry = {
-              friendId,
-              displayName: friendMember.user.displayName || friendMember.user.email,
-              email: friendMember.user.email,
-              netBalance: 0,
-              currencyDetails: [],
-            };
-            friendsMap.set(friendId, entry);
-          }
-          entry.currencyDetails.push({
-            groupId,
-            groupName,
-            amount: s.amount,
+            amount: isDebtor ? -s.amount : s.amount,
             currency: s.currency,
           });
         }

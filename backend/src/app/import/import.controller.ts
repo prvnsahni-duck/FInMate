@@ -43,7 +43,11 @@ export class ImportController {
       });
     }
 
-    const result = await this.importService.importExpenses(req.user.id, groupId, file);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.importService.importExpenses(req.user.id, groupId, file, context);
     return new SuccessResponse('Expenses imported successfully', result);
   }
 }

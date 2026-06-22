@@ -97,16 +97,56 @@ Client Request
 | `Attachment` | File attachments for expenses/notes/goals |
 | `AuditLog` | Action audit trail |
 
-### Security
+### Security & Cryptography
 
-- **Authentication**: JWT access + refresh tokens via `@nestjs/passport`
-- **Password Hashing**: Argon2
-- **Encryption**: AES-256-GCM for sensitive fields (via `ENCRYPTION_KEY` env var)
-- **Rate Limiting**: `@nestjs/throttler` (10 requests/60 seconds global)
-- **Security Headers**: Helmet middleware
-- **CORS**: Configured via `CORS_ORIGINS` / `FRONTEND_URL` env vars
+- **Authentication**: JWT access + refresh tokens via `@nestjs/passport` (15-minute access token, 7-day refresh token).
+- **Password Hashing**: Argon2 for user passwords.
+- **Argon2 Hashed Refresh Tokens in Redis**: Active session refresh token IDs (`refreshId`) are stored in Redis. To mitigate database compromise or session hijacking, key identifiers in Redis are stored deterministically as `refresh_token:${userId}:${sha256(refreshId)}`, and the value stored is the Argon2 hash of the `refreshId`.
+- **Zero-Knowledge Key Model**: On the Angular frontend, derived master keys for client-side encryption are retained exclusively in-memory as non-extractable `CryptoKey` objects. No `sessionStorage` or local storage cache is maintained, preventing XSS-based key exfiltration.
+- **Two-Factor Authentication (MFA)**: TOTP verification via authenticator apps, with secrets encrypted in PostgreSQL using AES-256-GCM.
+- **Rate Limiting**: `@nestjs/throttler` enforces request limit limits globally.
+- **Security Headers**: Helmet middleware configured globally.
 
 ---
+
+## Ledger & Database Transaction Safety
+
+### Database Transactions
+All write operations for group settlements and expense spreadsheet imports are executed inside explicit TypeORM database transaction blocks. This ensures that:
+- For settlements, creation, verification, and status updates (confirmed/cancelled) are atomic and consistent.
+- For imports, rows and their corresponding expense split associations are validated collectively, and any individual row validation error triggers a rollback of the entire import batch.
+
+### Concurrency Control
+Version columns (`@VersionColumn()`) on entities like `Settlement` act as an optimistic locking mechanism to prevent race conditions during concurrent modifications.
+
+---
+
+## Multi-Currency Ledgers & Friends Balances
+
+### Currency Consistency
+To prevent ledger balance corruption:
+- Group base currency changes are blocked if any expenses or settlements have already been posted in the group.
+- Proposed settlements within a group must match the group's active base currency.
+
+### Friends Balance Representation
+Friends balances across all mutual groups are grouped by currency. To prevent frontend track-by collisions, the friend records are virtualized per currency:
+- `friendId` is mapped using a combined key format: `${friendId}_${currency}`.
+- `displayName` is output with the currency suffix: `Name (Currency)`.
+
+---
+
+## Immutable Audit Logging
+
+An active, write-only audit trail logs high-priority actions for:
+1. **Authentication**: Successful logins, MFA enablement, MFA verification/activation, and MFA disabling.
+2. **Groups**: Group creation, info updates, member invitations, membership joins, role changes, and member removals.
+3. **Settlements**: Settlement proposal, confirmation, and cancellation.
+4. **Imports**: Successful expense spreadsheet imports.
+
+### Privacy Compliance
+To protect user privacy:
+- The actor's requesting IP address is hashed using SHA-256 (`ipHash`) before being written to the database.
+- Request User Agent details and other non-sensitive operational parameters are saved in the `metadataJson` field.
 
 ## Frontend Architecture
 

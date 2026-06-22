@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Group, GroupMember, Expense, ExpenseSplit, Settlement } from '@finmate/data-models';
+import { Repository, DataSource } from 'typeorm';
+import { Group, GroupMember, Expense, ExpenseSplit, Settlement, AuditLog } from '@finmate/data-models';
 import { SettlementsService, MemberBalance } from './settlements.service';
 import { ForbiddenException, NotFoundException, BadRequestException, PreconditionFailedException } from '@nestjs/common';
 
@@ -44,6 +44,43 @@ describe('SettlementsService', () => {
       createQueryBuilder: jest.fn(),
     };
 
+    const mockAuditLogRepository = {
+      save: jest.fn(),
+      create: jest.fn(),
+    };
+
+    const mockEntityManager = {
+      findOne: jest.fn(async (entityClass, options: any) => {
+        if (entityClass === GroupMember) {
+          const res = await mockGroupMemberRepository.findOne(options);
+          if (res && !res.user) {
+            res.user = { id: options?.where?.user?.id || 'caller-id', email: 'test@example.com' } as any;
+          }
+          return res;
+        }
+        if (entityClass === Settlement) {
+          return mockSettlementRepository.findOne(options);
+        }
+        return null;
+      }),
+      create: jest.fn((entityClass, data) => {
+        if (entityClass === Settlement) {
+          return mockSettlementRepository.create(data);
+        }
+        return data;
+      }),
+      save: jest.fn((entityClass, data) => {
+        if (entityClass === Settlement) {
+          return mockSettlementRepository.save(data);
+        }
+        return data;
+      }),
+    };
+
+    const mockDataSource = {
+      transaction: jest.fn((cb) => cb(mockEntityManager)),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SettlementsService,
@@ -52,6 +89,8 @@ describe('SettlementsService', () => {
         { provide: getRepositoryToken(Expense), useValue: mockExpenseRepository },
         { provide: getRepositoryToken(ExpenseSplit), useValue: mockExpenseSplitRepository },
         { provide: getRepositoryToken(Settlement), useValue: mockSettlementRepository },
+        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
+        { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
 

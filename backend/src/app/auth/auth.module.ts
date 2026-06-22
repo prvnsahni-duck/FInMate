@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { AuditLog } from '@finmate/data-models';
 import { UsersModule } from '../users/users.module';
 import { RedisModule } from '../redis/redis.module';
 import { AuthService } from './auth.service';
@@ -13,6 +15,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
   imports: [
     UsersModule,
     RedisModule,
+    TypeOrmModule.forFeature([AuditLog]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({}),
     ConfigModule,

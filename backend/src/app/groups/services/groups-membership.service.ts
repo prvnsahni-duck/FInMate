@@ -6,8 +6,8 @@ import { GroupsService } from '../groups.service';
 export class GroupsMembershipService {
   constructor(private readonly groupsService: GroupsService) {}
 
-  async inviteMember(userId: string, groupId: string, dto: InviteMemberDto): Promise<GroupMember> {
-    return this.groupsService.inviteMember(userId, groupId, dto);
+  async inviteMember(userId: string, groupId: string, dto: InviteMemberDto, context?: { ip?: string; userAgent?: string }): Promise<GroupMember> {
+    return this.groupsService.inviteMember(userId, groupId, dto, context);
   }
 
   async listMembers(userId: string, groupId: string): Promise<GroupMember[]> {
@@ -19,20 +19,21 @@ export class GroupsMembershipService {
     groupId: string,
     memberId: string,
     dto: UpdateMemberDto,
+    context?: { ip?: string; userAgent?: string },
   ): Promise<GroupMember> {
-    return this.groupsService.updateMember(userId, groupId, memberId, dto);
+    return this.groupsService.updateMember(userId, groupId, memberId, dto, context);
   }
 
-  async removeMember(userId: string, groupId: string, memberId: string): Promise<void> {
-    return this.groupsService.removeMember(userId, groupId, memberId);
+  async removeMember(userId: string, groupId: string, memberId: string, context?: { ip?: string; userAgent?: string }): Promise<void> {
+    return this.groupsService.removeMember(userId, groupId, memberId, context);
   }
 
   async getInviteDetails(inviteToken: string) {
     return this.groupsService.getInviteDetails(inviteToken);
   }
 
-  async joinGroupByToken(userId: string, inviteToken: string): Promise<GroupMember> {
-    return this.groupsService.joinGroupByToken(userId, inviteToken);
+  async joinGroupByToken(userId: string, inviteToken: string, context?: { ip?: string; userAgent?: string }): Promise<GroupMember> {
+    return this.groupsService.joinGroupByToken(userId, inviteToken, context);
   }
 
   async getPendingInvitations(userId: string) {

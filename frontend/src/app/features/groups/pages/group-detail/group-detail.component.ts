@@ -83,6 +83,13 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   deletedExpenses = signal<Expense[]>([]);
   carryForwardBalances = signal<CarryForwardBalance[]>([]);
 
+  // Signals for ledger closure settings
+  closeMonthSelected = signal<string>('');
+  isClosingMonth = signal<boolean>(false);
+  closeMonthError = signal<string | null>(null);
+  closeMonthSuccess = signal<string | null>(null);
+  isConfirmCloseMonthOpen = signal<boolean>(false);
+
   // Signals for UI state
   isLoading = signal<boolean>(true);
   activeTab = signal<'ledger' | 'analytics' | 'history' | 'trash' | 'settings'>('ledger');
@@ -146,6 +153,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.currentUserId.set(this.getCurrentUserId());
+    this.closeMonthSelected.set(this.getCurrentMonthString());
     this.routeSub = this.route.paramMap.subscribe(params => {
       const groupId = params.get('id');
       if (groupId) {
@@ -741,5 +749,41 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         this.contributionError = err.error?.message || 'Failed to save contributions.';
       }
     });
+  }
+
+  openConfirmCloseMonth() {
+    this.closeMonthError.set(null);
+    this.closeMonthSuccess.set(null);
+    this.isConfirmCloseMonthOpen.set(true);
+  }
+
+  onCloseMonthConfirmed() {
+    this.isConfirmCloseMonthOpen.set(false);
+    const g = this.group();
+    if (!g) return;
+
+    this.isClosingMonth.set(true);
+    this.closeMonthError.set(null);
+    this.closeMonthSuccess.set(null);
+
+    this.groupsService.closeMonth(g.id, this.closeMonthSelected()).subscribe({
+      next: (res) => {
+        this.isClosingMonth.set(false);
+        this.closeMonthSuccess.set(`Month ${this.closeMonthSelected()} closed successfully! ${res.carryForwardExpenseCount} rollover expense(s) created.`);
+        this.fetchExpenses(g.id);
+        this.fetchBalances(g.id);
+        this.fetchHistoryLogs(g.id);
+        this.fetchCarryForward(g.id);
+        setTimeout(() => this.closeMonthSuccess.set(null), 5000);
+      },
+      error: (err) => {
+        this.isClosingMonth.set(false);
+        this.closeMonthError.set(err.error?.message || 'Failed to close the billing month.');
+      }
+    });
+  }
+
+  onCloseMonthCancelled() {
+    this.isConfirmCloseMonthOpen.set(false);
   }
 }

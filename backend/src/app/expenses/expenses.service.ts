@@ -1002,7 +1002,7 @@ export class ExpensesService {
     userId: string,
     groupId: string,
     ledgerMonth: string,
-  ): Promise<{ userId: string; displayName: string | null; netBalance: number; currency: string }[]> {
+  ): Promise<{ userId: string; displayName: string | null; netBalance: number; currency: string; paid: number; expected: number; percentage: number }[]> {
     await this.assertGroupAccess(userId, groupId);
 
     const group = await this.groupRepository.findOne({ where: { id: groupId } });
@@ -1026,15 +1026,18 @@ export class ExpensesService {
       relations: ['user'],
     });
 
-    // Compute total monthly spending S
-    const S = expenses.reduce((sum, exp) => sum + Number(exp.amountTotal), 0);
+    const carryExpenses = expenses.filter((exp) => exp.isCarryForward);
+    const normalExpenses = expenses.filter((exp) => !exp.isCarryForward);
 
-    // Compute actual paid amounts per active user
+    // Compute total monthly spending S from normal expenses only
+    const S = normalExpenses.reduce((sum, exp) => sum + Number(exp.amountTotal), 0);
+
+    // Compute normal paid amounts per active user
     const paidMap = new Map<string, number>();
     for (const member of activeMembers) {
       paidMap.set(member.user.id, 0);
     }
-    for (const exp of expenses) {
+    for (const exp of normalExpenses) {
       const uid = exp.paidByUser.id;
       paidMap.set(uid, (paidMap.get(uid) ?? 0) + Number(exp.amountTotal));
     }
@@ -1058,10 +1061,46 @@ export class ExpensesService {
       return [];
     }
 
+    // Load splits for carry forward expenses to adjust targets
+    const carryExpenseIds = carryExpenses.map((e) => e.id);
+    const carrySplits = carryExpenseIds.length
+      ? await this.expenseSplitRepository.find({
+          where: { expense: { id: In(carryExpenseIds) } },
+          relations: ['expense', 'participantUser', 'participantGroupMember', 'participantGroupMember.user'],
+        })
+      : [];
+
+    const carryOwedMap = new Map<string, number>();
+    const carryPaidMap = new Map<string, number>();
+
+    for (const member of activeMembers) {
+      carryOwedMap.set(member.user.id, 0);
+      carryPaidMap.set(member.user.id, 0);
+    }
+
+    for (const exp of carryExpenses) {
+      const payerId = exp.paidByUser.id;
+      carryPaidMap.set(payerId, (carryPaidMap.get(payerId) ?? 0) + Number(exp.amountTotal));
+    }
+
+    for (const split of carrySplits) {
+      const participantId = split.participantUser?.id || split.participantGroupMember?.user?.id;
+      if (participantId) {
+        carryOwedMap.set(participantId, (carryOwedMap.get(participantId) ?? 0) + Number(split.amountOwed));
+      }
+    }
+
     return activeMembers.map((m) => {
       const pct = contributionMap.get(m.id) ?? (100 / activeMembers.length);
-      const Tu = S * (pct / 100);
-      const Pu = paidMap.get(m.user.id) ?? 0;
+      const TuNormal = S * (pct / 100);
+      const PuNormal = paidMap.get(m.user.id) ?? 0;
+
+      const carryPaid = carryPaidMap.get(m.user.id) ?? 0;
+      const carryOwed = carryOwedMap.get(m.user.id) ?? 0;
+
+      const Pu = PuNormal + carryPaid;
+      const Tu = TuNormal + carryOwed;
+
       return {
         userId: m.user.id,
         displayName: m.user.displayName || m.user.email,
@@ -1072,6 +1111,184 @@ export class ExpensesService {
         percentage: pct,
       };
     });
+  }
+
+  private simplifyDebts(balances: { userId: string; balance: number }[], currency: string): { fromUserId: string; toUserId: string; amount: number; currency: string }[] {
+    let activeBalances = balances
+      .map((b) => ({
+        userId: b.userId,
+        balance: Number(b.balance),
+      }))
+      .filter((b) => Math.abs(b.balance) >= 0.01);
+
+    const transactions: { fromUserId: string; toUserId: string; amount: number; currency: string }[] = [];
+
+    while (true) {
+      const debtors = activeBalances
+        .filter((b) => b.balance < 0)
+        .sort((a, b) => {
+          if (Math.abs(a.balance - b.balance) < 0.0001) {
+            return a.userId.localeCompare(b.userId);
+          }
+          return a.balance - b.balance;
+        });
+
+      const creditors = activeBalances
+        .filter((b) => b.balance > 0)
+        .sort((a, b) => {
+          if (Math.abs(a.balance - b.balance) < 0.0001) {
+            return a.userId.localeCompare(b.userId);
+          }
+          return b.balance - a.balance;
+        });
+
+      if (debtors.length === 0 || creditors.length === 0) {
+        break;
+      }
+
+      const debtor = debtors[0];
+      const creditor = creditors[0];
+
+      const debitAmount = Math.abs(debtor.balance);
+      const creditAmount = creditor.balance;
+      const transferAmount = Math.min(debitAmount, creditAmount);
+      const roundedTransfer = Math.round(transferAmount * 100) / 100;
+
+      if (roundedTransfer > 0) {
+        transactions.push({
+          fromUserId: debtor.userId,
+          toUserId: creditor.userId,
+          amount: roundedTransfer,
+          currency: currency,
+        });
+      }
+
+      debtor.balance += transferAmount;
+      creditor.balance -= transferAmount;
+
+      activeBalances = activeBalances
+        .map((b) => {
+          if (b.userId === debtor.userId) return { ...b, balance: debtor.balance };
+          if (b.userId === creditor.userId) return { ...b, balance: creditor.balance };
+          return b;
+        })
+        .filter((b) => Math.abs(b.balance) >= 0.01);
+    }
+
+    return transactions;
+  }
+
+  async closeMonth(
+    userId: string,
+    groupId: string,
+    ledgerMonth: string,
+  ): Promise<{ nextLedgerMonth: string; carryForwardExpenseCount: number }> {
+    // 1. Verify access: caller must have active membership and role owner or admin
+    const callerMember = await this.groupMemberRepository.findOne({
+      where: {
+        group: { id: groupId },
+        user: { id: userId },
+        joinStatus: 'active',
+      },
+      relations: ['user'],
+    });
+    if (!callerMember || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
+      throw new ForbiddenException('Only owners and admins can close a billing month');
+    }
+
+    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    if (!group) throw new NotFoundException('Group not found');
+    if (group.groupType !== 'household') {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Month finalization is only available for household groups',
+      });
+    }
+
+    const currentMonth = this.toYearMonth();
+    if (ledgerMonth > currentMonth) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Cannot close a future billing month',
+      });
+    }
+
+    const [yearStr, monthStr] = ledgerMonth.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const nextDate = new Date(year, month, 1);
+    const nextLedgerMonth = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, '0')}`;
+
+    // Verify duplicate closure
+    const existingCarryForward = await this.expenseRepository.count({
+      where: { group: { id: groupId }, ledgerMonth: nextLedgerMonth, isCarryForward: true },
+    });
+    if (existingCarryForward > 0) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: `Month ${ledgerMonth} is already closed/rolled over`,
+      });
+    }
+
+    let carryForwardExpenseCount = 0;
+
+    if (group.carryForwardEnabled) {
+      const summary = await this.getCarryForwardSummary(userId, groupId, ledgerMonth);
+      const balances = summary.map((s) => ({
+        userId: s.userId,
+        balance: s.netBalance,
+      }));
+
+      const simplified = this.simplifyDebts(balances, group.currency);
+      carryForwardExpenseCount = simplified.length;
+
+      if (simplified.length > 0) {
+        await this.dataSource.transaction(async (manager) => {
+          for (const tx of simplified) {
+            const debtorUser = await manager.getRepository(User).findOne({ where: { id: tx.fromUserId } });
+            const creditorUser = await manager.getRepository(User).findOne({ where: { id: tx.toUserId } });
+            if (!debtorUser || !creditorUser) continue;
+
+            const expense = manager.create(Expense, {
+              title: `Carry-Forward from ${ledgerMonth}`,
+              description: `System-generated carry-forward balance rollover`,
+              amountTotal: tx.amount,
+              currency: group.currency,
+              category: 'Other',
+              paidByUser: creditorUser,
+              ownerUser: callerMember.user,
+              group,
+              expenseDate: `${nextLedgerMonth}-01`,
+              ledgerMonth: nextLedgerMonth,
+              isCarryForward: true,
+              status: 'posted',
+            });
+            const savedExpense = await manager.save(Expense, expense);
+
+            const split = manager.create(ExpenseSplit, {
+              expense: savedExpense,
+              participantUser: debtorUser,
+              splitType: 'fixed',
+              shareValue: tx.amount,
+              amountOwed: tx.amount,
+              isSettled: false,
+            });
+            await manager.save(ExpenseSplit, split);
+          }
+        });
+      }
+    }
+
+    // Write audit log
+    void this.writeAuditLog({
+      actorUser: callerMember.user,
+      action: 'group.month_closed',
+      entityId: groupId,
+      groupId,
+      metadata: { ledgerMonth, nextLedgerMonth, carryForwardExpenseCount },
+    });
+
+    return { nextLedgerMonth, carryForwardExpenseCount };
   }
 
   /**

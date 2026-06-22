@@ -18,7 +18,11 @@ export class MembersController {
     @Body() inviteMemberDto: InviteMemberDto,
     @Req() req: any,
   ) {
-    const result = await this.groupsMembershipService.inviteMember(req.user.id, id, inviteMemberDto);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    };
+    const result = await this.groupsMembershipService.inviteMember(req.user.id, id, inviteMemberDto, context);
     return new SuccessResponse('Member invited successfully', result);
   }
 
@@ -37,7 +41,11 @@ export class MembersController {
     @Body() updateMemberDto: UpdateMemberDto,
     @Req() req: any,
   ) {
-    const result = await this.groupsMembershipService.updateMember(req.user.id, id, memberId, updateMemberDto);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    };
+    const result = await this.groupsMembershipService.updateMember(req.user.id, id, memberId, updateMemberDto, context);
     return new SuccessResponse('Group member updated successfully', result);
   }
 
@@ -49,7 +57,11 @@ export class MembersController {
     @Param('memberId', ParseUUIDPipe) memberId: string,
     @Req() req: any,
   ) {
-    await this.groupsMembershipService.removeMember(req.user.id, id, memberId);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    };
+    await this.groupsMembershipService.removeMember(req.user.id, id, memberId, context);
     return new SuccessResponse('Member removed successfully', {});
   }
 }

@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager, SelectQueryBuilder, Brackets } from 'typeorm';
-import { Group, GroupMember, Expense, ExpenseSplit, User } from '@finmate/data-models';
+import { Group, GroupMember, Expense, ExpenseSplit, User, AuditLog } from '@finmate/data-models';
 import { ImportService } from './import.service';
 import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
 import * as XLSX from 'xlsx';
@@ -36,6 +36,11 @@ describe('ImportService', () => {
       find: jest.fn(),
     };
 
+    const mockAuditLogRepository = {
+      create: jest.fn((data) => data),
+      save: jest.fn(async (data) => data),
+    };
+
     const mockDataSource = {
       transaction: jest.fn(),
     };
@@ -47,6 +52,7 @@ describe('ImportService', () => {
         { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepository },
         { provide: getRepositoryToken(Expense), useValue: mockExpenseRepository },
         { provide: getRepositoryToken(ExpenseSplit), useValue: mockExpenseSplitRepository },
+        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();

@@ -17,8 +17,16 @@ export class ExpensesCarryForwardService {
     userId: string,
     groupId: string,
     ledgerMonth: string,
-  ): Promise<CarryForwardSummaryItem[]> {
+  ): Promise<any[]> {
     return this.expensesService.getCarryForwardSummary(userId, groupId, ledgerMonth);
+  }
+
+  async closeMonth(
+    userId: string,
+    groupId: string,
+    ledgerMonth: string,
+  ): Promise<{ nextLedgerMonth: string; carryForwardExpenseCount: number }> {
+    return this.expensesService.closeMonth(userId, groupId, ledgerMonth);
   }
 
   async listDeletedExpenses(

@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException, PreconditionFailedException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, In } from 'typeorm';
-import { Group, GroupMember, User, AuditLog, CreateGroupDto, UpdateGroupDto, InviteMemberDto, UpdateMemberDto, GroupMemberContribution, UpdateContributionDto } from '@finmate/data-models';
+import { Group, GroupMember, User, AuditLog, CreateGroupDto, UpdateGroupDto, InviteMemberDto, UpdateMemberDto, GroupMemberContribution, UpdateContributionDto, Expense, Settlement } from '@finmate/data-models';
+import { createHash } from 'crypto';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
@@ -22,8 +23,44 @@ export class GroupsService {
     private readonly emailService: EmailService,
   ) {}
 
-  async createGroup(owner: User, dto: CreateGroupDto): Promise<Group> {
-    return this.dataSource.transaction(async (manager) => {
+  private getIpHash(ip?: string): string | undefined {
+    if (!ip) return undefined;
+    return createHash('sha256').update(ip).digest('hex');
+  }
+
+  private async writeAuditLog(opts: {
+    actorUser: User;
+    action: string;
+    entityId: string;
+    groupId?: string;
+    metadata?: Record<string, unknown>;
+    ip?: string;
+    userAgent?: string;
+  }): Promise<void> {
+    try {
+      const meta = { ...opts.metadata };
+      if (opts.userAgent) {
+        meta.userAgent = opts.userAgent;
+      }
+      await this.auditLogRepository.save(
+        this.auditLogRepository.create({
+          actorUser: opts.actorUser,
+          action: opts.action,
+          entityType: 'group',
+          entityId: opts.entityId,
+          scope: opts.groupId ? 'group' : 'personal',
+          group: opts.groupId ? ({ id: opts.groupId } as Group) : undefined,
+          metadataJson: meta,
+          ipHash: this.getIpHash(opts.ip),
+        }),
+      );
+    } catch {
+      // Audit log failures should never block the primary operation
+    }
+  }
+
+  async createGroup(owner: User, dto: CreateGroupDto, context?: { ip?: string; userAgent?: string }): Promise<Group> {
+    const savedGroup = await this.dataSource.transaction(async (manager) => {
       const group = manager.create(Group, {
         name: dto.name,
         description: dto.description,
@@ -100,6 +137,18 @@ export class GroupsService {
 
       return savedGroup;
     });
+
+    void this.writeAuditLog({
+      actorUser: owner,
+      action: 'group.created',
+      entityId: savedGroup.id,
+      groupId: savedGroup.id,
+      metadata: { name: savedGroup.name, currency: savedGroup.currency, groupType: savedGroup.groupType },
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
+
+    return savedGroup;
   }
 
   async listGroups(
@@ -149,7 +198,7 @@ export class GroupsService {
     return group;
   }
 
-  async updateGroup(userId: string, groupId: string, dto: UpdateGroupDto): Promise<Group> {
+  async updateGroup(userId: string, groupId: string, dto: UpdateGroupDto, context?: { ip?: string; userAgent?: string }): Promise<Group> {
     const membership = await this.groupMemberRepository
       .createQueryBuilder('member')
       .where('member.group_id = :groupId', { groupId })
@@ -182,10 +231,45 @@ export class GroupsService {
     if (dto.description !== undefined) group.description = dto.description;
     if (dto.visibility !== undefined) group.visibility = dto.visibility;
     if (dto.isArchived !== undefined) group.isArchived = dto.isArchived;
-    if (dto.currency !== undefined) group.currency = dto.currency.toUpperCase();
     if (dto.carryForwardEnabled !== undefined) group.carryForwardEnabled = dto.carryForwardEnabled;
 
-    return this.groupRepository.save(group);
+    if (dto.currency !== undefined && dto.currency.toUpperCase() !== group.currency.toUpperCase()) {
+      const expenseCount = await this.dataSource.getRepository(Expense).count({
+        where: { group: { id: groupId } }
+      });
+      const settlementCount = await this.dataSource.getRepository(Settlement).count({
+        where: { group: { id: groupId } }
+      });
+      if (expenseCount > 0 || settlementCount > 0) {
+        throw new BadRequestException({
+          errorCode: 'GRP_CURRENCY_LOCKED',
+          message: 'Cannot update group base currency: expenses or settlements have already been recorded in this group.'
+        });
+      }
+      group.currency = dto.currency.toUpperCase();
+    }
+
+    const savedGroup = await this.groupRepository.save(group);
+
+    const actorUser = await this.dataSource.getRepository(User).findOne({ where: { id: userId } });
+    if (actorUser) {
+      void this.writeAuditLog({
+        actorUser,
+        action: 'group.updated',
+        entityId: savedGroup.id,
+        groupId: savedGroup.id,
+        metadata: {
+          name: savedGroup.name,
+          currency: savedGroup.currency,
+          carryForwardEnabled: savedGroup.carryForwardEnabled,
+          isArchived: savedGroup.isArchived,
+        },
+        ip: context?.ip,
+        userAgent: context?.userAgent,
+      });
+    }
+
+    return savedGroup;
   }
 
   async checkGroupWriteAccess(groupId: string): Promise<void> {
@@ -201,7 +285,7 @@ export class GroupsService {
     }
   }
 
-  async inviteMember(userId: string, groupId: string, dto: InviteMemberDto): Promise<GroupMember> {
+  async inviteMember(userId: string, groupId: string, dto: InviteMemberDto, context?: { ip?: string; userAgent?: string }): Promise<GroupMember> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
       .leftJoinAndSelect('member.user', 'user')
@@ -306,6 +390,16 @@ export class GroupsService {
         .catch(err => this.emailService['logger'].error(`Failed to send invite email to ${targetUser.email}:`, err));
     }
 
+    void this.writeAuditLog({
+      actorUser: callerMember.user,
+      action: 'group.member_invited',
+      entityId: savedMember.id,
+      groupId: group.id,
+      metadata: { invitedEmail: targetUser.email, role: savedMember.role },
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
+
     return savedMember;
   }
 
@@ -333,6 +427,7 @@ export class GroupsService {
     groupId: string,
     memberId: string,
     dto: UpdateMemberDto,
+    context?: { ip?: string; userAgent?: string },
   ): Promise<GroupMember> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
@@ -360,7 +455,7 @@ export class GroupsService {
     if (dto.role) {
       if (dto.role === 'owner') {
         // If promoting to owner, demote current owner to admin in a transaction
-        return this.dataSource.transaction(async (manager) => {
+        const saved = await this.dataSource.transaction(async (manager) => {
           const currentOwner = await manager.getRepository(GroupMember).findOne({
             where: { group: { id: groupId }, role: 'owner' }
           });
@@ -373,6 +468,20 @@ export class GroupsService {
           targetMember.joinStatus = 'active'; // ensure active
           return manager.save(GroupMember, targetMember);
         });
+
+        const actorUser = await this.dataSource.getRepository(User).findOne({ where: { id: userId } });
+        if (actorUser) {
+          void this.writeAuditLog({
+            actorUser,
+            action: 'group.member_updated',
+            entityId: saved.id,
+            groupId,
+            metadata: { memberEmail: targetMember.user?.email, role: 'owner', joinStatus: 'active' },
+            ip: context?.ip,
+            userAgent: context?.userAgent,
+          });
+        }
+        return saved;
       }
       targetMember.role = dto.role;
     }
@@ -406,10 +515,25 @@ export class GroupsService {
       }
     }
 
-    return this.groupMemberRepository.save(targetMember);
+    const savedMember = await this.groupMemberRepository.save(targetMember);
+
+    const actorUser = await this.dataSource.getRepository(User).findOne({ where: { id: userId } });
+    if (actorUser) {
+      void this.writeAuditLog({
+        actorUser,
+        action: 'group.member_updated',
+        entityId: savedMember.id,
+        groupId,
+        metadata: { memberEmail: targetMember.user?.email, role: savedMember.role, joinStatus: savedMember.joinStatus },
+        ip: context?.ip,
+        userAgent: context?.userAgent,
+      });
+    }
+
+    return savedMember;
   }
 
-  async removeMember(userId: string, groupId: string, memberId: string): Promise<void> {
+  async removeMember(userId: string, groupId: string, memberId: string, context?: { ip?: string; userAgent?: string }): Promise<void> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
       .where('member.group_id = :groupId', { groupId })
@@ -440,7 +564,17 @@ export class GroupsService {
       }
       targetMember.joinStatus = 'left';
       targetMember.leftAt = new Date();
-      await this.groupMemberRepository.save(targetMember);
+      const savedMember = await this.groupMemberRepository.save(targetMember);
+
+      void this.writeAuditLog({
+        actorUser: targetMember.user,
+        action: 'group.member_left',
+        entityId: savedMember.id,
+        groupId,
+        metadata: { memberEmail: targetMember.user.email, role: targetMember.role },
+        ip: context?.ip,
+        userAgent: context?.userAgent,
+      });
     } else {
       if (callerMember.joinStatus !== 'active') {
         throw new ForbiddenException('You must accept the invitation first');
@@ -454,7 +588,20 @@ export class GroupsService {
 
       targetMember.joinStatus = 'removed';
       targetMember.leftAt = new Date();
-      await this.groupMemberRepository.save(targetMember);
+      const savedMember = await this.groupMemberRepository.save(targetMember);
+
+      const actorUser = await this.dataSource.getRepository(User).findOne({ where: { id: userId } });
+      if (actorUser) {
+        void this.writeAuditLog({
+          actorUser,
+          action: 'group.member_removed',
+          entityId: savedMember.id,
+          groupId,
+          metadata: { memberEmail: targetMember.user.email, role: targetMember.role },
+          ip: context?.ip,
+          userAgent: context?.userAgent,
+        });
+      }
     }
   }
 
@@ -557,7 +704,7 @@ export class GroupsService {
     };
   }
 
-  async joinGroupByToken(userId: string, inviteToken: string): Promise<GroupMember> {
+  async joinGroupByToken(userId: string, inviteToken: string, context?: { ip?: string; userAgent?: string }): Promise<GroupMember> {
     const group = await this.groupRepository.findOne({ where: { inviteToken } });
     if (!group) {
       throw new NotFoundException('Invalid or expired invitation link');
@@ -581,7 +728,19 @@ export class GroupsService {
       existingMember.joinStatus = 'active';
       existingMember.joinedAt = new Date();
       existingMember.leftAt = undefined;
-      return this.groupMemberRepository.save(existingMember);
+      const savedMember = await this.groupMemberRepository.save(existingMember);
+
+      void this.writeAuditLog({
+        actorUser: user,
+        action: 'group.member_joined',
+        entityId: savedMember.id,
+        groupId: group.id,
+        metadata: { role: savedMember.role },
+        ip: context?.ip,
+        userAgent: context?.userAgent,
+      });
+
+      return savedMember;
     }
 
     const newMember = this.groupMemberRepository.create({
@@ -591,7 +750,19 @@ export class GroupsService {
       joinStatus: 'active',
       joinedAt: new Date(),
     });
-    return this.groupMemberRepository.save(newMember);
+    const savedMember = await this.groupMemberRepository.save(newMember);
+
+    void this.writeAuditLog({
+      actorUser: user,
+      action: 'group.member_joined',
+      entityId: savedMember.id,
+      groupId: group.id,
+      metadata: { role: savedMember.role },
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
+
+    return savedMember;
   }
 
   async getPendingInvitations(userId: string): Promise<any[]> {

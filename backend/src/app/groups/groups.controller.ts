@@ -11,6 +11,7 @@ import {
   ParseUUIDPipe,
   ParseIntPipe,
   DefaultValuePipe,
+  BadRequestException,
 } from '@nestjs/common';
 import { CreateGroupDto, UpdateContributionDto, UpdateGroupDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -37,9 +38,13 @@ export class GroupsController {
   @Post()
   async create(
     @Body() createGroupDto: CreateGroupDto,
-    @Req() req: Request & { user: { id: string } & Record<string, unknown> },
+    @Req() req: Request & { user: { id: string } & Record<string, unknown>; ip?: string; socket: { remoteAddress?: string } },
   ) {
-    const result = await this.groupsCrudService.createGroup(req.user as unknown as Parameters<typeof this.groupsCrudService.createGroup>[0], createGroupDto);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.groupsCrudService.createGroup(req.user as unknown as Parameters<typeof this.groupsCrudService.createGroup>[0], createGroupDto, context);
     return new SuccessResponse('Group created successfully', result);
   }
 
@@ -64,9 +69,13 @@ export class GroupsController {
   @Post('join/:inviteToken')
   async joinGroupByToken(
     @Param('inviteToken', ParseUUIDPipe) inviteToken: string,
-    @Req() req: Request & { user: { id: string } },
+    @Req() req: Request & { user: { id: string }; ip?: string; socket: { remoteAddress?: string } },
   ) {
-    const result = await this.groupsMembershipService.joinGroupByToken(req.user.id, inviteToken);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.groupsMembershipService.joinGroupByToken(req.user.id, inviteToken, context);
     return new SuccessResponse('Joined group successfully', result);
   }
 
@@ -89,9 +98,13 @@ export class GroupsController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateGroupDto: UpdateGroupDto,
-    @Req() req: Request & { user: { id: string } },
+    @Req() req: Request & { user: { id: string }; ip?: string; socket: { remoteAddress?: string } },
   ) {
-    const result = await this.groupsCrudService.updateGroup(req.user.id, id, updateGroupDto);
+    const context = {
+      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.groupsCrudService.updateGroup(req.user.id, id, updateGroupDto, context);
     return new SuccessResponse('Group updated successfully', result);
   }
 
@@ -151,6 +164,19 @@ export class GroupsController {
     const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
     const result = await this.expensesCarryForwardService.getCarryForwardSummary(req.user.id, id, ledgerMonth);
     return new SuccessResponse('Carry-forward summary retrieved successfully', result);
+  }
+
+  @Post(':id/close-month')
+  async closeMonth(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { ledgerMonth: string },
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    if (!body || !body.ledgerMonth) {
+      throw new BadRequestException('ledgerMonth is required');
+    }
+    const result = await this.expensesCarryForwardService.closeMonth(req.user.id, id, body.ledgerMonth);
+    return new SuccessResponse('Billing month closed and carry-forward balances rolled over successfully', result);
   }
 
   @Get(':id/contributions')
