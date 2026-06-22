@@ -1,5 +1,6 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app/app.module';
 import { HttpExceptionFilter } from './app/filters/http-exception.filter';
 import helmet from 'helmet';
@@ -9,8 +10,19 @@ async function bootstrap() {
   const globalPrefix = 'api/v1';
   app.setGlobalPrefix(globalPrefix);
 
-  // Security headers
-  app.use(helmet());
+  // Security headers with CSP configured to allow Swagger UI
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: [`'self'`],
+          styleSrc: [`'self'`, `'unsafe-inline'`],
+          imgSrc: [`'self'`, 'data:', 'validator.swagger.io'],
+          scriptSrc: [`'self'`, `'unsafe-inline'`],
+        },
+      },
+    }),
+  );
 
   // CORS configuration
   const corsOrigins = process.env.CORS_ORIGINS
@@ -29,6 +41,16 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  // Configure Swagger Document
+  const config = new DocumentBuilder()
+    .setTitle('FinMate API')
+    .setDescription('FinMate Backend API Specification')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document);
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

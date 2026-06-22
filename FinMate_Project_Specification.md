@@ -1665,3 +1665,20 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
    - Encryption failures in `getExpenses` silently return the original (encrypted) expense to avoid breaking the UI when decryption keys are unavailable.
 - **Next Actions:**
    - Manual verification: login, create expense, confirm encrypted payloads in Network tab, and verify decrypted display in UI.
+
+---
+
+### 2026-06-22 (Part 1)
+- **Summary:** Installed and configured Swagger on the Nest.js backend with Helmet Content Security Policy compatibility.
+- **Changes Made:**
+   - Installed `@nestjs/swagger` and `swagger-ui-express` dependencies in root [package.json](file:///d:/prvn/Projects/FinMate/package.json).
+   - Configured Swagger DocumentBuilder and initialization on path `/docs` in [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts).
+   - Modified Helmet security headers configuration in [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts) to adjust CSP directives (adding `'unsafe-inline'` to `styleSrc` and `scriptSrc`, and updating `imgSrc`) so Swagger UI inline resources load successfully.
+- **Artifacts Updated:**
+   - [package.json](file:///d:/prvn/Projects/FinMate/package.json)
+   - [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts)
+   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+   - Customize Helmet's global Content Security Policy directives to support Swagger UI's inline styles and scripts rather than disabling CSP completely, preserving API security.
+- **Next Actions:**
+   - Run the backend service and test the `/docs` UI.
