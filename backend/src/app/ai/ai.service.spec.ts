@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AiService } from './ai.service';
 import { ConfigService } from '@nestjs/config';
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, GatewayTimeoutException, ServiceUnavailableException } from '@nestjs/common';
 import axios from 'axios';
 
 jest.mock('axios');
@@ -142,20 +142,37 @@ describe('AiService', () => {
       }
     });
 
-    it('should handle OpenAI API timeout or network failure and map to InternalServerErrorException', async () => {
+    it('should handle OpenAI API timeout and map to GatewayTimeoutException', async () => {
       configService.get.mockReturnValue('sk-key123');
       const testService = new AiService(configService);
 
-      const mockNetworkError = new Error('timeout of 10000ms exceeded');
+      const mockTimeoutError = new Error('timeout of 10000ms exceeded');
+      mockedAxios.post.mockRejectedValueOnce(mockTimeoutError);
+
+      try {
+        await testService.callOpenAiProxy('valid prompt');
+        fail('Should have thrown GatewayTimeoutException');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(GatewayTimeoutException);
+        expect(err.getResponse().errorCode).toBe('SYS_TIMEOUT');
+        expect(err.getResponse().message).toContain('timed out');
+      }
+    });
+
+    it('should handle OpenAI API network failure and map to ServiceUnavailableException', async () => {
+      configService.get.mockReturnValue('sk-key123');
+      const testService = new AiService(configService);
+
+      const mockNetworkError = new Error('Network Error');
       mockedAxios.post.mockRejectedValueOnce(mockNetworkError);
 
       try {
         await testService.callOpenAiProxy('valid prompt');
-        fail('Should have thrown InternalServerErrorException');
+        fail('Should have thrown ServiceUnavailableException');
       } catch (err: any) {
-        expect(err).toBeInstanceOf(InternalServerErrorException);
-        expect(err.getResponse().errorCode).toBe('AI_NETWORK_ERROR');
-        expect(err.getResponse().message).toContain('timeout of 10000ms exceeded');
+        expect(err).toBeInstanceOf(ServiceUnavailableException);
+        expect(err.getResponse().errorCode).toBe('SYS_SERVICE_UNAVAILABLE');
+        expect(err.getResponse().message).toContain('Network Error');
       }
     });
   });

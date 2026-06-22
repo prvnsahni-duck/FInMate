@@ -1,5 +1,6 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
+import { randomUUID } from 'crypto';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -33,7 +34,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         // Extract class-validator array formatting
         if (statusCode === HttpStatus.BAD_REQUEST && Array.isArray(resBody.message)) {
           errorCode = 'VAL_INVALID_INPUT';
-          message = 'Input validation failed';
+          message = 'Input validation failed: ' + resBody.message.join(', ');
           details = [];
           for (const msg of resBody.message) {
             if (typeof msg === 'string') {
@@ -65,10 +66,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
         statusCode = HttpStatus.BAD_REQUEST;
         errorCode = 'VAL_INVALID_INPUT';
         message = driverError.detail || 'Database foreign key constraint violation: referenced resource does not exist';
-      } else if (driverError && ['22P02', '22007', '22001', '22003'].includes(driverError.code)) {
+      } else if (driverError && ['22P02', '22007', '22001', '22003', '23502', '23514'].includes(driverError.code)) {
         statusCode = HttpStatus.BAD_REQUEST;
         errorCode = 'VAL_INVALID_INPUT';
-        message = 'Invalid input format: ' + (driverError.message || exception.message);
+        message = driverError.code === '23502'
+          ? 'Invalid input: a required field was missing or empty'
+          : driverError.code === '23514'
+            ? 'Invalid input: constraint violation'
+            : 'Invalid input format: ' + (driverError.message || exception.message);
+      } else if (driverError && (
+        String(driverError.code).startsWith('08') ||
+        ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EPIPE', 'ECONNRESET'].includes(driverError.code) ||
+        String(driverError.message).toLowerCase().includes('connect') ||
+        String(exception.message).toLowerCase().includes('connection')
+      )) {
+        statusCode = HttpStatus.SERVICE_UNAVAILABLE;
+        errorCode = 'SYS_SERVICE_UNAVAILABLE';
+        message = 'Database service is temporarily unavailable. Please try again later.';
       } else {
         statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
         errorCode = 'SYS_INTERNAL_ERROR';
@@ -78,6 +92,24 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // Unhandled generic errors
       const err = exception as Error;
       this.logger.error(`Unhandled Exception: ${err?.message || exception}`, err?.stack);
+
+      const errMsg = String(err?.message || exception).toLowerCase();
+      const errCode = (err as any)?.code;
+      if (
+        errCode === 'ECONNREFUSED' ||
+        errCode === 'ETIMEDOUT' ||
+        errCode === 'ENOTFOUND' ||
+        errCode === 'EPIPE' ||
+        errCode === 'ECONNRESET' ||
+        errMsg.includes('connection') ||
+        errMsg.includes('connect') ||
+        errMsg.includes('database down') ||
+        errMsg.includes('checkout timeout')
+      ) {
+        statusCode = HttpStatus.SERVICE_UNAVAILABLE;
+        errorCode = 'SYS_SERVICE_UNAVAILABLE';
+        message = 'Database service is temporarily unavailable. Please try again later.';
+      }
     }
 
     // Map status codes to custom error codes if they weren't explicitly set above
@@ -128,15 +160,40 @@ export class HttpExceptionFilter implements ExceptionFilter {
       'SYS_TIMEOUT'
     ].includes(errorCode);
 
-    const errorPayload = {
-      statusCode,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-      errorCode,
+    const errorPayload: Record<string, any> = {
+      success: false,
       message: typeof message === 'string' ? message : String(message),
-      details,
-      retryable,
+      errorCode,
     };
+
+    if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
+      const errorId = randomUUID();
+      const correlationId = request.headers['x-correlation-id'] || request.headers['x-request-id'] || randomUUID();
+      const err = exception as Error;
+
+      this.logger.error(
+        JSON.stringify({
+          message: `Unexpected 500 Internal Server Error: ${err?.message || exception}`,
+          path: request.url,
+          userId: request.user?.id || null,
+          correlationId,
+          errorId,
+          serviceName: 'HttpExceptionFilter',
+          timestamp: new Date().toISOString(),
+          stack: err?.stack || null,
+        })
+      );
+
+      errorPayload.message = 'An unexpected error occurred. Please try again later.';
+      errorPayload.errorId = errorId;
+    } else {
+      errorPayload.data = null;
+      errorPayload.statusCode = statusCode;
+      errorPayload.timestamp = new Date().toISOString();
+      errorPayload.path = request.url;
+      errorPayload.details = details;
+      errorPayload.retryable = retryable;
+    }
 
     response.status(statusCode).send(errorPayload);
   }

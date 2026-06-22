@@ -399,7 +399,7 @@ export class SettlementsService {
               where: { group: { id: groupId }, user: { id: friendId } },
               relations: ['user'],
             });
-            if (!friendMember) continue;
+            if (!friendMember || !friendMember.user) continue;
             entry = {
               friendId,
               displayName: friendMember.user.displayName || friendMember.user.email,
@@ -423,7 +423,7 @@ export class SettlementsService {
               where: { group: { id: groupId }, user: { id: friendId } },
               relations: ['user'],
             });
-            if (!friendMember) continue;
+            if (!friendMember || !friendMember.user) continue;
             entry = {
               friendId,
               displayName: friendMember.user.displayName || friendMember.user.email,

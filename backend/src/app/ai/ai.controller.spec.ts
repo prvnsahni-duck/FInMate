@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AiController, AiProxyDto } from './ai.controller';
 import { AiService } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SuccessResponse } from '../common/response.util';
 
 describe('AiController', () => {
   let controller: AiController;
@@ -40,7 +41,7 @@ describe('AiController', () => {
     service.callOpenAiProxy.mockResolvedValueOnce({ text: 'Response' });
 
     const result = await controller.callOpenAiProxy(dto);
-    expect(result).toEqual({ text: 'Response' });
+    expect(result).toEqual(new SuccessResponse('AI response generated successfully', { text: 'Response' }));
     expect(service.callOpenAiProxy).toHaveBeenCalledWith('Hello AI', 'Be nice', 'gpt-4');
   });
 });

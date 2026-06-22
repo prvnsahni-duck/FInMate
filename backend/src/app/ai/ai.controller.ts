@@ -2,6 +2,7 @@ import { Controller, Post, Body, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AiService } from './ai.service';
 import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
+import { SuccessResponse } from '../common/response.util';
 
 export class AiProxyDto {
   @IsString()
@@ -24,10 +25,11 @@ export class AiController {
 
   @Post('proxy')
   async callOpenAiProxy(@Body() dto: AiProxyDto) {
-    return this.aiService.callOpenAiProxy(
+    const result = await this.aiService.callOpenAiProxy(
       dto.prompt,
       dto.systemInstruction,
       dto.model
     );
+    return new SuccessResponse('AI response generated successfully', result);
   }
 }

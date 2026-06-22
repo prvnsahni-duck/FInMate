@@ -35,7 +35,7 @@ export const calculateDeterministicSplits = (
   splits: ExpenseSplitInputDto[],
   payerKey?: string,
 ): CalculatedSplit[] => {
-  if (!splits.length) {
+  if (!splits || !splits.length) {
     throw new BadRequestException({
       errorCode: 'VAL_INVALID_INPUT',
       message: 'At least one split is required',
@@ -44,7 +44,7 @@ export const calculateDeterministicSplits = (
 
   validateSplitParticipants(splits);
 
-  const splitType = splits[0].splitType;
+  const splitType = splits[0]?.splitType || 'equal';
   const mixedTypes = splits.some((s) => s.splitType !== splitType);
   if (mixedTypes) {
     throw new BadRequestException({

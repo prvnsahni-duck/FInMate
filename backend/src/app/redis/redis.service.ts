@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, RedisClientType } from 'redis';
 
@@ -47,18 +47,33 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
-    if (ttlSeconds) {
-      await this.client.set(key, value, { EX: ttlSeconds });
-    } else {
-      await this.client.set(key, value);
+    try {
+      if (ttlSeconds) {
+        await this.client.set(key, value, { EX: ttlSeconds });
+      } else {
+        await this.client.set(key, value);
+      }
+    } catch (err: any) {
+      this.logger.error(`Redis set operation failed: ${err.message}`, err.stack);
+      throw new ServiceUnavailableException('Cache service is temporarily unavailable');
     }
   }
 
   async get(key: string): Promise<string | null> {
-    return this.client.get(key) as any;
+    try {
+      return (await this.client.get(key)) as any;
+    } catch (err: any) {
+      this.logger.error(`Redis get operation failed: ${err.message}`, err.stack);
+      throw new ServiceUnavailableException('Cache service is temporarily unavailable');
+    }
   }
 
   async del(key: string): Promise<void> {
-    await this.client.del(key);
+    try {
+      await this.client.del(key);
+    } catch (err: any) {
+      this.logger.error(`Redis del operation failed: ${err.message}`, err.stack);
+      throw new ServiceUnavailableException('Cache service is temporarily unavailable');
+    }
   }
 }

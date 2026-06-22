@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
 import { GroupRoles } from '../auth/decorators/group-roles.decorator';
 import { ProposeSettlementDto, UpdateSettlementDto } from '@finmate/data-models';
+import { SuccessResponse } from '../common/response.util';
 
 @Controller('groups/:groupId/settlements')
 @UseGuards(JwtAuthGuard, GroupRolesGuard)
@@ -13,7 +14,8 @@ export class SettlementsController {
   @Get('balances')
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async getBalances(@Param('groupId', ParseUUIDPipe) groupId: string, @Req() req: any) {
-    return this.settlementsService.calculateGroupBalances(req.user.id, groupId);
+    const result = await this.settlementsService.calculateGroupBalances(req.user.id, groupId);
+    return new SuccessResponse('Group balances calculated successfully', result);
   }
 
   @Post()
@@ -23,7 +25,8 @@ export class SettlementsController {
     @Body() proposeSettlementDto: ProposeSettlementDto,
     @Req() req: any,
   ) {
-    return this.settlementsService.proposeSettlement(req.user.id, groupId, proposeSettlementDto);
+    const result = await this.settlementsService.proposeSettlement(req.user.id, groupId, proposeSettlementDto);
+    return new SuccessResponse('Settlement proposed successfully', result);
   }
 
   @Get()
@@ -34,9 +37,12 @@ export class SettlementsController {
     @Query('limit') limit?: string,
     @Req() req?: any,
   ) {
-    const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? parseInt(limit, 10) : 20;
-    return this.settlementsService.listSettlements(req.user.id, groupId, pageNum, limitNum);
+    let pageNum = page ? parseInt(page, 10) : 1;
+    let limitNum = limit ? parseInt(limit, 10) : 20;
+    if (isNaN(pageNum) || pageNum <= 0) pageNum = 1;
+    if (isNaN(limitNum) || limitNum <= 0) limitNum = 20;
+    const result = await this.settlementsService.listSettlements(req.user.id, groupId, pageNum, limitNum);
+    return new SuccessResponse('Settlements retrieved successfully', result);
   }
 
   @Patch(':id')
@@ -47,6 +53,7 @@ export class SettlementsController {
     @Body() updateSettlementDto: UpdateSettlementDto,
     @Req() req: any,
   ) {
-    return this.settlementsService.updateSettlement(req.user.id, groupId, id, updateSettlementDto);
+    const result = await this.settlementsService.updateSettlement(req.user.id, groupId, id, updateSettlementDto);
+    return new SuccessResponse('Settlement updated successfully', result);
   }
 }

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExpensesController } from './expenses.controller';
 import { ExpensesAnalyticsService, ExpensesCrudService } from './services';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { SuccessResponse } from '../common/response.util';
 
 describe('ExpensesController', () => {
   let controller: ExpensesController;
@@ -71,15 +72,16 @@ describe('ExpensesController', () => {
 
     const result = await controller.create(dto, { user: { id: 'user-1' } } as any);
 
-    expect(result).toEqual({ id: 'exp-1' });
+    expect(result).toEqual(new SuccessResponse('Expense created successfully', { id: 'exp-1' }));
     expect(crudService.createExpense).toHaveBeenCalledWith('user-1', dto);
   });
 
   it('should forward delete call', async () => {
     crudService.deleteExpense.mockResolvedValue();
 
-    await controller.remove('exp-1', { user: { id: 'user-1' } } as any);
+    const result = await controller.remove('exp-1', { user: { id: 'user-1' } } as any);
 
+    expect(result).toEqual(new SuccessResponse('Expense deleted successfully', {}));
     expect(crudService.deleteExpense).toHaveBeenCalledWith('user-1', 'exp-1');
   });
 
@@ -88,7 +90,7 @@ describe('ExpensesController', () => {
 
     const result = await controller.findOne('exp-1', { user: { id: 'user-1' } } as any);
 
-    expect(result).toEqual({ id: 'exp-1' });
+    expect(result).toEqual(new SuccessResponse('Expense retrieved successfully', { id: 'exp-1' }));
     expect(crudService.getExpenseById).toHaveBeenCalledWith('user-1', 'exp-1');
   });
 
@@ -99,7 +101,7 @@ describe('ExpensesController', () => {
       user: { id: 'user-1' },
     } as any);
 
-    expect(result).toEqual({ id: 'exp-1', title: 'Updated' });
+    expect(result).toEqual(new SuccessResponse('Expense updated successfully', { id: 'exp-1', title: 'Updated' }));
     expect(crudService.updateExpense).toHaveBeenCalledWith('user-1', 'exp-1', {
       title: 'Updated',
       version: 1,

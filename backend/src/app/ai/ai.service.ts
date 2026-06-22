@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, BadRequestException, GatewayTimeoutException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
@@ -67,7 +67,7 @@ export class AiService {
 
       const reply = response.data?.choices?.[0]?.message?.content;
       if (!reply) {
-        throw new InternalServerErrorException('Failed to retrieve response from OpenAI');
+        throw new ServiceUnavailableException('Failed to retrieve response from OpenAI');
       }
 
       return { text: reply };
@@ -79,9 +79,14 @@ export class AiService {
           errorCode: 'AI_PROVIDER_ERROR',
           message: `OpenAI API returned status ${status}: ${msg}`,
         });
+      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        throw new GatewayTimeoutException({
+          errorCode: 'SYS_TIMEOUT',
+          message: 'Connection to OpenAI timed out. Please try again.',
+        });
       } else {
-        throw new InternalServerErrorException({
-          errorCode: 'AI_NETWORK_ERROR',
+        throw new ServiceUnavailableException({
+          errorCode: 'SYS_SERVICE_UNAVAILABLE',
           message: `Failed to contact OpenAI: ${error.message}`,
         });
       }

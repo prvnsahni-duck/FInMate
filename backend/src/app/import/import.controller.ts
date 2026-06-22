@@ -3,6 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ImportService } from './import.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Request } from 'express';
+import { SuccessResponse } from '../common/response.util';
 
 interface RequestWithUser extends Request {
   user: {
@@ -42,6 +43,7 @@ export class ImportController {
       });
     }
 
-    return this.importService.importExpenses(req.user.id, groupId, file);
+    const result = await this.importService.importExpenses(req.user.id, groupId, file);
+    return new SuccessResponse('Expenses imported successfully', result);
   }
 }

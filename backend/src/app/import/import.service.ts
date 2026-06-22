@@ -70,10 +70,19 @@ export class ImportService {
     let rows: ParsedRow[] = [];
     try {
       const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: true });
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        throw new BadRequestException('The uploaded file has no sheets.');
+      }
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
+      if (!worksheet) {
+        throw new BadRequestException('The first sheet in the uploaded file is empty or missing.');
+      }
       rows = XLSX.utils.sheet_to_json<ParsedRow>(worksheet, { defval: '' });
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       const err = error as Error;
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_FILE',
@@ -256,11 +265,13 @@ export class ImportService {
           if (splitType === 'equal') {
             // Default to equal split among all active group members
             activeMembers.forEach((m) => {
-              parsedSplits.push({
-                email: m.user.email.toLowerCase(),
-                user: m.user,
-                value: 1.0, // weight = 1
-              });
+              if (m.user?.email) {
+                parsedSplits.push({
+                  email: m.user.email.toLowerCase(),
+                  user: m.user,
+                  value: 1.0, // weight = 1
+                });
+              }
             });
           } else {
             addError(rowNum, 'shares_data', `Shares data is required for split type '${splitType}'`);
@@ -564,7 +575,7 @@ export class ImportService {
         amount: Number(expense.amountTotal).toFixed(2),
         currency: expense.currency.toUpperCase(),
         category: expense.category,
-        payer_email: expense.paidByUser.email.toLowerCase(),
+        payer_email: expense.paidByUser?.email?.toLowerCase() || '',
         split_type: splits[0]?.splitType || 'equal',
         shares_data: sharesData,
         description: expense.description || '',

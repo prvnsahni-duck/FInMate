@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RequestWithUser } from '../common/interfaces/request-with-user.interface';
 import { Request } from 'express';
+import { SuccessResponse } from '../common/response.util';
 
 @Controller('auth')
 export class AuthController {
@@ -11,47 +12,54 @@ export class AuthController {
 
   @Post('register')
   async register(@Body() registerDto: RegisterDto) {
-    return this.authService.register(
+    const result = await this.authService.register(
       registerDto.email,
       registerDto.password,
       registerDto.displayName,
     );
+    return new SuccessResponse('User registered successfully', result);
   }
 
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Req() req: Request) {
     const mfaCode = req.headers['x-mfa-code'] as string | undefined;
-    return this.authService.login(loginDto.email, loginDto.password, mfaCode);
+    const result = await this.authService.login(loginDto.email, loginDto.password, mfaCode);
+    return new SuccessResponse('Login successful', result);
   }
 
   @Post('refresh')
   async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
-    return this.authService.refresh(refreshTokenDto.refreshToken);
+    const result = await this.authService.refresh(refreshTokenDto.refreshToken);
+    return new SuccessResponse('Token refreshed successfully', result);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async logout(@Body() refreshTokenDto: RefreshTokenDto, @Req() req: RequestWithUser) {
     await this.authService.logout(refreshTokenDto.refreshToken, req.user.id);
+    return new SuccessResponse('Logged out successfully', {});
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/enable')
   async enable2Fa(@Req() req: RequestWithUser) {
-    return this.authService.enable2Fa(req.user);
+    const result = await this.authService.enable2Fa(req.user);
+    return new SuccessResponse('2FA setup initiated', result);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/verify')
   async verify2Fa(@Body() verify2FaDto: Verify2FaDto, @Req() req: RequestWithUser) {
-    return this.authService.verify2Fa(req.user, verify2FaDto.code);
+    const result = await this.authService.verify2Fa(req.user, verify2FaDto.code);
+    return new SuccessResponse('2FA verified and enabled successfully', result);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/disable')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @HttpCode(HttpStatus.OK)
   async disable2Fa(@Body() verify2FaDto: Verify2FaDto, @Req() req: RequestWithUser) {
-    return this.authService.disable2Fa(req.user, verify2FaDto.code);
+    await this.authService.disable2Fa(req.user, verify2FaDto.code);
+    return new SuccessResponse('2FA disabled successfully', {});
   }
 }

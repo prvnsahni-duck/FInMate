@@ -1,5 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
+import { SuccessResponse } from './common/response.util';
 
 @Controller()
 export class AppController {
@@ -7,11 +8,13 @@ export class AppController {
 
   @Get()
   getData() {
-    return this.appService.getData();
+    const result = this.appService.getData();
+    return new SuccessResponse('Welcome data retrieved successfully', result);
   }
 
   @Get('health')
   healthCheck() {
-    return { status: 'ok', timestamp: new Date().toISOString() };
+    const result = { status: 'ok', timestamp: new Date().toISOString() };
+    return new SuccessResponse('Health status checked successfully', result);
   }
 }

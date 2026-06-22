@@ -70,6 +70,7 @@ export class ExpensesService {
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
   private basename(value: string): string {
+    if (!value) return '';
     const parts = value.split('/').filter(Boolean);
     return parts[parts.length - 1] || value;
   }
@@ -82,6 +83,10 @@ export class ExpensesService {
   /** Returns the YYYY-MM string for the given date string or today. */
   private toYearMonth(dateStr?: string): string {
     const d = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(d.getTime())) {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    }
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
 
@@ -339,6 +344,13 @@ export class ExpensesService {
 
   /** Create a personal or group expense. */
   async createExpense(userId: string, dto: CreateExpenseDto): Promise<Record<string, unknown>> {
+    if (!dto.splits || !Array.isArray(dto.splits) || dto.splits.length === 0) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Splits must be a non-empty array',
+      });
+    }
+
     const ownerUser = await this.userRepository.findOne({ where: { id: userId } });
     if (!ownerUser) {
       throw new NotFoundException('User not found');

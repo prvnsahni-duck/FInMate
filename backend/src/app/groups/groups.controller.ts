@@ -21,6 +21,7 @@ import {
   GroupsCrudService,
   GroupsMembershipService,
 } from './services';
+import { SuccessResponse } from '../common/response.util';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard)
@@ -38,9 +39,8 @@ export class GroupsController {
     @Body() createGroupDto: CreateGroupDto,
     @Req() req: Request & { user: { id: string } & Record<string, unknown> },
   ) {
-    // req.user is typed narrowly by JwtAuthGuard; cast to User is safe here
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return this.groupsCrudService.createGroup(req.user as unknown as Parameters<typeof this.groupsCrudService.createGroup>[0], createGroupDto);
+    const result = await this.groupsCrudService.createGroup(req.user as unknown as Parameters<typeof this.groupsCrudService.createGroup>[0], createGroupDto);
+    return new SuccessResponse('Group created successfully', result);
   }
 
 
@@ -51,11 +51,14 @@ export class GroupsController {
     @Query('isArchived') isArchived?: string,
     @Req() req?: Request & { user: { id: string } },
   ) {
-    const pageNum = page ? parseInt(page, 10) : 1;
-    const limitNum = limit ? parseInt(limit, 10) : 20;
+    let pageNum = page ? parseInt(page, 10) : 1;
+    let limitNum = limit ? parseInt(limit, 10) : 20;
+    if (isNaN(pageNum) || pageNum <= 0) pageNum = 1;
+    if (isNaN(limitNum) || limitNum <= 0) limitNum = 20;
     const isArchivedBool = isArchived === 'true' ? true : isArchived === 'false' ? false : undefined;
 
-    return this.groupsCrudService.listGroups(req!.user.id, pageNum, limitNum, isArchivedBool);
+    const result = await this.groupsCrudService.listGroups(req!.user.id, pageNum, limitNum, isArchivedBool);
+    return new SuccessResponse('Groups retrieved successfully', result);
   }
 
   @Post('join/:inviteToken')
@@ -63,12 +66,14 @@ export class GroupsController {
     @Param('inviteToken', ParseUUIDPipe) inviteToken: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsMembershipService.joinGroupByToken(req.user.id, inviteToken);
+    const result = await this.groupsMembershipService.joinGroupByToken(req.user.id, inviteToken);
+    return new SuccessResponse('Joined group successfully', result);
   }
 
   @Get('invitations/pending')
   async findPendingInvitations(@Req() req: Request & { user: { id: string } }) {
-    return this.groupsMembershipService.getPendingInvitations(req.user.id);
+    const result = await this.groupsMembershipService.getPendingInvitations(req.user.id);
+    return new SuccessResponse('Pending group invitations retrieved successfully', result);
   }
 
   @Get(':id')
@@ -76,7 +81,8 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsCrudService.findGroupById(req.user.id, id);
+    const result = await this.groupsCrudService.findGroupById(req.user.id, id);
+    return new SuccessResponse('Group retrieved successfully', result);
   }
 
   @Patch(':id')
@@ -85,7 +91,8 @@ export class GroupsController {
     @Body() updateGroupDto: UpdateGroupDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsCrudService.updateGroup(req.user.id, id, updateGroupDto);
+    const result = await this.groupsCrudService.updateGroup(req.user.id, id, updateGroupDto);
+    return new SuccessResponse('Group updated successfully', result);
   }
 
   @Post(':id/invite-link/regenerate')
@@ -93,7 +100,8 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsCrudService.regenerateInviteToken(req.user.id, id);
+    const result = await this.groupsCrudService.regenerateInviteToken(req.user.id, id);
+    return new SuccessResponse('Invite token regenerated successfully', result);
   }
 
   // ─── Group History ────────────────────────────────────────────────────────
@@ -109,7 +117,8 @@ export class GroupsController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsAuditService.getGroupHistory(req.user.id, id, page, limit);
+    const result = await this.groupsAuditService.getGroupHistory(req.user.id, id, page, limit);
+    return new SuccessResponse('Group history retrieved successfully', result);
   }
 
   /**
@@ -122,7 +131,8 @@ export class GroupsController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.expensesCarryForwardService.listDeletedExpenses(req.user.id, id, page, limit);
+    const result = await this.expensesCarryForwardService.listDeletedExpenses(req.user.id, id, page, limit);
+    return new SuccessResponse('Deleted expenses retrieved successfully', result);
   }
 
   // ─── Carry-Forward Summary ────────────────────────────────────────────────
@@ -139,7 +149,8 @@ export class GroupsController {
   ) {
     // Default to current month if not provided
     const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
-    return this.expensesCarryForwardService.getCarryForwardSummary(req.user.id, id, ledgerMonth);
+    const result = await this.expensesCarryForwardService.getCarryForwardSummary(req.user.id, id, ledgerMonth);
+    return new SuccessResponse('Carry-forward summary retrieved successfully', result);
   }
 
   @Get(':id/contributions')
@@ -149,7 +160,8 @@ export class GroupsController {
     @Req() req: Request & { user: { id: string } },
   ) {
     const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
-    return this.groupsContributionsService.getContributions(req.user.id, id, ledgerMonth);
+    const result = await this.groupsContributionsService.getContributions(req.user.id, id, ledgerMonth);
+    return new SuccessResponse('Group contribution shares retrieved successfully', result);
   }
 
   @Post(':id/contributions')
@@ -158,6 +170,7 @@ export class GroupsController {
     @Body() dto: UpdateContributionDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    return this.groupsContributionsService.updateContributions(req.user.id, id, dto);
+    const result = await this.groupsContributionsService.updateContributions(req.user.id, id, dto);
+    return new SuccessResponse('Group contribution shares updated successfully', result);
   }
 }

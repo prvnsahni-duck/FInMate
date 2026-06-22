@@ -1,5 +1,6 @@
 import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
 import { GroupsMembershipService } from './services';
+import { SuccessResponse } from '../common/response.util';
 
 @Controller('invite-links')
 export class InviteController {
@@ -7,6 +8,7 @@ export class InviteController {
 
   @Get(':inviteToken')
   async getDetails(@Param('inviteToken', ParseUUIDPipe) inviteToken: string) {
-    return this.groupsMembershipService.getInviteDetails(inviteToken);
+    const result = await this.groupsMembershipService.getInviteDetails(inviteToken);
+    return new SuccessResponse('Invite link details retrieved successfully', result);
   }
 }
