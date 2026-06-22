@@ -1,43 +1,90 @@
 # FinMate Architecture Overview
 
-## Workspace Layout
-
-FinMate is an Nx monorepo containing three primary packages and supporting infrastructure:
-
-```mermaid
-graph TD
-    subgraph "Nx Workspace"
-        FE["frontend<br/>(Angular 21)"]
-        BE["backend<br/>(NestJS)"]
-        DM["shared/data-models<br/>(TypeScript Library)"]
-        UT["shared/utils<br/>(TypeScript Library)"]
-    end
-
-    FE -->|imports entities, DTOs, types| DM
-    BE -->|imports entities, DTOs, types| DM
-    FE -.->|proxy /api → :3000/api/v1| BE
-    BE -->|TypeORM| DB[(PostgreSQL)]
-    BE -->|Cache| RD[(Redis)]
-
-    style FE fill:#4facfe,color:#fff
-    style BE fill:#00f2fe,color:#000
-    style DM fill:#818cf8,color:#fff
-    style DB fill:#34d399,color:#000
-    style RD fill:#f87171,color:#fff
-```
-
-### Package Descriptions
-
-| Package | Path | Purpose |
-|---------|------|---------|
-| `frontend` | `frontend/` | Angular 21 SPA with standalone components, NGXS state, Tailwind CSS |
-| `backend` | `backend/` | NestJS REST API with JWT auth, TypeORM, PostgreSQL |
-| `data-models` | `shared/data-models/` | Shared TypeORM entities, DTOs, validation classes, response types |
-| `utils` | `shared/utils/` | Shared utility functions |
+FinMate is a secure, collaborative personal and group finance application built as an **Nx monorepo**. It features a zero-knowledge (ZK) client-side encryption design, relational database consistency, high-performance API endpoints, and a responsive Angular progressive web app (PWA).
 
 ---
 
-## Backend Architecture
+## 1. Monorepo Workspace Overview
+
+FinMate leverages an **Nx Monorepo** structure to coordinate frontend applications, backend services, and shared TypeScript libraries under a unified build, test, and linting pipeline.
+
+```mermaid
+graph TD
+    subgraph "Nx Monorepo Workspace"
+        FE["frontend<br/>(Angular 21 SPA & PWA)"]
+        BE["backend<br/>(NestJS + Express REST API)"]
+        DM["shared/data-models<br/>(Shared TS Entities & DTOs)"]
+        UT["shared/utils<br/>(TypeScript Utilities)"]
+    end
+
+    FE -->|imports types, DTOs, entities| DM
+    BE -->|imports types, DTOs, entities| DM
+    FE -->|imports utility functions| UT
+    BE -->|imports utility functions| UT
+
+    FE -.->|proxy /api → :3000/api/v1| BE
+    BE -->|TypeORM| DB[(PostgreSQL 16 Primary)]
+    BE -->|Cache & Sessions| RD[(Redis 7.x)]
+```
+
+### Directory Structure & Packages
+
+| Package / Library | Path | Technology / Framework | Role |
+| :--- | :--- | :--- | :--- |
+| **`frontend`** | `frontend/` | Angular 21, Standalone Components, RxJS, NGXS, Tailwind CSS | The user-facing Single Page Application and progressive web app (PWA), including native compilation configuration via Capacitor. |
+| **`backend`** | `backend/` | NestJS, Express, TypeORM | The RESTful application server managing API requests, database queries, caching, and audit logging. |
+| **`data-models`** | `shared/data-models/` | TypeScript, class-validator, TypeORM entities | The shared code library containing base data models, DTOs (Data Transfer Objects), validation rules, and central type definitions. |
+| **`utils`** | `shared/utils/` | TypeScript | Shared mathematical and operational utility functions, such as the minimum transaction split-debt calculator. |
+
+---
+
+## 2. Security & Zero-Knowledge (ZK) Cryptography Model
+
+Security and user privacy are core columns of FinMate's architecture. It operates a hybrid encryption model ensuring zero-knowledge privacy for transactional descriptions and notes, combined with server-side column encryption for numerical storage.
+
+```mermaid
+sequenceDiagram
+    participant User as Client Browser (Angular)
+    participant Crypt as Client Crypt-Engine (AES-256)
+    participant API as NestJS Backend (Express)
+    participant DB as PostgreSQL Database
+
+    Note over User,Crypt: Client-Side (Zero-Knowledge)
+    User->>User: Enter transaction details (Title: "Rent", Amount: 1500)
+    User->>Crypt: Encrypt Title / Notes with local key (never sent to server)
+    Crypt-->>User: Returns ciphertext (base64)
+    User->>API: POST /expenses (Ciphertext Title, Plaintext Amount)
+    
+    Note over API,DB: Server-Side Processing
+    API->>API: Value Transformer encrypts Amount using ENCRYPTION_KEY
+    API->>DB: INSERT into expenses (encrypted_title, encrypted_amount)
+    DB-->>API: Persisted
+    API-->>User: HTTP 201 Created
+```
+
+### Encryption Breakdown
+
+1. **Client-Side (Zero-Knowledge) Encryption**:
+   - **Fields**: Expense `title`, Expense `description`, and Note `body`.
+   - **Mechanism**: Encrypted using **AES-256-GCM** on the client device. The derived master keys for client-side encryption are retained exclusively in-memory as non-extractable `CryptoKey` objects. No `sessionStorage` or local storage cache is maintained, preventing XSS-based key exfiltration.
+2. **Server-Side (At-Rest) Encryption**:
+   - **Fields**: Expense `amount_total`, split `amount_owed`, and sensitive user Profile details.
+   - **Mechanism**: Encrypted before writing to the database using TypeORM value transformers (AES-256-CBC/GCM) leveraging the server's `ENCRYPTION_KEY`.
+3. **Authentication & Session Security**:
+   - **JWT Tokens**: Dual token architecture consisting of short-lived `access_tokens` (15 mins) and HTTP-only, secure `refresh_tokens` (7 days) signed via HS256.
+   - **Redis Session Caching**: Active session refresh token IDs (`refreshId`) are stored in Redis. To mitigate database compromise or session hijacking, key identifiers in Redis are stored deterministically as `refresh_token:${userId}:${sha256(refreshId)}`, and the value stored is the Argon2 hash of the `refreshId`.
+   - **Two-Factor Authentication (MFA)**: TOTP verification via authenticator apps, with secrets encrypted in PostgreSQL using AES-256-GCM.
+4. **Rate Limiting**:
+   - Enforced using Redis and `@nestjs/throttler`:
+     - Global API paths: Max 100 requests / minute.
+     - Sensitive auth routes: Max 5 requests / minute.
+   - Security headers are enforced globally via Helmet.
+
+---
+
+## 3. Backend Architecture (NestJS)
+
+The NestJS backend operates as a modular REST API configured with standard controllers and services.
 
 ### Module Structure
 
@@ -57,71 +104,79 @@ graph LR
     Auth --> Passport[PassportModule]
 ```
 
-### Request Flow
+### Request Lifecycle
 
 ```
-Client Request
-  → Helmet (security headers)
-  → CORS check
-  → ThrottlerGuard (rate limiting)
-  → JwtAuthGuard (authentication)
-  → ValidationPipe (DTO validation)
-  → Controller → Service → TypeORM Repository → PostgreSQL
-  → HttpExceptionFilter (error formatting)
-  → Response
+Incoming Request
+  └── Helmet Middleware (Security Headers)
+        └── CORS Interceptor (Allowed Origins Validation)
+              └── ThrottlerGuard (Redis-backed Rate Limiter)
+                    └── JwtAuthGuard (Token Verification & Extraction)
+                          └── ValidationPipe (DTO Schema Integrity)
+                                └── Controller Handler
+                                      └── Service Layer / TypeORM Repositories
+                                            └── Database / Cache Mutators
+                                                  └── Central Response Utilities (SuccessResponse)
+                                                        └── Centralized Error Filter (HttpExceptionFilter)
+                                                              └── Outgoing Response
 ```
-
-### Database Layer
-
-- **ORM**: TypeORM with PostgreSQL
-- **Naming**: `SnakeNamingStrategy` (all DB columns use `snake_case`)
-- **Migrations**: Stored in `backend/src/migrations/`, exported via barrel `index.ts`
-- **Entities**: Defined in `shared/data-models/src/lib/`, imported via `@finmate/data-models`
-- **Optimistic Locking**: Entities use `@VersionColumn()` for conflict detection
-- **Soft Deletes**: Expenses support soft delete via `@DeleteDateColumn()`
 
 ### Key Entities
 
 | Entity | Description |
 |--------|-------------|
-| `User` | Account with email, password hash, 2FA support |
+| `User` | Account with email, username, phone number, password hash, status, and 2FA support |
 | `Profile` | Extended user profile data |
-| `Group` | Expense group (normal, household, trip types) |
-| `GroupMember` | Membership with role (owner/admin/member/viewer/spectator) |
+| `Group` | Expense group (normal, household, trip types) with invite token and settings |
+| `GroupMember` | Membership link with role (owner/admin/member/viewer/spectator) and joinStatus |
 | `GroupMemberContribution` | Custom contribution percentages per ledger month |
-| `Expense` | Expense record with soft delete and carry-forward |
-| `ExpenseSplit` | Individual split allocation per participant |
+| `Expense` | Expense record with soft delete, ledgerMonth, and carry-forward flag |
+| `ExpenseSplit` | Individual split allocation (fixed, equal, percent, share splits) |
 | `Settlement` | Payment settlement between users |
-| `Note` | User notes/memos |
-| `Goal` | Financial goals |
-| `Attachment` | File attachments for expenses/notes/goals |
 | `AuditLog` | Action audit trail |
 
-### Security & Cryptography
+---
 
-- **Authentication**: JWT access + refresh tokens via `@nestjs/passport` (15-minute access token, 7-day refresh token).
-- **Password Hashing**: Argon2 for user passwords.
-- **Argon2 Hashed Refresh Tokens in Redis**: Active session refresh token IDs (`refreshId`) are stored in Redis. To mitigate database compromise or session hijacking, key identifiers in Redis are stored deterministically as `refresh_token:${userId}:${sha256(refreshId)}`, and the value stored is the Argon2 hash of the `refreshId`.
-- **Zero-Knowledge Key Model**: On the Angular frontend, derived master keys for client-side encryption are retained exclusively in-memory as non-extractable `CryptoKey` objects. No `sessionStorage` or local storage cache is maintained, preventing XSS-based key exfiltration.
-- **Two-Factor Authentication (MFA)**: TOTP verification via authenticator apps, with secrets encrypted in PostgreSQL using AES-256-GCM.
-- **Rate Limiting**: `@nestjs/throttler` enforces request limit limits globally.
-- **Security Headers**: Helmet middleware configured globally.
+## 4. Database Schema & Ledger Design
+
+The PostgreSQL database enforces relational integrity and ACID compliance, which is vital for ledger auditability.
+
+```mermaid
+erDiagram
+    users ||--|| profiles : "has (1:1)"
+    users ||--o{ groups : "owns (1:N)"
+    users ||--o{ group_members : "joins (1:N)"
+    groups ||--o{ group_members : "contains (1:N)"
+
+    users ||--o{ expenses : "paid_by (1:N)"
+    users ||--o{ expenses : "owns (1:N)"
+    groups ||--o{ expenses : "includes (1:N)"
+
+    expenses ||--o{ expense_splits : "split_into (1:N)"
+    users o|--o{ expense_splits : "participant_user (0:N)"
+    group_members o|--o{ expense_splits : "participant_member (0:N)"
+
+    groups ||--o{ settlements : "settles (1:N)"
+    users ||--o{ settlements : "debtor (1:N)"
+    users ||--o{ settlements : "creditor (1:N)"
+
+    users ||--o{ audit_logs : "logs (1:N)"
+```
+
+### Critical Ledger Mechanics
+
+1. **Database Transactions**:
+   All write operations for group settlements and expense spreadsheet imports are executed inside explicit TypeORM database transaction blocks. Any individual validation error triggers a rollback of the entire batch.
+2. **Concurrency Control (Optimistic Locking)**:
+   To prevent concurrent updates from overwriting ledger states, entities contain a `@VersionColumn()` configuration. Transactions fail with a conflict error (`CON_VERSION_CONFLICT`) if their version is stale, triggering client reconciliation via an Angular conflict modal.
+3. **Soft Deletes**:
+   Expenses and splits use soft-deletion patterns through `@DeleteDateColumn()` (stored with `deletedAt`) to preserve ledger history and allow easy restorations within a 7-day grace period.
+4. **Roll-over / Carry-Forward Support**:
+   Household groups can toggle `carryForwardEnabled`. Finalizing a ledger month calculates net balances ($P_u - T_u$) and generates carry-forward expenses under the next ledger month automatically.
 
 ---
 
-## Ledger & Database Transaction Safety
-
-### Database Transactions
-All write operations for group settlements and expense spreadsheet imports are executed inside explicit TypeORM database transaction blocks. This ensures that:
-- For settlements, creation, verification, and status updates (confirmed/cancelled) are atomic and consistent.
-- For imports, rows and their corresponding expense split associations are validated collectively, and any individual row validation error triggers a rollback of the entire import batch.
-
-### Concurrency Control
-Version columns (`@VersionColumn()`) on entities like `Settlement` act as an optimistic locking mechanism to prevent race conditions during concurrent modifications.
-
----
-
-## Multi-Currency Ledgers & Friends Balances
+## 5. Multi-Currency Ledgers & Friends Balances
 
 ### Currency Consistency
 To prevent ledger balance corruption:
@@ -135,66 +190,44 @@ Friends balances across all mutual groups are grouped by currency. To prevent fr
 
 ---
 
-## Immutable Audit Logging
+## 6. Immutable Audit Logging
 
-An active, write-only audit trail logs high-priority actions for:
-1. **Authentication**: Successful logins, MFA enablement, MFA verification/activation, and MFA disabling.
-2. **Groups**: Group creation, info updates, member invitations, membership joins, role changes, and member removals.
-3. **Settlements**: Settlement proposal, confirmation, and cancellation.
-4. **Imports**: Successful expense spreadsheet imports.
-
-### Privacy Compliance
+An active, write-only audit trail logs high-priority actions for authentication, group configuration, settlements, and spreadsheet imports.
 To protect user privacy:
 - The actor's requesting IP address is hashed using SHA-256 (`ipHash`) before being written to the database.
 - Request User Agent details and other non-sensitive operational parameters are saved in the `metadataJson` field.
 
-## Frontend Architecture
+---
 
-### Structure
+## 7. Frontend Architecture (Angular 21)
 
-```
-frontend/src/
-├── app/
-│   ├── core/                  # Singletons (auth, interceptors, services)
-│   │   ├── auth/              # AuthService, AuthGuard, AuthState (NGXS)
-│   │   ├── interceptors/      # JWT, error, optimistic-lock interceptors
-│   │   ├── services/          # Encryption, automerge, conflict-modal
-│   │   └── constants/         # App-wide constants
-│   ├── features/              # Feature modules (lazy-loaded)
-│   │   ├── groups/            # Group management + expenses
-│   │   └── friends/           # Friends & balances
-│   └── shared/                # Shared components, pipes, models
-├── environments/              # environment.ts, environment.prod.ts
-└── styles.scss                # Global Tailwind + safe-area CSS
-```
+The frontend is a modern Angular SPA designed with standalone components, fine-grained reactivity, and offline-first functionality.
 
-### State Management
+### Layout & Routing
+- **Lazy Loading**: Route configurations isolate feature bundles (`groups`, `friends`) and load them dynamically to keep initial package sizes optimized.
+- **Organization**:
+  - `core/`: Singleton services, auth guards, interceptors, and cryptographic engines.
+  - `features/`: Isolated layout contexts containing dashboard and feature tabs.
+  - `shared/`: Reusable components (e.g., custom Submit Buttons, Confirm Modals), custom pipes, and utility classes.
 
-FinMate uses a hybrid approach:
+### State & Reactivity
+FinMate uses a three-tier hybrid reactivity structure:
 
 | Layer | Technology | Use Case |
 |-------|-----------|----------|
-| **Local UI** | Angular Signals | Toggles, form state, derived values |
+| **Local UI** | Angular Signals | Toggles, form state, local filters, and derived values |
 | **Async Streams** | RxJS | HTTP requests, debounced inputs, event composition |
 | **Global State** | NGXS | Auth state, cached entities, user preferences |
 
 ### Styling
-
-- **Primary**: Tailwind CSS v3 with custom `finmate` color palette
-- **Fallback**: SCSS for complex keyframes or cases Tailwind can't cover
-- **Dark Mode**: Class-based (`dark` class on `<html>`)
-- **Mobile-First**: Responsive breakpoints (xs → 2xl) in Tailwind config
-- **Safe Areas**: iOS notch/bottom inset CSS variables
-
-### API Communication
-
-- All services use `environment.apiBaseUrl` (from `environments/environment.ts`)
-- Dev proxy (`proxy.conf.json`) rewrites `/api` → `http://localhost:3000/api/v1`
-- Interceptors handle JWT injection, error formatting, and optimistic lock conflicts
+- **Primary**: Tailwind CSS v3 with custom `finmate` color palette.
+- **Fallback**: SCSS for complex keyframes or cases Tailwind can't cover.
+- **Dark Mode**: Class-based (`dark` class on `<html>`).
+- **Safe Areas**: iOS notch/bottom inset CSS variables.
 
 ---
 
-## Environment Variables
+## 8. Environment Variables
 
 All backend environment variables are documented in `.env.example`. Key variables:
 
@@ -204,16 +237,14 @@ All backend environment variables are documented in `.env.example`. Key variable
 | `REDIS_URL` | ✅ | Redis connection string |
 | `JWT_SECRET` | ✅ | JWT signing secret |
 | `JWT_REFRESH_SECRET` | ✅ | Refresh token secret |
-| `ENCRYPTION_KEY` | ✅ | AES-256 encryption key |
+| `ENCRYPTION_KEY` | ✅ | AES-256 server-side encryption key |
 | `FRONTEND_URL` | ✅ | Frontend origin (CORS + invite links) |
 | `CORS_ORIGINS` | ❌ | Comma-separated additional CORS origins |
-| `RESEND_API_KEY` | ❌ | Email service API key |
-| `OPENAI_API_KEY` | ❌ | AI categorization API key |
 | `PORT` | ❌ | Server port (default: 3000) |
 
 ---
 
-## Infrastructure
+## 9. Infrastructure Scripts
 
 ### Local Development
 
@@ -224,10 +255,10 @@ docker-compose up -d
 # Run database migrations
 npm run db:migrate
 
-# Start backend (Terminal 1)
+# Start backend
 npx nx serve backend
 
-# Start frontend (Terminal 2)
+# Start frontend
 npx nx serve frontend
 ```
 
