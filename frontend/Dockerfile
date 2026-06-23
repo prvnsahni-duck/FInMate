@@ -22,7 +22,7 @@ RUN npx nx build frontend --configuration=production
 FROM nginx:stable-alpine
 
 # Copy custom nginx config that handles SPA routing
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
+COPY frontend/nginx.conf /etc/nginx/templates/default.conf.template
 
 # Copy the built Angular app (browser sub-folder contains index.html + assets)
 COPY --from=builder /app/dist/frontend/browser /usr/share/nginx/html
