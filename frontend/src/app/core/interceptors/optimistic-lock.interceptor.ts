@@ -5,7 +5,7 @@ import {
   HttpInterceptorFn,
 } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { catchError, switchMap, throwError } from 'rxjs';
+import { catchError, map, switchMap, throwError } from 'rxjs';
 import { AutomergeService } from '../services/automerge.service';
 import { ConflictModalService } from '../services/conflict-modal.service';
 import { ConflictErrorResponse } from '../../shared/models/conflict.types';
@@ -47,6 +47,7 @@ export const optimisticLockInterceptor: HttpInterceptorFn = (req, next) => {
       const localVersion = (localPayload['version'] as number) ?? 0;
 
       return bypassClient.get<Record<string, unknown>>(req.url).pipe(
+        map((res: any) => res?.success === true && res?.data !== undefined ? res.data : res),
         switchMap((serverState) => {
           const overlappingFields = automerge.detectOverlap(
             localPayload,

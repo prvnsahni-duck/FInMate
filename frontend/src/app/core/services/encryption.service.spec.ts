@@ -184,9 +184,9 @@ describe('ClientEncryptionService', () => {
     expect(service.getKey()).toBeNull();
 
     // 3. Re-store and test loadKeyFromSession
-    await service.deriveAndStoreKey(password, email);
+    const key2 = await service.deriveAndStoreKey(password, email);
     const loadedKey = await service.loadKeyFromSession(email);
-    expect(loadedKey).toBe(key);
+    expect(loadedKey).toBe(key2);
     
     // Cleanup
     service.clearKey(email);

@@ -9,6 +9,7 @@ import { appRoutes } from './app.routes';
 import { optimisticLockInterceptor } from './core/interceptors/optimistic-lock.interceptor';
 import { jwtInterceptor } from './core/interceptors/jwt.interceptor';
 import { errorInterceptor } from './core/interceptors/error.interceptor';
+import { responseInterceptor } from './core/interceptors/response.interceptor';
 import { provideStore } from '@ngxs/store';
 import { withNgxsReduxDevtoolsPlugin } from '@ngxs/devtools-plugin';
 import { withNgxsLoggerPlugin } from '@ngxs/logger-plugin';
@@ -19,7 +20,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes),
-    provideHttpClient(withInterceptors([jwtInterceptor, optimisticLockInterceptor, errorInterceptor])),
+    provideHttpClient(withInterceptors([responseInterceptor, jwtInterceptor, optimisticLockInterceptor, errorInterceptor])),
     provideStore(
       [AuthState], // Register AuthState
       withNgxsReduxDevtoolsPlugin(),
