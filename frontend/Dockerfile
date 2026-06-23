@@ -4,6 +4,7 @@
 
 FROM node:20-alpine AS builder
 WORKDIR /app
+ENV NX_DAEMON=false
 
 # 1. Copy lockfile + package.json first (better layer caching)
 COPY package.json package-lock.json ./
