@@ -5,8 +5,8 @@ import { UpdateExpenseDto } from './update-expense.dto';
 
 describe('Expenses DTO validation', () => {
   const validCreatePayload = {
-    title: 'Dinner',
-    description: 'Team dinner',
+    title: 'aGVsbG8=:d29ybGQ=',
+    description: 'aGVsbG8=:d29ybGQ=',
     amountTotal: 120.5,
     currency: 'USD',
     category: 'Food',

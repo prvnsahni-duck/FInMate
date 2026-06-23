@@ -474,12 +474,12 @@ To enforce a Zero-Knowledge Architecture, user data containing transactional det
 | | `role`, `join_status`, `joined_at` | Plaintext | ❌ | Enforces RBAC permissions. |
 | **Expense** | `id`, `paid_by_user_id`, `group_id` | Plaintext | ❌ | Primary/foreign keys. |
 | | `currency`, `expense_date`, `status` | Plaintext | ❌ | Indexing, sorting, and balance calculations. |
-| | `amount_total` | SSE | ⚠️ (Optional) | Numeric totals for smart analytics (opt-in). |
+| | `amount_total` | Plaintext | ⚠️ (Optional) | Numeric totals for smart analytics (opt-in). |
 | | `category` | Plaintext | ⚠️ (Optional) | Categorization tags for spending analysis. |
 | | `title`, `description` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Private transaction contents. Zero-knowledge. |
 | **ExpenseSplit**| `id`, `expense_id`, `split_type` | Plaintext | ❌ | Database constraints. |
 | | `share_value`, `is_settled` | Plaintext | ❌ | Settlement balance processing. |
-| | `amount_owed` | SSE | ❌ | Owed amount calculations. |
+| | `amount_owed` | Plaintext | ❌ | Owed amount calculations. |
 | **Settlement** | `id`, `group_id`, `from_user_id`, `to_user_id` | Plaintext | ❌ | Core relation indicators. |
 | | `amount`, `currency`, `status` | Plaintext | ❌ | Ledger balance updates. |
 | | `note` | Client-Side (ZK) | ❌ | Personal payment notes. Zero-knowledge. |

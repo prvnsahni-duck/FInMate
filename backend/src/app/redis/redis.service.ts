@@ -76,4 +76,17 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       throw new ServiceUnavailableException('Cache service is temporarily unavailable');
     }
   }
+
+  async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      const result = await this.client.set(key, value, {
+        NX: true,
+        EX: ttlSeconds,
+      });
+      return result === 'OK';
+    } catch (err: any) {
+      this.logger.error(`Redis setNx operation failed: ${err.message}`, err.stack);
+      return false;
+    }
+  }
 }

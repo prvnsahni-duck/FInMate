@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EncryptionService } from './encryption.service';
 import { ConfigService } from '@nestjs/config';
+import { encryptionTransformer } from '@finmate/data-models';
 
 describe('EncryptionService', () => {
   let service: EncryptionService;
@@ -48,7 +49,7 @@ describe('EncryptionService', () => {
     
     it('should transform number to encrypted string on saving', () => {
       const value = 123.45;
-      const dbValue = require('@finmate/data-models').encryptionTransformer.to(value);
+      const dbValue = encryptionTransformer.to(value);
       expect(dbValue).toBeDefined();
       expect(typeof dbValue).toBe('string');
       expect(dbValue).not.toBe('123.45');
@@ -59,15 +60,15 @@ describe('EncryptionService', () => {
 
     it('should transform encrypted string back to number on reading', () => {
       const value = 123.45;
-      const dbValue = require('@finmate/data-models').encryptionTransformer.to(value);
+      const dbValue = encryptionTransformer.to(value);
       
-      const decoded = require('@finmate/data-models').encryptionTransformer.from(dbValue);
+      const decoded = encryptionTransformer.from(dbValue);
       expect(decoded).toBe(123.45);
     });
 
     it('should fallback to original number if decryption fails', () => {
       const plaintext = '456.78';
-      const decoded = require('@finmate/data-models').encryptionTransformer.from(plaintext);
+      const decoded = encryptionTransformer.from(plaintext);
       expect(decoded).toBe(456.78);
     });
   });

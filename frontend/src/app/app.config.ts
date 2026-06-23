@@ -14,6 +14,7 @@ import { provideStore } from '@ngxs/store';
 import { withNgxsReduxDevtoolsPlugin } from '@ngxs/devtools-plugin';
 import { withNgxsLoggerPlugin } from '@ngxs/logger-plugin';
 import { AuthState } from './core/auth/auth.state';
+import { RecurringExpensesState } from './core/recurring-expenses/recurring-expenses.state';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -22,7 +23,7 @@ export const appConfig: ApplicationConfig = {
     provideRouter(appRoutes),
     provideHttpClient(withInterceptors([responseInterceptor, jwtInterceptor, optimisticLockInterceptor, errorInterceptor])),
     provideStore(
-      [AuthState], // Register AuthState
+      [AuthState, RecurringExpensesState], // Register AuthState and RecurringExpensesState
       withNgxsReduxDevtoolsPlugin(),
       withNgxsLoggerPlugin()
     )

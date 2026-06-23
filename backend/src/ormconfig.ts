@@ -13,6 +13,8 @@ import {
   Goal,
   Attachment,
   AuditLog,
+  RecurringExpense,
+  RecurringExpenseSplit,
 } from '@finmate/data-models';
 import * as Migrations from './migrations';
 import { SnakeNamingStrategy } from './app/common/snake-naming-strategy';
@@ -33,6 +35,8 @@ export default new DataSource({
     GroupMemberContribution,
     Expense,
     ExpenseSplit,
+    RecurringExpense,
+    RecurringExpenseSplit,
     Settlement,
     Note,
     Goal,

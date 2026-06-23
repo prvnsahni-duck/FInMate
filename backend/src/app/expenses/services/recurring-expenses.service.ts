@@ -1,0 +1,389 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  PreconditionFailedException,
+} from '@nestjs/common';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import {
+  RecurringExpense,
+  RecurringExpenseSplit,
+  Expense,
+  ExpenseSplit,
+  Group,
+  GroupMember,
+  User,
+  CreateRecurringExpenseDto,
+  UpdateRecurringExpenseDto,
+} from '@finmate/data-models';
+import { DataSource, EntityManager, In, Repository } from 'typeorm';
+import { calculateDeterministicSplits } from '../split-calculator.util';
+
+@Injectable()
+export class RecurringExpensesService {
+  constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
+    @InjectRepository(RecurringExpense)
+    private readonly recurringExpenseRepository: Repository<RecurringExpense>,
+    @InjectRepository(RecurringExpenseSplit)
+    private readonly recurringExpenseSplitRepository: Repository<RecurringExpenseSplit>,
+    @InjectRepository(Group)
+    private readonly groupRepository: Repository<Group>,
+    @InjectRepository(GroupMember)
+    private readonly groupMemberRepository: Repository<GroupMember>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  private async getGroupMembership(userId: string, groupId: string): Promise<GroupMember | null> {
+    return this.groupMemberRepository.findOne({
+      where: { group: { id: groupId }, user: { id: userId }, joinStatus: In(['active', 'invited']) },
+      relations: ['user', 'group'],
+    });
+  }
+
+  private async ensureAccess(userId: string, template: RecurringExpense, write = false): Promise<void> {
+    if (!template.group) {
+      if (template.ownerUser.id !== userId) {
+        throw new ForbiddenException('You do not have access to this recurring expense');
+      }
+      return;
+    }
+
+    const membership = await this.getGroupMembership(userId, template.group.id);
+    if (!membership) {
+      throw new ForbiddenException('You do not have access to this recurring expense');
+    }
+
+    if (write) {
+      if (membership.joinStatus !== 'active') {
+        throw new ForbiddenException('You must accept the invitation first');
+      }
+      if (membership.role === 'viewer') {
+        throw new ForbiddenException('Viewers cannot modify recurring expenses');
+      }
+      if (membership.role === 'member' || membership.role === 'spectator') {
+        if (template.ownerUser.id !== userId && template.paidByUser.id !== userId) {
+          throw new ForbiddenException('Members can only modify their own recurring expenses');
+        }
+      }
+    }
+  }
+
+  private async buildGroupParticipantMaps(groupId: string, manager: EntityManager): Promise<{
+    groupMemberById: Map<string, GroupMember>;
+    activeOrInvitedByUserId: Map<string, GroupMember>;
+  }> {
+    const members = await manager.getRepository(GroupMember).find({
+      where: { group: { id: groupId }, joinStatus: In(['active', 'invited']) },
+      relations: ['user'],
+    });
+
+    const groupMemberById = new Map<string, GroupMember>();
+    const activeOrInvitedByUserId = new Map<string, GroupMember>();
+
+    for (const member of members) {
+      groupMemberById.set(member.id, member);
+      activeOrInvitedByUserId.set(member.user.id, member);
+    }
+
+    return { groupMemberById, activeOrInvitedByUserId };
+  }
+
+  private async persistSplits(
+    template: RecurringExpense,
+    dto: Pick<CreateRecurringExpenseDto, 'splits' | 'amountTotal' | 'paidByUserId' | 'groupId'>,
+    manager: EntityManager,
+  ): Promise<void> {
+    const payerKey = dto.groupId
+      ? (await manager.getRepository(GroupMember).findOne({
+          where: { group: { id: dto.groupId }, user: { id: dto.paidByUserId }, joinStatus: In(['active', 'invited']) },
+        }))?.id
+      : dto.paidByUserId;
+
+    const calculated = calculateDeterministicSplits(dto.amountTotal, dto.splits as any, payerKey);
+
+    if (!dto.groupId) {
+      const participantIds = [...new Set(dto.splits.map((split) => split.participantUserId || ''))].filter(Boolean);
+      const users = await manager.getRepository(User).find({ where: { id: In(participantIds) } });
+      const userMap = new Map(users.map((u) => [u.id, u]));
+
+      for (const split of calculated) {
+        const participantUser = split.participantUserId ? userMap.get(split.participantUserId) : undefined;
+        if (!participantUser) {
+          throw new BadRequestException({
+            errorCode: 'VAL_INVALID_INPUT',
+            message: 'Personal recurring expense participants must be valid users',
+          });
+        }
+
+        await manager.getRepository(RecurringExpenseSplit).save(
+          manager.getRepository(RecurringExpenseSplit).create({
+            recurringExpense: template,
+            participantUser,
+            splitType: split.splitType,
+            shareValue: split.shareValue,
+            amountOwed: split.amountOwed,
+          }),
+        );
+      }
+      return;
+    }
+
+    const { groupMemberById, activeOrInvitedByUserId } = await this.buildGroupParticipantMaps(dto.groupId, manager);
+
+    for (const split of calculated) {
+      const participantGroupMember = split.participantGroupMemberId
+        ? groupMemberById.get(split.participantGroupMemberId)
+        : undefined;
+      const participantByUser = split.participantUserId
+        ? activeOrInvitedByUserId.get(split.participantUserId)
+        : undefined;
+
+      const resolvedMember = participantGroupMember || participantByUser;
+
+      if (!resolvedMember) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'Each split participant must belong to the selected group',
+        });
+      }
+
+      if (resolvedMember.role === 'spectator') {
+        throw new BadRequestException({
+          errorCode: 'EXP_SPECTATOR_SPLIT',
+          message: 'Spectators cannot be included in splits',
+        });
+      }
+
+      await manager.getRepository(RecurringExpenseSplit).save(
+        manager.getRepository(RecurringExpenseSplit).create({
+          recurringExpense: template,
+          participantGroupMember: resolvedMember,
+          splitType: split.splitType,
+          shareValue: split.shareValue,
+          amountOwed: split.amountOwed,
+        }),
+      );
+    }
+  }
+
+  async createRecurringExpense(userId: string, dto: CreateRecurringExpenseDto): Promise<Record<string, any>> {
+    if (!dto.splits || dto.splits.length === 0) {
+      throw new BadRequestException('Splits cannot be empty');
+    }
+
+    const ownerUser = await this.userRepository.findOne({ where: { id: userId } });
+    if (!ownerUser) {
+      throw new NotFoundException('User not found');
+    }
+
+    const paidByUser = await this.userRepository.findOne({ where: { id: dto.paidByUserId } });
+    if (!paidByUser) {
+      throw new BadRequestException('paidByUser not found');
+    }
+
+    let group: Group | undefined;
+    if (dto.groupId) {
+      const membership = await this.getGroupMembership(userId, dto.groupId);
+      if (!membership || membership.joinStatus !== 'active' || membership.role === 'viewer') {
+        throw new ForbiddenException('No write access to this group');
+      }
+      group = await this.groupRepository.findOne({ where: { id: dto.groupId } });
+      if (!group) {
+        throw new NotFoundException('Group not found');
+      }
+    }
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const template = await manager.getRepository(RecurringExpense).save(
+        manager.getRepository(RecurringExpense).create({
+          title: dto.title,
+          description: dto.description,
+          amountTotal: dto.amountTotal,
+          currency: dto.currency.toUpperCase(),
+          category: dto.category,
+          paidByUser,
+          ownerUser,
+          group,
+          frequency: dto.frequency,
+          startDate: dto.startDate,
+          endDate: dto.endDate,
+          nextOccurrenceDate: dto.startDate,
+          status: 'active',
+        }),
+      );
+
+      await this.persistSplits(template, dto, manager);
+
+      return manager.getRepository(RecurringExpense).findOne({
+        where: { id: template.id },
+        relations: ['paidByUser', 'ownerUser', 'group'],
+      });
+    });
+
+    if (!saved) {
+      throw new NotFoundException('Failed to create recurring expense');
+    }
+
+    return this.mapResponse(saved);
+  }
+
+  async listRecurringExpenses(userId: string, groupId?: string): Promise<Record<string, any>[]> {
+    const membershipGroupIds = (await this.groupMemberRepository.find({
+      where: { user: { id: userId }, joinStatus: In(['active', 'invited']) },
+      relations: ['group'],
+    })).map((m) => m.group.id);
+
+    const query = this.recurringExpenseRepository
+      .createQueryBuilder('template')
+      .leftJoinAndSelect('template.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('template.ownerUser', 'ownerUser')
+      .leftJoinAndSelect('template.group', 'group');
+
+    if (groupId) {
+      if (groupId === 'personal') {
+        query.where('group.id IS NULL AND ownerUser.id = :userId', { userId });
+      } else {
+        if (!membershipGroupIds.includes(groupId)) {
+          throw new ForbiddenException('Access denied');
+        }
+        query.where('group.id = :groupId', { groupId });
+      }
+    } else {
+      query.where('group.id IS NULL AND ownerUser.id = :userId', { userId });
+      if (membershipGroupIds.length > 0) {
+        query.orWhere('group.id IN (:...groupIds)', { groupIds: membershipGroupIds });
+      }
+    }
+
+    const templates = await query.getMany();
+    return Promise.all(templates.map((t) => this.mapResponse(t)));
+  }
+
+  async getRecurringExpenseById(userId: string, id: string): Promise<Record<string, any>> {
+    const template = await this.recurringExpenseRepository.findOne({
+      where: { id },
+      relations: ['paidByUser', 'ownerUser', 'group'],
+    });
+    if (!template) {
+      throw new NotFoundException('Recurring expense not found');
+    }
+    await this.ensureAccess(userId, template, false);
+    return this.mapResponse(template);
+  }
+
+  async updateRecurringExpense(userId: string, id: string, dto: UpdateRecurringExpenseDto): Promise<Record<string, any>> {
+    const template = await this.recurringExpenseRepository.findOne({
+      where: { id },
+      relations: ['paidByUser', 'ownerUser', 'group'],
+    });
+    if (!template) {
+      throw new NotFoundException('Recurring expense not found');
+    }
+    await this.ensureAccess(userId, template, true);
+
+    if (template.version !== dto.version) {
+      throw new PreconditionFailedException('Version conflict');
+    }
+
+    if (dto.paidByUserId) {
+      const paidByUser = await this.userRepository.findOne({ where: { id: dto.paidByUserId } });
+      if (!paidByUser) {
+        throw new BadRequestException('paidByUserId not found');
+      }
+      template.paidByUser = paidByUser;
+    }
+
+    if (dto.title !== undefined) template.title = dto.title;
+    if (dto.description !== undefined) template.description = dto.description;
+    if (dto.amountTotal !== undefined) template.amountTotal = dto.amountTotal;
+    if (dto.currency !== undefined) template.currency = dto.currency.toUpperCase();
+    if (dto.category !== undefined) template.category = dto.category;
+    if (dto.frequency !== undefined) template.frequency = dto.frequency;
+    if (dto.startDate !== undefined) {
+      template.startDate = dto.startDate;
+      // Also reset nextOccurrenceDate if nextOccurrenceDate is before new startDate
+      if (new Date(template.nextOccurrenceDate) < new Date(dto.startDate)) {
+        template.nextOccurrenceDate = dto.startDate;
+      }
+    }
+    if (dto.endDate !== undefined) template.endDate = dto.endDate;
+    if (dto.status !== undefined) template.status = dto.status;
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(RecurringExpense).save(template);
+
+      if (dto.splits) {
+        await manager.getRepository(RecurringExpenseSplit).delete({ recurringExpense: { id: template.id } as any });
+        await this.persistSplits(template, {
+          splits: dto.splits,
+          amountTotal: dto.amountTotal ?? Number(template.amountTotal),
+          paidByUserId: dto.paidByUserId ?? template.paidByUser.id,
+          groupId: template.group?.id,
+        }, manager);
+      }
+
+      return manager.getRepository(RecurringExpense).findOne({
+        where: { id: template.id },
+        relations: ['paidByUser', 'ownerUser', 'group'],
+      });
+    });
+
+    if (!saved) {
+      throw new NotFoundException('Failed to update recurring expense');
+    }
+
+    return this.mapResponse(saved);
+  }
+
+  async deleteRecurringExpense(userId: string, id: string): Promise<void> {
+    const template = await this.recurringExpenseRepository.findOne({
+      where: { id },
+      relations: ['paidByUser', 'ownerUser', 'group'],
+    });
+    if (!template) {
+      throw new NotFoundException('Recurring expense not found');
+    }
+    await this.ensureAccess(userId, template, true);
+    await this.recurringExpenseRepository.delete({ id });
+  }
+
+  private async mapResponse(template: RecurringExpense): Promise<Record<string, any>> {
+    const splits = await this.recurringExpenseSplitRepository.find({
+      where: { recurringExpense: { id: template.id } },
+      relations: ['participantUser', 'participantGroupMember'],
+      order: { createdAt: 'ASC' },
+    });
+
+    return {
+      id: template.id,
+      title: template.title,
+      description: template.description ?? null,
+      amountTotal: Number(template.amountTotal),
+      currency: template.currency,
+      category: template.category,
+      paidByUserId: template.paidByUser.id,
+      ownerUserId: template.ownerUser.id,
+      groupId: template.group?.id ?? null,
+      frequency: template.frequency,
+      startDate: template.startDate,
+      endDate: template.endDate ?? null,
+      nextOccurrenceDate: template.nextOccurrenceDate,
+      status: template.status,
+      splits: splits.map((s) => ({
+        id: s.id,
+        participantUserId: s.participantUser?.id ?? null,
+        participantGroupMemberId: s.participantGroupMember?.id ?? null,
+        splitType: s.splitType,
+        shareValue: Number(s.shareValue),
+        amountOwed: Number(s.amountOwed),
+      })),
+      version: template.version,
+      createdAt: template.createdAt,
+      updatedAt: template.updatedAt,
+    };
+  }
+}

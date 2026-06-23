@@ -13,7 +13,7 @@ export class Note {
   @ManyToOne(() => Group, { nullable: true })
   group?: Group;
 
-  @Column({ type: 'varchar', length: 160 })
+  @Column({ type: 'text' })
   title!: string;
 
   @Column({ type: 'text' })

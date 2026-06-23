@@ -5,8 +5,8 @@
   "scripts": {
     "db:up": "docker compose up -d || docker-compose up -d",
     "db:down": "docker compose down || docker-compose down",
-    "db:migrate": "npx typeorm-ts-node-commonjs migration:run -d backend/src/ormconfig.ts",
-    "db:migrate:revert": "npx typeorm-ts-node-commonjs migration:revert -d backend/src/ormconfig.ts",
+    "db:migrate": "npx ts-node --project backend/tsconfig.app.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:run -d backend/src/ormconfig.ts",
+    "db:migrate:revert": "npx ts-node --project backend/tsconfig.app.json -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d backend/src/ormconfig.ts",
     "start:dev": "npx nx serve backend",
     "setup": "npm run db:up && npm run db:migrate && npm run start:dev"
   },
@@ -81,6 +81,7 @@
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/schedule": "^4.1.1",
     "@nestjs/swagger": "^11.4.4",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.1",

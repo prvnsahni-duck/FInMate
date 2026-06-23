@@ -141,6 +141,9 @@
           <button (click)="setTab('settings')" [class]="activeTab() === 'settings' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
             Settings
           </button>
+          <button (click)="setTab('recurring')" [class]="activeTab() === 'recurring' ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'" class="flex-1 py-2 rounded-xl text-sm font-bold transition-all">
+            Recurring
+          </button>
         </div>
 
         <!-- TAB: Ledger -->
@@ -626,6 +629,72 @@
           </div>
         }
 
+        <!-- TAB: Recurring -->
+        @if (activeTab() === 'recurring') {
+          <div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 animate-fade-in">
+            <div class="flex items-center justify-between mb-6">
+              <h2 class="text-xl font-bold">Recurring Expenses</h2>
+              @if (!isViewer()) {
+                <button (click)="openRecurringExpenseForm()" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2 px-4 rounded-xl flex items-center space-x-2 cursor-pointer">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                  <span>Create Schedule</span>
+                </button>
+              }
+            </div>
+
+            @if (recurringExpenses().length === 0) {
+              <div class="text-center py-12 text-slate-500 dark:text-slate-400">
+                No recurring expense schedules configured for this group.
+              </div>
+            } @else {
+              <div class="space-y-4">
+                @for (template of recurringExpenses(); track template.id) {
+                  <div class="p-5 bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <div class="flex items-center gap-3">
+                        <h3 class="font-bold text-slate-800 dark:text-white">{{ template.title }}</h3>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md bg-primary/10 text-primary">{{ template.frequency }}</span>
+                        <span [class]="template.status === 'active' ? 'bg-green-500/10 text-green-500' : 'bg-slate-300/20 text-slate-500'" class="px-2 py-0.5 text-[10px] font-bold uppercase rounded-md">
+                          {{ template.status }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ template.description || 'No description' }}</p>
+                      <div class="flex items-center gap-4 text-xs text-slate-400 mt-2">
+                        <span>Payer: {{ getUserName(template.paidByUser?.id || template.paidByUserId) }}</span>
+                        <span>Starts: {{ template.startDate }}</span>
+                        @if (template.endDate) {
+                          <span>Ends: {{ template.endDate }}</span>
+                        }
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 pt-3 md:pt-0 border-slate-100 dark:border-white/5">
+                      <span class="text-lg font-black text-slate-800 dark:text-white">{{ template.amountTotal | currency:template.currency }}</span>
+                      
+                      @if (!isViewer()) {
+                        <div class="flex items-center gap-2">
+                          <button (click)="toggleRecurringExpenseStatus(template)" [title]="template.status === 'active' ? 'Pause' : 'Resume'" class="p-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-all">
+                            @if (template.status === 'active') {
+                              <svg class="w-4 h-4 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            } @else {
+                              <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            }
+                          </button>
+                          <button (click)="openRecurringExpenseForm(template)" title="Edit" class="p-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-all text-slate-600 dark:text-slate-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                          </button>
+                          <button (click)="deleteRecurringExpense(template.id)" title="Delete" class="p-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-all text-red-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
       </div>
 
       <!-- Sidebar (Balances & Members) -->
@@ -681,4 +750,19 @@
     (confirm)="onCloseMonthConfirmed()"
     (cancel)="onCloseMonthCancelled()"
   ></app-confirm-modal>
+}
+
+@if (isRecurringExpenseFormOpen()) {
+  <div class="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="w-full max-w-2xl bg-white dark:bg-finmate-card rounded-3xl p-6 shadow-2xl relative animate-fade-in">
+      <app-recurring-expense-form
+        [groupId]="group()!.id"
+        [groupCurrency]="group()!.currency"
+        [members]="members()"
+        [template]="selectedRecurringExpenseForEdit()"
+        (saveSuccess)="onRecurringExpenseSaved()"
+        (cancel)="closeRecurringExpenseForm()"
+      ></app-recurring-expense-form>
+    </div>
+  </div>
 }

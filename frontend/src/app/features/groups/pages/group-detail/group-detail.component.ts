@@ -2,6 +2,8 @@ import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CreateExpenseModalComponent } from '../../components/create-expense-modal/create-expense-modal.component';
+import { RecurringExpenseFormComponent } from '../../components/recurring-expense-form/recurring-expense-form.component';
+import { RecurringExpensesService } from '../../services/recurring-expenses.service';
 import { jwtDecode } from 'jwt-decode';
 import { FormsModule } from '@angular/forms';
 import { AnalyticsChartsComponent } from '../../components/analytics-charts/analytics-charts.component';
@@ -54,6 +56,7 @@ export interface GroupExpense extends Expense {
     DatePipe,
     RouterLink,
     CreateExpenseModalComponent,
+    RecurringExpenseFormComponent,
     FormsModule,
     AnalyticsChartsComponent,
     ConfirmModalComponent,
@@ -68,6 +71,7 @@ export interface GroupExpense extends Expense {
 export class GroupDetailComponent implements OnInit, OnDestroy {
   private groupsService = inject(GroupsService);
   private expensesService = inject(ExpensesService);
+  private recurringExpensesService = inject(RecurringExpensesService);
   private route = inject(ActivatedRoute);
 
   private routeSub?: Subscription;
@@ -82,6 +86,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   historyLogs = signal<GroupAuditLog[]>([]);
   deletedExpenses = signal<Expense[]>([]);
   carryForwardBalances = signal<CarryForwardBalance[]>([]);
+  recurringExpenses = signal<any[]>([]);
 
   // Signals for ledger closure settings
   closeMonthSelected = signal<string>('');
@@ -92,7 +97,9 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
   // Signals for UI state
   isLoading = signal<boolean>(true);
-  activeTab = signal<'ledger' | 'analytics' | 'history' | 'trash' | 'settings'>('ledger');
+  activeTab = signal<'ledger' | 'analytics' | 'history' | 'trash' | 'settings' | 'recurring'>('ledger');
+  isRecurringExpenseFormOpen = signal<boolean>(false);
+  selectedRecurringExpenseForEdit = signal<any | null>(null);
   isExpenseModalOpen = signal<boolean>(false);
   isDeleteConfirmOpen = signal<boolean>(false);
   deleteExpenseId = signal<string | null>(null);
@@ -171,6 +178,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
             this.fetchBalances(groupId);
             this.fetchHistoryLogs(groupId);
             this.fetchDeletedExpenses(groupId);
+            this.fetchRecurringExpenses(groupId);
             if (res.groupType === 'household') {
               this.fetchCarryForward(groupId);
             }
@@ -520,7 +528,64 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   contributionError = '';
   contributionSuccess = '';
 
-  setTab(tab: 'ledger' | 'analytics' | 'history' | 'trash' | 'settings') {
+  fetchRecurringExpenses(groupId: string) {
+    this.recurringExpensesService.getRecurringExpenses(groupId).subscribe({
+      next: (res) => {
+        this.recurringExpenses.set(res || []);
+      },
+      error: (err) => console.error('Failed to fetch recurring expenses', err)
+    });
+  }
+
+  openRecurringExpenseForm(template?: any) {
+    this.selectedRecurringExpenseForEdit.set(template || null);
+    this.isRecurringExpenseFormOpen.set(true);
+  }
+
+  closeRecurringExpenseForm() {
+    this.selectedRecurringExpenseForEdit.set(null);
+    this.isRecurringExpenseFormOpen.set(false);
+  }
+
+  onRecurringExpenseSaved() {
+    const g = this.group();
+    if (g?.id) {
+      this.fetchRecurringExpenses(g.id);
+    }
+    this.closeRecurringExpenseForm();
+  }
+
+  deleteRecurringExpense(id: string) {
+    if (confirm('Are you sure you want to delete this recurring expense schedule?')) {
+      this.recurringExpensesService.deleteRecurringExpense(id).subscribe({
+        next: () => {
+          const g = this.group();
+          if (g?.id) {
+            this.fetchRecurringExpenses(g.id);
+          }
+        },
+        error: (err) => alert(err.error?.message || 'Failed to delete recurring expense')
+      });
+    }
+  }
+
+  toggleRecurringExpenseStatus(template: any) {
+    const nextStatus = template.status === 'active' ? 'paused' : 'active';
+    this.recurringExpensesService.updateRecurringExpense(template.id, {
+      status: nextStatus,
+      version: template.version
+    }).subscribe({
+      next: () => {
+        const g = this.group();
+        if (g?.id) {
+          this.fetchRecurringExpenses(g.id);
+        }
+      },
+      error: (err) => alert(err.error?.message || 'Failed to update status')
+    });
+  }
+
+  setTab(tab: 'ledger' | 'analytics' | 'history' | 'trash' | 'settings' | 'recurring') {
     this.activeTab.set(tab);
     if (tab === 'settings') {
       const g = this.group();
@@ -531,6 +596,11 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         this.editGroupCurrency = g.currency || 'USD';
         this.editGroupCarryForward = g.carryForwardEnabled || false;
         this.loadContributionsForMonth();
+      }
+    } else if (tab === 'recurring') {
+      const g = this.group();
+      if (g?.id) {
+        this.fetchRecurringExpenses(g.id);
       }
     }
   }

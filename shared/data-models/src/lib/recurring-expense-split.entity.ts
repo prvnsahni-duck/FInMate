@@ -1,16 +1,16 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, Check } from 'typeorm';
-import { Expense } from './expense.entity';
+import { RecurringExpense } from './recurring-expense.entity';
 import { User } from './user.entity';
 import { GroupMember } from './group-member.entity';
 
-@Entity('expense_splits')
+@Entity('recurring_expense_splits')
 @Check('("participantUserId" IS NOT NULL AND "participantGroupMemberId" IS NULL) OR ("participantUserId" IS NULL AND "participantGroupMemberId" IS NOT NULL)')
-export class ExpenseSplit {
+export class RecurringExpenseSplit {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @ManyToOne(() => Expense, { nullable: false })
-  expense!: Expense;
+  @ManyToOne(() => RecurringExpense, { nullable: false, onDelete: 'CASCADE' })
+  recurringExpense!: RecurringExpense;
 
   @ManyToOne(() => User, { nullable: true })
   participantUser?: User;
@@ -24,22 +24,12 @@ export class ExpenseSplit {
   @Column('decimal', { precision: 12, scale: 4 })
   shareValue!: number;
 
-  @Column('decimal', {
-    name: 'amount_owed',
-    precision: 12,
-    scale: 2,
-  })
-  amountOwed!: number;
+  @Column('decimal', { name: 'amount_owed', precision: 12, scale: 2 })
+  amountOwed!: number; // Plaintext decimal
 
-  @Column({ type: 'boolean', default: false })
-  isSettled!: boolean;
-
-  @Column({ type: 'timestamptz', nullable: true })
-  settledAt?: Date;
-
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date;
 }

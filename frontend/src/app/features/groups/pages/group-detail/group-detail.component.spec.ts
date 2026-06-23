@@ -10,11 +10,14 @@ import { FormsModule } from '@angular/forms';
 import { provideRouter } from '@angular/router';
 import { GroupMember } from '@finmate/data-models';
 
+import { RecurringExpensesService } from '../../services/recurring-expenses.service';
+
 describe('GroupDetailComponent', () => {
   let component: GroupDetailComponent;
   let fixture: ComponentFixture<GroupDetailComponent>;
   let mockGroupsService: jest.Mocked<GroupsService>;
   let mockExpensesService: jest.Mocked<ExpensesService>;
+  let mockRecurringExpensesService: any;
   let mockActivatedRoute: any;
 
   const mockGroup = {
@@ -79,6 +82,13 @@ describe('GroupDetailComponent', () => {
       getExpenses: jest.fn().mockReturnValue(of({ data: [], meta: { totalItems: 0 } }))
     } as any;
 
+    mockRecurringExpensesService = {
+      getRecurringExpenses: jest.fn().mockReturnValue(of([])),
+      createRecurringExpense: jest.fn().mockReturnValue(of({})),
+      updateRecurringExpense: jest.fn().mockReturnValue(of({})),
+      deleteRecurringExpense: jest.fn().mockReturnValue(of(null))
+    };
+
     mockActivatedRoute = {
       paramMap: of(convertToParamMap({ id: 'group-1' }))
     };
@@ -88,6 +98,7 @@ describe('GroupDetailComponent', () => {
       providers: [
         { provide: GroupsService, useValue: mockGroupsService },
         { provide: ExpensesService, useValue: mockExpensesService },
+        { provide: RecurringExpensesService, useValue: mockRecurringExpensesService },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute } // Listed LAST to override provideRouter
       ]

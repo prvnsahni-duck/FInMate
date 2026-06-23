@@ -1,7 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, VersionColumn, Index, DeleteDateColumn } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
-import { encryptionTransformer } from './encryption.transformer';
 
 @Entity('expenses')
 @Index(['group', 'status', 'expenseDate'])
@@ -11,17 +10,16 @@ export class Expense {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 160 })
+  @Column({ type: 'text' })
   title!: string;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({
-    type: 'varchar',
+  @Column('decimal', {
     name: 'amount_total',
-    length: 255,
-    transformer: encryptionTransformer,
+    precision: 12,
+    scale: 2,
   })
   amountTotal!: number;
 

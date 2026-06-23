@@ -17,6 +17,10 @@ erDiagram
     users o|--o{ expense_splits : "participant_user (0:N)"
     group_members o|--o{ expense_splits : "participant_member (0:N)"
 
+    recurring_expenses ||--o{ recurring_expense_splits : "split_into (1:N)"
+    users o|--o{ recurring_expense_splits : "participant_user (0:N)"
+    group_members o|--o{ recurring_expense_splits : "participant_member (0:N)"
+
     groups ||--o{ settlements : "settles (1:N)"
     users ||--o{ settlements : "debtor (1:N)"
     users ||--o{ settlements : "creditor (1:N)"
@@ -169,6 +173,43 @@ erDiagram
 | `settled_on` | `date` | Yes | `NULL` | |
 | `note` | `text` | Yes | `NULL` | Client-Side Encrypted |
 
+### 9. `recurring_expenses`
+- **Purpose**: Templates for recurring/scheduled transactions.
+- **Columns**:
+
+| Column Name | Type | Nullable | Default | Constraints |
+| :--- | :--- | :---: | :--- | :--- |
+| `id` | `uuid` | No | `uuid_generate_v4()` | Primary Key |
+| `title` | `varchar(160)` | No | | Client-Side Encrypted |
+| `description` | `text` | Yes | `NULL` | Client-Side Encrypted |
+| `amount_total`| `decimal(12,2)`| No | | Plaintext |
+| `currency` | `char(3)` | No | | |
+| `category` | `varchar(64)` | No | | |
+| `paid_by_user_id`| `uuid` | No | | Foreign Key -> `users(id)` |
+| `owner_user_id`| `uuid` | No | | Foreign Key -> `users(id)` |
+| `group_id` | `uuid` | Yes | `NULL` | Foreign Key -> `groups(id)` |
+| `frequency` | `varchar(20)` | No | | Values: `daily`, `weekly`, `monthly`, `yearly` |
+| `start_date` | `date` | No | | |
+| `end_date` | `date` | Yes | `NULL` | |
+| `next_occurrence_date`| `date` | No | | |
+| `status` | `varchar(20)` | No | `'active'` | Values: `active`, `paused`, `completed` |
+| `version` | `integer` | No | `1` | |
+
+### 10. `recurring_expense_splits`
+- **Purpose**: Split ratios/shares for recurring expense templates.
+- **Columns**:
+
+| Column Name | Type | Nullable | Default | Constraints |
+| :--- | :--- | :---: | :--- | :--- |
+| `id` | `uuid` | No | `uuid_generate_v4()` | Primary Key |
+| `recurring_expense_id`| `uuid`| No | | Foreign Key -> `recurring_expenses(id)` |
+| `participant_user_id`| `uuid` | Yes | `NULL` | Foreign Key -> `users(id)` |
+| `participant_group_member_id`| `uuid`| Yes| `NULL` | Foreign Key -> `group_members(id)` |
+| `split_type` | `varchar(16)`| No | | Values: `equal`, `fixed`, `percent`, `share` |
+| `share_value` | `decimal(12,4)`| No | | |
+| `amount_owed` | `decimal(12,2)`| No | | Plaintext |
+| **Check Constraint**| | | | Exactly one participant reference must be non-null |
+
 ---
 
 ## 🗂️ Indexes
@@ -177,6 +218,8 @@ erDiagram
   - `idx_expenses_group_status_date`: ON `(group_id, status, expense_date)`
   - `idx_expenses_group_category`: ON `(group_id, category)`
   - `idx_expenses_group_ledger_month`: ON `(group_id, ledger_month)`
+- **`recurring_expenses`**:
+  - `idx_recurring_expenses_occurrence`: ON `(next_occurrence_date, status)`
 - **`group_members`**:
   - `idx_group_members_user`: ON `(user_id)`
   - `idx_group_members_group`: ON `(group_id)`

@@ -598,6 +598,65 @@ This project specification file is the long-term project source of truth.
 
 If the task explicitly excludes documentation updates, ask the user whether to skip the progress log entry.
 
+## Mandatory Task Lifecycle
+
+Every task must follow this sequence.
+
+### Phase 1 - Discovery
+
+Before coding:
+1. Read relevant blueprint files.
+2. Read relevant architecture files.
+3. Identify impacted modules.
+4. Ask questions if information is missing.
+
+Output:
+* assumptions
+* impacted files
+* open questions
+
+Do not code yet.
+
+---
+
+### Phase 2 - Implementation
+
+Implement only after:
+* requirements understood
+* architecture checked
+* impact analysis complete
+
+Update:
+* code
+* tests
+* DTOs
+* entities
+* contracts
+
+---
+
+### Phase 3 - Synchronization
+
+Before task completion verify:
+* documentation updated
+* roadmap updated
+* progress log updated
+* architecture references updated
+* API specs updated
+
+---
+
+### Phase 4 - Verification
+
+Generate:
+* Files Modified
+* Tests Added
+* Documentation Updated
+* Progress Log Updated
+* Architecture Drift (PASS / FAIL)
+
+Task is NOT complete until PASS.
+
 ---
 
 ## Commit Message Requirement

@@ -2,16 +2,19 @@ import { Transform } from 'class-transformer';
 import { IsArray, IsDateString, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID, Matches, MaxLength, Min, Validate } from 'class-validator';
 import { ExpenseSplitInputDto } from './expense-split.dto';
 import { SplitPayloadValidator } from './split-payload.validator';
+import { IsCiphertext } from '../../common/decorators/is-ciphertext.decorator';
 
 export class CreateExpenseDto {
 	@IsString()
 	@Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
 	@IsNotEmpty({ message: 'title is required' })
-	@MaxLength(160, { message: 'title cannot exceed 160 characters' })
+	@MaxLength(1000, { message: 'title cannot exceed 1000 characters' })
+	@IsCiphertext({ message: 'title must be a valid ciphertext' })
 	title!: string;
 
 	@IsString()
 	@IsOptional()
+	@IsCiphertext({ message: 'description must be a valid ciphertext' })
 	description?: string;
 
 	@IsNumber({ maxDecimalPlaces: 2 }, { message: 'amountTotal must be a number with up to 2 decimals' })

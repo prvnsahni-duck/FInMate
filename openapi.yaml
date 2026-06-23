@@ -655,7 +655,7 @@ paths:
               properties:
                 title:
                   type: string
-                  maxLength: 160
+                  maxLength: 1000
                   example: "Dinner at Taj"
                 description:
                   type: string
@@ -811,7 +811,7 @@ paths:
               properties:
                 title:
                   type: string
-                  maxLength: 160
+                  maxLength: 1000
                 description:
                   type: string
                 amountTotal:
@@ -874,6 +874,215 @@ paths:
       responses:
         '204':
           description: Expense voided or deleted successfully
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /recurring-expenses:
+    post:
+      summary: Create a recurring expense template
+      tags:
+        - Recurring Expenses
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - amountTotal
+                - currency
+                - category
+                - paidByUserId
+                - frequency
+                - startDate
+                - splits
+              properties:
+                title:
+                  type: string
+                  maxLength: 1000
+                description:
+                  type: string
+                amountTotal:
+                  type: number
+                currency:
+                  type: string
+                  maxLength: 3
+                category:
+                  type: string
+                paidByUserId:
+                  type: string
+                  format: uuid
+                groupId:
+                  type: string
+                  format: uuid
+                  nullable: true
+                frequency:
+                  type: string
+                  enum: [daily, weekly, monthly, yearly]
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+                  nullable: true
+                splits:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/ExpenseSplitInput'
+      responses:
+        '201':
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringExpenseResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    get:
+      summary: List recurring expense templates
+      tags:
+        - Recurring Expenses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: groupId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          required: false
+      responses:
+        '200':
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RecurringExpenseResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /recurring-expenses/{id}:
+    get:
+      summary: Retrieve specific recurring template details
+      tags:
+        - Recurring Expenses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringExpenseResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      summary: Update recurring template details
+      tags:
+        - Recurring Expenses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - version
+              properties:
+                title:
+                  type: string
+                  maxLength: 1000
+                description:
+                  type: string
+                amountTotal:
+                  type: number
+                currency:
+                  type: string
+                category:
+                  type: string
+                paidByUserId:
+                  type: string
+                  format: uuid
+                frequency:
+                  type: string
+                  enum: [daily, weekly, monthly, yearly]
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+                status:
+                  type: string
+                  enum: [active, paused, completed]
+                version:
+                  type: integer
+      responses:
+        '200':
+          description: Template updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecurringExpenseResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '412':
+          $ref: '#/components/responses/PreconditionFailedError'
+    delete:
+      summary: Delete a recurring template
+      tags:
+        - Recurring Expenses
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Template deleted successfully
         '401':
           $ref: '#/components/responses/UnauthorizedError'
         '403':
@@ -1119,7 +1328,7 @@ paths:
               properties:
                 title:
                   type: string
-                  maxLength: 160
+                  maxLength: 1000
                   example: "Trip Itinerary"
                 body:
                   type: string
@@ -1233,7 +1442,7 @@ paths:
               properties:
                 title:
                   type: string
-                  maxLength: 160
+                  maxLength: 1000
                 body:
                   type: string
                 visibility:
@@ -1306,7 +1515,7 @@ paths:
               properties:
                 title:
                   type: string
-                  maxLength: 160
+                  maxLength: 1000
                   example: "Trip to Goa"
                 targetAmount:
                   type: number
@@ -1418,7 +1627,7 @@ paths:
               properties:
                 title:
                   type: string
-                  maxLength: 160
+                  maxLength: 1000
                 targetAmount:
                   type: number
                 savedAmount:
@@ -1704,6 +1913,106 @@ components:
             retryable: true
 
   schemas:
+    RecurringExpenseResponse:
+      type: object
+      required:
+        - id
+        - title
+        - amountTotal
+        - currency
+        - category
+        - paidByUserId
+        - ownerUserId
+        - groupId
+        - frequency
+        - startDate
+        - nextOccurrenceDate
+        - status
+        - splits
+        - version
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        amountTotal:
+          type: number
+        currency:
+          type: string
+        category:
+          type: string
+        paidByUserId:
+          type: string
+          format: uuid
+        ownerUserId:
+          type: string
+          format: uuid
+        groupId:
+          type: string
+          format: uuid
+          nullable: true
+        frequency:
+          type: string
+          enum: [daily, weekly, monthly, yearly]
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+          nullable: true
+        nextOccurrenceDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [active, paused, completed]
+        splits:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecurringExpenseSplit'
+        version:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    RecurringExpenseSplit:
+      type: object
+      required:
+        - id
+        - splitType
+        - shareValue
+        - amountOwed
+      properties:
+        id:
+          type: string
+          format: uuid
+        participantUserId:
+          type: string
+          format: uuid
+          nullable: true
+        participantGroupMemberId:
+          type: string
+          format: uuid
+          nullable: true
+        splitType:
+          type: string
+          enum: [equal, fixed, percent, share]
+        shareValue:
+          type: number
+        amountOwed:
+          type: number
+
     ErrorResponse:
       type: object
       required:

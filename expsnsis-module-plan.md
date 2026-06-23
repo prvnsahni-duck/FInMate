@@ -28,7 +28,6 @@ graph TD
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, VersionColumn, Index, DeleteDateColumn } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
-import { encryptionTransformer } from './encryption.transformer';
 
 @Entity('expenses')
 @Index(['group', 'status', 'expenseDate'])
@@ -38,17 +37,16 @@ export class Expense {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
 
-  @Column({ type: 'varchar', length: 160 })
+  @Column({ type: 'text' })
   title!: string;
 
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({
-    type: 'varchar',
+  @Column('decimal', {
     name: 'amount_total',
-    length: 255,
-    transformer: encryptionTransformer,
+    precision: 12,
+    scale: 2,
   })
   amountTotal!: number;
 
@@ -110,7 +108,6 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { Expense } from './expense.entity';
 import { User } from './user.entity';
 import { GroupMember } from './group-member.entity';
-import { encryptionTransformer } from './encryption.transformer';
 
 @Entity('expense_splits')
 @Check('("participantUserId" IS NOT NULL AND "participantGroupMemberId" IS NULL) OR ("participantUserId" IS NULL AND "participantGroupMemberId" IS NOT NULL)')
@@ -133,11 +130,10 @@ export class ExpenseSplit {
   @Column('decimal', { precision: 12, scale: 4 })
   shareValue!: number;
 
-  @Column({
-    type: 'varchar',
+  @Column('decimal', {
     name: 'amount_owed',
-    length: 255,
-    transformer: encryptionTransformer,
+    precision: 12,
+    scale: 2,
   })
   amountOwed!: number;
 

@@ -4,3 +4,7 @@ export { AddGroupCurrencyAndExpenseSoftDelete1718100000000 } from './17181000000
 export { AddGroupTypeAndSpectatorAndHousehold1718200000000 } from './1718200000000-AddGroupTypeAndSpectatorAndHousehold';
 export { EncryptExpenseAmounts1718300000000 } from './1718300000000-EncryptExpenseAmounts';
 export { AddUserPhoneAndGroupInviteToken1718400000000 } from './1718400000000-AddUserPhoneAndGroupInviteToken';
+export { AddRecurringExpenses1718500000000 } from './1718500000000-AddRecurringExpenses';
+export { RevertExpenseAmountsEncryption1718600000000 } from './1718600000000-RevertExpenseAmountsEncryption';
+export { ChangeTitlesToText1718700000000 } from './1718700000000-ChangeTitlesToText';
+

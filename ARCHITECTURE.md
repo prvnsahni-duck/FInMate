@@ -40,7 +40,7 @@ graph TD
 
 ## 2. Security & Zero-Knowledge (ZK) Cryptography Model
 
-Security and user privacy are core columns of FinMate's architecture. It operates a hybrid encryption model ensuring zero-knowledge privacy for transactional descriptions and notes, combined with server-side column encryption for numerical storage.
+Security and user privacy are core columns of FinMate's architecture. It operates a hybrid model ensuring zero-knowledge privacy for transactional descriptions and notes, combined with plaintext numerical ledger storage for performant reporting and settlements.
 
 ```mermaid
 sequenceDiagram
@@ -56,8 +56,7 @@ sequenceDiagram
     User->>API: POST /expenses (Ciphertext Title, Plaintext Amount)
     
     Note over API,DB: Server-Side Processing
-    API->>API: Value Transformer encrypts Amount using ENCRYPTION_KEY
-    API->>DB: INSERT into expenses (encrypted_title, encrypted_amount)
+    API->>DB: INSERT into expenses (encrypted_title, plaintext_amount)
     DB-->>API: Persisted
     API-->>User: HTTP 201 Created
 ```
@@ -65,12 +64,25 @@ sequenceDiagram
 ### Encryption Breakdown
 
 1. **Client-Side (Zero-Knowledge) Encryption**:
-   - **Fields**: Expense `title`, Expense `description`, and Note `body`.
+   - **Fields**: Expense `title`, Expense `description`, Note `title`, Note `body`, and Settlement `note`.
    - **Mechanism**: Encrypted using **AES-256-GCM** on the client device. The derived master keys for client-side encryption are retained exclusively in-memory as non-extractable `CryptoKey` objects. No `sessionStorage` or local storage cache is maintained, preventing XSS-based key exfiltration.
 2. **Server-Side (At-Rest) Encryption**:
-   - **Fields**: Expense `amount_total`, split `amount_owed`, and sensitive user Profile details.
+   - **Fields**: Sensitive user Profile details and 2FA secrets.
    - **Mechanism**: Encrypted before writing to the database using TypeORM value transformers (AES-256-CBC/GCM) leveraging the server's `ENCRYPTION_KEY`.
-3. **Authentication & Session Security**:
+3. **Plaintext Storage**:
+   - **Fields**: Expense `amount_total`, split `amount_owed`, `currency`, and `category`.
+   - **Mechanism**: Retained strictly as plaintext decimals (`DECIMAL(12, 2)`) to allow performant aggregations, analytics, reports, budgets, and settlement math on the server.
+
+### Future Cryptography & Integration Roadmap
+
+1. **Zero-Knowledge Attachment Storage**:
+   - **Architecture**: Attachments (receipts/files) will be encrypted in the client browser using AES-256-GCM prior to upload. The encrypted payloads will be dispatched directly to **Supabase Storage**, while the storage reference keys and hash checksums are stored in the PostgreSQL database.
+2. **Receipt OCR Workflow**:
+   - **Architecture**: Receipt files uploaded by the user will trigger client-side temporary decryption or transmission to an isolated, transient AI engine for OCR text extraction. The extracted details will pre-fill the creation forms for user review before encryption and persistence, ensuring plaintext receipts are never saved directly to the database.
+3. **Blind Index Search**:
+   - **Architecture**: To allow searching on client-side encrypted fields (like expense titles) without decrypting them on the server, we will implement blind index hashing (`title_search_hash` and `title_ciphertext` columns) enabling server-side exact-match indexing without exposure to the raw plaintext.
+
+### 4. Authentication & Session Security:
    - **JWT Tokens**: Dual token architecture consisting of short-lived `access_tokens` (15 mins) and HTTP-only, secure `refresh_tokens` (7 days) signed via HS256.
    - **Redis Session Caching**: Active session refresh token IDs (`refreshId`) are stored in Redis. To mitigate database compromise or session hijacking, key identifiers in Redis are stored deterministically as `refresh_token:${userId}:${sha256(refreshId)}`, and the value stored is the Argon2 hash of the `refreshId`.
    - **Two-Factor Authentication (MFA)**: TOTP verification via authenticator apps, with secrets encrypted in PostgreSQL using AES-256-GCM.
@@ -132,6 +144,8 @@ Incoming Request
 | `GroupMemberContribution` | Custom contribution percentages per ledger month |
 | `Expense` | Expense record with soft delete, ledgerMonth, and carry-forward flag |
 | `ExpenseSplit` | Individual split allocation (fixed, equal, percent, share splits) |
+| `RecurringExpense` | Recurring expense template template with frequency and occurrence tracking |
+| `RecurringExpenseSplit` | Individual split allocation for recurring templates |
 | `Settlement` | Payment settlement between users |
 | `AuditLog` | Action audit trail |
 
@@ -156,10 +170,14 @@ erDiagram
     users o|--o{ expense_splits : "participant_user (0:N)"
     group_members o|--o{ expense_splits : "participant_member (0:N)"
 
+    recurring_expenses ||--o{ recurring_expense_splits : "split_into (1:N)"
+    users o|--o{ recurring_expense_splits : "participant_user (0:N)"
+    group_members o|--o{ recurring_expense_splits : "participant_member (0:N)"
+
     groups ||--o{ settlements : "settles (1:N)"
     users ||--o{ settlements : "debtor (1:N)"
     users ||--o{ settlements : "creditor (1:N)"
-
+ 
     users ||--o{ audit_logs : "logs (1:N)"
 ```
 

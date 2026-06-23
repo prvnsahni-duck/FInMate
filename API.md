@@ -544,3 +544,68 @@ graph TD
     Content-Type: text/csv
     Content-Disposition: attachment; filename="expenses_export_20260609.csv"
     ```
+
+---
+
+### 🔁 9. Recurring Expenses Module
+
+#### Create Recurring Expense Template
+*   **Endpoint**: `POST /api/v1/recurring-expenses`
+*   **Description**: Creates a template for generating periodic expenses automatically.
+*   **Request Example**:
+    ```json
+    {
+      "title": "Gym Membership",
+      "description": "Monthly subscription fee",
+      "amountTotal": 1200.00,
+      "currency": "INR",
+      "category": "Subscription",
+      "paidByUserId": "e44d3202-b2a6-42d4-bb06-b33df1fb3e61",
+      "groupId": null,
+      "frequency": "monthly",
+      "startDate": "2026-06-23",
+      "splits": [
+        {
+          "participantUserId": "e44d3202-b2a6-42d4-bb06-b33df1fb3e61",
+          "splitType": "equal",
+          "shareValue": 1.00
+        }
+      ]
+    }
+    ```
+*   **Response Example (`201 Created`)**:
+    ```json
+    {
+      "id": "e6f4773c-bf5c-4148-be22-df38ca9e661c",
+      "title": "Gym Membership",
+      "description": "Monthly subscription fee",
+      "amountTotal": 1200.00,
+      "currency": "INR",
+      "category": "Subscription",
+      "paidByUserId": "e44d3202-b2a6-42d4-bb06-b33df1fb3e61",
+      "ownerUserId": "e44d3202-b2a6-42d4-bb06-b33df1fb3e61",
+      "groupId": null,
+      "frequency": "monthly",
+      "startDate": "2026-06-23",
+      "nextOccurrenceDate": "2026-06-23",
+      "status": "active",
+      "splits": [
+        {
+          "id": "1826bbcc-1a1a-4ab0-88cb-fe88a1be992c",
+          "participantUserId": "e44d3202-b2a6-42d4-bb06-b33df1fb3e61",
+          "splitType": "equal",
+          "shareValue": 1.00,
+          "amountOwed": 1200.00
+        }
+      ],
+      "version": 1,
+      "createdAt": "2026-06-23T13:30:00.000Z",
+      "updatedAt": "2026-06-23T13:30:00.000Z"
+    }
+    ```
+
+#### List Recurring Expense Templates
+*   **Endpoint**: `GET /api/v1/recurring-expenses`
+*   **Description**: Retrieve all recurring templates. Optional query filter `groupId`.
+*   **Response Example (`200 OK`)**: List of Recurring Expense Templates.
+

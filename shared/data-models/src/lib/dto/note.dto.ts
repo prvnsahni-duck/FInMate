@@ -1,13 +1,16 @@
 import { IsString, IsNotEmpty, MaxLength, IsOptional, IsEnum, IsUUID, IsInt } from 'class-validator';
+import { IsCiphertext } from './is-ciphertext.decorator';
 
 export class CreateNoteDto {
   @IsString()
   @IsNotEmpty({ message: 'Note title is required' })
-  @MaxLength(160, { message: 'Note title cannot exceed 160 characters' })
+  @MaxLength(1000, { message: 'Note title cannot exceed 1000 characters' })
+  @IsCiphertext({ message: 'Note title must be a valid ciphertext' })
   title!: string;
 
   @IsString()
   @IsNotEmpty({ message: 'Note body is required' })
+  @IsCiphertext({ message: 'Note body must be a valid ciphertext' })
   body!: string;
 
   @IsEnum(['private', 'group'], { message: 'Invalid note visibility option' })
@@ -22,11 +25,13 @@ export class CreateNoteDto {
 export class UpdateNoteDto {
   @IsString()
   @IsOptional()
-  @MaxLength(160, { message: 'Note title cannot exceed 160 characters' })
+  @MaxLength(1000, { message: 'Note title cannot exceed 1000 characters' })
+  @IsCiphertext({ message: 'Note title must be a valid ciphertext' })
   title?: string;
 
   @IsString()
   @IsOptional()
+  @IsCiphertext({ message: 'Note body must be a valid ciphertext' })
   body?: string;
 
   @IsEnum(['private', 'group'], { message: 'Invalid note visibility option' })
