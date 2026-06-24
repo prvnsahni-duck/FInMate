@@ -1,0 +1,39 @@
+<div class="space-y-6">
+  <div>
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
+      My Space Profile
+    </h1>
+    <p class="text-secondary/60 mt-1 font-medium">Verify login statistics, profile configurations, and data integrity.</p>
+  </div>
+
+  <div class="card-glass p-6 space-y-6">
+    <div class="flex items-center space-x-6">
+      <div class="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center text-4xl shadow-inner shadow-primary/5">
+        👤
+      </div>
+      <div>
+        <h3 class="text-2xl font-extrabold text-secondary">{{ userName }}</h3>
+        <span class="text-xs font-bold text-success bg-success/15 px-3 py-1 rounded-full uppercase tracking-wider mt-1.5 inline-block">Active Ledger User</span>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+      <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
+        <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Email Address</span>
+        <p class="text-sm font-semibold text-secondary truncate">{{ userEmail }}</p>
+      </div>
+      <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
+        <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Default Currency</span>
+        <p class="text-sm font-semibold text-secondary">{{ userProfile?.defaultCurrency || 'USD' }}</p>
+      </div>
+      <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
+        <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Expenses Tracked</span>
+        <p class="text-lg font-bold text-secondary">{{ personalExpensesCount }} logged</p>
+      </div>
+      <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
+        <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Income Limit Ratio</span>
+        <p class="text-lg font-bold text-secondary">{{ incomePercentage }}% spent</p>
+      </div>
+    </div>
+  </div>
+</div>

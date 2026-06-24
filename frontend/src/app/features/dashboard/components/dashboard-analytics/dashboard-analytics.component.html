@@ -1,0 +1,12 @@
+<div class="flex flex-col gap-4">
+  <div>
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
+      Personal Expenses Analytics
+    </h1>
+    <p class="text-secondary/60 mt-1 font-medium">Detailed trends, category weightings, and historical logging logs.</p>
+  </div>
+
+  <div class="card-glass p-6">
+    <app-analytics-charts [groupId]="null" [currency]="userProfile?.defaultCurrency || 'USD'"></app-analytics-charts>
+  </div>
+</div>

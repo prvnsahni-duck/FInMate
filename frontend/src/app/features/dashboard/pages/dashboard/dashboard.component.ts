@@ -16,11 +16,31 @@ import { PendingInvitationResponse, Profile } from '@finmate/data-models';
 import { GroupExpense } from '../../../groups/pages/group-detail/group-detail.component';
 import { AiService } from '../../services/ai.service';
 import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
+import { DashboardHomeComponent } from '../../components/dashboard-home/dashboard-home.component';
+import { DashboardAnalyticsComponent } from '../../components/dashboard-analytics/dashboard-analytics.component';
+import { DashboardGoalsComponent } from '../../components/dashboard-goals/dashboard-goals.component';
+import { DashboardSettingsComponent } from '../../components/dashboard-settings/dashboard-settings.component';
+import { DashboardProfileComponent } from '../../components/dashboard-profile/dashboard-profile.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [FormsModule, CurrencyPipe, DatePipe, CreateExpenseModalComponent, AnalyticsChartsComponent, ConfirmModalComponent, StatsCardComponent, IconComponent, DropdownComponent],
+  imports: [
+    FormsModule, 
+    CurrencyPipe, 
+    DatePipe, 
+    CreateExpenseModalComponent, 
+    AnalyticsChartsComponent, 
+    ConfirmModalComponent, 
+    StatsCardComponent, 
+    IconComponent, 
+    DropdownComponent,
+    DashboardHomeComponent,
+    DashboardAnalyticsComponent,
+    DashboardGoalsComponent,
+    DashboardSettingsComponent,
+    DashboardProfileComponent
+  ],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
