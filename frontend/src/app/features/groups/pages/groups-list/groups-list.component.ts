@@ -4,11 +4,12 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { GroupsService } from '../../services/groups.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 import { CreateGroupDto, Group } from '@finmate/data-models';
+import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
 
 @Component({
   selector: 'app-groups-list',
   standalone: true,
-  imports: [RouterLink, ReactiveFormsModule, SubmitButtonComponent],
+  imports: [RouterLink, ReactiveFormsModule, SubmitButtonComponent, DropdownComponent],
   templateUrl: './groups-list.component.html'
 })
 export class GroupsListComponent implements OnInit {
@@ -22,6 +23,23 @@ export class GroupsListComponent implements OnInit {
   isModalOpen = false;
   isSubmitting = false;
   errorMessage = '';
+
+  visibilityOptions: DropdownOption[] = [
+    { value: 'private', label: 'Private (Only invited members)' },
+    { value: 'invite_only', label: 'Invite Only (Request to join)' },
+    { value: 'public_readonly', label: 'Public Read-Only (Anyone can view)' }
+  ];
+
+  currencyOptions: DropdownOption[] = [
+    { value: 'USD', label: 'USD ($)' },
+    { value: 'INR', label: 'INR (₹)' },
+    { value: 'EUR', label: 'EUR (€)' }
+  ];
+
+  groupTypeOptions: DropdownOption[] = [
+    { value: 'normal', label: 'Normal' },
+    { value: 'household', label: 'Household' }
+  ];
 
   groupForm = this.fb.group({
     name: ['', [Validators.required, Validators.maxLength(120)]],

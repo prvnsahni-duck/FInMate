@@ -11,6 +11,8 @@ import { ConfirmModalComponent } from '../../../../shared/components/confirm-mod
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
 import { Subscription } from 'rxjs';
+import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
+
 import {
   BalanceEntry,
   CarryForwardBalance,
@@ -63,7 +65,8 @@ export interface GroupExpense extends Expense {
     GroupHistoryLogComponent,
     GroupTrashComponent,
     GroupBalancesComponent,
-    GroupMembersComponent
+    GroupMembersComponent,
+    DropdownComponent
   ],
   templateUrl: './group-detail.component.html',
   styleUrls: ['./group-detail.component.scss']
@@ -75,6 +78,41 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
 
   private routeSub?: Subscription;
+
+  filterCategoryOptions: DropdownOption[] = [
+    { value: '', label: 'All Categories' },
+    { value: 'Food & Drinks', label: 'Food & Drinks' },
+    { value: 'Travel', label: 'Travel' },
+    { value: 'Utilities', label: 'Utilities' },
+    { value: 'Entertainment', label: 'Entertainment' },
+    { value: 'Shopping', label: 'Shopping' },
+    { value: 'Housing', label: 'Housing' },
+    { value: 'Others', label: 'Others' }
+  ];
+
+  visibilityOptions: DropdownOption[] = [
+    { value: 'private', label: 'Private' },
+    { value: 'invite_only', label: 'Invite Only' },
+    { value: 'public_readonly', label: 'Public Read-Only' }
+  ];
+
+  currencyOptions: DropdownOption[] = [
+    { value: 'USD', label: 'USD ($)' },
+    { value: 'EUR', label: 'EUR (€)' },
+    { value: 'GBP', label: 'GBP (£)' },
+    { value: 'INR', label: 'INR (₹)' },
+    { value: 'CAD', label: 'CAD ($)' },
+    { value: 'AUD', label: 'AUD ($)' },
+    { value: 'JPY', label: 'JPY (¥)' }
+  ];
+
+  memberRoleOptions: DropdownOption[] = [
+    { value: 'member', label: 'Contributor' },
+    { value: 'admin', label: 'Admin' },
+    { value: 'spectator', label: 'Spectator' },
+    { value: 'viewer', label: 'Viewer' },
+    { value: 'owner', label: 'Transfer Owner' }
+  ];
 
   // Signals for Group State
   group = signal<Group | null>(null);
@@ -696,9 +734,14 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     return false;
   }
 
-  updateMemberRole(member: GroupMember, event: Event) {
-    const target = event.target as HTMLSelectElement;
-    const newRole = target.value as GroupMember['role'];
+  updateMemberRole(member: GroupMember, event: Event | string) {
+    let newRole: GroupMember['role'];
+    if (typeof event === 'string') {
+      newRole = event as GroupMember['role'];
+    } else {
+      const target = event.target as HTMLSelectElement;
+      newRole = target.value as GroupMember['role'];
+    }
     const g = this.group();
     if (!g) return;
 

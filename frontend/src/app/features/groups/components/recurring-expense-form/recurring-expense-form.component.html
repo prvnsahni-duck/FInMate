@@ -31,24 +31,12 @@
 
       <div class="form-field">
         <label for="currency">Currency *</label>
-        <select id="currency" formControlName="currency" class="finmate-input">
-          <option value="USD">USD ($)</option>
-          <option value="INR">INR (₹)</option>
-          <option value="EUR">EUR (€)</option>
-        </select>
+        <app-dropdown id="currency" formControlName="currency" [options]="currencyOptions" placeholder="Select currency..."></app-dropdown>
       </div>
 
       <div class="form-field">
         <label for="category">Category *</label>
-        <select id="category" formControlName="category" class="finmate-input">
-          <option value="Food & Drinks">Food & Drinks</option>
-          <option value="Housing & Rent">Housing & Rent</option>
-          <option value="Utilities & Bills">Utilities & Bills</option>
-          <option value="Subscription">Subscription</option>
-          <option value="Travel & Commute">Travel & Commute</option>
-          <option value="Entertainment">Entertainment</option>
-          <option value="Others">Others</option>
-        </select>
+        <app-dropdown id="category" formControlName="category" [options]="categoryOptions" placeholder="Select category..."></app-dropdown>
       </div>
     </div>
 
@@ -56,21 +44,12 @@
     <div class="form-row">
       <div class="form-field">
         <label for="paidByUserId">Paid By *</label>
-        <select id="paidByUserId" formControlName="paidByUserId" class="finmate-input">
-          @for (payer of availablePayers; track payer.id) {
-            <option [value]="payer.id">{{ payer.name }}</option>
-          }
-        </select>
+        <app-dropdown id="paidByUserId" formControlName="paidByUserId" [options]="payerOptions" placeholder="Select payer..."></app-dropdown>
       </div>
 
       <div class="form-field">
         <label for="frequency">Frequency *</label>
-        <select id="frequency" formControlName="frequency" class="finmate-input">
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="yearly">Yearly</option>
-        </select>
+        <app-dropdown id="frequency" formControlName="frequency" [options]="frequencyOptions" placeholder="Select frequency..."></app-dropdown>
       </div>
     </div>
 

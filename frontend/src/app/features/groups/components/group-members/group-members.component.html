@@ -102,12 +102,12 @@
         }
 
         <div class="flex space-x-2">
-          <select [(ngModel)]="inviteRole" class="text-xs px-2 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none cursor-pointer text-slate-800 dark:text-slate-200">
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-            <option value="viewer">Viewer</option>
-            <option value="spectator">Spectator</option>
-          </select>
+          <app-dropdown
+            [(ngModel)]="inviteRole"
+            [options]="roleOptions"
+            size="sm"
+            styleClass="w-32"
+          ></app-dropdown>
 
           <button (click)="selectCustomInvite()" [disabled]="!searchQuery.trim()" class="flex-1 py-2 bg-gradient-neon text-white rounded-xl text-xs font-semibold shadow-md shadow-finmate-neon/10 hover:shadow-finmate-neon/30 transition-all disabled:opacity-40 flex items-center justify-center space-x-1">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -226,12 +226,11 @@
 
         <div>
           <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Group Role</label>
-          <select [(ngModel)]="newContactRole" class="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none cursor-pointer text-slate-800 dark:text-slate-200">
-            <option value="member">Member</option>
-            <option value="admin">Admin</option>
-            <option value="viewer">Viewer</option>
-            <option value="spectator">Spectator</option>
-          </select>
+          <app-dropdown
+            [(ngModel)]="newContactRole"
+            [options]="roleOptions"
+            size="sm"
+          ></app-dropdown>
         </div>
 
         <div class="flex space-x-2 pt-2">

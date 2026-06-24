@@ -93,15 +93,12 @@
           </div>
           <div>
             <label for="expense-currency-select" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Currency *</label>
-            <select 
+            <app-dropdown
               id="expense-currency-select"
-              formControlName="currency" 
-              class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all cursor-pointer"
-            >
-              <option value="USD">USD ($)</option>
-              <option value="INR">INR (₹)</option>
-              <option value="EUR">EUR (€)</option>
-            </select>
+              formControlName="currency"
+              [options]="currencyOptions"
+              placeholder="Select currency..."
+            ></app-dropdown>
           </div>
         </div>
     
@@ -109,19 +106,12 @@
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label for="expense-category-select" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Category *</label>
-            <select 
+            <app-dropdown
               id="expense-category-select"
-              formControlName="category" 
-              class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all cursor-pointer"
-            >
-              <option value="Food & Drinks">Food & Drinks</option>
-              <option value="Travel">Travel</option>
-              <option value="Utilities">Utilities</option>
-              <option value="Entertainment">Entertainment</option>
-              <option value="Shopping">Shopping</option>
-              <option value="Housing">Housing</option>
-              <option value="Others">Others</option>
-            </select>
+              formControlName="category"
+              [options]="categoryOptions"
+              placeholder="Select category..."
+            ></app-dropdown>
           </div>
           <div>
             <label for="expense-date-input" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Date *</label>
@@ -186,17 +176,12 @@
         @if (groupId || splitWithFriend) {
           <div>
             <label for="expense-payer-select" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Paid By *</label>
-            <select 
+            <app-dropdown
               id="expense-payer-select"
-              formControlName="paidByUserId" 
-              class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all cursor-pointer"
-            >
-              @for (payer of availablePayers; track payer.id) {
-                <option [value]="payer.id">
-                  {{ payer.name }}
-                </option>
-              }
-            </select>
+              formControlName="paidByUserId"
+              [options]="payerOptions"
+              placeholder="Select payer..."
+            ></app-dropdown>
           </div>
   
           <div>

@@ -4,17 +4,48 @@ import { jwtDecode } from 'jwt-decode';
 import { RecurringExpensesService } from '../../services/recurring-expenses.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 import { CreateRecurringExpenseDto, RecurringExpenseSplitInputDto, GroupMember, JwtPayload, UpdateRecurringExpenseDto } from '@finmate/data-models';
+import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
 
 @Component({
   selector: 'app-recurring-expense-form',
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, SubmitButtonComponent],
+  imports: [ReactiveFormsModule, FormsModule, SubmitButtonComponent, DropdownComponent],
   templateUrl: './recurring-expense-form.component.html',
   styleUrls: ['./recurring-expense-form.component.css']
 })
 export class RecurringExpenseFormComponent implements OnChanges {
   private recurringExpensesService = inject(RecurringExpensesService);
   private fb = inject(FormBuilder);
+
+  currencyOptions: DropdownOption[] = [
+    { value: 'USD', label: 'USD ($)' },
+    { value: 'INR', label: 'INR (₹)' },
+    { value: 'EUR', label: 'EUR (€)' }
+  ];
+
+  categoryOptions: DropdownOption[] = [
+    { value: 'Food & Drinks', label: 'Food & Drinks' },
+    { value: 'Housing & Rent', label: 'Housing & Rent' },
+    { value: 'Utilities & Bills', label: 'Utilities & Bills' },
+    { value: 'Subscription', label: 'Subscription' },
+    { value: 'Travel & Commute', label: 'Travel & Commute' },
+    { value: 'Entertainment', label: 'Entertainment' },
+    { value: 'Others', label: 'Others' }
+  ];
+
+  frequencyOptions: DropdownOption[] = [
+    { value: 'daily', label: 'Daily' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'monthly', label: 'Monthly' },
+    { value: 'yearly', label: 'Yearly' }
+  ];
+
+  get payerOptions(): DropdownOption[] {
+    return this.availablePayers.map(p => ({
+      value: p.id,
+      label: p.name
+    }));
+  }
 
   @Input() groupId: string | null = null;
   @Input() groupCurrency!: string;

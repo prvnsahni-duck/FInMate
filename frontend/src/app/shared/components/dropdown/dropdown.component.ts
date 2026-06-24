@@ -27,6 +27,8 @@ export class DropdownComponent implements ControlValueAccessor {
   @Input() disabled = false;
   @Input() styleClass = '';
   @Input() id = '';
+  @Input() size: 'sm' | 'md' = 'md';
+  @Input() buttonClass = '';
 
   value = signal<any>(null);
   isOpen = false;

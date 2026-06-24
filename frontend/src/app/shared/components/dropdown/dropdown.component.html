@@ -10,7 +10,15 @@
     type="button"
     (click)="toggle()"
     [disabled]="disabled"
-    class="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white text-sm outline-none transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100/50 dark:hover:bg-white/5"
+    class="w-full flex items-center justify-between bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white outline-none transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-100/50 dark:hover:bg-white/5"
+    [class.px-4]="size === 'md'"
+    [class.py-3]="size === 'md'"
+    [class.rounded-2xl]="size === 'md'"
+    [class.text-sm]="size === 'md'"
+    [class.px-3]="size === 'sm'"
+    [class.py-2]="size === 'sm'"
+    [class.rounded-xl]="size === 'sm'"
+    [class.text-xs]="size === 'sm'"
     [class.border-finmate-neon]="isOpen"
     [class.ring-1]="isOpen"
     [class.ring-finmate-neon]="isOpen"
@@ -26,7 +34,11 @@
       </span>
     </span>
     <svg
-      class="w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform duration-200 flex-shrink-0"
+      class="text-slate-400 dark:text-slate-500 transition-transform duration-200 flex-shrink-0"
+      [class.w-4]="size === 'md'"
+      [class.h-4]="size === 'md'"
+      [class.w-3.5]="size === 'sm'"
+      [class.h-3.5]="size === 'sm'"
       [class.rotate-180]="isOpen"
       fill="none"
       stroke="currentColor"
@@ -45,19 +57,23 @@
         <button
           type="button"
           (click)="selectOption(option)"
-          class="w-full text-left px-4 py-3 hover:bg-slate-50 dark:hover:bg-white/5 flex flex-col transition-colors relative border-b last:border-0 border-slate-100 dark:border-white/5"
+          class="w-full text-left hover:bg-slate-50 dark:hover:bg-white/5 flex flex-col transition-colors relative border-b last:border-0 border-slate-100 dark:border-white/5"
+          [class.px-4]="size === 'md'"
+          [class.py-3]="size === 'md'"
+          [class.px-3]="size === 'sm'"
+          [class.py-2]="size === 'sm'"
           [class.bg-slate-50]="idx === focusedIndex"
           [class.dark:bg-white/5]="idx === focusedIndex"
         >
           <div class="flex items-center justify-between w-full">
-            <span class="truncate flex items-center gap-2 text-sm text-slate-800 dark:text-slate-200" [class.font-bold]="option.value === value()">
+            <span class="truncate flex items-center gap-2 text-slate-800 dark:text-slate-200" [class.text-sm]="size === 'md'" [class.text-xs]="size === 'sm'" [class.font-bold]="option.value === value()">
               @if (option.icon) {
                 <span class="flex-shrink-0" [innerHTML]="option.icon"></span>
               }
               <span>{{ option.label }}</span>
             </span>
             @if (option.value === value()) {
-              <svg class="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="text-primary flex-shrink-0" [class.w-4]="size === 'md'" [class.h-4]="size === 'md'" [class.w-3.5]="size === 'sm'" [class.h-3.5]="size === 'sm'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
               </svg>
             }

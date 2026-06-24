@@ -7,6 +7,7 @@ import { GroupMember, UserSearchResult } from '@finmate/data-models';
 import { GroupsService } from '../../services/groups.service';
 import { FriendsService } from '../../../friends/services/friends.service';
 import { APP_NAME } from '../../../../core/constants/app.constants';
+import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
 
 export interface StagedInvite {
   id: string;
@@ -30,7 +31,7 @@ function isFailedInviteResult(result: GroupMember | FailedInviteResult): result 
 @Component({
   selector: 'app-group-members',
   standalone: true,
-  imports: [NgClass, FormsModule],
+  imports: [NgClass, FormsModule, DropdownComponent],
   templateUrl: './group-members.component.html'
 })
 export class GroupMembersComponent {
@@ -52,10 +53,14 @@ export class GroupMembersComponent {
   inviteError = '';
   inviteSuccess = '';
 
-  // Staged Invites Queue
-  stagedInvites = signal<StagedInvite[]>([]);
+  roleOptions: DropdownOption[] = [
+    { value: 'member', label: 'Member' },
+    { value: 'admin', label: 'Admin' },
+    { value: 'viewer', label: 'Viewer' },
+    { value: 'spectator', label: 'Spectator' }
+  ];
 
-  // "Add New Contact" Modal State
+  stagedInvites = signal<StagedInvite[]>([]);
   isNewContactModalOpen = false;
   newContactName = '';
   newContactIdentifier = '';

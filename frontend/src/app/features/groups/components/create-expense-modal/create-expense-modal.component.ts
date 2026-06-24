@@ -6,17 +6,69 @@ import { FriendsService } from '../../../../features/friends/services/friends.se
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 import { CreateExpenseDto, ExpenseSplitInputDto, GroupMember, JwtPayload, UpdateExpenseDto, UserSearchResult } from '@finmate/data-models';
 import { GroupExpense } from '../../pages/group-detail/group-detail.component';
+import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
 
 @Component({
   selector: 'app-create-expense-modal',
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, SubmitButtonComponent],
+  imports: [ReactiveFormsModule, FormsModule, SubmitButtonComponent, DropdownComponent],
   templateUrl: './create-expense-modal.component.html'
 })
 export class CreateExpenseModalComponent implements OnChanges {
   private expensesService = inject(ExpensesService);
   private friendsService = inject(FriendsService);
   private fb = inject(FormBuilder);
+
+  currencyOptions: DropdownOption[] = [
+    { value: 'USD', label: 'USD ($)' },
+    { value: 'INR', label: 'INR (₹)' },
+    { value: 'EUR', label: 'EUR (€)' }
+  ];
+
+  categoryOptions: DropdownOption[] = [
+    { 
+      value: 'Food & Drinks', 
+      label: 'Food & Drinks', 
+      icon: `<svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>`
+    },
+    { 
+      value: 'Travel', 
+      label: 'Travel', 
+      icon: `<svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>`
+    },
+    { 
+      value: 'Utilities', 
+      label: 'Utilities', 
+      icon: `<svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>`
+    },
+    { 
+      value: 'Entertainment', 
+      label: 'Entertainment', 
+      icon: `<svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path></svg>`
+    },
+    { 
+      value: 'Shopping', 
+      label: 'Shopping', 
+      icon: `<svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>`
+    },
+    { 
+      value: 'Housing', 
+      label: 'Housing', 
+      icon: `<svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>`
+    },
+    { 
+      value: 'Others', 
+      label: 'Others', 
+      icon: `<svg class="w-4 h-4 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>`
+    }
+  ];
+
+  get payerOptions(): DropdownOption[] {
+    return this.availablePayers.map(p => ({
+      value: p.id,
+      label: p.name
+    }));
+  }
 
   @Input() groupId: string | null = null;
   @Input() groupCurrency!: string;
@@ -75,9 +127,9 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
   }
 
-  get availablePayers() {
+  get availablePayers(): {id: string; name: string}[] {
     if (this.groupId) {
-      return this.members.map(m => ({ id: m.user.id, name: m.user.displayName || m.user.email }));
+      return this.members.map(m => ({ id: m.user.id, name: m.user.displayName || m.user.username || m.user.email || '' }));
     } else {
       const currentUserId = this.getCurrentUserId();
       const list = [];
@@ -85,7 +137,7 @@ export class CreateExpenseModalComponent implements OnChanges {
         list.push({ id: currentUserId, name: 'You' });
       }
       for (const friend of this.resolvedFriends.values()) {
-        list.push({ id: friend.id, name: friend.displayName });
+        list.push({ id: friend.id, name: friend.displayName || friend.username || friend.email || '' });
       }
       return list;
     }

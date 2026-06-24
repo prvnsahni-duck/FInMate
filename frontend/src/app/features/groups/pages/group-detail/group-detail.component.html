@@ -178,12 +178,12 @@
               <div class="sticky top-0 z-30 bg-finmate-card/95 backdrop-blur-md p-4 mb-6 rounded-2xl border border-secondary/15 grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Category</label>
-                  <select [ngModel]="filterCategory()" (ngModelChange)="filterCategory.set($event); applyFilters()" class="w-full text-xs px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none cursor-pointer">
-                    <option value="">All Categories</option>
-                    @for (cat of categories; track cat) {
-                      <option [value]="cat">{{ cat }}</option>
-                    }
-                  </select>
+                  <app-dropdown
+                    [ngModel]="filterCategory()"
+                    (ngModelChange)="filterCategory.set($event); applyFilters()"
+                    [options]="filterCategoryOptions"
+                    size="sm"
+                  ></app-dropdown>
                 </div>
                 <div>
                   <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Start Date</label>
@@ -355,15 +355,12 @@
 
                   <div>
                     <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Currency</label>
-                    <select [(ngModel)]="editGroupCurrency" name="editGroupCurrency" class="w-full text-sm px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none cursor-pointer">
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                      <option value="INR">INR (₹)</option>
-                      <option value="CAD">CAD ($)</option>
-                      <option value="AUD">AUD ($)</option>
-                      <option value="JPY">JPY (¥)</option>
-                    </select>
+                    <app-dropdown
+                      [(ngModel)]="editGroupCurrency"
+                      name="editGroupCurrency"
+                      [options]="currencyOptions"
+                      placeholder="Select currency..."
+                    ></app-dropdown>
                   </div>
                 </div>
 
@@ -375,11 +372,12 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Visibility</label>
-                    <select [(ngModel)]="editGroupVisibility" name="editGroupVisibility" class="w-full text-sm px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none cursor-pointer">
-                      <option value="private">Private</option>
-                      <option value="invite_only">Invite Only</option>
-                      <option value="public_readonly">Public Read-Only</option>
-                    </select>
+                    <app-dropdown
+                      [(ngModel)]="editGroupVisibility"
+                      name="editGroupVisibility"
+                      [options]="visibilityOptions"
+                      placeholder="Select visibility..."
+                    ></app-dropdown>
                   </div>
 
                   <div class="flex items-center pt-5">
@@ -601,13 +599,13 @@
                     <div class="flex items-center space-x-3">
                       <!-- Role Selector -->
                       @if (canChangeRole(member)) {
-                        <select [value]="member.role" (change)="updateMemberRole(member, $event)" class="text-xs px-2 py-1.5 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon outline-none cursor-pointer">
-                          <option value="member">Contributor</option>
-                          <option value="admin">Admin</option>
-                          <option value="spectator">Spectator</option>
-                          <option value="viewer">Viewer</option>
-                          <option value="owner">Transfer Owner</option>
-                        </select>
+                        <app-dropdown
+                          [ngModel]="member.role"
+                          (ngModelChange)="updateMemberRole(member, $event)"
+                          [options]="memberRoleOptions"
+                          size="sm"
+                          styleClass="w-36"
+                        ></app-dropdown>
                       } @else {
                         <span class="text-xs font-semibold px-2 py-1 bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 rounded-xl capitalize">
                           {{ member.role === 'member' ? 'Contributor' : member.role }}
