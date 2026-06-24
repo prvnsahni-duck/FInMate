@@ -1,186 +1,187 @@
-<div
-  class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[900] animate-fade-in"
-  (click)="cancel()">
-</div>
+<div class="fixed inset-0 z-[900] flex items-end justify-center md:items-end lg:items-center md:p-4 lg:p-4 bg-black/70 backdrop-blur-sm transition-all duration-300" (click)="cancel()">
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="cdm-title"
+    (click)="$event.stopPropagation()"
+    class="bg-[rgba(15,16,28,0.97)] border border-white/8 w-full h-[100dvh] md:h-auto md:max-h-[85vh] lg:max-h-[88vh] md:max-w-2xl lg:max-w-3xl rounded-none md:rounded-t-3xl md:rounded-b-none lg:rounded-2xl shadow-2xl relative flex flex-col text-slate-100 font-sans transform scale-100 transition-all p-6 lg:p-8">
 
-<div
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="cdm-title"
-  class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[901]
-         w-[min(92vw,780px)] max-h-[88vh] overflow-y-auto
-         bg-[rgba(15,16,28,0.97)] border border-white/8 rounded-2xl
-         shadow-[0_32px_80px_rgba(0,0,0,0.65),0_0_0_1px_rgba(129,140,248,0.15)]
-         text-slate-100 font-sans animate-slide-in">
+    <!-- Drag/Pull handle indicator for tablet bottom sheet -->
+    <div class="hidden md:block lg:hidden w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 flex-shrink-0"></div>
 
-  <!-- ─── Header ─────────────────────────────────────────────────── -->
-  <div class="flex items-start gap-3.5 px-6 pt-5 pb-4 border-b border-white/8">
-    <span class="text-3xl leading-none shrink-0">⚡</span>
-    <div>
-      <h2 id="cdm-title" class="m-0 mb-1 text-[17px] font-bold tracking-tight">
-        Edit Conflict Detected
-      </h2>
-      <p class="m-0 text-[13px] text-slate-400">
-        Field <strong class="text-indigo-400">{{ primaryField() }}</strong>
-        was changed by another user while you were editing.
-      </p>
-    </div>
+    <!-- Close Button -->
     <button
-      class="ml-auto shrink-0 bg-transparent border-none text-slate-400 text-lg
+      class="absolute top-6 right-6 bg-transparent border-none text-slate-400 text-lg
              cursor-pointer px-1.5 py-0.5 rounded-md transition-colors
-             hover:text-slate-100 hover:bg-white/6"
+             hover:text-slate-100 hover:bg-white/6 z-10"
       (click)="cancel()"
       aria-label="Cancel">
       ✕
     </button>
+
+    <!-- ─── Header ─────────────────────────────────────────────────── -->
+    <div class="flex items-start gap-3.5 pb-4 border-b border-white/8 flex-shrink-0 pr-8">
+      <span class="text-3xl leading-none shrink-0">⚡</span>
+      <div>
+        <h2 id="cdm-title" class="m-0 mb-1 text-[17px] font-bold tracking-tight">
+          Edit Conflict Detected
+        </h2>
+        <p class="m-0 text-[13px] text-slate-400">
+          Field <strong class="text-indigo-400">{{ primaryField() }}</strong>
+          was changed by another user while you were editing.
+        </p>
+      </div>
+    </div>
+
+    <!-- Scrollable content area -->
+    <div class="flex-1 overflow-y-auto py-4 pr-1 -mr-1">
+      <!-- ─── Manual Merge Editor ─────────────────────────────────────── -->
+      @if (activeStrategy() === 'manual') {
+        <div class="space-y-3">
+          <label for="cdm-editor" class="block text-[12.5px] text-slate-400">
+            Edit the merged result — combining changes from both versions:
+          </label>
+          <textarea
+            id="cdm-editor"
+            class="w-full box-border bg-black/35 border border-white/8 rounded-lg
+                   text-slate-100 font-mono text-[13px] leading-relaxed p-3.5
+                   resize-y outline-none transition-colors
+                   focus:border-indigo-400"
+            rows="8"
+            spellcheck="false"
+            [ngModel]="manualText()"
+            (ngModelChange)="manualText.set($event)"
+          ></textarea>
+        </div>
+
+      } @else {
+        <!-- ─── Side-by-side Diff ──────────────────────────────────────── -->
+        <div class="grid grid-cols-[1fr_36px_1fr] h-[340px] overflow-hidden border border-white/8 rounded-lg bg-black/10">
+
+          <!-- Local panel -->
+          <div class="flex flex-col overflow-hidden border-r border-white/8">
+            <div class="flex items-center justify-between px-3.5 py-2.5
+                        text-[11px] font-bold tracking-widest border-b border-white/8
+                        bg-white/[0.03]">
+              <span class="px-2 py-0.5 rounded-full text-[10px]
+                           bg-red-400/18 text-red-400">YOUR VERSION</span>
+              <span class="text-slate-400">v{{ context.localVersion }}</span>
+            </div>
+            <div class="flex-1 overflow-y-auto font-mono text-[12.5px] leading-[1.65] py-2">
+              @for (line of localDiffLines(); track $index) {
+                <div class="flex px-3 min-h-6 break-words whitespace-pre-wrap"
+                     [ngClass]="{
+                       'bg-red-400/14 text-red-400':   line.type === 'removed',
+                       'text-slate-400/55':             line.type === 'same'
+                     }">
+                  <span class="w-5 shrink-0 text-slate-400 select-none">
+                    {{ line.type === 'removed' ? '−' : ' ' }}
+                  </span>
+                  <span>{{ line.text || '\u00a0' }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <!-- Divider -->
+          <div class="flex items-center justify-center text-base text-slate-400
+                      border-l border-r border-white/8 bg-white/[0.02]"
+               aria-hidden="true">⟷</div>
+
+          <!-- Server panel -->
+          <div class="flex flex-col overflow-hidden">
+            <div class="flex items-center justify-between px-3.5 py-2.5
+                        text-[11px] font-bold tracking-widest border-b border-white/8
+                        bg-white/[0.03]">
+              <span class="px-2 py-0.5 rounded-full text-[10px]
+                           bg-emerald-400/18 text-emerald-400">SERVER VERSION</span>
+              <span class="text-slate-400">v{{ context.serverState['version'] }}</span>
+            </div>
+            <div class="flex-1 overflow-y-auto font-mono text-[12.5px] leading-[1.65] py-2">
+              @for (line of serverDiffLines(); track $index) {
+                <div class="flex px-3 min-h-6 break-words whitespace-pre-wrap"
+                     [ngClass]="{
+                       'bg-emerald-400/14 text-emerald-400': line.type === 'added',
+                       'text-slate-400/55':                  line.type === 'same'
+                     }">
+                  <span class="w-5 shrink-0 text-slate-400 select-none">
+                    {{ line.type === 'added' ? '+' : ' ' }}
+                  </span>
+                  <span>{{ line.text || '\u00a0' }}</span>
+                </div>
+              }
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+
+    <!-- ─── Footer Strategy Picker / Confirm Bar ────────────────────── -->
+    <div class="flex-shrink-0 border-t border-white/8 pt-4">
+      @if (activeStrategy() === null) {
+        <div class="grid grid-cols-3 gap-3">
+          <button id="cdm-btn-keep-mine"
+                  class="flex flex-col items-center gap-1.5 px-3 py-[12px]
+                         bg-white/[0.04] border border-white/8 rounded-xl
+                         text-slate-100 cursor-pointer transition-all duration-150
+                         hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-red-400"
+                  (click)="selectStrategy('keep-mine')">
+            <span class="text-2xl">🙋</span>
+            <span class="text-[13px] font-bold">Keep Mine</span>
+            <span class="text-[10px] text-slate-400 text-center leading-tight">Overwrite server with your edit</span>
+          </button>
+
+          <button id="cdm-btn-keep-theirs"
+                  class="flex flex-col items-center gap-1.5 px-3 py-[12px]
+                         bg-white/[0.04] border border-white/8 rounded-xl
+                         text-slate-100 cursor-pointer transition-all duration-150
+                         hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-emerald-400"
+                  (click)="selectStrategy('keep-theirs')">
+            <span class="text-2xl">🌐</span>
+            <span class="text-[13px] font-bold">Keep Theirs</span>
+            <span class="text-[10px] text-slate-400 text-center leading-tight">Accept server and discard yours</span>
+          </button>
+
+          <button id="cdm-btn-manual-merge"
+                  class="flex flex-col items-center gap-1.5 px-3 py-[12px]
+                         bg-white/[0.04] border border-white/8 rounded-xl
+                         text-slate-100 cursor-pointer transition-all duration-150
+                         hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-indigo-400"
+                  (click)="selectStrategy('manual')">
+            <span class="text-2xl">✍️</span>
+            <span class="text-[13px] font-bold">Manual Merge</span>
+            <span class="text-[10px] text-slate-400 text-center leading-tight">Combine both versions yourself</span>
+          </button>
+        </div>
+
+      } @else {
+        <div class="flex items-center justify-between">
+          <button
+            class="bg-transparent border-none text-slate-400 text-[13px]
+                   cursor-pointer px-1 py-1.5 transition-colors hover:text-slate-100"
+            (click)="activeStrategy.set(null)">
+            ← Back
+          </button>
+          <div class="flex gap-2.5">
+            <button
+              class="px-5 py-2 bg-white/[0.05] border border-white/8 rounded-lg
+                     text-slate-400 text-[13px] cursor-pointer transition-colors
+                     hover:bg-white/10 hover:text-slate-100"
+              (click)="cancel()">
+              Cancel
+            </button>
+            <button
+              id="cdm-btn-confirm"
+              class="px-5 py-2 bg-indigo-400 border-none rounded-lg
+                     text-white text-[13px] font-semibold cursor-pointer
+                     transition-all hover:opacity-90 hover:-translate-y-px active:translate-y-0"
+              (click)="confirm()">
+              Apply Resolution
+            </button>
+          </div>
+        </div>
+      }
+    </div>
+
   </div>
-
-  <!-- ─── Manual Merge Editor ─────────────────────────────────────── -->
-  @if (activeStrategy() === 'manual') {
-    <div class="px-6 pt-5">
-      <label for="cdm-editor" class="block text-[12.5px] text-slate-400 mb-2.5">
-        Edit the merged result — combining changes from both versions:
-      </label>
-      <textarea
-        id="cdm-editor"
-        class="w-full box-border bg-black/35 border border-white/8 rounded-lg
-               text-slate-100 font-mono text-[13px] leading-relaxed p-3.5
-               resize-y outline-none transition-colors
-               focus:border-indigo-400"
-        rows="8"
-        spellcheck="false"
-        [ngModel]="manualText()"
-        (ngModelChange)="manualText.set($event)"
-      ></textarea>
-    </div>
-
-  } @else {
-    <!-- ─── Side-by-side Diff ──────────────────────────────────────── -->
-    <div class="grid grid-cols-[1fr_36px_1fr] max-h-[340px] overflow-hidden">
-
-      <!-- Local panel -->
-      <div class="flex flex-col overflow-hidden border-r border-white/8">
-        <div class="flex items-center justify-between px-3.5 py-2.5
-                    text-[11px] font-bold tracking-widest border-b border-white/8
-                    bg-white/[0.03]">
-          <span class="px-2 py-0.5 rounded-full text-[10px]
-                       bg-red-400/18 text-red-400">YOUR VERSION</span>
-          <span class="text-slate-400">v{{ context.localVersion }}</span>
-        </div>
-        <div class="flex-1 overflow-y-auto font-mono text-[12.5px] leading-[1.65]">
-          @for (line of localDiffLines(); track $index) {
-            <div class="flex px-3 min-h-6 break-words whitespace-pre-wrap"
-                 [ngClass]="{
-                   'bg-red-400/14 text-red-400':   line.type === 'removed',
-                   'text-slate-400/55':             line.type === 'same'
-                 }">
-              <span class="w-5 shrink-0 text-slate-400 select-none">
-                {{ line.type === 'removed' ? '−' : ' ' }}
-              </span>
-              <span>{{ line.text || '\u00a0' }}</span>
-            </div>
-          }
-        </div>
-      </div>
-
-      <!-- Divider -->
-      <div class="flex items-center justify-center text-base text-slate-400
-                  border-l border-r border-white/8 bg-white/[0.02]"
-           aria-hidden="true">⟷</div>
-
-      <!-- Server panel -->
-      <div class="flex flex-col overflow-hidden">
-        <div class="flex items-center justify-between px-3.5 py-2.5
-                    text-[11px] font-bold tracking-widest border-b border-white/8
-                    bg-white/[0.03]">
-          <span class="px-2 py-0.5 rounded-full text-[10px]
-                       bg-emerald-400/18 text-emerald-400">SERVER VERSION</span>
-          <span class="text-slate-400">v{{ context.serverState['version'] }}</span>
-        </div>
-        <div class="flex-1 overflow-y-auto font-mono text-[12.5px] leading-[1.65]">
-          @for (line of serverDiffLines(); track $index) {
-            <div class="flex px-3 min-h-6 break-words whitespace-pre-wrap"
-                 [ngClass]="{
-                   'bg-emerald-400/14 text-emerald-400': line.type === 'added',
-                   'text-slate-400/55':                  line.type === 'same'
-                 }">
-              <span class="w-5 shrink-0 text-slate-400 select-none">
-                {{ line.type === 'added' ? '+' : ' ' }}
-              </span>
-              <span>{{ line.text || '\u00a0' }}</span>
-            </div>
-          }
-        </div>
-      </div>
-    </div>
-  }
-
-  <!-- ─── Strategy Picker ──────────────────────────────────────────── -->
-  @if (activeStrategy() === null) {
-    <div class="grid grid-cols-3 gap-3 px-6 py-5">
-
-      <button id="cdm-btn-keep-mine"
-              class="flex flex-col items-center gap-1.5 px-3 py-[18px]
-                     bg-white/[0.04] border border-white/8 rounded-xl
-                     text-slate-100 cursor-pointer transition-all duration-150
-                     hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-red-400"
-              (click)="selectStrategy('keep-mine')">
-        <span class="text-2xl">🙋</span>
-        <span class="text-[13px] font-bold">Keep Mine</span>
-        <span class="text-[11px] text-slate-400 text-center">Overwrite server with your edit</span>
-      </button>
-
-      <button id="cdm-btn-keep-theirs"
-              class="flex flex-col items-center gap-1.5 px-3 py-[18px]
-                     bg-white/[0.04] border border-white/8 rounded-xl
-                     text-slate-100 cursor-pointer transition-all duration-150
-                     hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-emerald-400"
-              (click)="selectStrategy('keep-theirs')">
-        <span class="text-2xl">🌐</span>
-        <span class="text-[13px] font-bold">Keep Theirs</span>
-        <span class="text-[11px] text-slate-400 text-center">Accept server version and discard yours</span>
-      </button>
-
-      <button id="cdm-btn-manual-merge"
-              class="flex flex-col items-center gap-1.5 px-3 py-[18px]
-                     bg-white/[0.04] border border-white/8 rounded-xl
-                     text-slate-100 cursor-pointer transition-all duration-150
-                     hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-indigo-400"
-              (click)="selectStrategy('manual')">
-        <span class="text-2xl">✍️</span>
-        <span class="text-[13px] font-bold">Manual Merge</span>
-        <span class="text-[11px] text-slate-400 text-center">Combine both versions yourself</span>
-      </button>
-
-    </div>
-
-  } @else {
-    <!-- ─── Confirm Bar ────────────────────────────────────────────── -->
-    <div class="flex items-center justify-between px-6 pt-4 pb-5 border-t border-white/8">
-      <button
-        class="bg-transparent border-none text-slate-400 text-[13px]
-               cursor-pointer px-1 py-1.5 transition-colors hover:text-slate-100"
-        (click)="activeStrategy.set(null)">
-        ← Back
-      </button>
-      <div class="flex gap-2.5">
-        <button
-          class="px-5 py-2 bg-white/[0.05] border border-white/8 rounded-lg
-                 text-slate-400 text-[13px] cursor-pointer transition-colors
-                 hover:bg-white/10 hover:text-slate-100"
-          (click)="cancel()">
-          Cancel
-        </button>
-        <button
-          id="cdm-btn-confirm"
-          class="px-5 py-2 bg-indigo-400 border-none rounded-lg
-                 text-white text-[13px] font-semibold cursor-pointer
-                 transition-all hover:opacity-90 hover:-translate-y-px active:translate-y-0"
-          (click)="confirm()">
-          Apply Resolution
-        </button>
-      </div>
-    </div>
-  }
-
 </div>

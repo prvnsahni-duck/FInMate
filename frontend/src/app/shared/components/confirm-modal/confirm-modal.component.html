@@ -1,11 +1,15 @@
-<div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+<div class="fixed inset-0 z-[100] flex items-end justify-center md:items-end lg:items-center md:p-4 lg:p-4">
     <!-- Backdrop with blur -->
     <div class="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm transition-opacity duration-300"
         (click)="onCancel()"></div>
 
     <!-- Modal Card -->
     <div
-        class="relative bg-white dark:bg-finmate-card border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-2xl max-w-sm w-full z-10 transform scale-100 transition-all duration-300 animate-slide-up">
+        class="relative bg-white dark:bg-finmate-card border border-slate-200 dark:border-white/5 rounded-t-3xl md:rounded-t-3xl md:rounded-b-none lg:rounded-3xl p-6 lg:p-8 shadow-2xl w-full max-w-md z-10 transform scale-100 transition-all duration-300 animate-slide-up">
+        
+        <!-- Drag/Pull handle indicator for tablet bottom sheet -->
+        <div class="hidden md:block lg:hidden w-12 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full mx-auto mb-4"></div>
+
         <!-- Icon section based on type -->
         <div class="flex items-center justify-center mb-5">
             <div [ngClass]="{
