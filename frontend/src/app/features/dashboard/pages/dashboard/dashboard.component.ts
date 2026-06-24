@@ -76,6 +76,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   isEditingIncome = false;
   newIncome = 0;
   newBudget = 0;
+  newCurrency = 'USD';
 
   // Track edit mode
   selectedExpenseForEdit: GroupExpense | null = null;
@@ -140,6 +141,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.authService.getMe().subscribe({
       next: (res) => {
         this.userProfile = res.profile;
+        this.newIncome = res.profile.monthlyIncome || 0;
+        this.newBudget = res.profile.monthlyBudget || 0;
+        this.newCurrency = res.profile.defaultCurrency || 'USD';
         this.recalculatePercentages();
       },
       error: () => { }
@@ -196,11 +200,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (this.isEditingIncome && this.userProfile) {
       this.newIncome = this.userProfile.monthlyIncome || 0;
       this.newBudget = this.userProfile.monthlyBudget || 0;
+      this.newCurrency = this.userProfile.defaultCurrency || 'USD';
     }
   }
 
   saveIncome() {
     this.authService.updateProfile({
+      defaultCurrency: this.newCurrency,
       monthlyIncome: Number(this.newIncome),
       monthlyBudget: Number(this.newBudget)
     }).subscribe({

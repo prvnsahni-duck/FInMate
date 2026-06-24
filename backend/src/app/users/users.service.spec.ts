@@ -133,6 +133,7 @@ describe('UsersService', () => {
       const mockProfile = {
         id: 'profile-id',
         locale: 'en-IN',
+        defaultCurrency: 'INR',
         avatarUrl: undefined,
       } as any;
 
@@ -145,13 +146,16 @@ describe('UsersService', () => {
         displayName: 'New Name',
         avatarUrl: 'https://example.com/new.png',
         locale: 'en-US',
+        defaultCurrency: 'EUR',
       });
 
       expect(mockUser.displayName).toBe('New Name');
       expect(mockProfile.locale).toBe('en-US');
+      expect(mockProfile.defaultCurrency).toBe('EUR');
       expect(encryptionService.encrypt).toHaveBeenCalledWith('https://example.com/new.png');
       expect(result.user.displayName).toBe('New Name');
       expect(result.profile.avatarUrl).toBe('https://example.com/new.png');
+      expect(result.profile.defaultCurrency).toBe('EUR');
     });
   });
 });

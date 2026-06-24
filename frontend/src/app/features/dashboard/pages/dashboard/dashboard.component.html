@@ -20,14 +20,14 @@
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <app-stats-card
         title="Total Personal Balance"
-        [value]="(totalBalance | currency:'USD') ?? ''"
+        [value]="(totalBalance | currency:(userProfile?.defaultCurrency || 'USD')) ?? ''"
         [icon]="bankIconPath"
         type="primary"
       ></app-stats-card>
 
       <app-stats-card
         title="Monthly Spent"
-        [value]="(monthlyExpenses | currency:'USD') ?? ''"
+        [value]="(monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD')) ?? ''"
         [icon]="creditCardIconPath"
         type="error"
       ></app-stats-card>
@@ -71,7 +71,7 @@
             <div class="flex justify-between items-center text-xs font-semibold">
               <span class="text-secondary/60 font-medium">Income Spent</span>
               <span class="text-secondary font-bold">
-                {{ monthlyExpenses | currency:'USD' }} / {{ (userProfile?.monthlyIncome || 0) | currency:'USD' }}
+                {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyIncome || 0) | currency:(userProfile?.defaultCurrency || 'USD') }}
                 <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary/10 text-secondary/85 font-extrabold">{{ incomePercentage }}%</span>
               </span>
             </div>
@@ -87,7 +87,7 @@
             <div class="flex justify-between items-center text-xs font-semibold">
               <span class="text-secondary/60 font-medium">Budget Limits</span>
               <span class="text-secondary font-bold">
-                {{ monthlyExpenses | currency:'USD' }} / {{ (userProfile?.monthlyBudget || 0) | currency:'USD' }}
+                {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyBudget || 0) | currency:(userProfile?.defaultCurrency || 'USD') }}
                 <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded font-extrabold"
                       [class.bg-error/15]="isBudgetExceeded"
                       [class.text-error]="isBudgetExceeded"
@@ -271,7 +271,7 @@
                     <span>{{ cat.category }}</span>
                   </span>
                   <span class="font-extrabold text-secondary/80">
-                    {{ cat.amount | currency:'USD' }}
+                    {{ cat.amount | currency:(userProfile?.defaultCurrency || 'USD') }}
                     <span class="ml-1 text-[10px] text-secondary/50 font-normal">({{ cat.percentage }}%)</span>
                   </span>
                 </div>
@@ -299,7 +299,7 @@
       </div>
 
       <div class="card-glass p-6">
-        <app-analytics-charts [groupId]="null" [currency]="'USD'"></app-analytics-charts>
+        <app-analytics-charts [groupId]="null" [currency]="userProfile?.defaultCurrency || 'USD'"></app-analytics-charts>
       </div>
     </div>
   }
@@ -397,16 +397,28 @@
       </div>
 
       <div class="card-glass p-6 space-y-6">
-        <!-- Budget thresholds config -->
+        <!-- Budget & Currency thresholds config -->
         <div class="space-y-6 bg-secondary/5 p-6 rounded-2xl border border-secondary/10">
-          <h4 class="font-bold text-sm text-secondary">Income & Budgeting Limits</h4>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <h4 class="font-bold text-sm text-secondary">Income, Budgeting & Currency</h4>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Salary / Income ($)</label>
+              <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Default Currency</label>
+              <select [(ngModel)]="newCurrency" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary cursor-pointer">
+                <option value="USD">USD ($)</option>
+                <option value="INR">INR (₹)</option>
+                <option value="EUR">EUR (€)</option>
+                <option value="GBP">GBP (£)</option>
+                <option value="JPY">JPY (¥)</option>
+                <option value="CAD">CAD (C$)</option>
+                <option value="AUD">AUD (A$)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Salary / Income</label>
               <input type="number" [(ngModel)]="newIncome" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 5000" />
             </div>
             <div>
-              <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Budget Limit ($)</label>
+              <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Budget Limit</label>
               <input type="number" [(ngModel)]="newBudget" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 1500" />
             </div>
           </div>
@@ -463,7 +475,7 @@
           </div>
           <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
             <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Default Currency</span>
-            <p class="text-sm font-semibold text-secondary">USD ($)</p>
+            <p class="text-sm font-semibold text-secondary">{{ userProfile?.defaultCurrency || 'USD' }}</p>
           </div>
           <div class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2">
             <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Expenses Tracked</span>
@@ -484,7 +496,7 @@
 @if (isExpenseModalOpen) {
   <app-create-expense-modal
     [groupId]="null"
-    [groupCurrency]="'USD'"
+    [groupCurrency]="userProfile?.defaultCurrency || 'USD'"
     [members]="[]"
     [expense]="selectedExpenseForEdit"
     [defaultCategory]="quickLogCategory"

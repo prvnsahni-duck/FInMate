@@ -37,7 +37,8 @@ describe('DashboardComponent', () => {
   const mockProfile = {
     profile: {
       monthlyIncome: 5000,
-      monthlyBudget: 2000
+      monthlyBudget: 2000,
+      defaultCurrency: 'USD'
     }
   };
 
@@ -117,16 +118,18 @@ describe('DashboardComponent', () => {
     expect(component.isEditingIncome).toBe(false);
   });
 
-  it('should save updated income and budget', () => {
+  it('should save updated income, budget, and default currency', () => {
     fixture.detectChanges();
     component.toggleEditIncome();
     component.newIncome = 6000;
     component.newBudget = 3000;
+    component.newCurrency = 'EUR';
 
     const updatedProfile = {
       profile: {
         monthlyIncome: 6000,
-        monthlyBudget: 3000
+        monthlyBudget: 3000,
+        defaultCurrency: 'EUR'
       }
     };
     mockAuthService.updateProfile.mockReturnValue(of(updatedProfile));
@@ -134,6 +137,7 @@ describe('DashboardComponent', () => {
     component.saveIncome();
 
     expect(mockAuthService.updateProfile).toHaveBeenCalledWith({
+      defaultCurrency: 'EUR',
       monthlyIncome: 6000,
       monthlyBudget: 3000
     });
