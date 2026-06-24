@@ -1,8 +1,5 @@
-<div class="fixed inset-0 z-50 flex items-end justify-center md:items-end lg:items-center md:p-4 lg:p-4 bg-slate-900/60 backdrop-blur-md transition-all duration-300">
-  <div class="bg-white dark:bg-finmate-card w-full h-[100dvh] md:h-auto md:max-h-[85vh] lg:max-h-[80vh] rounded-none md:rounded-t-3xl md:rounded-b-none lg:rounded-3xl p-6 lg:p-8 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 relative flex flex-col transform scale-100 transition-all">
-    
-    <!-- Drag/Pull handle indicator for tablet bottom sheet -->
-    <div class="hidden md:block lg:hidden w-12 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full mx-auto mb-4 flex-shrink-0"></div>
+<div class="fixed inset-0 z-[60] flex items-end justify-center md:items-center md:p-4 bg-slate-900/60 backdrop-blur-md transition-all duration-300">
+  <div class="bg-white dark:bg-finmate-card w-full md:max-w-lg h-[100dvh] md:h-auto md:max-h-[80vh] rounded-none md:rounded-3xl p-6 pb-safe md:p-8 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 relative flex flex-col transform scale-100 transition-all">
 
     <!-- Close Button -->
     <button (click)="closeModal()" class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors z-10">
@@ -34,8 +31,9 @@
         
         <!-- Title / Name -->
         <div>
-          <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Title / Name *</label>
+          <label for="expense-title-input" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Title / Name *</label>
           <input 
+            id="expense-title-input"
             type="text" 
             formControlName="title" 
             placeholder="e.g., Dinner, Groceries" 
@@ -56,8 +54,9 @@
 
         <!-- Description (Optional) -->
         <div>
-          <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Description (Optional)</label>
+          <label for="expense-desc-input" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Description (Optional)</label>
           <textarea 
+            id="expense-desc-input"
             formControlName="description" 
             placeholder="Add more details, notes, or comments..." 
             rows="2"
@@ -68,10 +67,11 @@
         <!-- Amount & Currency -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Amount *</label>
+            <label for="expense-amount-input" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Amount *</label>
             <div class="relative flex items-center">
               <span class="absolute left-4 text-slate-400 font-semibold select-none">{{ currencySymbol }}</span>
               <input 
+                id="expense-amount-input"
                 type="number" 
                 step="0.01"
                 formControlName="amountTotal" 
@@ -92,8 +92,9 @@
             }
           </div>
           <div>
-            <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Currency *</label>
+            <label for="expense-currency-select" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Currency *</label>
             <select 
+              id="expense-currency-select"
               formControlName="currency" 
               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all cursor-pointer"
             >
@@ -107,8 +108,9 @@
         <!-- Category & Date -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Category *</label>
+            <label for="expense-category-select" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Category *</label>
             <select 
+              id="expense-category-select"
               formControlName="category" 
               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all cursor-pointer"
             >
@@ -122,8 +124,9 @@
             </select>
           </div>
           <div>
-            <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Date *</label>
+            <label for="expense-date-input" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Date *</label>
             <input 
+              id="expense-date-input"
               type="date" 
               formControlName="expenseDate" 
               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
@@ -149,9 +152,10 @@
         <!-- Search & Manage Friends (visible if personal mode AND splitWithFriend is active) -->
         @if (!groupId && splitWithFriend) {
           <div class="space-y-2 relative">
-            <label class="block text-sm font-semibold text-slate-700 dark:text-slate-300">Add Friends to Split</label>
+            <label for="friend-search-input" class="block text-sm font-semibold text-slate-700 dark:text-slate-300">Add Friends to Split</label>
             <div class="relative">
               <input 
+                id="friend-search-input"
                 type="text" 
                 [(ngModel)]="searchQuery" 
                 [ngModelOptions]="{standalone: true}"
@@ -181,8 +185,9 @@
         <!-- Paid By Select (visible if group mode OR direct split mode) -->
         @if (groupId || splitWithFriend) {
           <div>
-            <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Paid By *</label>
+            <label for="expense-payer-select" class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Paid By *</label>
             <select 
+              id="expense-payer-select"
               formControlName="paidByUserId" 
               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all cursor-pointer"
             >
@@ -195,7 +200,7 @@
           </div>
   
           <div>
-            <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Split Equally Among</label>
+            <div class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Split Equally Among</div>
             <div class="space-y-2 max-h-40 overflow-y-auto p-3 bg-slate-50 dark:bg-black/10 rounded-2xl border border-slate-200/50 dark:border-white/5">
               @for (participant of availableParticipants; track participant.id) {
                 <label class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
@@ -228,7 +233,7 @@
   
         <!-- Attachments Section (Zero-Knowledge file uploader simulation) -->
         <div>
-          <label class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Attachments (Optional)</label>
+          <div class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Attachments (Optional)</div>
           <div class="flex items-center space-x-2">
             <label class="cursor-pointer py-2 px-4 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl font-semibold border border-slate-200 dark:border-white/10 transition-all flex items-center space-x-2 text-xs">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>

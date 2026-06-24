@@ -1,13 +1,12 @@
-<div class="fixed inset-0 z-[900] flex items-end justify-center md:items-end lg:items-center md:p-4 lg:p-4 bg-black/70 backdrop-blur-sm transition-all duration-300" (click)="cancel()">
+<div class="fixed inset-0 z-[900] flex items-end justify-center md:items-center lg:items-center md:p-4 lg:p-4 bg-black/70 backdrop-blur-sm transition-all duration-300" (click)="cancel()">
   <div
     role="dialog"
     aria-modal="true"
     aria-labelledby="cdm-title"
     (click)="$event.stopPropagation()"
-    class="bg-[rgba(15,16,28,0.97)] border border-white/8 w-full h-[100dvh] md:h-auto md:max-h-[85vh] lg:max-h-[88vh] md:max-w-2xl lg:max-w-3xl rounded-none md:rounded-t-3xl md:rounded-b-none lg:rounded-2xl shadow-2xl relative flex flex-col text-slate-100 font-sans transform scale-100 transition-all p-6 lg:p-8">
+    class="bg-[rgba(15,16,28,0.97)] border border-white/8 w-full h-[100dvh] md:h-auto md:max-h-[88vh] md:max-w-2xl lg:max-w-3xl rounded-none md:rounded-2xl shadow-2xl relative flex flex-col text-slate-100 font-sans transform scale-100 transition-all p-6 pb-safe md:p-8">
 
-    <!-- Drag/Pull handle indicator for tablet bottom sheet -->
-    <div class="hidden md:block lg:hidden w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 flex-shrink-0"></div>
+
 
     <!-- Close Button -->
     <button

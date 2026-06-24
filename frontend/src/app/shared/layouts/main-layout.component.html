@@ -79,12 +79,12 @@
   </aside>
 
   <!-- Main Content Area -->
-  <main class="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-28 lg:pb-8 relative">
+  <main class="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-28 lg:pb-8">
     <!-- Decorative Blob -->
     <div
-      class="fixed top-0 right-0 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[150px] pointer-events-none z-0">
+      class="fixed top-0 right-0 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[150px] pointer-events-none -z-10">
     </div>
-    <div class="relative z-10 max-w-5xl mx-auto">
+    <div class="max-w-5xl mx-auto">
       <router-outlet></router-outlet>
     </div>
   </main>
