@@ -3,7 +3,8 @@
     <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
       Personal Finance Settings
     </h1>
-    <p class="text-secondary/60 mt-1 font-medium">Configure monthly limit alarms, salary inputs, and AI integrations.</p>
+    <p class="text-secondary/60 mt-1 font-medium">Configure monthly limit alarms, salary inputs, and AI integrations.
+    </p>
   </div>
 
   <div class="card-glass p-6 space-y-6">
@@ -12,25 +13,29 @@
       <h4 class="font-bold text-sm text-secondary">Income, Budgeting & Currency</h4>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
-          <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Default Currency</label>
-          <app-dropdown
-            [ngModel]="newCurrency"
-            (ngModelChange)="newCurrencyChange.emit($event)"
-            [options]="currencyOptions"
-            id="new-currency-dropdown"
-          ></app-dropdown>
+          <label class="block text-xs font-bold uppercase text-secondary/60 mb-2"
+            htmlFor="new-currency-dropdown">Default Currency</label>
+          <app-dropdown [ngModel]="newCurrency" (ngModelChange)="newCurrencyChange.emit($event)"
+            [options]="currencyOptions" id="new-currency-dropdown"></app-dropdown>
         </div>
         <div>
-          <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Salary / Income</label>
-          <input type="number" [ngModel]="newIncome" (ngModelChange)="newIncomeChange.emit($event)" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 5000" />
+          <label class="block text-xs font-bold uppercase text-secondary/60 mb-2" htmlFor="new-income-input">Monthly
+            Salary / Income</label>
+          <input type="number" [ngModel]="newIncome" (ngModelChange)="newIncomeChange.emit($event)"
+            class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary"
+            placeholder="e.g. 5000" />
         </div>
         <div>
-          <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Budget Limit</label>
-          <input type="number" [ngModel]="newBudget" (ngModelChange)="newBudgetChange.emit($event)" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 1500" />
+          <label class="block text-xs font-bold uppercase text-secondary/60 mb-2" htmlFor="new-budget-input">Monthly
+            Budget Limit</label>
+          <input type="number" [ngModel]="newBudget" (ngModelChange)="newBudgetChange.emit($event)"
+            class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary"
+            placeholder="e.g. 1500" />
         </div>
       </div>
       <div class="flex justify-end pt-4">
-        <button (click)="saveIncomeEvent.emit()" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-3 px-6 rounded-xl text-sm font-bold cursor-pointer">
+        <button (click)="saveIncomeEvent.emit()"
+          class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-3 px-6 rounded-xl text-sm font-bold cursor-pointer">
           Save Configuration
         </button>
       </div>
@@ -42,11 +47,14 @@
       <div class="flex items-center justify-between text-sm px-2">
         <div>
           <span class="text-secondary font-semibold">Enable Zero-Knowledge AI Forecasting</span>
-          <p class="text-xs text-secondary/55 mt-0.5">Encrypt descriptions locally and only evaluate transaction amounts securely.</p>
+          <p class="text-xs text-secondary/55 mt-0.5">Encrypt descriptions locally and only evaluate transaction amounts
+            securely.</p>
         </div>
         <label class="relative inline-flex items-center cursor-pointer">
           <input type="checkbox" [checked]="aiOptIn" (change)="toggleAiOptInEvent.emit($event)" class="sr-only peer" />
-          <div class="w-11 h-6 bg-secondary/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+          <div
+            class="w-11 h-6 bg-secondary/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary">
+          </div>
         </label>
       </div>
     </div>

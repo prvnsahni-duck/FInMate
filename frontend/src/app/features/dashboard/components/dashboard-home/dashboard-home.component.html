@@ -6,146 +6,151 @@
     </h1>
     <p class="text-secondary/60 mt-1 font-medium">Here is an overview of your personal finance space.</p>
   </div>
-  
-  <button (click)="openExpenseModalEvent.emit({})" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-2xl flex items-center space-x-2 text-sm cursor-pointer">
+
+  <button (click)="openExpenseModalEvent.emit({})"
+    class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-2xl flex items-center space-x-2 text-sm cursor-pointer">
     <span>+ Log Expense</span>
   </button>
 </div>
 
 <!-- Key Statistics Summary Cards -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-  <app-stats-card
-    title="Total Personal Balance"
-    [value]="(totalBalance | currency:(userProfile?.defaultCurrency || 'USD')) ?? ''"
-    [icon]="bankIconPath"
-    type="primary"
-  ></app-stats-card>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+  <app-stats-card title="Total Personal Balance"
+    [value]="(totalBalance | currency:(userProfile?.defaultCurrency || 'USD')) ?? ''" [icon]="bankIconPath"
+    type="primary"></app-stats-card>
 
-  <app-stats-card
-    title="Monthly Spent"
-    [value]="(monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD')) ?? ''"
-    [icon]="creditCardIconPath"
-    type="error"
-  ></app-stats-card>
+  <app-stats-card title="Monthly Spent"
+    [value]="(monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD')) ?? ''" [icon]="creditCardIconPath"
+    type="error"></app-stats-card>
 
-  <app-stats-card
-    title="Active Groups"
-    [value]="activeGroupsCount"
-    [icon]="usersIconPath"
-    type="accent"
-  ></app-stats-card>
+  <app-stats-card title="Active Groups" [value]="activeGroupsCount" [icon]="usersIconPath"
+    type="accent"></app-stats-card>
 </div>
 
 <!-- Expected vs Actual Budget Utilization Tracker -->
-<div class="card-glass p-6 space-y-6">
+<div class="card-glass p-6 space-y-6 mt-4">
   <div class="flex justify-between items-center">
     <h3 class="text-secondary font-extrabold text-lg tracking-tight">Monthly Budget Utilization</h3>
-    <button (click)="toggleEditIncomeEvent.emit()" class="text-xs font-bold text-primary hover:brightness-110 transition-all flex items-center space-x-1 cursor-pointer">
+    <button (click)="toggleEditIncomeEvent.emit()"
+      class="text-xs font-bold text-primary hover:brightness-110 transition-all flex items-center space-x-1 cursor-pointer">
       <app-icon [path]="cogIconPath" className="w-3.5 h-3.5"></app-icon>
       <span>{{ isEditingIncome ? 'Cancel' : 'Configure Limits' }}</span>
     </button>
   </div>
 
   @if (isEditingIncome) {
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-secondary/5 p-5 rounded-2xl border border-secondary/10">
-      <div>
-        <label class="block text-[10px] font-extrabold uppercase text-secondary/60 mb-1">Monthly Salary / Income</label>
-        <input type="number" [ngModel]="newIncome" (ngModelChange)="newIncomeChange.emit($event)" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-2.5 text-xs outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 5000" />
-      </div>
-      <div>
-        <label class="block text-[10px] font-extrabold uppercase text-secondary/60 mb-1">Monthly Budget Limit</label>
-        <input type="number" [ngModel]="newBudget" (ngModelChange)="newBudgetChange.emit($event)" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-2.5 text-xs outline-none focus:ring-1 focus:ring-primary/50 text-secondary" placeholder="e.g. 1500" />
-      </div>
-      <button (click)="saveIncomeEvent.emit()" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-5 rounded-xl text-xs font-bold cursor-pointer">
-        Save Settings
-      </button>
+  <div
+    class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end bg-secondary/5 p-5 rounded-2xl border border-secondary/10">
+    <div>
+      <label class="block text-[10px] font-extrabold uppercase text-secondary/60 mb-1"
+        htmlFor="new-income-input">Monthly Salary / Income</label>
+      <input type="number" [ngModel]="newIncome" (ngModelChange)="newIncomeChange.emit($event)"
+        class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-2.5 text-xs outline-none focus:ring-1 focus:ring-primary/50 text-secondary"
+        placeholder="e.g. 5000" />
     </div>
+    <div>
+      <label class="block text-[10px] font-extrabold uppercase text-secondary/60 mb-1"
+        htmlFor="new-budget-input">Monthly Budget Limit</label>
+      <input type="number" [ngModel]="newBudget" (ngModelChange)="newBudgetChange.emit($event)"
+        class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-2.5 text-xs outline-none focus:ring-1 focus:ring-primary/50 text-secondary"
+        placeholder="e.g. 1500" />
+    </div>
+    <button (click)="saveIncomeEvent.emit()"
+      class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-5 rounded-xl text-xs font-bold cursor-pointer">
+      Save Settings
+    </button>
+  </div>
   } @else {
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <!-- Salary Spent Tracker -->
-      <div class="space-y-2.5">
-        <div class="flex justify-between items-center text-xs font-semibold">
-          <span class="text-secondary/60 font-medium">Income Spent</span>
-          <span class="text-secondary font-bold">
-            {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyIncome || 0) | currency:(userProfile?.defaultCurrency || 'USD') }}
-            <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary/10 text-secondary/85 font-extrabold">{{ incomePercentage }}%</span>
-          </span>
-        </div>
-        <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
-          <div class="bg-gradient-to-r from-primary to-accent h-3 rounded-full transition-all duration-500 shadow-sm shadow-primary/20" 
-               [style.width.%]="incomeProgressWidth">
-          </div>
-        </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <!-- Salary Spent Tracker -->
+    <div class="space-y-2.5">
+      <div class="flex justify-between items-center text-xs font-semibold">
+        <span class="text-secondary/60 font-medium">Income Spent</span>
+        <span class="text-secondary font-bold">
+          {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyIncome ||
+          0) | currency:(userProfile?.defaultCurrency || 'USD') }}
+          <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary/10 text-secondary/85 font-extrabold">{{
+            incomePercentage }}%</span>
+        </span>
       </div>
-
-      <!-- Budget Utilization Tracker -->
-      <div class="space-y-2.5">
-        <div class="flex justify-between items-center text-xs font-semibold">
-          <span class="text-secondary/60 font-medium">Budget Limits</span>
-          <span class="text-secondary font-bold">
-            {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyBudget || 0) | currency:(userProfile?.defaultCurrency || 'USD') }}
-            <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded font-extrabold"
-                  [class.bg-error/15]="isBudgetExceeded"
-                  [class.text-error]="isBudgetExceeded"
-                  [class.bg-success/15]="!isBudgetExceeded"
-                  [class.text-success]="!isBudgetExceeded">
-              {{ budgetPercentage }}%
-            </span>
-          </span>
-        </div>
-        <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
-          <div class="h-3 rounded-full transition-all duration-500 shadow-sm" 
-               [class.bg-error]="isBudgetExceeded"
-               [class.shadow-error/20]="isBudgetExceeded"
-               [class.bg-gradient-to-r]="!isBudgetExceeded"
-               [class.from-primary]="!isBudgetExceeded"
-               [class.to-success]="!isBudgetExceeded"
-               [class.shadow-primary/20]="!isBudgetExceeded"
-               [style.width.%]="budgetProgressWidth">
-          </div>
+      <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
+        <div
+          class="bg-gradient-to-r from-primary to-accent h-3 rounded-full transition-all duration-500 shadow-sm shadow-primary/20"
+          [style.width.%]="incomeProgressWidth">
         </div>
       </div>
     </div>
+
+    <!-- Budget Utilization Tracker -->
+    <div class="space-y-2.5">
+      <div class="flex justify-between items-center text-xs font-semibold">
+        <span class="text-secondary/60 font-medium">Budget Limits</span>
+        <span class="text-secondary font-bold">
+          {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyBudget ||
+          0) | currency:(userProfile?.defaultCurrency || 'USD') }}
+          <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded font-extrabold" [class.bg-error/15]="isBudgetExceeded"
+            [class.text-error]="isBudgetExceeded" [class.bg-success/15]="!isBudgetExceeded"
+            [class.text-success]="!isBudgetExceeded">
+            {{ budgetPercentage }}%
+          </span>
+        </span>
+      </div>
+      <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
+        <div class="h-3 rounded-full transition-all duration-500 shadow-sm" [class.bg-error]="isBudgetExceeded"
+          [class.shadow-error/20]="isBudgetExceeded" [class.bg-gradient-to-r]="!isBudgetExceeded"
+          [class.from-primary]="!isBudgetExceeded" [class.to-success]="!isBudgetExceeded"
+          [class.shadow-primary/20]="!isBudgetExceeded" [style.width.%]="budgetProgressWidth">
+        </div>
+      </div>
+    </div>
+  </div>
   }
 </div>
 
 <!-- Quick Log Expense (Category grid) -->
-<div class="card-glass p-6">
+<div class="card-glass p-6 mt-4">
   <h3 class="text-secondary font-extrabold text-lg tracking-tight mb-4">Quick Log Expense</h3>
   <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4">
-    <button (click)="openExpenseModalEvent.emit({ category: 'Food & Drinks' })" 
+    <button (click)="openExpenseModalEvent.emit({ category: 'Food & Drinks' })"
       class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-      <app-icon [path]="getCategoryIconPath('Food & Drinks')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
+      <app-icon [path]="getCategoryIconPath('Food & Drinks')"
+        className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
       <span class="text-xs font-semibold text-secondary/80">Food & Drinks</span>
     </button>
-    <button (click)="openExpenseModalEvent.emit({ category: 'Travel' })" 
+    <button (click)="openExpenseModalEvent.emit({ category: 'Travel' })"
       class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-      <app-icon [path]="getCategoryIconPath('Travel')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
+      <app-icon [path]="getCategoryIconPath('Travel')"
+        className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
       <span class="text-xs font-semibold text-secondary/80">Travel</span>
     </button>
-    <button (click)="openExpenseModalEvent.emit({ category: 'Utilities' })" 
+    <button (click)="openExpenseModalEvent.emit({ category: 'Utilities' })"
       class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-      <app-icon [path]="getCategoryIconPath('Utilities')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
+      <app-icon [path]="getCategoryIconPath('Utilities')"
+        className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
       <span class="text-xs font-semibold text-secondary/80">Utilities</span>
     </button>
-    <button (click)="openExpenseModalEvent.emit({ category: 'Entertainment' })" 
+    <button (click)="openExpenseModalEvent.emit({ category: 'Entertainment' })"
       class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-      <app-icon [path]="getCategoryIconPath('Entertainment')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
+      <app-icon [path]="getCategoryIconPath('Entertainment')"
+        className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
       <span class="text-xs font-semibold text-secondary/80">Entertainment</span>
     </button>
-    <button (click)="openExpenseModalEvent.emit({ category: 'Shopping' })" 
+    <button (click)="openExpenseModalEvent.emit({ category: 'Shopping' })"
       class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-      <app-icon [path]="getCategoryIconPath('Shopping')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
+      <app-icon [path]="getCategoryIconPath('Shopping')"
+        className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
       <span class="text-xs font-semibold text-secondary/80">Shopping</span>
     </button>
-    <button (click)="openExpenseModalEvent.emit({ category: 'Housing' })" 
+    <button (click)="openExpenseModalEvent.emit({ category: 'Housing' })"
       class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 cursor-pointer">
-      <app-icon [path]="getCategoryIconPath('Housing')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
+      <app-icon [path]="getCategoryIconPath('Housing')"
+        className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
       <span class="text-xs font-semibold text-secondary/80">Housing</span>
     </button>
-    <button (click)="openExpenseModalEvent.emit({ category: 'Others' })" 
+    <button (click)="openExpenseModalEvent.emit({ category: 'Others' })"
       class="flex flex-col items-center justify-center p-4 bg-secondary/5 hover:bg-secondary/10 border border-secondary/10 rounded-2xl transition-all duration-200 group hover:-translate-y-1 col-span-2 sm:col-span-1 cursor-pointer">
-      <app-icon [path]="getCategoryIconPath('Others')" className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
+      <app-icon [path]="getCategoryIconPath('Others')"
+        className="w-8 h-8 mb-2 text-primary group-hover:scale-110 transition-all"></app-icon>
       <span class="text-xs font-semibold text-secondary/80">Others</span>
     </button>
   </div>
@@ -153,132 +158,145 @@
 
 <!-- Group Invitations Queue -->
 @if (pendingInvitations.length > 0) {
-  <div class="card-glass p-6 border border-warning/20 bg-gradient-to-br from-warning/5 to-transparent relative overflow-hidden">
-    <h3 class="font-extrabold text-secondary text-lg mb-4 flex items-center space-x-2">
-      <app-icon [path]="bellIconPath" className="w-5 h-5 text-warning"></app-icon>
-      <span>Group Invitations ({{ pendingInvitations.length }})</span>
-    </h3>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      @for (invite of pendingInvitations; track invite.membershipId) {
-        <div class="bg-white dark:bg-finmate-card/50 border border-secondary/10 rounded-2xl p-4 flex flex-col justify-between space-y-3">
-          <div>
-            <h4 class="font-bold text-secondary text-sm truncate">{{ invite.name }}</h4>
-            <p class="text-[11px] text-secondary/60 mt-0.5">Invited by: {{ invite.ownerName }}</p>
-          </div>
-          
-          <div class="flex space-x-2 pt-2">
-            <button (click)="declineInvitationEvent.emit(invite)" class="flex-1 py-2 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-xl text-xs font-bold transition-all cursor-pointer">
-              Decline
-            </button>
-            <button (click)="acceptInvitationEvent.emit(invite)" class="flex-1 bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2 rounded-xl text-xs font-bold cursor-pointer">
-              Accept
-            </button>
-          </div>
-        </div>
-      }
+<div
+  class="card-glass p-6 border border-warning/20 bg-gradient-to-br from-warning/5 to-transparent relative overflow-hidden">
+  <h3 class="font-extrabold text-secondary text-lg mb-4 flex items-center space-x-2">
+    <app-icon [path]="bellIconPath" className="w-5 h-5 text-warning"></app-icon>
+    <span>Group Invitations ({{ pendingInvitations.length }})</span>
+  </h3>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    @for (invite of pendingInvitations; track invite.membershipId) {
+    <div
+      class="bg-white dark:bg-finmate-card/50 border border-secondary/10 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+      <div>
+        <h4 class="font-bold text-secondary text-sm truncate">{{ invite.name }}</h4>
+        <p class="text-[11px] text-secondary/60 mt-0.5">Invited by: {{ invite.ownerName }}</p>
+      </div>
+
+      <div class="flex space-x-2 pt-2">
+        <button (click)="declineInvitationEvent.emit(invite)"
+          class="flex-1 py-2 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-xl text-xs font-bold transition-all cursor-pointer">
+          Decline
+        </button>
+        <button (click)="acceptInvitationEvent.emit(invite)"
+          class="flex-1 bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2 rounded-xl text-xs font-bold cursor-pointer">
+          Accept
+        </button>
+      </div>
     </div>
+    }
   </div>
+</div>
 }
 
 <!-- Split grid with transactions list on left and category breakdown on right -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-  
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+
   <!-- Recent transactions (2/3 width) -->
   <div class="lg:col-span-2 card-glass p-6 space-y-6">
     <h2 class="text-lg font-extrabold text-secondary tracking-tight">Recent Personal Expenses</h2>
-    
+
     @if (isLoading) {
-      <div class="space-y-4">
-        @for (i of [1, 2, 3]; track i) {
-          <div class="h-16 w-full rounded-2xl skeleton-shimmer bg-secondary/5 animate-pulse"></div>
-        }
-      </div>
+    <div class="space-y-4">
+      @for (i of [1, 2, 3]; track i) {
+      <div class="h-16 w-full rounded-2xl skeleton-shimmer bg-secondary/5 animate-pulse"></div>
+      }
+    </div>
     } @else if (personalExpenses.length === 0) {
-      <div class="flex flex-col items-center justify-center py-12 text-center">
-        <div class="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mb-6">
-          <app-icon [path]="inboxIconPath" className="w-10 h-10 text-primary"></app-icon>
-        </div>
-        <p class="text-secondary font-bold text-base mb-1">Create your first expense</p>
-        <p class="text-xs text-secondary/50 max-w-xs mb-6">Aggregate and track your personal expenditures with absolute zero-knowledge privacy.</p>
-        <button (click)="openExpenseModalEvent.emit({})" class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-xl text-xs font-bold shadow-md shadow-primary/20 cursor-pointer">
-          Log Transaction
-        </button>
+    <div class="flex flex-col items-center justify-center py-12 text-center">
+      <div class="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mb-6">
+        <app-icon [path]="inboxIconPath" className="w-10 h-10 text-primary"></app-icon>
       </div>
+      <p class="text-secondary font-bold text-base mb-1">Create your first expense</p>
+      <p class="text-xs text-secondary/50 max-w-xs mb-6">Aggregate and track your personal expenditures with absolute
+        zero-knowledge privacy.</p>
+      <button (click)="openExpenseModalEvent.emit({})"
+        class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-xl text-xs font-bold shadow-md shadow-primary/20 cursor-pointer">
+        Log Transaction
+      </button>
+    </div>
     } @else {
-      <div class="space-y-4 max-h-[480px] overflow-y-auto pr-1">
-        @for (expense of personalExpenses; track expense.id) {
-          <div class="flex items-center justify-between p-4 rounded-2xl bg-secondary/5 border border-secondary/5 hover:border-primary/25 hover:bg-secondary/10 transition-all duration-300 group">
-            <div class="flex items-center space-x-4">
-              <!-- Category Icon -->
-              <div class="w-10 h-10 rounded-xl bg-finmate-card flex items-center justify-center text-primary shadow-sm border border-secondary/10 group-hover:scale-105 transition-all">
-                <app-icon [path]="getCategoryIconPath(expense.category)" className="w-5 h-5"></app-icon>
-              </div>
-              <div>
-                <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2">
-                  <span>{{ expense.title }}</span>
-                  <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider" [class]="getCategoryBadgeClass(expense.category)">
-                    {{ expense.category }}
-                  </span>
-                </h4>
-                <p class="text-[10px] text-secondary/55 mt-0.5 font-medium">{{ expense.expenseDate | date:'mediumDate' }}</p>
-              </div>
-            </div>
-            
-            <div class="flex items-center space-x-4">
-              <p class="font-extrabold text-base text-secondary tracking-tight">{{ expense.amountTotal | currency:expense.currency }}</p>
-              <div class="flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-250">
-                <button (click)="openExpenseModalEvent.emit({ expense })" class="p-2 text-secondary/40 hover:text-primary hover:bg-secondary/15 rounded-xl transition-all cursor-pointer">
-                  ✏️
-                </button>
-                <button (click)="confirmDeleteExpenseEvent.emit(expense.id)" class="p-2 text-secondary/40 hover:text-error hover:bg-error/15 rounded-xl transition-all cursor-pointer">
-                  🗑️
-                </button>
-              </div>
-            </div>
+    <div class="space-y-4 max-h-[480px] overflow-y-auto pr-1">
+      @for (expense of personalExpenses; track expense.id) {
+      <div
+        class="flex items-center justify-between p-4 rounded-2xl bg-secondary/5 border border-secondary/5 hover:border-primary/25 hover:bg-secondary/10 transition-all duration-300 group">
+        <div class="flex items-center space-x-4">
+          <!-- Category Icon -->
+          <div
+            class="w-10 h-10 rounded-xl bg-finmate-card flex items-center justify-center text-primary shadow-sm border border-secondary/10 group-hover:scale-105 transition-all">
+            <app-icon [path]="getCategoryIconPath(expense.category)" className="w-5 h-5"></app-icon>
           </div>
-        }
+          <div>
+            <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2">
+              <span>{{ expense.title }}</span>
+              <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider"
+                [class]="getCategoryBadgeClass(expense.category)">
+                {{ expense.category }}
+              </span>
+            </h4>
+            <p class="text-[10px] text-secondary/55 mt-0.5 font-medium">{{ expense.expenseDate | date:'mediumDate' }}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-4">
+          <p class="font-extrabold text-base text-secondary tracking-tight">{{ expense.amountTotal |
+            currency:expense.currency }}</p>
+          <div
+            class="flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-250">
+            <button (click)="openExpenseModalEvent.emit({ expense })"
+              class="p-2 text-secondary/40 hover:text-primary hover:bg-secondary/15 rounded-xl transition-all cursor-pointer">
+              ✏️
+            </button>
+            <button (click)="confirmDeleteExpenseEvent.emit(expense.id)"
+              class="p-2 text-secondary/40 hover:text-error hover:bg-error/15 rounded-xl transition-all cursor-pointer">
+              🗑️
+            </button>
+          </div>
+        </div>
       </div>
+      }
+    </div>
     }
   </div>
 
   <!-- Spending by Category Breakdown (1/3 width) -->
   <div class="card-glass p-6 space-y-6">
     <h2 class="text-lg font-extrabold text-secondary tracking-tight">Spending by Category</h2>
-    
+
     @if (isLoading) {
-      <div class="space-y-4">
-        @for (i of [1, 2, 3]; track i) {
-          <div class="h-12 w-full rounded-2xl skeleton-shimmer bg-secondary/5 animate-pulse"></div>
-        }
-      </div>
+    <div class="space-y-4">
+      @for (i of [1, 2, 3]; track i) {
+      <div class="h-12 w-full rounded-2xl skeleton-shimmer bg-secondary/5 animate-pulse"></div>
+      }
+    </div>
     } @else if (categoryAnalytics.length === 0) {
-      <div class="flex flex-col items-center justify-center py-12 text-center text-secondary/50">
-        <span class="text-3xl mb-2">📊</span>
-        <p class="text-xs font-semibold">No category insights yet.</p>
-      </div>
+    <div class="flex flex-col items-center justify-center py-12 text-center text-secondary/50">
+      <span class="text-3xl mb-2">📊</span>
+      <p class="text-xs font-semibold">No category insights yet.</p>
+    </div>
     } @else {
-      <div class="space-y-5">
-        @for (cat of categoryAnalytics; track cat.category) {
-          <div class="space-y-1.5">
-            <div class="flex justify-between items-center text-xs">
-              <span class="font-bold text-secondary flex items-center space-x-1.5">
-                <app-icon [path]="getCategoryIconPath(cat.category)" className="w-4 h-4"></app-icon>
-                <span>{{ cat.category }}</span>
-              </span>
-              <span class="font-extrabold text-secondary/80">
-                {{ cat.amount | currency:(userProfile?.defaultCurrency || 'USD') }}
-                <span class="ml-1 text-[10px] text-secondary/50 font-normal">({{ cat.percentage }}%)</span>
-              </span>
-            </div>
-            <div class="w-full bg-secondary/10 rounded-full h-2">
-              <div class="bg-primary h-2 rounded-full transition-all duration-500" 
-                   [style.width.%]="cat.percentage">
-              </div>
-            </div>
+    <div class="space-y-5">
+      @for (cat of categoryAnalytics; track cat.category) {
+      <div class="space-y-1.5">
+        <div class="flex justify-between items-center text-xs">
+          <span class="font-bold text-secondary flex items-center space-x-1.5">
+            <app-icon [path]="getCategoryIconPath(cat.category)" className="w-4 h-4"></app-icon>
+            <span>{{ cat.category }}</span>
+          </span>
+          <span class="font-extrabold text-secondary/80">
+            {{ cat.amount | currency:(userProfile?.defaultCurrency || 'USD') }}
+            <span class="ml-1 text-[10px] text-secondary/50 font-normal">({{ cat.percentage }}%)</span>
+          </span>
+        </div>
+        <div class="w-full bg-secondary/10 rounded-full h-2">
+          <div class="bg-primary h-2 rounded-full transition-all duration-500" [style.width.%]="cat.percentage">
           </div>
-        }
+        </div>
       </div>
+      }
+    </div>
     }
   </div>
 </div>
