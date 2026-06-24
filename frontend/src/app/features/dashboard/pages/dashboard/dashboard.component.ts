@@ -15,11 +15,12 @@ import { ExpensesService } from '../../../groups/services/expenses.service';
 import { PendingInvitationResponse, Profile } from '@finmate/data-models';
 import { GroupExpense } from '../../../groups/pages/group-detail/group-detail.component';
 import { AiService } from '../../services/ai.service';
+import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [FormsModule, CurrencyPipe, DatePipe, CreateExpenseModalComponent, AnalyticsChartsComponent, ConfirmModalComponent, StatsCardComponent, IconComponent],
+  imports: [FormsModule, CurrencyPipe, DatePipe, CreateExpenseModalComponent, AnalyticsChartsComponent, ConfirmModalComponent, StatsCardComponent, IconComponent, DropdownComponent],
   templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
@@ -77,6 +78,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
   newIncome = 0;
   newBudget = 0;
   newCurrency = 'USD';
+
+  currencyOptions: DropdownOption[] = [
+    { value: 'USD', label: 'USD ($)', description: 'US Dollar' },
+    { value: 'INR', label: 'INR (₹)', description: 'Indian Rupee' },
+    { value: 'EUR', label: 'EUR (€)', description: 'Euro' },
+    { value: 'GBP', label: 'GBP (£)', description: 'British Pound' },
+    { value: 'JPY', label: 'JPY (¥)', description: 'Japanese Yen' },
+    { value: 'CAD', label: 'CAD (C$)', description: 'Canadian Dollar' },
+    { value: 'AUD', label: 'AUD (A$)', description: 'Australian Dollar' }
+  ];
 
   // Track edit mode
   selectedExpenseForEdit: GroupExpense | null = null;

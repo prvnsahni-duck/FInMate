@@ -70,3 +70,14 @@ body {
   100% { background-position: -200% 0; }
 }
 
+/* Fix native select options contrast in light/dark mode */
+select option {
+  background-color: #ffffff;
+  color: #1e1e1e;
+}
+.dark select option {
+  background-color: #1e1e1e;
+  color: #f2ede6;
+}
+
+

@@ -403,15 +403,11 @@
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
               <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Default Currency</label>
-              <select [(ngModel)]="newCurrency" class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary cursor-pointer">
-                <option value="USD">USD ($)</option>
-                <option value="INR">INR (₹)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="GBP">GBP (£)</option>
-                <option value="JPY">JPY (¥)</option>
-                <option value="CAD">CAD (C$)</option>
-                <option value="AUD">AUD (A$)</option>
-              </select>
+              <app-dropdown
+                [(ngModel)]="newCurrency"
+                [options]="currencyOptions"
+                id="new-currency-dropdown"
+              ></app-dropdown>
             </div>
             <div>
               <label class="block text-xs font-bold uppercase text-secondary/60 mb-2">Monthly Salary / Income</label>
