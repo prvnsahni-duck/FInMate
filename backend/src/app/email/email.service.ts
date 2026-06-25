@@ -9,11 +9,15 @@ export class EmailService {
   private readonly logger = new Logger(EmailService.name);
 
   constructor(private readonly configService: ConfigService) {
-    this.resendApiKey = this.configService.get<string>('RESEND_API_KEY') || null;
-    this.fromEmail = this.configService.get<string>('FROM_EMAIL') || 'noreply@finmate.app';
+    this.resendApiKey =
+      this.configService.get<string>('RESEND_API_KEY') || null;
+    this.fromEmail =
+      this.configService.get<string>('FROM_EMAIL') || 'noreply@finmate.app';
 
     if (!this.resendApiKey) {
-      this.logger.warn('RESEND_API_KEY is not set. Emails will be logged to the console instead of being sent.');
+      this.logger.warn(
+        'RESEND_API_KEY is not set. Emails will be logged to the console instead of being sent.',
+      );
     }
   }
 
@@ -52,7 +56,12 @@ ${html}
     }
   }
 
-  async sendInviteEmail(toEmail: string, groupName: string, inviteUrl: string, inviterName: string): Promise<void> {
+  async sendInviteEmail(
+    toEmail: string,
+    groupName: string,
+    inviteUrl: string,
+    inviterName: string,
+  ): Promise<void> {
     const subject = `You're invited to join the group "${groupName}" on FinMate`;
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
@@ -71,7 +80,10 @@ ${html}
     await this.sendEmail(toEmail, subject, html);
   }
 
-  async sendVerificationEmail(toEmail: string, verificationUrl: string): Promise<void> {
+  async sendVerificationEmail(
+    toEmail: string,
+    verificationUrl: string,
+  ): Promise<void> {
     const subject = 'Verify your email - FinMate';
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
@@ -87,7 +99,10 @@ ${html}
     await this.sendEmail(toEmail, subject, html);
   }
 
-  async sendPasswordResetEmail(toEmail: string, resetUrl: string): Promise<void> {
+  async sendPasswordResetEmail(
+    toEmail: string,
+    resetUrl: string,
+  ): Promise<void> {
     const subject = 'Reset your password - FinMate';
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">

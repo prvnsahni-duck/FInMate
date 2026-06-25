@@ -1,4 +1,8 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { User, Profile, UpdateProfileDto } from '@finmate/data-models';
@@ -16,7 +20,11 @@ export class UsersService {
     private readonly encryptionService: EncryptionService,
   ) {}
 
-  async createUser(email: string, passwordPlain: string, displayName?: string): Promise<User> {
+  async createUser(
+    email: string,
+    passwordPlain: string,
+    displayName?: string,
+  ): Promise<User> {
     const existing = await this.userRepository.findOne({ where: { email } });
     if (existing) {
       // mapped by global filter to RES_ALREADY_EXISTS
@@ -66,7 +74,10 @@ export class UsersService {
     return this.decryptProfile(profile);
   }
 
-  async updateProfile(userId: string, data: UpdateProfileDto): Promise<{ user: User; profile: Profile }> {
+  async updateProfile(
+    userId: string,
+    data: UpdateProfileDto,
+  ): Promise<{ user: User; profile: Profile }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -100,7 +111,9 @@ export class UsersService {
       profile.monthlyIncome = data.monthlyIncome;
     }
     if (data.avatarUrl !== undefined) {
-      profile.avatarUrl = data.avatarUrl ? this.encryptionService.encrypt(data.avatarUrl) : undefined;
+      profile.avatarUrl = data.avatarUrl
+        ? this.encryptionService.encrypt(data.avatarUrl)
+        : undefined;
     }
 
     const savedProfile = await this.profileRepository.save(profile);

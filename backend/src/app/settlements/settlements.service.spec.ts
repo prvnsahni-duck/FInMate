@@ -1,9 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { Group, GroupMember, Expense, ExpenseSplit, Settlement, AuditLog } from '@finmate/data-models';
+import {
+  Group,
+  GroupMember,
+  Expense,
+  ExpenseSplit,
+  Settlement,
+  AuditLog,
+} from '@finmate/data-models';
 import { SettlementsService, MemberBalance } from './settlements.service';
-import { ForbiddenException, NotFoundException, BadRequestException, PreconditionFailedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  NotFoundException,
+  BadRequestException,
+  PreconditionFailedException,
+} from '@nestjs/common';
 
 describe('SettlementsService', () => {
   let service: SettlementsService;
@@ -24,7 +36,9 @@ describe('SettlementsService', () => {
       createQueryBuilder: jest.fn(() => ({
         where: jest.fn().mockReturnThis(),
         andWhere: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockImplementation(() => mockGroupMemberRepository.findOne()),
+        getOne: jest
+          .fn()
+          .mockImplementation(() => mockGroupMemberRepository.findOne()),
       })),
     };
 
@@ -54,7 +68,10 @@ describe('SettlementsService', () => {
         if (entityClass === GroupMember) {
           const res = await mockGroupMemberRepository.findOne(options);
           if (res && !res.user) {
-            res.user = { id: options?.where?.user?.id || 'caller-id', email: 'test@example.com' } as any;
+            res.user = {
+              id: options?.where?.user?.id || 'caller-id',
+              email: 'test@example.com',
+            } as any;
           }
           return res;
         }
@@ -85,11 +102,26 @@ describe('SettlementsService', () => {
       providers: [
         SettlementsService,
         { provide: getRepositoryToken(Group), useValue: mockGroupRepository },
-        { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepository },
-        { provide: getRepositoryToken(Expense), useValue: mockExpenseRepository },
-        { provide: getRepositoryToken(ExpenseSplit), useValue: mockExpenseSplitRepository },
-        { provide: getRepositoryToken(Settlement), useValue: mockSettlementRepository },
-        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
+        {
+          provide: getRepositoryToken(GroupMember),
+          useValue: mockGroupMemberRepository,
+        },
+        {
+          provide: getRepositoryToken(Expense),
+          useValue: mockExpenseRepository,
+        },
+        {
+          provide: getRepositoryToken(ExpenseSplit),
+          useValue: mockExpenseSplitRepository,
+        },
+        {
+          provide: getRepositoryToken(Settlement),
+          useValue: mockSettlementRepository,
+        },
+        {
+          provide: getRepositoryToken(AuditLog),
+          useValue: mockAuditLogRepository,
+        },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -217,22 +249,24 @@ describe('SettlementsService', () => {
     it('should throw ForbiddenException if caller is not an active member', async () => {
       groupMemberRepository.findOne.mockResolvedValueOnce(null);
 
-      await expect(service.calculateGroupBalances('user-id', 'group-id')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.calculateGroupBalances('user-id', 'group-id'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should compile balances and simplify debts across multiple currencies', async () => {
       // Setup members
       const userA = { id: 'aaaa', email: 'a@ex.com', displayName: 'User A' };
       const userB = { id: 'bbbb', email: 'b@ex.com', displayName: 'User B' };
-      
+
       const mockMembers = [
         { user: userA, joinStatus: 'active' },
         { user: userB, joinStatus: 'active' },
       ] as any[];
-      
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
+
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
       groupMemberRepository.find.mockResolvedValueOnce(mockMembers);
 
@@ -275,10 +309,18 @@ describe('SettlementsService', () => {
       // A paid 100, owes 0, received 30. Net = 100 - 0 - 30 = 70.
       // B paid 0, owes 100, paid 30. Net = 0 - 100 + 30 = -70.
       expect(result.balances).toContainEqual(
-        expect.objectContaining({ userId: 'aaaa', netBalance: 70.0, currency: 'USD' }),
+        expect.objectContaining({
+          userId: 'aaaa',
+          netBalance: 70.0,
+          currency: 'USD',
+        }),
       );
       expect(result.balances).toContainEqual(
-        expect.objectContaining({ userId: 'bbbb', netBalance: -70.0, currency: 'USD' }),
+        expect.objectContaining({
+          userId: 'bbbb',
+          netBalance: -70.0,
+          currency: 'USD',
+        }),
       );
 
       // Suggested settlements should simplify: B pays A $70
@@ -297,30 +339,49 @@ describe('SettlementsService', () => {
       groupMemberRepository.findOne.mockResolvedValueOnce(null);
 
       await expect(
-        service.proposeSettlement('caller-id', 'group-id', { toUserId: 'target-id', amount: 10, currency: 'USD' }),
+        service.proposeSettlement('caller-id', 'group-id', {
+          toUserId: 'target-id',
+          amount: 10,
+          currency: 'USD',
+        }),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw BadRequestException if recipient is not in group', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
       groupMemberRepository.findOne.mockResolvedValueOnce(null);
 
       await expect(
-        service.proposeSettlement('caller-id', 'group-id', { toUserId: 'target-id', amount: 10, currency: 'USD' }),
+        service.proposeSettlement('caller-id', 'group-id', {
+          toUserId: 'target-id',
+          amount: 10,
+          currency: 'USD',
+        }),
       ).rejects.toThrow(BadRequestException);
     });
 
     it('should successfully propose settlement', async () => {
-      const mockCaller = { id: 'caller-member', user: { id: 'caller-id' } } as any;
-      const mockRecipient = { id: 'recipient-member', user: { id: 'recipient-id' } } as any;
+      const mockCaller = {
+        id: 'caller-member',
+        user: { id: 'caller-id' },
+      } as any;
+      const mockRecipient = {
+        id: 'recipient-member',
+        user: { id: 'recipient-id' },
+      } as any;
 
       groupMemberRepository.findOne.mockResolvedValueOnce(mockCaller);
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
       groupMemberRepository.findOne.mockResolvedValueOnce(mockRecipient);
 
       settlementRepository.create.mockImplementation((data) => data as any);
-      settlementRepository.save.mockResolvedValueOnce({ id: 'settlement-id', ...mockCaller.user } as any);
+      settlementRepository.save.mockResolvedValueOnce({
+        id: 'settlement-id',
+        ...mockCaller.user,
+      } as any);
 
       const result = await service.proposeSettlement('caller-id', 'group-id', {
         toUserId: 'recipient-id',
@@ -344,13 +405,15 @@ describe('SettlementsService', () => {
     it('should throw ForbiddenException if caller is not active', async () => {
       groupMemberRepository.findOne.mockResolvedValueOnce(null);
 
-      await expect(service.listSettlements('caller-id', 'group-id', 1, 20)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.listSettlements('caller-id', 'group-id', 1, 20),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should return paginated list of settlements', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
 
       const mockQueryBuilder = {
         leftJoinAndSelect: jest.fn().mockReturnThis(),
@@ -359,11 +422,20 @@ describe('SettlementsService', () => {
         getCount: jest.fn().mockResolvedValueOnce(2),
         skip: jest.fn().mockReturnThis(),
         take: jest.fn().mockReturnThis(),
-        getMany: jest.fn().mockResolvedValueOnce([{ id: 's-1' }, { id: 's-2' }]),
+        getMany: jest
+          .fn()
+          .mockResolvedValueOnce([{ id: 's-1' }, { id: 's-2' }]),
       };
-      settlementRepository.createQueryBuilder.mockReturnValueOnce(mockQueryBuilder as any);
+      settlementRepository.createQueryBuilder.mockReturnValueOnce(
+        mockQueryBuilder as any,
+      );
 
-      const result = await service.listSettlements('caller-id', 'group-id', 1, 10);
+      const result = await service.listSettlements(
+        'caller-id',
+        'group-id',
+        1,
+        10,
+      );
 
       expect(result).toBeDefined();
       expect(result.data).toHaveLength(2);
@@ -376,31 +448,49 @@ describe('SettlementsService', () => {
       groupMemberRepository.findOne.mockResolvedValueOnce(null);
 
       await expect(
-        service.updateSettlement('caller-id', 'group-id', 'settlement-id', { status: 'confirmed', version: 1 }),
+        service.updateSettlement('caller-id', 'group-id', 'settlement-id', {
+          status: 'confirmed',
+          version: 1,
+        }),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw NotFoundException if settlement is not found', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
       settlementRepository.findOne.mockResolvedValueOnce(null);
 
       await expect(
-        service.updateSettlement('caller-id', 'group-id', 'settlement-id', { status: 'confirmed', version: 1 }),
+        service.updateSettlement('caller-id', 'group-id', 'settlement-id', {
+          status: 'confirmed',
+          version: 1,
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw PreconditionFailedException on version conflict', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
-      settlementRepository.findOne.mockResolvedValueOnce({ id: 'settlement-id', version: 2 } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
+      settlementRepository.findOne.mockResolvedValueOnce({
+        id: 'settlement-id',
+        version: 2,
+      } as any);
 
       await expect(
-        service.updateSettlement('caller-id', 'group-id', 'settlement-id', { status: 'confirmed', version: 1 }),
+        service.updateSettlement('caller-id', 'group-id', 'settlement-id', {
+          status: 'confirmed',
+          version: 1,
+        }),
       ).rejects.toThrow(PreconditionFailedException);
     });
 
     it('should throw ForbiddenException if non-creditor tries to confirm', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
-      
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
+
       const mockSettlement = {
         id: 'settlement-id',
         version: 1,
@@ -410,12 +500,17 @@ describe('SettlementsService', () => {
       settlementRepository.findOne.mockResolvedValueOnce(mockSettlement);
 
       await expect(
-        service.updateSettlement('debtor-id', 'group-id', 'settlement-id', { status: 'confirmed', version: 1 }),
+        service.updateSettlement('debtor-id', 'group-id', 'settlement-id', {
+          status: 'confirmed',
+          version: 1,
+        }),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow creditor to confirm receipt', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
 
       const mockSettlement = {
         id: 'settlement-id',
@@ -427,11 +522,16 @@ describe('SettlementsService', () => {
       settlementRepository.findOne.mockResolvedValueOnce(mockSettlement);
       settlementRepository.save.mockResolvedValueOnce(mockSettlement);
 
-      const result = await service.updateSettlement('creditor-id', 'group-id', 'settlement-id', {
-        status: 'confirmed',
-        settledOn: '2026-06-10',
-        version: 1,
-      });
+      const result = await service.updateSettlement(
+        'creditor-id',
+        'group-id',
+        'settlement-id',
+        {
+          status: 'confirmed',
+          settledOn: '2026-06-10',
+          version: 1,
+        },
+      );
 
       expect(mockSettlement.status).toBe('confirmed');
       expect(mockSettlement.settledOn).toBe('2026-06-10');
@@ -439,7 +539,9 @@ describe('SettlementsService', () => {
     });
 
     it('should throw ForbiddenException if non-party tries to cancel', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
 
       const mockSettlement = {
         id: 'settlement-id',
@@ -450,12 +552,17 @@ describe('SettlementsService', () => {
       settlementRepository.findOne.mockResolvedValueOnce(mockSettlement);
 
       await expect(
-        service.updateSettlement('other-id', 'group-id', 'settlement-id', { status: 'cancelled', version: 1 }),
+        service.updateSettlement('other-id', 'group-id', 'settlement-id', {
+          status: 'cancelled',
+          version: 1,
+        }),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow debtor to cancel', async () => {
-      groupMemberRepository.findOne.mockResolvedValueOnce({ id: 'caller-member' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
 
       const mockSettlement = {
         id: 'settlement-id',
@@ -467,10 +574,15 @@ describe('SettlementsService', () => {
       settlementRepository.findOne.mockResolvedValueOnce(mockSettlement);
       settlementRepository.save.mockResolvedValueOnce(mockSettlement);
 
-      const result = await service.updateSettlement('debtor-id', 'group-id', 'settlement-id', {
-        status: 'cancelled',
-        version: 1,
-      });
+      const result = await service.updateSettlement(
+        'debtor-id',
+        'group-id',
+        'settlement-id',
+        {
+          status: 'cancelled',
+          version: 1,
+        },
+      );
 
       expect(mockSettlement.status).toBe('cancelled');
       expect(result).toBeDefined();

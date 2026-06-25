@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsEnum, IsUUID, IsInt } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsOptional,
+  IsEnum,
+  IsUUID,
+  IsInt,
+} from 'class-validator';
 import { IsCiphertext } from './is-ciphertext.decorator';
 
 export class CreateNoteDto {

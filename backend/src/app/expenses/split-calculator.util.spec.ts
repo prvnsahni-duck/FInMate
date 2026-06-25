@@ -14,9 +14,15 @@ describe('split-calculator.util', () => {
     );
 
     expect(result).toHaveLength(3);
-    expect(result.find((s) => s.participantUserId === 'aaaa')?.amountOwed).toBe(3.34);
-    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(3.33);
-    expect(result.find((s) => s.participantUserId === 'cccc')?.amountOwed).toBe(3.33);
+    expect(result.find((s) => s.participantUserId === 'aaaa')?.amountOwed).toBe(
+      3.34,
+    );
+    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(
+      3.33,
+    );
+    expect(result.find((s) => s.participantUserId === 'cccc')?.amountOwed).toBe(
+      3.33,
+    );
   });
 
   it('should use lexical order fallback when payer is not present', () => {
@@ -29,8 +35,12 @@ describe('split-calculator.util', () => {
       'zzzz',
     );
 
-    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(5.01);
-    expect(result.find((s) => s.participantUserId === 'cccc')?.amountOwed).toBe(5.0);
+    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(
+      5.01,
+    );
+    expect(result.find((s) => s.participantUserId === 'cccc')?.amountOwed).toBe(
+      5.0,
+    );
   });
 
   it('should reject fixed split when total does not match amount', () => {
@@ -71,8 +81,12 @@ describe('split-calculator.util', () => {
     ]);
 
     expect(result).toHaveLength(2);
-    expect(result.find((s) => s.participantUserId === 'aaaa')?.amountOwed).toBe(4);
-    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(6);
+    expect(result.find((s) => s.participantUserId === 'aaaa')?.amountOwed).toBe(
+      4,
+    );
+    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(
+      6,
+    );
   });
 
   it('should compute valid percent splits', () => {
@@ -81,8 +95,12 @@ describe('split-calculator.util', () => {
       { participantUserId: 'bbbb', splitType: 'percent', shareValue: 60 },
     ]);
 
-    expect(result.find((s) => s.participantUserId === 'aaaa')?.amountOwed).toBe(39.6);
-    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(59.4);
+    expect(result.find((s) => s.participantUserId === 'aaaa')?.amountOwed).toBe(
+      39.6,
+    );
+    expect(result.find((s) => s.participantUserId === 'bbbb')?.amountOwed).toBe(
+      59.4,
+    );
   });
 
   it('should reject mixed split types', () => {

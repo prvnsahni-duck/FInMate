@@ -1,12 +1,21 @@
 import { Injectable } from '@nestjs/common';
-import { GroupMember, InviteMemberDto, UpdateMemberDto } from '@finmate/data-models';
+import {
+  GroupMember,
+  InviteMemberDto,
+  UpdateMemberDto,
+} from '@finmate/data-models';
 import { GroupsService } from '../groups.service';
 
 @Injectable()
 export class GroupsMembershipService {
   constructor(private readonly groupsService: GroupsService) {}
 
-  async inviteMember(userId: string, groupId: string, dto: InviteMemberDto, context?: { ip?: string; userAgent?: string }): Promise<GroupMember> {
+  async inviteMember(
+    userId: string,
+    groupId: string,
+    dto: InviteMemberDto,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<GroupMember> {
     return this.groupsService.inviteMember(userId, groupId, dto, context);
   }
 
@@ -21,10 +30,21 @@ export class GroupsMembershipService {
     dto: UpdateMemberDto,
     context?: { ip?: string; userAgent?: string },
   ): Promise<GroupMember> {
-    return this.groupsService.updateMember(userId, groupId, memberId, dto, context);
+    return this.groupsService.updateMember(
+      userId,
+      groupId,
+      memberId,
+      dto,
+      context,
+    );
   }
 
-  async removeMember(userId: string, groupId: string, memberId: string, context?: { ip?: string; userAgent?: string }): Promise<void> {
+  async removeMember(
+    userId: string,
+    groupId: string,
+    memberId: string,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<void> {
     return this.groupsService.removeMember(userId, groupId, memberId, context);
   }
 
@@ -32,7 +52,11 @@ export class GroupsMembershipService {
     return this.groupsService.getInviteDetails(inviteToken);
   }
 
-  async joinGroupByToken(userId: string, inviteToken: string, context?: { ip?: string; userAgent?: string }): Promise<GroupMember> {
+  async joinGroupByToken(
+    userId: string,
+    inviteToken: string,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<GroupMember> {
     return this.groupsService.joinGroupByToken(userId, inviteToken, context);
   }
 
@@ -40,4 +64,3 @@ export class GroupsMembershipService {
     return this.groupsService.getPendingInvitations(userId);
   }
 }
-

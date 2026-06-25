@@ -3,7 +3,7 @@
 ## 🔄 User Journey
 
 ```
-[Landing Page] 
+[Landing Page]
       │
       ├─► [Sign Up / Register] ──► [Onboarding (Profile Settings)]
       │                                   │
@@ -38,6 +38,7 @@
 ## 🖥️ Screen Directory
 
 ### 1. Dashboard Screen
+
 - **Purpose**: Home viewport displaying a financial overview, personal spending metrics, and actionable alerts.
 - **Entry Points**: Auth guard redirect after login, navigation bar clicks.
 - **Exit Points**: Sidebar clicks to specific modules.
@@ -47,6 +48,7 @@
 - **Components Used**: `DashboardComponent`, `CreateExpenseModalComponent`, `ConfirmModalComponent`.
 
 ### 2. Login / Register Screens
+
 - **Purpose**: Security access portals.
 - **Entry Points**: Unauthenticated route guard intercept.
 - **Exit Points**: Redirect to Onboarding (if first-time register) or Dashboard (after successful login).
@@ -56,6 +58,7 @@
 - **Components Used**: `LoginComponent`, `RegisterComponent`, `SubmitButtonComponent`.
 
 ### 3. Groups List Screen
+
 - **Purpose**: Display all active and archived groups the user is a member of.
 - **Entry Points**: Sidebar / Bottom nav.
 - **Exit Points**: Click group card -> Group Detail Screen.
@@ -64,6 +67,7 @@
 - **Components Used**: `GroupsListComponent`, `CreateGroupModalComponent`.
 
 ### 4. Group Detail Screen
+
 - **Purpose**: Unified workspace for a specific group containing ledgers, member roles, analytics, and collaborative notes.
 - **Entry Points**: Groups List Screen click, Deep-linked URL.
 - **Exit Points**: Back button to Groups List.
@@ -76,6 +80,7 @@
 - **Components Used**: `GroupDetailComponent`, `CreateExpenseModalComponent`, `AnalyticsChartsComponent`, `ConflictDiffModalComponent`, `GroupMembersComponent`.
 
 ### 5. Friends Screen
+
 - **Purpose**: Aggregate list of all friends across all group boundaries showing net positive/negative balances.
 - **Entry Points**: Sidebar / Bottom nav.
 - **Exit Points**: Click friend -> Friend Debts detail modal.
@@ -87,6 +92,7 @@
 ## 📦 Module Flows
 
 ### Expense Module Flow
+
 ```
 [Dashboard] / [Group Detail]
       │

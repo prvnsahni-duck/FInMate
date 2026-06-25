@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, GatewayTimeoutException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  GatewayTimeoutException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
@@ -16,7 +21,8 @@ export class AiService {
    */
   redactUuids(text: string): string {
     if (!text) return '';
-    const uuidPattern = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g;
+    const uuidPattern =
+      /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/g;
     return text.replace(uuidPattern, '[REDACTED_ID]');
   }
 
@@ -26,12 +32,13 @@ export class AiService {
   async callOpenAiProxy(
     prompt: string,
     systemInstruction?: string,
-    model = 'gpt-4'
+    model = 'gpt-4',
   ): Promise<{ text: string }> {
     if (!this.apiKey) {
       throw new BadRequestException({
         errorCode: 'AI_CONFIG_ERROR',
-        message: 'OpenAI API is not configured on the server. Please set OPENAI_API_KEY.',
+        message:
+          'OpenAI API is not configured on the server. Please set OPENAI_API_KEY.',
       });
     }
 
@@ -41,7 +48,9 @@ export class AiService {
 
     // Sweep input for internal database keys (UUIDs)
     const sanitizedPrompt = this.redactUuids(prompt);
-    const sanitizedSystemInstruction = systemInstruction ? this.redactUuids(systemInstruction) : undefined;
+    const sanitizedSystemInstruction = systemInstruction
+      ? this.redactUuids(systemInstruction)
+      : undefined;
 
     const messages: Array<{ role: 'system' | 'user'; content: string }> = [];
     if (sanitizedSystemInstruction) {
@@ -62,12 +71,14 @@ export class AiService {
             Authorization: `Bearer ${this.apiKey}`,
           },
           timeout: 10000,
-        }
+        },
       );
 
       const reply = response.data?.choices?.[0]?.message?.content;
       if (!reply) {
-        throw new ServiceUnavailableException('Failed to retrieve response from OpenAI');
+        throw new ServiceUnavailableException(
+          'Failed to retrieve response from OpenAI',
+        );
       }
 
       return { text: reply };
@@ -79,7 +90,10 @@ export class AiService {
           errorCode: 'AI_PROVIDER_ERROR',
           message: `OpenAI API returned status ${status}: ${msg}`,
         });
-      } else if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      } else if (
+        error.code === 'ECONNABORTED' ||
+        error.message?.includes('timeout')
+      ) {
         throw new GatewayTimeoutException({
           errorCode: 'SYS_TIMEOUT',
           message: 'Connection to OpenAI timed out. Please try again.',

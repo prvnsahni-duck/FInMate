@@ -59,7 +59,8 @@ describe('RecurringExpenses Service & Scheduler', () => {
   const mockTransactionManager = {
     getRepository: jest.fn((entity) => {
       if (entity === RecurringExpense) return mockRecurringExpenseRepo;
-      if (entity === RecurringExpenseSplit) return mockRecurringExpenseSplitRepo;
+      if (entity === RecurringExpenseSplit)
+        return mockRecurringExpenseSplitRepo;
       if (entity === Expense) return mockExpenseRepo;
       if (entity === ExpenseSplit) return mockExpenseSplitRepo;
       if (entity === User) return mockUserRepo;
@@ -81,18 +82,32 @@ describe('RecurringExpenses Service & Scheduler', () => {
         RecurringExpensesScheduler,
         { provide: RedisService, useValue: mockRedisService },
         { provide: DataSource, useValue: mockDataSource },
-        { provide: getRepositoryToken(RecurringExpense), useValue: mockRecurringExpenseRepo },
-        { provide: getRepositoryToken(RecurringExpenseSplit), useValue: mockRecurringExpenseSplitRepo },
+        {
+          provide: getRepositoryToken(RecurringExpense),
+          useValue: mockRecurringExpenseRepo,
+        },
+        {
+          provide: getRepositoryToken(RecurringExpenseSplit),
+          useValue: mockRecurringExpenseSplitRepo,
+        },
         { provide: getRepositoryToken(Expense), useValue: mockExpenseRepo },
-        { provide: getRepositoryToken(ExpenseSplit), useValue: mockExpenseSplitRepo },
+        {
+          provide: getRepositoryToken(ExpenseSplit),
+          useValue: mockExpenseSplitRepo,
+        },
         { provide: getRepositoryToken(Group), useValue: mockGroupRepo },
-        { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepo },
+        {
+          provide: getRepositoryToken(GroupMember),
+          useValue: mockGroupMemberRepo,
+        },
         { provide: getRepositoryToken(User), useValue: mockUserRepo },
       ],
     }).compile();
 
     service = module.get<RecurringExpensesService>(RecurringExpensesService);
-    scheduler = module.get<RecurringExpensesScheduler>(RecurringExpensesScheduler);
+    scheduler = module.get<RecurringExpensesScheduler>(
+      RecurringExpensesScheduler,
+    );
   });
 
   describe('RecurringExpensesService CRUD', () => {
@@ -200,11 +215,17 @@ describe('RecurringExpenses Service & Scheduler', () => {
 
     it('should acquire lock and run if lock is available', async () => {
       mockRedisService.setNx.mockResolvedValueOnce(true);
-      const processDueExpensesSpy = jest.spyOn(scheduler, 'processDueExpenses').mockResolvedValueOnce(undefined);
+      const processDueExpensesSpy = jest
+        .spyOn(scheduler, 'processDueExpenses')
+        .mockResolvedValueOnce(undefined);
 
       await scheduler.handleRecurringExpensesCron();
 
-      expect(mockRedisService.setNx).toHaveBeenCalledWith('lock:recurring_expenses_cron', 'locked', 3600);
+      expect(mockRedisService.setNx).toHaveBeenCalledWith(
+        'lock:recurring_expenses_cron',
+        'locked',
+        3600,
+      );
       expect(processDueExpensesSpy).toHaveBeenCalled();
       processDueExpensesSpy.mockRestore();
     });
@@ -215,7 +236,11 @@ describe('RecurringExpenses Service & Scheduler', () => {
 
       await scheduler.handleRecurringExpensesCron();
 
-      expect(mockRedisService.setNx).toHaveBeenCalledWith('lock:recurring_expenses_cron', 'locked', 3600);
+      expect(mockRedisService.setNx).toHaveBeenCalledWith(
+        'lock:recurring_expenses_cron',
+        'locked',
+        3600,
+      );
       expect(processDueExpensesSpy).not.toHaveBeenCalled();
       processDueExpensesSpy.mockRestore();
     });

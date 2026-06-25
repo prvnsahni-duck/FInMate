@@ -31,11 +31,19 @@ export class ClientEncryptionService {
   }
 
   private getSubtleCrypto(): SubtleCrypto {
-    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    if (
+      typeof window !== 'undefined' &&
+      window.crypto &&
+      window.crypto.subtle
+    ) {
       return window.crypto.subtle;
     }
     // Fallback for Node.js / Jest testing environment
-    if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
+    if (
+      typeof globalThis !== 'undefined' &&
+      globalThis.crypto &&
+      globalThis.crypto.subtle
+    ) {
       return globalThis.crypto.subtle;
     }
     throw new Error('Web Cryptography API (SubtleCrypto) is not available');
@@ -64,7 +72,7 @@ export class ClientEncryptionService {
       passwordBuffer,
       'PBKDF2',
       false,
-      ['deriveKey']
+      ['deriveKey'],
     );
 
     return subtle.deriveKey(
@@ -80,7 +88,7 @@ export class ClientEncryptionService {
         length: 256,
       },
       false, // Key must be non-extractable for maximum security (prevent XSS extraction)
-      ['encrypt', 'decrypt']
+      ['encrypt', 'decrypt'],
     );
   }
 
@@ -133,14 +141,17 @@ export class ClientEncryptionService {
       throw new Error('Web Cryptography API (SubtleCrypto) is not available');
     }
 
-    const ivBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength) as ArrayBuffer;
+    const ivBuffer = iv.buffer.slice(
+      iv.byteOffset,
+      iv.byteOffset + iv.byteLength,
+    ) as ArrayBuffer;
     const ciphertextBuffer = await subtle.encrypt(
       {
         name: 'AES-GCM',
         iv: ivBuffer,
       },
       key,
-      encodedPlaintext
+      encodedPlaintext,
     );
 
     const ivBase64 = arrayBufferToBase64(ivBuffer);
@@ -159,12 +170,17 @@ export class ClientEncryptionService {
 
     const parts = encryptedStr.split(':');
     if (parts.length !== 2) {
-      throw new Error('Invalid ciphertext format. Expected iv_base64:ciphertext_base64');
+      throw new Error(
+        'Invalid ciphertext format. Expected iv_base64:ciphertext_base64',
+      );
     }
 
     const subtle = this.getSubtleCrypto();
     const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
-    const ivBuffer = iv.buffer.slice(iv.byteOffset, iv.byteOffset + iv.byteLength) as ArrayBuffer;
+    const ivBuffer = iv.buffer.slice(
+      iv.byteOffset,
+      iv.byteOffset + iv.byteLength,
+    ) as ArrayBuffer;
     const ciphertextBuffer = base64ToArrayBuffer(parts[1]);
 
     const decryptedBuffer = await subtle.decrypt(
@@ -173,7 +189,7 @@ export class ClientEncryptionService {
         iv: ivBuffer,
       },
       key,
-      ciphertextBuffer
+      ciphertextBuffer,
     );
 
     const decoder = new TextDecoder();
@@ -185,7 +201,7 @@ export class ClientEncryptionService {
    */
   async encryptExpense(
     expense: { title: string; description?: string; [key: string]: unknown },
-    key: CryptoKey
+    key: CryptoKey,
   ): Promise<{ title: string; description?: string; [key: string]: unknown }> {
     const encryptedTitle = await this.encrypt(expense.title, key);
     const encryptedDesc = expense.description
@@ -204,7 +220,7 @@ export class ClientEncryptionService {
    */
   async decryptExpense(
     expense: { title: string; description?: string; [key: string]: unknown },
-    key: CryptoKey
+    key: CryptoKey,
   ): Promise<{ title: string; description?: string; [key: string]: unknown }> {
     const decryptedTitle = await this.decrypt(expense.title, key);
     const decryptedDesc = expense.description
@@ -223,7 +239,7 @@ export class ClientEncryptionService {
    */
   async encryptNote(
     note: { title: string; body: string; [key: string]: unknown },
-    key: CryptoKey
+    key: CryptoKey,
   ): Promise<{ title: string; body: string; [key: string]: unknown }> {
     const encryptedTitle = await this.encrypt(note.title, key);
     const encryptedBody = await this.encrypt(note.body, key);
@@ -240,7 +256,7 @@ export class ClientEncryptionService {
    */
   async decryptNote(
     note: { title: string; body: string; [key: string]: unknown },
-    key: CryptoKey
+    key: CryptoKey,
   ): Promise<{ title: string; body: string; [key: string]: unknown }> {
     const decryptedTitle = await this.decrypt(note.title, key);
     const decryptedBody = await this.decrypt(note.body, key);
@@ -257,7 +273,7 @@ export class ClientEncryptionService {
    */
   async encryptGoal(
     goal: { title: string; [key: string]: unknown },
-    key: CryptoKey
+    key: CryptoKey,
   ): Promise<{ title: string; [key: string]: unknown }> {
     const encryptedTitle = await this.encrypt(goal.title, key);
 
@@ -272,7 +288,7 @@ export class ClientEncryptionService {
    */
   async decryptGoal(
     goal: { title: string; [key: string]: unknown },
-    key: CryptoKey
+    key: CryptoKey,
   ): Promise<{ title: string; [key: string]: unknown }> {
     const decryptedTitle = await this.decrypt(goal.title, key);
 
@@ -287,7 +303,7 @@ export class ClientEncryptionService {
    */
   async encryptSettlement(
     settlement: { note?: string; [key: string]: unknown },
-    key: CryptoKey
+    key: CryptoKey,
   ): Promise<{ note?: string; [key: string]: unknown }> {
     const encryptedNote = settlement.note
       ? await this.encrypt(settlement.note, key)
@@ -304,7 +320,7 @@ export class ClientEncryptionService {
    */
   async decryptSettlement(
     settlement: { note?: string; [key: string]: unknown },
-    key: CryptoKey
+    key: CryptoKey,
   ): Promise<{ note?: string; [key: string]: unknown }> {
     const decryptedNote = settlement.note
       ? await this.decrypt(settlement.note, key)

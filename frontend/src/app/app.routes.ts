@@ -20,9 +20,7 @@ export const appRoutes: Route[] = [
       {
         path: 'groups',
         loadChildren: () =>
-          import('./features/groups/groups.routes').then(
-            (m) => m.groupsRoutes,
-          ),
+          import('./features/groups/groups.routes').then((m) => m.groupsRoutes),
       },
       {
         path: 'friends',
@@ -37,9 +35,7 @@ export const appRoutes: Route[] = [
     path: 'auth',
     component: AuthLayoutComponent,
     loadChildren: () =>
-      import('./features/auth/auth.routes').then(
-        (m) => m.authRoutes,
-      ),
+      import('./features/auth/auth.routes').then((m) => m.authRoutes),
   },
   { path: '**', redirectTo: '' },
 ];

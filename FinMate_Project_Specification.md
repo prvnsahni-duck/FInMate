@@ -1,11 +1,10 @@
-
 # 💰 FinMate — Personal Finance & Lifestyle Companion
 
 ## 🧩 Overview
+
 **FinMate** is a comprehensive web and mobile application designed to manage, analyze, and share personal and group expenses. It also integrates notes, goals, and AI insights to make financial management intuitive, collaborative, and intelligent.
 
 ---
-
 
 I've reviewed the suggestions against your current spec. Here's my assessment:
 
@@ -21,17 +20,20 @@ I've reviewed the suggestions against your current spec. Here's my assessment:
 8. **Import/Export Schemas** — CSV/XLSX format specs are missing
 
 **Medium Priority:**
+
 - Backup/RTO/RPO requirements
 - Cost/dependency constraints (OpenAI, Supabase, Sentry limits)
 - Offline key-management details
 
 **Fair Concerns:**
+
 - 200KB bundle target may be tight given scope; document MVP boundary
 - "One-click setup" needs detailed scripting plan
 - Zero-knowledge + AI analysis needs reconciliation
 
 **Recommendation:**
 Add a new section **"System Design Details"** after "Architecture & Tech Stack" covering:
+
 - Domain Model (entities, relationships)
 - RBAC Matrix (roles × permissions)
 - Encryption Classification (per-data rules)
@@ -42,27 +44,27 @@ Then add **"Operational Requirements"** section (RTO/RPO, backups, incident resp
 
 Should I draft the replacement markdown for these sections?
 
-
-| Layer | Technology | Notes |
-|-------|-------------|-------|
-| **Frontend** | Angular 19 (Standalone Components) | Modular, scalable, SSR-ready |
-| **Backend** | NestJS + Fastify | High-performance REST API, WebSockets |
-| **Database** | PostgreSQL 16 + pgcrypto | ACID compliance, encrypted storage |
-| **Cache Layer** | Redis 7.x | Session store, rate limiting, caching |
-| **State Management** | NGXS + RxJS | Predictable state, optimized selectors |
-| **Deployment** | Docker + Docker Compose | One-click local & cloud deployment |
-| **AI Integration** | OpenAI API (GPT-4) | Smart insights & chatbot |
-| **Auth** | JWT + Argon2 + 2FA | Secure session, encryption, RBAC |
-| **Storage** | Supabase Storage | Encrypted files, CDN delivery |
-| **CDN** | Cloudflare (Free) | Global edge caching, DDoS protection |
-| **Offline Support** | PWA + Service Workers + IndexedDB | Offline-first, encrypted local storage |
-| **Performance Monitor** | Lighthouse CI + Web Vitals | Continuous performance tracking |
+| Layer                   | Technology                         | Notes                                  |
+| ----------------------- | ---------------------------------- | -------------------------------------- |
+| **Frontend**            | Angular 19 (Standalone Components) | Modular, scalable, SSR-ready           |
+| **Backend**             | NestJS + Fastify                   | High-performance REST API, WebSockets  |
+| **Database**            | PostgreSQL 16 + pgcrypto           | ACID compliance, encrypted storage     |
+| **Cache Layer**         | Redis 7.x                          | Session store, rate limiting, caching  |
+| **State Management**    | NGXS + RxJS                        | Predictable state, optimized selectors |
+| **Deployment**          | Docker + Docker Compose            | One-click local & cloud deployment     |
+| **AI Integration**      | OpenAI API (GPT-4)                 | Smart insights & chatbot               |
+| **Auth**                | JWT + Argon2 + 2FA                 | Secure session, encryption, RBAC       |
+| **Storage**             | Supabase Storage                   | Encrypted files, CDN delivery          |
+| **CDN**                 | Cloudflare (Free)                  | Global edge caching, DDoS protection   |
+| **Offline Support**     | PWA + Service Workers + IndexedDB  | Offline-first, encrypted local storage |
+| **Performance Monitor** | Lighthouse CI + Web Vitals         | Continuous performance tracking        |
 
 ---
 
 ## 🧠 Core Features
 
 ### A. Expense Management
+
 - Add/edit/delete categorized expenses.
 - Monthly and yearly analytics.
 - Group-based shared expense tracking.
@@ -71,6 +73,7 @@ Should I draft the replacement markdown for these sections?
 - **Personal/Group-less Expenses**: Supports personal expenses added from the dashboard and aggregated into a month-end monthly total.
 
 ### B. Shared Group Module
+
 - Create or join expense groups (public/private).
 - **Multi-Identifier Invites**: Add members by email, username, or phone number, displaying the user's full name to ensure clarity.
 - **QR Code & Link Invites**: Join groups via secure invite links/QR codes, routing to a landing page with group info and a Join/Decline action.
@@ -81,26 +84,31 @@ Should I draft the replacement markdown for these sections?
 - Shared ledger with smart settlement.
 - **Export/Import (CSV, XLSX) Support**:
   Enables offline bulk editing and migrations. Exported files MUST align with the import schema, allowing zero-modification re-imports of the exact same records.
-  
+
   For the detailed column layout, validators, and transaction rules, see the consolidated [expsnsis-module-plan.md (Import/Export schemas)](file:///g:/prvn/Projects/FinMate/expsnsis-module-plan.md#8-importexport-csv-xlsx-support).
+
 - Collaborative notes inside groups.
 
 ### C. Notes & Content Integration
+
 - Personal and shared notes.
 - Import social media posts (Instagram, etc.).
 - AI summarization and tagging.
 
 ### D. Goal & Saving Tracker
+
 - Define financial goals (e.g., “Trip to Goa”).
 - Track savings progress.
 - Set reminders and targets.
 
 ### E. AI Assistant
+
 - Smart insights and analysis.
 - Automatic expense categorization.
 - Summarization and reminders.
 
 ### F. Settings & Controls
+
 - Enable/disable collaboration.
 - Manage import/export permissions.
 - Sync preferences.
@@ -111,6 +119,7 @@ Should I draft the replacement markdown for these sections?
 ## ⚙️ Technical Requirements
 
 ### 🎯 Performance Standards
+
 - **First Contentful Paint (FCP):** < 1.5s
 - **Time to Interactive (TTI):** < 3.0s
 - **Lighthouse Score:** > 90 (all categories)
@@ -119,6 +128,7 @@ Should I draft the replacement markdown for these sections?
 - **Database Query Time:** < 50ms (indexed queries)
 
 ### 🏗️ Architecture Requirements
+
 - Reusable UI components with OnPush change detection.
 - Proper cleanup of observables (takeUntil pattern).
 - Centralized error handling and logging.
@@ -135,8 +145,11 @@ Should I draft the replacement markdown for these sections?
 ## 🧱 System Design Details
 
 ### 1. Domain Model
+
 #### Scope
+
 Core entities finalized for schema design:
+
 - User
 - Profile
 - Expense
@@ -150,6 +163,7 @@ Core entities finalized for schema design:
 - AuditLog
 
 #### Naming Conventions (Final)
+
 - Entity class names: singular PascalCase (`User`, `ExpenseSplit`).
 - Table names: plural snake_case (`users`, `expense_splits`, `group_members`).
 - Primary keys: UUID (`id uuid`).
@@ -160,6 +174,7 @@ Core entities finalized for schema design:
 - Enum columns: snake_case values (`pending`, `settled`, `active`, `archived`).
 
 #### Ownership and Sharing Boundaries
+
 - Personal scope (owned by `User`): `Profile`, personal `Expense`, personal `Note`, personal `Goal`, related `Attachment`.
 - Shared scope (owned by `Group`): shared `Expense`, `GroupMember`, group `Note`, `Settlement`, related `Attachment`.
 - Split scope: `ExpenseSplit` can reference either a direct `User` context or a `GroupMember` context.
@@ -168,6 +183,7 @@ Core entities finalized for schema design:
 #### Entity Field List (Required)
 
 ##### User
+
 - `id: uuid` (PK)
 - `email: varchar(255)` (unique, required)
 - `username: varchar(50)` (unique, nullable)
@@ -180,6 +196,7 @@ Core entities finalized for schema design:
 - `updated_at: timestamptz` (required)
 
 ##### Profile
+
 - `id: uuid` (PK)
 - `user_id: uuid` (FK -> users.id, unique, required)
 - `avatar_url: text` (nullable)
@@ -192,6 +209,7 @@ Core entities finalized for schema design:
 - `updated_at: timestamptz` (required)
 
 ##### Group
+
 - `id: uuid` (PK)
 - `name: varchar(120)` (required)
 - `description: text` (nullable)
@@ -203,6 +221,7 @@ Core entities finalized for schema design:
 - `updated_at: timestamptz` (required)
 
 ##### GroupMember
+
 - `id: uuid` (PK)
 - `group_id: uuid` (FK -> groups.id, required)
 - `user_id: uuid` (FK -> users.id, required)
@@ -215,6 +234,7 @@ Core entities finalized for schema design:
 - Unique constraint: `(group_id, user_id)`
 
 ##### GroupMemberContribution
+
 - `id: uuid` (PK)
 - `group_member_id: uuid` (FK -> group_members.id, required)
 - `ledger_month: char(7)` (required, format: YYYY-MM)
@@ -224,6 +244,7 @@ Core entities finalized for schema design:
 - Unique constraint: `(group_member_id, ledger_month)`
 
 ##### Expense
+
 - `id: uuid` (PK)
 - `title: varchar(160)` (required)
 - `description: text` (nullable)
@@ -239,6 +260,7 @@ Core entities finalized for schema design:
 - `updated_at: timestamptz` (required)
 
 ##### ExpenseSplit
+
 - `id: uuid` (PK)
 - `expense_id: uuid` (FK -> expenses.id, required)
 - `participant_user_id: uuid` (FK -> users.id, nullable)
@@ -253,6 +275,7 @@ Core entities finalized for schema design:
 - Check constraint: exactly one participant reference is non-null.
 
 ##### Settlement
+
 - `id: uuid` (PK)
 - `group_id: uuid` (FK -> groups.id, required)
 - `from_user_id: uuid` (FK -> users.id, required)
@@ -266,6 +289,7 @@ Core entities finalized for schema design:
 - `updated_at: timestamptz` (required)
 
 ##### Note
+
 - `id: uuid` (PK)
 - `author_user_id: uuid` (FK -> users.id, required)
 - `group_id: uuid` (FK -> groups.id, nullable)
@@ -276,6 +300,7 @@ Core entities finalized for schema design:
 - `updated_at: timestamptz` (required)
 
 ##### Goal
+
 - `id: uuid` (PK)
 - `owner_user_id: uuid` (FK -> users.id, required)
 - `title: varchar(160)` (required)
@@ -288,6 +313,7 @@ Core entities finalized for schema design:
 - `updated_at: timestamptz` (required)
 
 ##### Attachment
+
 - `id: uuid` (PK)
 - `uploader_user_id: uuid` (FK -> users.id, required)
 - `expense_id: uuid` (FK -> expenses.id, nullable)
@@ -303,6 +329,7 @@ Core entities finalized for schema design:
 - Check constraint: attached to at least one parent context.
 
 ##### AuditLog
+
 - `id: uuid` (PK)
 - `actor_user_id: uuid` (FK -> users.id, nullable for system actions)
 - `action: varchar(80)` (required)
@@ -317,6 +344,7 @@ Core entities finalized for schema design:
 - Immutable rule: no update/delete operations at application layer.
 
 #### Relationship Cardinality Definitions
+
 - `User 1:1 Profile` (a user has one profile; a profile belongs to one user).
 - `User 1:N Group (owner)` (one user can own many groups; each group has one owner).
 - `User N:M Group` via `GroupMember`.
@@ -343,6 +371,7 @@ Core entities finalized for schema design:
 - `Group 1:N AuditLog` (optional scoped logs).
 
 #### ERD (Mermaid)
+
 ```mermaid
 erDiagram
    USER ||--|| PROFILE : has
@@ -378,6 +407,7 @@ erDiagram
 ```
 
 #### Lifecycle Notes
+
 - User deactivation disables login and future writes, but historical records remain.
 - Group archive blocks new shared writes; read-only access is preserved.
 - Expense status `void` keeps auditability without hard deletion.
@@ -389,116 +419,117 @@ erDiagram
 Role-Based Access Control (RBAC) in FinMate is applied at the group level. A user's role within a group determines their authorization level for group-scoped resources. Personal resources (personal expenses, personal notes, saving goals, user profiles) are governed strictly by individual ownership (User Scope) and are zero-knowledge to other users.
 
 #### 👥 Group Roles Definition
-*   **Owner**: The creator of the group. Holds absolute administrative power, including the ability to delete the group or manage Admin roles.
-*   **Admin**: Group administrators. Can manage general members and group settings, invite users, and moderate content.
-*   **Member**: General collaborators. Can create expenses, notes, and settlements, and edit/delete their own submissions.
-*   **Viewer**: Read-only access. Can view ledger and shared logs but cannot write or modify data.
+
+- **Owner**: The creator of the group. Holds absolute administrative power, including the ability to delete the group or manage Admin roles.
+- **Admin**: Group administrators. Can manage general members and group settings, invite users, and moderate content.
+- **Member**: General collaborators. Can create expenses, notes, and settlements, and edit/delete their own submissions.
+- **Viewer**: Read-only access. Can view ledger and shared logs but cannot write or modify data.
 
 #### 📊 Unified Permission Matrix (Shared Group Scope)
 
-| Module | Action | Owner | Admin | Member | Viewer |
-| :--- | :--- | :---: | :---: | :---: | :---: |
-| **Groups** | View Group Metadata / Ledger | ✅ | ✅ | ✅ | ✅ |
-| | Edit Group Settings (Name, Desc) | ✅ | ✅ | ❌ | ❌ |
-| | Archive Group (Read-only status) | ✅ | ✅ | ❌ | ❌ |
-| | Delete Group | ✅ | ❌ | ❌ | ❌ |
-| **Group Members**| View Member List | ✅ | ✅ | ✅ | ✅ |
-| | Invite Member / Link Invite | ✅ | ✅ | ⚠️ | ❌ |
-| | Promote to Admin / Demote Admin | ✅ | ❌ | ❌ | ❌ |
-| | Promote to Member / Demote to Viewer| ✅ | ✅ | ❌ | ❌ |
-| | Remove Member (Admin/Owner) | ✅ | ❌ | ❌ | ❌ |
-| | Remove Member (Member/Viewer) | ✅ | ✅ | ❌ | ❌ |
-| | Leave Group | ✅ (Must transfer) | ✅ | ✅ | ✅ |
-| **Expenses** | View Group Expenses | ✅ | ✅ | ✅ | ✅ |
-| | Create Group Expense | ✅ | ✅ | ✅ | ❌ |
-| | Update/Void Own Group Expense | ✅ | ✅ | ✅ | ❌ |
-| | Update/Void Other's Group Expense | ✅ | ✅ | ❌ | ❌ |
-| **Notes** | View Group Notes | ✅ | ✅ | ✅ | ✅ |
-| | Create Group Note | ✅ | ✅ | ✅ | ❌ |
-| | Update/Delete Own Group Note | ✅ | ✅ | ✅ | ❌ |
-| | Update/Delete Other's Group Note | ✅ | ✅ | ❌ | ❌ |
-| **Settlements** | View Group Settlements | ✅ | ✅ | ✅ | ✅ |
-| | Propose Settlement (Own Debt) | ✅ | ✅ | ✅ | ❌ |
-| | Confirm Settlement (as Creditor only) | ✅ | ✅ | ✅ | ❌ |
-| | Cancel Settlement (as Debtor/Creditor) | ✅ | ✅ | ✅ | ❌ |
-| **Import/Export**| Export Group Ledger | ✅ | ✅ | ✅ | ✅ |
-| | Import Expenses to Group | ✅ | ✅ | ✅ | ❌ |
+| Module            | Action                                 |       Owner        | Admin | Member | Viewer |
+| :---------------- | :------------------------------------- | :----------------: | :---: | :----: | :----: |
+| **Groups**        | View Group Metadata / Ledger           |         ✅         |  ✅   |   ✅   |   ✅   |
+|                   | Edit Group Settings (Name, Desc)       |         ✅         |  ✅   |   ❌   |   ❌   |
+|                   | Archive Group (Read-only status)       |         ✅         |  ✅   |   ❌   |   ❌   |
+|                   | Delete Group                           |         ✅         |  ❌   |   ❌   |   ❌   |
+| **Group Members** | View Member List                       |         ✅         |  ✅   |   ✅   |   ✅   |
+|                   | Invite Member / Link Invite            |         ✅         |  ✅   |   ⚠️   |   ❌   |
+|                   | Promote to Admin / Demote Admin        |         ✅         |  ❌   |   ❌   |   ❌   |
+|                   | Promote to Member / Demote to Viewer   |         ✅         |  ✅   |   ❌   |   ❌   |
+|                   | Remove Member (Admin/Owner)            |         ✅         |  ❌   |   ❌   |   ❌   |
+|                   | Remove Member (Member/Viewer)          |         ✅         |  ✅   |   ❌   |   ❌   |
+|                   | Leave Group                            | ✅ (Must transfer) |  ✅   |   ✅   |   ✅   |
+| **Expenses**      | View Group Expenses                    |         ✅         |  ✅   |   ✅   |   ✅   |
+|                   | Create Group Expense                   |         ✅         |  ✅   |   ✅   |   ❌   |
+|                   | Update/Void Own Group Expense          |         ✅         |  ✅   |   ✅   |   ❌   |
+|                   | Update/Void Other's Group Expense      |         ✅         |  ✅   |   ❌   |   ❌   |
+| **Notes**         | View Group Notes                       |         ✅         |  ✅   |   ✅   |   ✅   |
+|                   | Create Group Note                      |         ✅         |  ✅   |   ✅   |   ❌   |
+|                   | Update/Delete Own Group Note           |         ✅         |  ✅   |   ✅   |   ❌   |
+|                   | Update/Delete Other's Group Note       |         ✅         |  ✅   |   ❌   |   ❌   |
+| **Settlements**   | View Group Settlements                 |         ✅         |  ✅   |   ✅   |   ✅   |
+|                   | Propose Settlement (Own Debt)          |         ✅         |  ✅   |   ✅   |   ❌   |
+|                   | Confirm Settlement (as Creditor only)  |         ✅         |  ✅   |   ✅   |   ❌   |
+|                   | Cancel Settlement (as Debtor/Creditor) |         ✅         |  ✅   |   ✅   |   ❌   |
+| **Import/Export** | Export Group Ledger                    |         ✅         |  ✅   |   ✅   |   ✅   |
+|                   | Import Expenses to Group               |         ✅         |  ✅   |   ✅   |   ❌   |
 
-*   `⚠️` *Allowed for Members only if the group Owner has enabled "Allow Member Invites" in group settings (default: false).*
+- `⚠️` _Allowed for Members only if the group Owner has enabled "Allow Member Invites" in group settings (default: false)._
 
 #### 🔑 Contextual Access Control Policy
 
-*   **Personal Context (User Scope)**:
-    - Governed by ownership: `Owner User ID == Authenticated User ID`.
-    - Applies to: Personal Expenses (`group_id` is null), Personal Notes (`visibility == 'private'`), saving Goals, user Profile, and personal Attachments.
-    - No other user, regardless of role, can read, update, or delete these resources.
-*   **Shared Context (Group Scope)**:
-    - Governed by the group membership role.
-    - Applies to: Group Expenses, Group Notes, Settlements, Group Member Records, Group Attachments, and Group Audit Logs.
-    - Viewers are strictly restricted from all mutative actions.
-    - Members can only mutate resources they authored (`author_user_id == user_id` or `paid_by_user_id == user_id`).
-*   **Offline Actions vs. Cloud Sync**:
-    - **Offline Allowed**: View ledger (cached in IndexedDB), draft new personal/group expenses, draft personal notes.
-    - **Sync Required**: Inviting members, modifying member roles, archiving/deleting groups, proposing settlements, and exporting data.
-
+- **Personal Context (User Scope)**:
+  - Governed by ownership: `Owner User ID == Authenticated User ID`.
+  - Applies to: Personal Expenses (`group_id` is null), Personal Notes (`visibility == 'private'`), saving Goals, user Profile, and personal Attachments.
+  - No other user, regardless of role, can read, update, or delete these resources.
+- **Shared Context (Group Scope)**:
+  - Governed by the group membership role.
+  - Applies to: Group Expenses, Group Notes, Settlements, Group Member Records, Group Attachments, and Group Audit Logs.
+  - Viewers are strictly restricted from all mutative actions.
+  - Members can only mutate resources they authored (`author_user_id == user_id` or `paid_by_user_id == user_id`).
+- **Offline Actions vs. Cloud Sync**:
+  - **Offline Allowed**: View ledger (cached in IndexedDB), draft new personal/group expenses, draft personal notes.
+  - **Sync Required**: Inviting members, modifying member roles, archiving/deleting groups, proposing settlements, and exporting data.
 
 ### 3. Encryption Boundary Table
 
 To enforce a Zero-Knowledge Architecture, user data containing transactional details, personal notes, and goal titles is encrypted client-side before submission. The backend server acts as a blind sync engine for these fields. Other fields needed for database querying, sorting, or settlements are stored in plaintext or server-side encrypted.
 
 #### 🔐 Encryption Key Tiers
+
 1.  **Client-Side Encrypted (Zero-Knowledge / ZK)**:
-    *   **Mechanism**: Encrypted on the client device using AES-256-GCM.
-    *   **Keys**: Keys are derived locally on the client device using PBKDF2/Argon2. The master key never leaves the client device.
-    *   **Server Access**: The server only sees base64-encoded ciphertext and initialization vectors. The server cannot decrypt this data.
+    - **Mechanism**: Encrypted on the client device using AES-256-GCM.
+    - **Keys**: Keys are derived locally on the client device using PBKDF2/Argon2. The master key never leaves the client device.
+    - **Server Access**: The server only sees base64-encoded ciphertext and initialization vectors. The server cannot decrypt this data.
 2.  **Server-Side Encrypted (SSE)**:
-    *   **Mechanism**: Encrypted in transit and at rest on the server using database-level or application-level encryption keys (PostgreSQL `pgcrypto` or KMS).
-    *   **Keys**: Managed securely by the server environment.
-    *   **Server Access**: Decrypted ephemerally in server memory when running authorized queries (e.g. rendering user profile values or computing budget margins).
+    - **Mechanism**: Encrypted in transit and at rest on the server using database-level or application-level encryption keys (PostgreSQL `pgcrypto` or KMS).
+    - **Keys**: Managed securely by the server environment.
+    - **Server Access**: Decrypted ephemerally in server memory when running authorized queries (e.g. rendering user profile values or computing budget margins).
 3.  **Plaintext**:
-    *   **Mechanism**: Stored as plaintext in database tables.
-    *   **Server Access**: Fully searchable, indexable, and sortable.
+    - **Mechanism**: Stored as plaintext in database tables.
+    - **Server Access**: Fully searchable, indexable, and sortable.
 
 #### 📊 Entity-Field Encryption & AI Access Matrix
 
-| Entity | Field Name | Encryption Classification | AI Access Eligibility | Rationale |
-| :--- | :--- | :--- | :---: | :--- |
-| **User** | `id`, `status`, `created_at` | Plaintext | ❌ | Needed for joins, audits, and routing. |
-| | `email`, `password_hash` | SSE | ❌ | Sensitive credentials, protected at rest. |
-| **Profile** | `id`, `user_id`, `created_at` | Plaintext | ❌ | Index keys. |
-| | `avatar_url`, `monthly_budget` | SSE | ❌ | Personal financial settings, protected at rest. |
-| | `locale`, `timezone`, `default_currency` | Plaintext | ❌ | Used for localized formatting and server runs. |
-| **Group** | `id`, `owner_user_id`, `is_archived` | Plaintext | ❌ | Used for routing and soft-deletes. |
-| | `name`, `description` | SSE | ❌ | Shared identifiers, accessible to group. |
-| **GroupMember**| `id`, `group_id`, `user_id` | Plaintext | ❌ | Unique constraints and indexing. |
-| | `role`, `join_status`, `joined_at` | Plaintext | ❌ | Enforces RBAC permissions. |
-| **Expense** | `id`, `paid_by_user_id`, `group_id` | Plaintext | ❌ | Primary/foreign keys. |
-| | `currency`, `expense_date`, `status` | Plaintext | ❌ | Indexing, sorting, and balance calculations. |
-| | `amount_total` | Plaintext | ⚠️ (Optional) | Numeric totals for smart analytics (opt-in). |
-| | `category` | Plaintext | ⚠️ (Optional) | Categorization tags for spending analysis. |
-| | `title`, `description` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Private transaction contents. Zero-knowledge. |
-| **ExpenseSplit**| `id`, `expense_id`, `split_type` | Plaintext | ❌ | Database constraints. |
-| | `share_value`, `is_settled` | Plaintext | ❌ | Settlement balance processing. |
-| | `amount_owed` | Plaintext | ❌ | Owed amount calculations. |
-| **Settlement** | `id`, `group_id`, `from_user_id`, `to_user_id` | Plaintext | ❌ | Core relation indicators. |
-| | `amount`, `currency`, `status` | Plaintext | ❌ | Ledger balance updates. |
-| | `note` | Client-Side (ZK) | ❌ | Personal payment notes. Zero-knowledge. |
-| **Note** | `id`, `author_user_id`, `group_id` | Plaintext | ❌ | Index keys. |
-| | `visibility` | Plaintext | ❌ | Privacy boundaries control. |
-| | `title`, `body` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Private contents. Zero-knowledge. |
-| **Goal** | `id`, `owner_user_id`, `currency` | Plaintext | ❌ | Core structure and parameters. |
-| | `status`, `target_date` | Plaintext | ❌ | Tracking status. |
-| | `target_amount`, `saved_amount` | SSE | ⚠️ (Optional) | Target numbers. |
-| | `title` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Goal identifier. Zero-knowledge. |
-| **Attachment** | `id`, `storage_key`, `mime_type` | Plaintext | ❌ | File retrieval references. |
-| | `original_name`, `file_content` | Client-Side (ZK) | ⚠️ (Opt-In Only) | Personal files (PDFs, images) are encrypted locally. |
-
+| Entity           | Field Name                                     | Encryption Classification | AI Access Eligibility | Rationale                                            |
+| :--------------- | :--------------------------------------------- | :------------------------ | :-------------------: | :--------------------------------------------------- |
+| **User**         | `id`, `status`, `created_at`                   | Plaintext                 |          ❌           | Needed for joins, audits, and routing.               |
+|                  | `email`, `password_hash`                       | SSE                       |          ❌           | Sensitive credentials, protected at rest.            |
+| **Profile**      | `id`, `user_id`, `created_at`                  | Plaintext                 |          ❌           | Index keys.                                          |
+|                  | `avatar_url`, `monthly_budget`                 | SSE                       |          ❌           | Personal financial settings, protected at rest.      |
+|                  | `locale`, `timezone`, `default_currency`       | Plaintext                 |          ❌           | Used for localized formatting and server runs.       |
+| **Group**        | `id`, `owner_user_id`, `is_archived`           | Plaintext                 |          ❌           | Used for routing and soft-deletes.                   |
+|                  | `name`, `description`                          | SSE                       |          ❌           | Shared identifiers, accessible to group.             |
+| **GroupMember**  | `id`, `group_id`, `user_id`                    | Plaintext                 |          ❌           | Unique constraints and indexing.                     |
+|                  | `role`, `join_status`, `joined_at`             | Plaintext                 |          ❌           | Enforces RBAC permissions.                           |
+| **Expense**      | `id`, `paid_by_user_id`, `group_id`            | Plaintext                 |          ❌           | Primary/foreign keys.                                |
+|                  | `currency`, `expense_date`, `status`           | Plaintext                 |          ❌           | Indexing, sorting, and balance calculations.         |
+|                  | `amount_total`                                 | Plaintext                 |     ⚠️ (Optional)     | Numeric totals for smart analytics (opt-in).         |
+|                  | `category`                                     | Plaintext                 |     ⚠️ (Optional)     | Categorization tags for spending analysis.           |
+|                  | `title`, `description`                         | Client-Side (ZK)          |   ⚠️ (Opt-In Only)    | Private transaction contents. Zero-knowledge.        |
+| **ExpenseSplit** | `id`, `expense_id`, `split_type`               | Plaintext                 |          ❌           | Database constraints.                                |
+|                  | `share_value`, `is_settled`                    | Plaintext                 |          ❌           | Settlement balance processing.                       |
+|                  | `amount_owed`                                  | Plaintext                 |          ❌           | Owed amount calculations.                            |
+| **Settlement**   | `id`, `group_id`, `from_user_id`, `to_user_id` | Plaintext                 |          ❌           | Core relation indicators.                            |
+|                  | `amount`, `currency`, `status`                 | Plaintext                 |          ❌           | Ledger balance updates.                              |
+|                  | `note`                                         | Client-Side (ZK)          |          ❌           | Personal payment notes. Zero-knowledge.              |
+| **Note**         | `id`, `author_user_id`, `group_id`             | Plaintext                 |          ❌           | Index keys.                                          |
+|                  | `visibility`                                   | Plaintext                 |          ❌           | Privacy boundaries control.                          |
+|                  | `title`, `body`                                | Client-Side (ZK)          |   ⚠️ (Opt-In Only)    | Private contents. Zero-knowledge.                    |
+| **Goal**         | `id`, `owner_user_id`, `currency`              | Plaintext                 |          ❌           | Core structure and parameters.                       |
+|                  | `status`, `target_date`                        | Plaintext                 |          ❌           | Tracking status.                                     |
+|                  | `target_amount`, `saved_amount`                | SSE                       |     ⚠️ (Optional)     | Target numbers.                                      |
+|                  | `title`                                        | Client-Side (ZK)          |   ⚠️ (Opt-In Only)    | Goal identifier. Zero-knowledge.                     |
+| **Attachment**   | `id`, `storage_key`, `mime_type`               | Plaintext                 |          ❌           | File retrieval references.                           |
+|                  | `original_name`, `file_content`                | Client-Side (ZK)          |   ⚠️ (Opt-In Only)    | Personal files (PDFs, images) are encrypted locally. |
 
 ### 4. API Error Taxonomy
 
 Standardize all error responses across FinMate REST APIs to maintain consistency, ease frontend debugging, and provide explicit instructions for client-side recovery.
 
 #### Shared Error Response Schema
+
 All error responses from any API endpoint (HTTP status code >= 400) MUST conform to the following standard JSON payload structure:
 
 ```json
@@ -519,6 +550,7 @@ All error responses from any API endpoint (HTTP status code >= 400) MUST conform
 ```
 
 ##### TypeScript Client-Side Interface
+
 To ensure reliable parsing and type safety in the Angular frontend, client-side deserialization models should implement the following interface:
 
 ```typescript
@@ -538,82 +570,82 @@ export interface FinMateErrorResponse {
 }
 ```
 
-*   **Bulk File Import Validation Failure (`VAL_INVALID_INPUT`)**:
-    When a file upload (CSV or XLSX) contains structural, relational, or mathematical errors, the API returns a structured list mapping rows and columns to their respective validation errors:
-    ```json
-    {
-      "statusCode": 400,
-      "timestamp": "2026-06-09T22:56:00.000Z",
-      "path": "/api/v1/import/expenses",
-      "errorCode": "VAL_INVALID_INPUT",
-      "message": "File validation failed. No transactions were imported.",
-      "details": [
-        {
-          "field": "Row 5: payer_email",
-          "issue": "User 'unknown@example.com' is not a member of the group."
-        },
-        {
-          "field": "Row 8: split_type",
-          "issue": "Fixed split amounts sum up to $45.00, but amount is $50.00."
-        }
-      ],
-      "retryable": false
-    }
-    ```
+- **Bulk File Import Validation Failure (`VAL_INVALID_INPUT`)**:
+  When a file upload (CSV or XLSX) contains structural, relational, or mathematical errors, the API returns a structured list mapping rows and columns to their respective validation errors:
+  ```json
+  {
+    "statusCode": 400,
+    "timestamp": "2026-06-09T22:56:00.000Z",
+    "path": "/api/v1/import/expenses",
+    "errorCode": "VAL_INVALID_INPUT",
+    "message": "File validation failed. No transactions were imported.",
+    "details": [
+      {
+        "field": "Row 5: payer_email",
+        "issue": "User 'unknown@example.com' is not a member of the group."
+      },
+      {
+        "field": "Row 8: split_type",
+        "issue": "Fixed split amounts sum up to $45.00, but amount is $50.00."
+      }
+    ],
+    "retryable": false
+  }
+  ```
 
 #### Field Glossary
-*   `statusCode` (integer): The HTTP status code matching the response headers.
-*   `timestamp` (string): ISO-8601 formatted timestamp of the event.
-*   `path` (string): The requested URI path.
-*   `errorCode` (string): A unique domain-specific alphanumeric code for client-side programmatic handling (e.g. error translation/routing).
-*   `message` (string): Human-readable summary message.
-*   `details` (array, optional): Specific parameter or input field issues.
-*   `retryable` (boolean): Flag indicating whether the client can retry the request immediately or after a cooldown.
+
+- `statusCode` (integer): The HTTP status code matching the response headers.
+- `timestamp` (string): ISO-8601 formatted timestamp of the event.
+- `path` (string): The requested URI path.
+- `errorCode` (string): A unique domain-specific alphanumeric code for client-side programmatic handling (e.g. error translation/routing).
+- `message` (string): Human-readable summary message.
+- `details` (array, optional): Specific parameter or input field issues.
+- `retryable` (boolean): Flag indicating whether the client can retry the request immediately or after a cooldown.
 
 #### Error Code Classification and HTTP Mappings
 
-| HTTP Status | Error Code Range | Description | Example Error Code | Retryable |
-| :--- | :--- | :--- | :--- | :--- |
-| **400 Bad Request** | `VAL_*` | Input verification or format validation errors. | `VAL_INVALID_INPUT` | No |
-| **401 Unauthorized** | `AUTH_*` | Missing, invalid, or expired authentication tokens. | `AUTH_TOKEN_EXPIRED` | No (must refresh token/login) |
-| **403 Forbidden** | `AUTH_*`, `RES_*` | Lack of permissions for resource context, or incomplete authentication step (MFA). | `RES_FORBIDDEN` | No |
-| **404 Not Found** | `RES_*` | Requested resource or endpoint does not exist. | `RES_NOT_FOUND` | No |
-| **409 Conflict** | `RES_*`, `CON_*` | Duplicate unique identifiers or database constraint failures. | `RES_ALREADY_EXISTS` | No |
-| **412 Precondition Failed** | `CON_*` | State conflict or optimistic lock version mismatch (concurrency resolution). | `CON_VERSION_CONFLICT` | Yes (fetch state, merge, and retry) |
-| **429 Too Many Requests** | `CON_*` | Throttling limits hit. Includes `Retry-After` header. | `CON_LIMIT_EXCEEDED` | Yes (after duration specified in header) |
-| **500 Internal Error** | `SYS_*` | Unexpected errors within server context. | `SYS_INTERNAL_ERROR` | No (or retry with exponential backoff) |
-| **503 Service Unavailable** | `SYS_*` | Downstream services, database, or dependencies down. | `SYS_SERVICE_UNAVAILABLE` | Yes (retry with exponential backoff) |
+| HTTP Status                 | Error Code Range  | Description                                                                        | Example Error Code        | Retryable                                |
+| :-------------------------- | :---------------- | :--------------------------------------------------------------------------------- | :------------------------ | :--------------------------------------- |
+| **400 Bad Request**         | `VAL_*`           | Input verification or format validation errors.                                    | `VAL_INVALID_INPUT`       | No                                       |
+| **401 Unauthorized**        | `AUTH_*`          | Missing, invalid, or expired authentication tokens.                                | `AUTH_TOKEN_EXPIRED`      | No (must refresh token/login)            |
+| **403 Forbidden**           | `AUTH_*`, `RES_*` | Lack of permissions for resource context, or incomplete authentication step (MFA). | `RES_FORBIDDEN`           | No                                       |
+| **404 Not Found**           | `RES_*`           | Requested resource or endpoint does not exist.                                     | `RES_NOT_FOUND`           | No                                       |
+| **409 Conflict**            | `RES_*`, `CON_*`  | Duplicate unique identifiers or database constraint failures.                      | `RES_ALREADY_EXISTS`      | No                                       |
+| **412 Precondition Failed** | `CON_*`           | State conflict or optimistic lock version mismatch (concurrency resolution).       | `CON_VERSION_CONFLICT`    | Yes (fetch state, merge, and retry)      |
+| **429 Too Many Requests**   | `CON_*`           | Throttling limits hit. Includes `Retry-After` header.                              | `CON_LIMIT_EXCEEDED`      | Yes (after duration specified in header) |
+| **500 Internal Error**      | `SYS_*`           | Unexpected errors within server context.                                           | `SYS_INTERNAL_ERROR`      | No (or retry with exponential backoff)   |
+| **503 Service Unavailable** | `SYS_*`           | Downstream services, database, or dependencies down.                               | `SYS_SERVICE_UNAVAILABLE` | Yes (retry with exponential backoff)     |
 
 #### Concurrency & Retry Guidance
-*   **Version Conflicts (`CON_VERSION_CONFLICT`)**: Triggered when the client attempts to update a shared entity (e.g., group notes, split details) using an outdated version ID. The client must retrieve the latest version from `GET /api/v1/.../{id}`, merge local edits, and submit again.
-*   **Network & Rate Limit Recoverability**: For status 429 and 503, the client must honor the `Retry-After` response header and implement exponential backoff (starting at 1000ms with a factor of 2, capped at 10 seconds, max 3 retries).
+
+- **Version Conflicts (`CON_VERSION_CONFLICT`)**: Triggered when the client attempts to update a shared entity (e.g., group notes, split details) using an outdated version ID. The client must retrieve the latest version from `GET /api/v1/.../{id}`, merge local edits, and submit again.
+- **Network & Rate Limit Recoverability**: For status 429 and 503, the client must honor the `Retry-After` response header and implement exponential backoff (starting at 1000ms with a factor of 2, capped at 10 seconds, max 3 retries).
 
 #### 🗂️ Detailed Error Code Catalog
 
 The following catalog lists all programmatically parsed error codes generated by the API modules:
 
-| Error Code | HTTP Status | Module Scope | Description / Trigger Condition | Retryable |
-| :--- | :---: | :--- | :--- | :---: |
-| **`AUTH_MISSING_TOKEN`** | 401 | Auth / Global | The HTTP `Authorization` header is empty or missing. | ❌ |
-| **`AUTH_INVALID_TOKEN`** | 401 | Auth / Global | The JWT token signature is invalid or the payload is corrupt. | ❌ |
-| **`AUTH_TOKEN_EXPIRED`** | 401 | Auth / Global | The JWT access token lifespan check has failed. | 🔄 (Refresh) |
-| **`AUTH_INVALID_CREDENTIALS`** | 401 | Auth | Email/password combination verification failed. | ❌ |
-| **`AUTH_MFA_REQUIRED`** | 403 | Auth | Password is correct but account requires TOTP challenge verification. | ❌ |
-| **`AUTH_MFA_INVALID`** | 400 | Auth | The provided 6-digit TOTP code failed verification. | ❌ |
-| **`VAL_INVALID_INPUT`** | 400 | Global | JSON request body values fail class-validator properties. | ❌ |
-| **`VAL_MISSING_FIELD`** | 400 | Global | A required column or JSON key was omitted from request. | ❌ |
-| **`VAL_INVALID_FILE`** | 400 | Import | Uploaded spreadsheet contains parse errors, bad mime, or size caps. | ❌ |
-| **`RES_NOT_FOUND`** | 404 | Global | The target entity ID does not exist in active context. | ❌ |
-| **`RES_FORBIDDEN`** | 403 | Global / RBAC | RBAC validation failed (insufficient role privileges) or personal scope locked. | ❌ |
-| **`RES_ALREADY_EXISTS`** | 409 | Global / Group | Violation of unique database keys (e.g. email in use or duplicate group member). | ❌ |
-| **`CON_VERSION_CONFLICT`** | 412 | Global / Note / Exp | Optimistic locking match failed. Outdated version identifier. | ✅ |
-| **`CON_LIMIT_EXCEEDED`** | 422 | Global / OpenAI | Plan/usage thresholds exceeded (e.g. OpenAI rate caps or Supabase bytes). | ❌ |
-| **`CON_LIMIT_RATE`** | 429 | Global / Redis | Throttling limits hit. Client must wait specified seconds. | ✅ |
-| **`SYS_INTERNAL_ERROR`** | 500 | System | An unhandled exception occurred in-memory. | ❌ |
-| **`SYS_SERVICE_UNAVAILABLE`**| 503 | System / Database | DB pool exhausted, Redis server down, or Supabase offline. | ✅ |
-| **`SYS_TIMEOUT`** | 504 | System | Downstream processes took longer than the server limit to process. | ✅ |
-
-
+| Error Code                     | HTTP Status | Module Scope        | Description / Trigger Condition                                                  |  Retryable   |
+| :----------------------------- | :---------: | :------------------ | :------------------------------------------------------------------------------- | :----------: |
+| **`AUTH_MISSING_TOKEN`**       |     401     | Auth / Global       | The HTTP `Authorization` header is empty or missing.                             |      ❌      |
+| **`AUTH_INVALID_TOKEN`**       |     401     | Auth / Global       | The JWT token signature is invalid or the payload is corrupt.                    |      ❌      |
+| **`AUTH_TOKEN_EXPIRED`**       |     401     | Auth / Global       | The JWT access token lifespan check has failed.                                  | 🔄 (Refresh) |
+| **`AUTH_INVALID_CREDENTIALS`** |     401     | Auth                | Email/password combination verification failed.                                  |      ❌      |
+| **`AUTH_MFA_REQUIRED`**        |     403     | Auth                | Password is correct but account requires TOTP challenge verification.            |      ❌      |
+| **`AUTH_MFA_INVALID`**         |     400     | Auth                | The provided 6-digit TOTP code failed verification.                              |      ❌      |
+| **`VAL_INVALID_INPUT`**        |     400     | Global              | JSON request body values fail class-validator properties.                        |      ❌      |
+| **`VAL_MISSING_FIELD`**        |     400     | Global              | A required column or JSON key was omitted from request.                          |      ❌      |
+| **`VAL_INVALID_FILE`**         |     400     | Import              | Uploaded spreadsheet contains parse errors, bad mime, or size caps.              |      ❌      |
+| **`RES_NOT_FOUND`**            |     404     | Global              | The target entity ID does not exist in active context.                           |      ❌      |
+| **`RES_FORBIDDEN`**            |     403     | Global / RBAC       | RBAC validation failed (insufficient role privileges) or personal scope locked.  |      ❌      |
+| **`RES_ALREADY_EXISTS`**       |     409     | Global / Group      | Violation of unique database keys (e.g. email in use or duplicate group member). |      ❌      |
+| **`CON_VERSION_CONFLICT`**     |     412     | Global / Note / Exp | Optimistic locking match failed. Outdated version identifier.                    |      ✅      |
+| **`CON_LIMIT_EXCEEDED`**       |     422     | Global / OpenAI     | Plan/usage thresholds exceeded (e.g. OpenAI rate caps or Supabase bytes).        |      ❌      |
+| **`CON_LIMIT_RATE`**           |     429     | Global / Redis      | Throttling limits hit. Client must wait specified seconds.                       |      ✅      |
+| **`SYS_INTERNAL_ERROR`**       |     500     | System              | An unhandled exception occurred in-memory.                                       |      ❌      |
+| **`SYS_SERVICE_UNAVAILABLE`**  |     503     | System / Database   | DB pool exhausted, Redis server down, or Supabase offline.                       |      ✅      |
+| **`SYS_TIMEOUT`**              |     504     | System              | Downstream processes took longer than the server limit to process.               |      ✅      |
 
 ### 5. Settlement Logic
 
@@ -626,6 +658,7 @@ For detailed mathematical formulas, rounding behavior, tie-breaking ordering rul
 To maintain data integrity in collaborative, offline-first environments, FinMate enforces version-based optimistic concurrency controls on all mutable shared entities.
 
 #### 🔄 1. Version-Based Concurrency Control (Optimistic Locking)
+
 1.  **Schema Support**: Every mutable shared database entity (e.g. `Group`, `Expense`, `Note`, `Goal`, `Settlement`) contains a `version: integer` column, initialized to `1` on creation.
 2.  **API Read Contract**: Read endpoints (e.g., `GET /api/v1/notes/{id}`) return the resource's current `version`.
 3.  **API Write Contract**: All mutative endpoints (e.g., `PATCH /api/v1/notes/{id}`) require the expected version parameter in the request payload. Example JSON:
@@ -639,33 +672,36 @@ To maintain data integrity in collaborative, offline-first environments, FinMate
 4.  **Database Concurrency Verification**:
     Update statements verify version matches in the SQL `WHERE` clause:
     ```sql
-    UPDATE notes 
-    SET title = $1, body = $2, version = version + 1, updated_at = NOW() 
+    UPDATE notes
+    SET title = $1, body = $2, version = version + 1, updated_at = NOW()
     WHERE id = $3 AND version = $4;
     ```
     If the update statement returns `0` affected rows, the transaction rolls back, and the server rejects the request.
 
 #### ❌ 2. Conflict Response & API Behavior
+
 When a version mismatch is detected, the API immediately throws a `412 Precondition Failed` error with code `CON_VERSION_CONFLICT`.
-*   **Payload**:
-    ```json
-    {
-      "statusCode": 412,
-      "timestamp": "2026-06-09T23:08:00.000Z",
-      "path": "/api/v1/notes/ca8b3de3-d144-4822-ba30-dcbbf11ab9c2",
-      "errorCode": "CON_VERSION_CONFLICT",
-      "message": "Resource version conflict. The note has been modified by another user.",
-      "details": [
-        {
-          "field": "version",
-          "issue": "Submitted version 4, but current database version is 5."
-        }
-      ],
-      "retryable": true
-    }
-    ```
+
+- **Payload**:
+  ```json
+  {
+    "statusCode": 412,
+    "timestamp": "2026-06-09T23:08:00.000Z",
+    "path": "/api/v1/notes/ca8b3de3-d144-4822-ba30-dcbbf11ab9c2",
+    "errorCode": "CON_VERSION_CONFLICT",
+    "message": "Resource version conflict. The note has been modified by another user.",
+    "details": [
+      {
+        "field": "version",
+        "issue": "Submitted version 4, but current database version is 5."
+      }
+    ],
+    "retryable": true
+  }
+  ```
 
 #### 🤝 3. Client-Side Conflict Resolution & Merge Policy
+
 Upon intercepting a `412` error, the client (Angular) handles the conflict based on field overlap:
 
 ```mermaid
@@ -673,7 +709,7 @@ graph TD
     A[412 Error Intercepted] --> B{Overlapping Fields?}
     B -->|No| C[Automerge client edits]
     B -->|Yes| D[Render side-by-side Diff Modal]
-    
+
     C --> E[Submit with new server version]
     D -->|User Choice: Keep Mine| F[Overwrite server with local edits]
     D -->|User Choice: Keep Theirs| G[Discard local edits & refresh]
@@ -684,18 +720,20 @@ graph TD
     If the fields modified by the local edits do not overlap with the changes made on the server (e.g., local edit modified the note `title` while the server update modified the note `body`), the client automatically merges the two sets of changes, retrieves the current database `version`, and re-submits.
 2.  **Interactive User Resolution (Manual Diff)**:
     If there are overlapping changes (e.g., both local and server edits modified the note `body` text), the client blocks automated submits and displays a conflict resolution modal:
-    *   **Side-by-Side Diff**: Displays the user's local version, the current server version, and a proposed merge.
-    *   **Resolution Choices**:
-        *   *Keep Mine*: Overwrite the server's changes with the user's local edits (submitting the new server version).
-        *   *Keep Theirs*: Discard the user's local edits and accept the server's version.
-        *   *Merge Manually*: Present a rich-text editor for the user to combine the two files and submit.
+    - **Side-by-Side Diff**: Displays the user's local version, the current server version, and a proposed merge.
+    - **Resolution Choices**:
+      - _Keep Mine_: Overwrite the server's changes with the user's local edits (submitting the new server version).
+      - _Keep Theirs_: Discard the user's local edits and accept the server's version.
+      - _Merge Manually_: Present a rich-text editor for the user to combine the two files and submit.
 
 #### 📝 4. Concurrency worked scenarios
 
 ##### Scenario A: Non-Overlapping Automerge (Expense Update)
+
 See the consolidated [expsnsis-module-plan.md (Concurrency Worked Scenario)](file:///g:/prvn/Projects/FinMate/expsnsis-module-plan.md#11-concurrency-worked-scenario).
 
 ##### Scenario B: Overlapping Manual Resolve (Collaborative Note Edit)
+
 1.  `Note_1` is created (Version = 5, `body = "Bring sunscreen"`).
 2.  **User A** edits `body` locally to `"Bring sunscreen and hats"`.
 3.  **User B** concurrently edits `body` locally to `"Bring sunscreen and umbrellas"`.
@@ -703,23 +741,25 @@ See the consolidated [expsnsis-module-plan.md (Concurrency Worked Scenario)](fil
 5.  User A submits their request (`"version": 5`).
 6.  The server rejects User A's update since version in database (6) != version submitted (5), returning `412`.
 7.  User A's client intercepts the `412` error, fetches `Note_1` latest copy, detects overlapping edits on `body`, and opens the **Conflict Resolution Modal**.
-8.  User A reviews the diff and chooses *Keep Mine*.
+8.  User A reviews the diff and chooses _Keep Mine_.
 9.  The client sets the note `body` to `"Bring sunscreen and hats"`, sets `"version": 6`, and submits. The database updates successfully to Version 7.
-
 
 ## 📦 Deployment & Infrastructure
 
 **Single Boot Setup (`npm run setup`):**
-1. Initialize DB schema.  
-2. Seed configuration.  
-3. Start backend & frontend.  
+
+1. Initialize DB schema.
+2. Seed configuration.
+3. Start backend & frontend.
 
 **Environment Files:**
+
 - `dev.env`
 - `staging.env`
 - `prod.env`
 
 **Monitoring Tools:**
+
 - Sentry / Elastic APM
 
 ## 🧰 Operational Requirements
@@ -730,26 +770,26 @@ Operational policies and targets to ensure high availability, data durability, a
 
 The Recovery Time Objective (RTO) and Recovery Point Objective (RPO) targets vary by data classification and system criticality:
 
-| Service Category | Critical Path | RTO Target | RPO Target | Recovery Strategy |
-| :--- | :---: | :---: | :---: | :--- |
-| **User Identity & Auth** | Yes | 4 Hours | 1 Hour | JWT token caching, active replicas, WAL backups. |
-| **Ledger & Balances (DB)** | Yes | 4 Hours | 1 Hour | Point-in-Time Recovery (PITR) via Write-Ahead Logging (WAL). |
-| **File Storage (Receipts)** | No | 12 Hours | 6 Hours | Supabase storage replication & cold-bucket backups. |
-| **AI Insights / Chat** | No | 24 Hours | N/A (Stateless) | API key rotation and model fallbacks. |
-| **Offline Local Storage** | No | 0 (Instant) | 0 (Instant) | Local client-side IndexedDB caching. Sync upon reconnect. |
+| Service Category            | Critical Path | RTO Target  |   RPO Target    | Recovery Strategy                                            |
+| :-------------------------- | :-----------: | :---------: | :-------------: | :----------------------------------------------------------- |
+| **User Identity & Auth**    |      Yes      |   4 Hours   |     1 Hour      | JWT token caching, active replicas, WAL backups.             |
+| **Ledger & Balances (DB)**  |      Yes      |   4 Hours   |     1 Hour      | Point-in-Time Recovery (PITR) via Write-Ahead Logging (WAL). |
+| **File Storage (Receipts)** |      No       |  12 Hours   |     6 Hours     | Supabase storage replication & cold-bucket backups.          |
+| **AI Insights / Chat**      |      No       |  24 Hours   | N/A (Stateless) | API key rotation and model fallbacks.                        |
+| **Offline Local Storage**   |      No       | 0 (Instant) |   0 (Instant)   | Local client-side IndexedDB caching. Sync upon reconnect.    |
 
 ### 2. Backups & Restore Drills
 
-*   **Backup Automation**:
-    *   **Full Backups**: Captured automatically every 24 hours at 02:00 UTC during low-traffic windows.
-    *   **Differential Log Backups**: WAL archives streamed continuously (every 5 minutes) to secure off-site object storage.
-*   **Encryption**:
-    *   All backup archives MUST be encrypted before transit using AES-256.
-    *   Encryption keys are managed via AWS KMS / GCP KMS, separate from the primary application server database credentials.
-*   **Retention Policy**: Daily backups retained for 30 days; weekly backups retained for 90 days; monthly backups archived for 1 year.
-*   **Testing and Restore Drills**:
-    *   **Automated Integrity Check (Weekly)**: An automated script provisions an ephemeral sandbox database, restores the latest backup, runs test queries, and outputs validation reports.
-    *   **Manual Disaster Recovery Drill (Quarterly)**: Engineering team executes a simulated total service recovery to verify RTO compliance.
+- **Backup Automation**:
+  - **Full Backups**: Captured automatically every 24 hours at 02:00 UTC during low-traffic windows.
+  - **Differential Log Backups**: WAL archives streamed continuously (every 5 minutes) to secure off-site object storage.
+- **Encryption**:
+  - All backup archives MUST be encrypted before transit using AES-256.
+  - Encryption keys are managed via AWS KMS / GCP KMS, separate from the primary application server database credentials.
+- **Retention Policy**: Daily backups retained for 30 days; weekly backups retained for 90 days; monthly backups archived for 1 year.
+- **Testing and Restore Drills**:
+  - **Automated Integrity Check (Weekly)**: An automated script provisions an ephemeral sandbox database, restores the latest backup, runs test queries, and outputs validation reports.
+  - **Manual Disaster Recovery Drill (Quarterly)**: Engineering team executes a simulated total service recovery to verify RTO compliance.
 
 ### 3. Incident Severity & Alerting Path
 
@@ -761,7 +801,7 @@ graph TD
     B -->|Sev-1| C[PagerDuty Alert to On-Call]
     B -->|Sev-2| D[Slack Notification to Dev Channel]
     B -->|Sev-3| E[Linear Ticket Generated]
-    
+
     C --> F[Update Status Page]
     C --> G[Resolution inside 4 hrs]
     D --> H[Resolution inside 12 hrs]
@@ -769,22 +809,23 @@ graph TD
 
 #### 🚨 Severity Level Mappings & Alert Routing
 
-*   **Sev-1 (Critical Outage)**:
-    *   *Triggers*: Database connection failures, Auth endpoint down, major latency (> 5s for > 5% of users).
-    *   *Alerting Route*: Automated Sentry/Prometheus trigger -> PagerDuty notification to On-Call Engineer. Auto-escalates to Lead Architect if unacknowledged within 15 minutes.
-    *   *Communication*: Auto-updates public status page (e.g. status.finmate.com) via API heartbeats.
-    *   *SLA*: Resolution or mitigation within **4 hours**.
-*   **Sev-2 (Degraded Operations)**:
-    *   *Triggers*: AI API failing, CSV imports timing out, elevated error rates (2xx/3xx latency > 1s).
-    *   *Alerting Route*: Slack bot notification posted to `#alerts-finmate-prod` channel. Handled by the active engineering team on a priority queue.
-    *   *SLA*: Resolution or hotfix deployed within **12 hours**.
-    *   *Communication*: Banner added to user dashboard indicating feature degradation.
-*   **Sev-3 (Minor Issues)**:
-    *   *Triggers*: Minor CSS layout alignment bugs, static page warnings, non-blocking UI exceptions.
-    *   *Alerting Route*: Automatically creates a card in Linear backlog tagged `bug:minor`.
-    *   *SLA*: Prioritized and resolved in subsequent sprint cycles.
+- **Sev-1 (Critical Outage)**:
+  - _Triggers_: Database connection failures, Auth endpoint down, major latency (> 5s for > 5% of users).
+  - _Alerting Route_: Automated Sentry/Prometheus trigger -> PagerDuty notification to On-Call Engineer. Auto-escalates to Lead Architect if unacknowledged within 15 minutes.
+  - _Communication_: Auto-updates public status page (e.g. status.finmate.com) via API heartbeats.
+  - _SLA_: Resolution or mitigation within **4 hours**.
+- **Sev-2 (Degraded Operations)**:
+  - _Triggers_: AI API failing, CSV imports timing out, elevated error rates (2xx/3xx latency > 1s).
+  - _Alerting Route_: Slack bot notification posted to `#alerts-finmate-prod` channel. Handled by the active engineering team on a priority queue.
+  - _SLA_: Resolution or hotfix deployed within **12 hours**.
+  - _Communication_: Banner added to user dashboard indicating feature degradation.
+- **Sev-3 (Minor Issues)**:
+  - _Triggers_: Minor CSS layout alignment bugs, static page warnings, non-blocking UI exceptions.
+  - _Alerting Route_: Automatically creates a card in Linear backlog tagged `bug:minor`.
+  - _SLA_: Prioritized and resolved in subsequent sprint cycles.
 
 ### 4. Dependency Constraints & Cost Controls
+
 - OpenAI API: Rates limited at client level; auto-fallback to cache for repeating smart forecast questions.
 - Supabase storage caps: Active alerts when total storage utilization reaches 80% of current subscription tier.
 
@@ -793,6 +834,7 @@ graph TD
 ## 🔐 Security & Privacy
 
 ### 🛡️ Security Architecture
+
 - **End-to-end encryption** (AES-256-GCM).
 - **Database encryption** (PostgreSQL pgcrypto, encrypted columns).
 - **Password hashing** (Argon2 - memory-hard algorithm).
@@ -815,44 +857,45 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
 
 #### ❌ Unauthorized Action Responses (HTTP Status Code & Error Payload)
 
-*   **Error Type: Resource Access Forbidden (`RES_FORBIDDEN`)**
-    When an authenticated user requests a resource belonging to a different personal scope or a group they are not a member of:
-    *   **HTTP Status**: `403 Forbidden`
-    *   **Payload**:
-        ```json
-        {
-          "statusCode": 403,
-          "timestamp": "2026-06-09T22:49:00.000Z",
-          "path": "/api/v1/groups/2ab72e81-b20f-488f-a9cb-b2f5cf111818/members",
-          "errorCode": "RES_FORBIDDEN",
-          "message": "You do not have access to view this group.",
-          "retryable": false
-        }
-        ```
+- **Error Type: Resource Access Forbidden (`RES_FORBIDDEN`)**
+  When an authenticated user requests a resource belonging to a different personal scope or a group they are not a member of:
+  - **HTTP Status**: `403 Forbidden`
+  - **Payload**:
+    ```json
+    {
+      "statusCode": 403,
+      "timestamp": "2026-06-09T22:49:00.000Z",
+      "path": "/api/v1/groups/2ab72e81-b20f-488f-a9cb-b2f5cf111818/members",
+      "errorCode": "RES_FORBIDDEN",
+      "message": "You do not have access to view this group.",
+      "retryable": false
+    }
+    ```
 
-*   **Error Type: Action Not Allowed (`RES_FORBIDDEN`)**
-    When a user is a member of the group but does not have the required role privileges (e.g. a `Viewer` attempting to invite a member, or a `Member` attempting to update an expense created by another member):
-    *   **HTTP Status**: `403 Forbidden`
-    *   **Payload**:
-        ```json
-        {
-          "statusCode": 403,
-          "timestamp": "2026-06-09T22:49:00.000Z",
-          "path": "/api/v1/groups/2ab72e81-b20f-488f-a9cb-b2f5cf111818/members",
-          "errorCode": "RES_FORBIDDEN",
-          "message": "You do not have permission to perform this action.",
-          "retryable": false
-        }
-        ```
+- **Error Type: Action Not Allowed (`RES_FORBIDDEN`)**
+  When a user is a member of the group but does not have the required role privileges (e.g. a `Viewer` attempting to invite a member, or a `Member` attempting to update an expense created by another member):
+  - **HTTP Status**: `403 Forbidden`
+  - **Payload**:
+    ```json
+    {
+      "statusCode": 403,
+      "timestamp": "2026-06-09T22:49:00.000Z",
+      "path": "/api/v1/groups/2ab72e81-b20f-488f-a9cb-b2f5cf111818/members",
+      "errorCode": "RES_FORBIDDEN",
+      "message": "You do not have permission to perform this action.",
+      "retryable": false
+    }
+    ```
 
 #### 🛡️ Explicit Conflict Resolution & Boundary Safeguards
 
-*   **No Ambiguous Admin Promotions**: Admins cannot promote other members to `Admin` or demote current `Admins`. This prevents admin privilege escalation. Only the group `Owner` can manage Admin status.
-*   **Settlement Approvals Safeguard**: A settlement can ONLY be confirmed by the creditor (the user receiving the money). Group Owners, Admins, and standard members cannot confirm a settlement on behalf of others or confirm a settlement where they are the debtor (paying). Attempting to do so returns `RES_FORBIDDEN`.
-*   **Member Invites Settings**: Standard members can only invite other members if the group settings (managed by the Owner) permit member invites. If this setting is disabled, attempts by standard members to invite others return `RES_FORBIDDEN`.
-*   **Personal Scope Lock**: No group owner or admin can read or write another member's personal expenses or private notes. The authorization logic verifies `group_id` presence; if null, it resolves purely to individual user ownership checks.
+- **No Ambiguous Admin Promotions**: Admins cannot promote other members to `Admin` or demote current `Admins`. This prevents admin privilege escalation. Only the group `Owner` can manage Admin status.
+- **Settlement Approvals Safeguard**: A settlement can ONLY be confirmed by the creditor (the user receiving the money). Group Owners, Admins, and standard members cannot confirm a settlement on behalf of others or confirm a settlement where they are the debtor (paying). Attempting to do so returns `RES_FORBIDDEN`.
+- **Member Invites Settings**: Standard members can only invite other members if the group settings (managed by the Owner) permit member invites. If this setting is disabled, attempts by standard members to invite others return `RES_FORBIDDEN`.
+- **Personal Scope Lock**: No group owner or admin can read or write another member's personal expenses or private notes. The authorization logic verifies `group_id` presence; if null, it resolves purely to individual user ownership checks.
 
 ### 🔒 Privacy Compliance
+
 - No tracking/ads.
 - GDPR and Indian IT Act compliant.
 - User-controlled data export/delete.
@@ -865,22 +908,21 @@ The authorization layer enforces the rules defined in the [RBAC Matrix](#2-rbac-
 To reconcile zero-knowledge encryption with intelligent AI features, FinMate adheres to strict data handling constraints:
 
 1.  **Strict Ephemeral Processing**:
-    *   Plaintext data sent for AI processing (such as expense receipt OCR or note summarization) is **never written to persistent database storage** on the backend.
-    *   Plaintext exists only in-memory in server execution space and is discarded immediately after transmitting to/from the AI provider.
+    - Plaintext data sent for AI processing (such as expense receipt OCR or note summarization) is **never written to persistent database storage** on the backend.
+    - Plaintext exists only in-memory in server execution space and is discarded immediately after transmitting to/from the AI provider.
 2.  **Explicit User Opt-In Settings**:
-    *   By default, all AI capabilities are disabled.
-    *   Users must explicitly opt-in via account settings (`ai_opt_in = true`) to enable features requiring remote AI orchestration.
-    *   Users can revoke this consent at any time, which instantly sweeps any client-side cached suggestions.
+    - By default, all AI capabilities are disabled.
+    - Users must explicitly opt-in via account settings (`ai_opt_in = true`) to enable features requiring remote AI orchestration.
+    - Users can revoke this consent at any time, which instantly sweeps any client-side cached suggestions.
 3.  **Local Decryption & Secure Transit**:
-    *   Since transactional data is client-side encrypted, the client device decrypts the target fields locally using the local keys.
-    *   The client sends the plaintext payload of only the specific active transaction (e.g. the active note body or receipt file binary) to the server via TLS.
+    - Since transactional data is client-side encrypted, the client device decrypts the target fields locally using the local keys.
+    - The client sends the plaintext payload of only the specific active transaction (e.g. the active note body or receipt file binary) to the server via TLS.
 4.  **Zero-Retention AI Integration**:
-    *   The backend proxy routes AI calls strictly to enterprise API endpoints (e.g., OpenAI API) governed by strict data privacy agreements:
-        *   **Zero-Data-Retention (ZDR)**: The AI partner does not retain files or prompt contents.
-        *   **No Training**: The AI partner is contractually blocked from training future LLMs or models using FinMate API prompts or contents.
+    - The backend proxy routes AI calls strictly to enterprise API endpoints (e.g., OpenAI API) governed by strict data privacy agreements:
+      - **Zero-Data-Retention (ZDR)**: The AI partner does not retain files or prompt contents.
+      - **No Training**: The AI partner is contractually blocked from training future LLMs or models using FinMate API prompts or contents.
 5.  **Anonymization Boundaries**:
-    *   Before sending prompts, the backend sweeps any metadata headers to exclude internal database keys (e.g. `user_id`, `group_id`). Only the raw contextual plaintext (the note text or receipt metadata) is sent.
-
+    - Before sending prompts, the backend sweeps any metadata headers to exclude internal database keys (e.g. `user_id`, `group_id`). Only the raw contextual plaintext (the note text or receipt metadata) is sent.
 
 ---
 
@@ -896,18 +938,19 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 
 ## 🧩 Pros and Cons
 
-| Pros | Cons |
-|------|------|
-| Scalable, modular design | Slightly complex setup |
-| Hybrid web & mobile app | PWA optimization required |
-| AI-driven features | AI tuning effort |
-| Offline-first design | Initial dev cycle longer |
+| Pros                     | Cons                      |
+| ------------------------ | ------------------------- |
+| Scalable, modular design | Slightly complex setup    |
+| Hybrid web & mobile app  | PWA optimization required |
+| AI-driven features       | AI tuning effort          |
+| Offline-first design     | Initial dev cycle longer  |
 
 ---
 
 ## 🧾 Developer Documentation
 
 **Include:**
+
 - Folder structure & naming conventions.
 - **API Contracts**: Detailed endpoint request/response specifications are documented in [API.md](file:///d:/prvn/Projects/FinMate/API.md), with a full OpenAPI 3.0 draft in [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml).
 - DFD & ERD diagrams.
@@ -920,6 +963,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 ## ⚡ Performance Optimization Strategy
 
 ### 🚀 Frontend Optimization
+
 1. **Angular 19 Features**
    - Standalone components (reduced bundle size)
    - OnPush change detection (fewer renders)
@@ -957,6 +1001,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
    - API response caching
 
 ### ⚙️ Backend Optimization
+
 1. **NestJS + Fastify**
    - Fastify (2x faster than Express)
    - Connection pooling (PostgreSQL)
@@ -986,6 +1031,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
    - Rate limiting (Redis)
 
 ### 📊 Monitoring & Analytics
+
 - **Lighthouse CI** - Automated performance testing
 - **Web Vitals** - Core metrics (LCP, FID, CLS)
 - **Sentry** - Error tracking + performance monitoring
@@ -995,23 +1041,25 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Custom metrics** - Business-specific KPIs
 
 ### 🎯 Performance Targets
-| Metric | Target | Tool |
-|--------|--------|------|
-| First Contentful Paint | < 1.5s | Lighthouse |
-| Time to Interactive | < 3.0s | Lighthouse |
-| Largest Contentful Paint | < 2.5s | Web Vitals |
-| Cumulative Layout Shift | < 0.1 | Web Vitals |
-| First Input Delay | < 100ms | Web Vitals |
-| Bundle Size (initial) | < 200KB | webpack-bundle-analyzer |
-| API Response Time (p95) | < 200ms | Sentry |
-| Database Query Time | < 50ms | pg_stat_statements |
-| Lighthouse Score | > 90 | Lighthouse CI |
+
+| Metric                   | Target  | Tool                    |
+| ------------------------ | ------- | ----------------------- |
+| First Contentful Paint   | < 1.5s  | Lighthouse              |
+| Time to Interactive      | < 3.0s  | Lighthouse              |
+| Largest Contentful Paint | < 2.5s  | Web Vitals              |
+| Cumulative Layout Shift  | < 0.1   | Web Vitals              |
+| First Input Delay        | < 100ms | Web Vitals              |
+| Bundle Size (initial)    | < 200KB | webpack-bundle-analyzer |
+| API Response Time (p95)  | < 200ms | Sentry                  |
+| Database Query Time      | < 50ms  | pg_stat_statements      |
+| Lighthouse Score         | > 90    | Lighthouse CI           |
 
 ---
 
 ## 📘 Development Notes
 
 ### 🎓 Best Practices
+
 - Use **latest stable versions** of all dependencies
 - Avoid memory leaks (unsubscribe observables, cleanup listeners)
 - Follow **SOLID principles** and clean code
@@ -1022,12 +1070,14 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Accessibility** (WCAG 2.1 AA compliance)
 
 ### 🔗 Integration Goals
+
 - Seamless OpenAI integration for smart insights
 - Real-time collaboration (WebSockets)
 - Offline-first architecture (PWA)
 - Cross-platform (Web, iOS, Android)
 
 ### 🚀 Deployment Strategy
+
 - One unified boot process (`npm run setup`)
 - Docker + Docker Compose for consistency
 - Environment-based configuration
@@ -1038,6 +1088,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 ---
 
 ## 📚 Documentation Structure
+
 - **README.md** - Quick start guide
 - **ARCHITECTURE.md** - System design and diagrams
 - **API.md** - API documentation (Swagger/OpenAPI)
@@ -1055,191 +1106,200 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 ## 🗂️ Progress Log
 
 ### Entry Template
+
 - **Date:** YYYY-MM-DD
 - **Summary:** 1-2 lines on what was done
 - **Changes Made:**
-   - Item 1
-   - Item 2
+  - Item 1
+  - Item 2
 - **Artifacts Updated:**
-   - File/Module/Issue references
+  - File/Module/Issue references
 - **Decisions:**
-   - Decision and rationale
+  - Decision and rationale
 - **Next Actions:**
-   - Immediate next step
+  - Immediate next step
 
 ### 2026-06-20
+
 - **Summary:** Fixed backend test harness regressions in the expenses controller and groups service specs.
 - **Changes Made:**
-   - Updated `backend/src/app/expenses/expenses.controller.spec.ts` to use explicit mock service bindings that Nest resolves reliably.
-   - Extended `backend/src/app/groups/groups.service.spec.ts` transaction mocking to support the ownership-transfer path and imported the missing contribution entity.
+  - Updated `backend/src/app/expenses/expenses.controller.spec.ts` to use explicit mock service bindings that Nest resolves reliably.
+  - Extended `backend/src/app/groups/groups.service.spec.ts` transaction mocking to support the ownership-transfer path and imported the missing contribution entity.
 - **Artifacts Updated:**
-   - `backend/src/app/expenses/expenses.controller.spec.ts`
-   - `backend/src/app/groups/groups.service.spec.ts`
-   - `FinMate_Project_Specification.md`
+  - `backend/src/app/expenses/expenses.controller.spec.ts`
+  - `backend/src/app/groups/groups.service.spec.ts`
+  - `FinMate_Project_Specification.md`
 - **Decisions:**
-   - Kept the fix scoped to test setup instead of changing controller or service logic.
+  - Kept the fix scoped to test setup instead of changing controller or service logic.
 - **Next Actions:**
-   - None.
+  - None.
 
 ### 2026-06-08
+
 - **Summary:** Established Linear-first project coordination approach and consolidated the active planning record format.
 - **Changes Made:**
-   - Standardized project operating model to one team + one project (FinMate MVP) with epic grouping and dependency-driven execution.
-   - Defined that ongoing progress and detail should be maintained in this specification file as the long-term record.
+  - Standardized project operating model to one team + one project (FinMate MVP) with epic grouping and dependency-driven execution.
+  - Defined that ongoing progress and detail should be maintained in this specification file as the long-term record.
 - **Artifacts Updated:**
-   - TICKET_BACKLOG.md
-   - FinMate_Project_Specification.md
+  - TICKET_BACKLOG.md
+  - FinMate_Project_Specification.md
 - **Decisions:**
-   - Keep tracking lightweight by using one Linear project during MVP planning.
-   - Use this section for date-stamped progress entries instead of splitting history across multiple planning files.
+  - Keep tracking lightweight by using one Linear project during MVP planning.
+  - Use this section for date-stamped progress entries instead of splitting history across multiple planning files.
 - **Next Actions:**
-    - Define encryption boundary classifications.
+  - Define encryption boundary classifications.
 
 ### 2026-06-09
+
 - **Summary:** Froze API contracts, mapped RBAC, defined debt simplification, standardized import/export, defined encryption boundaries, AI policies, error taxonomies, finalized production reliability guardrails, defined collaborative concurrent edit conflict resolution strategies, built the shared validation DTO library, and implemented global NestJS exception filters for standardized error taxonomy.
 - **Changes Made:**
-    - Added standard error payload schema and mappings under `API Error Taxonomy`.
-    - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
-    - Generated [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml) draft for the REST API.
-    - Replaced the placeholder at `System Design Details -> 2. RBAC Matrix` with group roles definition, permission matrix table, and contextual policy constraints.
-    - Added `Security & Privacy -> Authorization Behavior` with 403 error payload examples and boundary/conflict safeguards.
-    - Replaced the placeholder at `System Design Details -> 5. Settlement Logic` with the mathematical balance formula, round-half-up remainder allocations, tie-breaking rules, greedy matching pseudocode, and three concrete worked examples.
-    - Expanded `- Export/Import (CSV, XLSX) support.` under `Shared Group Module` to include explicit column layouts (CSV schema v1), split math validation rules, and transaction atomicity logic.
-    - Updated `API Error Taxonomy` with the structured error response payload example for bulk file import validation failures.
-    - Replaced the placeholder at `System Design Details -> 3. Encryption Boundary Table` with key tier definitions and the entity-field encryption matrix.
-    - Added `Security & Privacy -> AI Data Access & Handling Rules` defining opt-in mechanics, local decryption rules, and zero-retention integration constraints.
-    - Added TypeScript interfaces for client-side programmatic parsing of API errors and established the complete **Error Code Catalog** mapping all potential errors (`AUTH_`, `VAL_`, `RES_`, `CON_`, `SYS_`).
-    - Replaced the placeholder bullet list under `## 🧰 Operational Requirements` with the Ops Baseline Matrix (RTO/RPO targets), backup automation rules, weekly/quarterly restore testing requirements, and Sev-1/Sev-2/Sev-3 incident alerting paths.
-    - Added `System Design Details -> 6. Conflict Resolution` detailing optimistic locking (version-based concurrency), database update strategies, API conflict response structures (412), client-side automerge policies vs interactive manual diff modals, and two timeline worked scenarios.
-    - Updated [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml) schemas and PATCH endpoints to require the `version` field for `Group`, `Expense`, `Settlement`, `Note`, and `Goal`.
-    - Updated [API.md](file:///d:/prvn/Projects/FinMate/API.md) examples with the `version` field.
-    - Created shared validation DTO classes in `shared/data-models/src/lib/dto/` for user preferences, authentication registrations, group invitations, settlements, expense recording, and notes CRUD.
-    - Exported all validation classes from the `@finmate/data-models` shared library entry point index.ts.
-    - Created NestJS global `HttpExceptionFilter` handling programmatic mapping of error status codes, validation formatting arrays, and database unique/foreign key constraint errors.
-    - Registered the custom global exception filter and active validation pipes in `main.ts`, adjusting the path-based versioning global prefix to `api/v1`.
+  - Added standard error payload schema and mappings under `API Error Taxonomy`.
+  - Created [API.md](file:///d:/prvn/Projects/FinMate/API.md) containing the endpoint directory and request/response examples.
+  - Generated [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml) draft for the REST API.
+  - Replaced the placeholder at `System Design Details -> 2. RBAC Matrix` with group roles definition, permission matrix table, and contextual policy constraints.
+  - Added `Security & Privacy -> Authorization Behavior` with 403 error payload examples and boundary/conflict safeguards.
+  - Replaced the placeholder at `System Design Details -> 5. Settlement Logic` with the mathematical balance formula, round-half-up remainder allocations, tie-breaking rules, greedy matching pseudocode, and three concrete worked examples.
+  - Expanded `- Export/Import (CSV, XLSX) support.` under `Shared Group Module` to include explicit column layouts (CSV schema v1), split math validation rules, and transaction atomicity logic.
+  - Updated `API Error Taxonomy` with the structured error response payload example for bulk file import validation failures.
+  - Replaced the placeholder at `System Design Details -> 3. Encryption Boundary Table` with key tier definitions and the entity-field encryption matrix.
+  - Added `Security & Privacy -> AI Data Access & Handling Rules` defining opt-in mechanics, local decryption rules, and zero-retention integration constraints.
+  - Added TypeScript interfaces for client-side programmatic parsing of API errors and established the complete **Error Code Catalog** mapping all potential errors (`AUTH_`, `VAL_`, `RES_`, `CON_`, `SYS_`).
+  - Replaced the placeholder bullet list under `## 🧰 Operational Requirements` with the Ops Baseline Matrix (RTO/RPO targets), backup automation rules, weekly/quarterly restore testing requirements, and Sev-1/Sev-2/Sev-3 incident alerting paths.
+  - Added `System Design Details -> 6. Conflict Resolution` detailing optimistic locking (version-based concurrency), database update strategies, API conflict response structures (412), client-side automerge policies vs interactive manual diff modals, and two timeline worked scenarios.
+  - Updated [openapi.yaml](file:///d:/prvn/Projects/FinMate/openapi.yaml) schemas and PATCH endpoints to require the `version` field for `Group`, `Expense`, `Settlement`, `Note`, and `Goal`.
+  - Updated [API.md](file:///d:/prvn/Projects/FinMate/API.md) examples with the `version` field.
+  - Created shared validation DTO classes in `shared/data-models/src/lib/dto/` for user preferences, authentication registrations, group invitations, settlements, expense recording, and notes CRUD.
+  - Exported all validation classes from the `@finmate/data-models` shared library entry point index.ts.
+  - Created NestJS global `HttpExceptionFilter` handling programmatic mapping of error status codes, validation formatting arrays, and database unique/foreign key constraint errors.
+  - Registered the custom global exception filter and active validation pipes in `main.ts`, adjusting the path-based versioning global prefix to `api/v1`.
 - **Artifacts Updated:**
-    - FinMate_Project_Specification.md
-    - API.md
-    - openapi.yaml
-    - shared/data-models/src/index.ts
-    - backend/src/main.ts
-    - backend/src/app/filters/http-exception.filter.ts
+  - FinMate_Project_Specification.md
+  - API.md
+  - openapi.yaml
+  - shared/data-models/src/index.ts
+  - backend/src/main.ts
+  - backend/src/app/filters/http-exception.filter.ts
 - **Decisions:**
-    - Use URL-based versioning (`/api/v1`) for NestJS routing simplicity.
-    - Maintain a standardized JSON error shape containing `errorCode` for ease of handling.
-    - Allocate rounding discrepancies to the payer (or the lexicographically first participant if the payer is not in the split) to ensure split sum parity.
-    - Enforce UUID string ascending as the ultimate tie-breaker during greedy matching debtor/creditor lists.
-    - Process file imports atomically inside a single database transaction to prevent partial data corruption and duplicates.
-    - Keep transaction titles and descriptions strictly client-side encrypted (zero-knowledge) by default, using ephemeral plaintext transmission for AI features only on explicit user opt-in.
-    - Provide programmatically classifiable error codes (e.g. `AUTH_MFA_REQUIRED`, `CON_VERSION_CONFLICT`) to allow frontend clients to run localized translations and route users dynamically.
-    - Target 4-hour RTO for critical paths (Auth, DB sync, REST API) and 1-hour RPO using Write-Ahead Logging PITR.
-    - Use a request body-based `"version": integer` parameter on mutable shared resource updates to simplify payload validation.
-    - Handle concurrency conflicts dynamically via client-side interception of 412 errors, executing silent automerges for non-overlapping fields or rendering interactive side-by-side diff modals for overlapping edits.
+  - Use URL-based versioning (`/api/v1`) for NestJS routing simplicity.
+  - Maintain a standardized JSON error shape containing `errorCode` for ease of handling.
+  - Allocate rounding discrepancies to the payer (or the lexicographically first participant if the payer is not in the split) to ensure split sum parity.
+  - Enforce UUID string ascending as the ultimate tie-breaker during greedy matching debtor/creditor lists.
+  - Process file imports atomically inside a single database transaction to prevent partial data corruption and duplicates.
+  - Keep transaction titles and descriptions strictly client-side encrypted (zero-knowledge) by default, using ephemeral plaintext transmission for AI features only on explicit user opt-in.
+  - Provide programmatically classifiable error codes (e.g. `AUTH_MFA_REQUIRED`, `CON_VERSION_CONFLICT`) to allow frontend clients to run localized translations and route users dynamically.
+  - Target 4-hour RTO for critical paths (Auth, DB sync, REST API) and 1-hour RPO using Write-Ahead Logging PITR.
+  - Use a request body-based `"version": integer` parameter on mutable shared resource updates to simplify payload validation.
+  - Handle concurrency conflicts dynamically via client-side interception of 412 errors, executing silent automerges for non-overlapping fields or rendering interactive side-by-side diff modals for overlapping edits.
 - **Next Actions:**
-    - Implement User Registration and JWT Authentication Service (FIN-19).
+  - Implement User Registration and JWT Authentication Service (FIN-19).
 
 ### 2026-06-14
+
 - **Summary:** Audited the current codebase status against the specification and updated agent guidelines.
 - **Changes Made:**
-   - Added Rule 6 to AGENT_RULES.md to enforce updating the Progress Log at the end of the project specification file for every task/update.
+  - Added Rule 6 to AGENT_RULES.md to enforce updating the Progress Log at the end of the project specification file for every task/update.
 - **Artifacts Updated:**
-   - AGENT_RULES.md
-   - FinMate_Project_Specification.md
+  - AGENT_RULES.md
+  - FinMate_Project_Specification.md
 - **Decisions:**
-   - Document all implementations and decisions directly in the spec Progress Log to ensure seamless project handovers and clarity for future updates.
+  - Document all implementations and decisions directly in the spec Progress Log to ensure seamless project handovers and clarity for future updates.
 - **Next Actions:**
-   - Address Jest unit test failures in the frontend (mocking Web Crypto and correcting App component test config).
-   - Implement backend endpoints for the Notes and Goals modules.
+  - Address Jest unit test failures in the frontend (mocking Web Crypto and correcting App component test config).
+  - Implement backend endpoints for the Notes and Goals modules.
 
 ### 2026-06-15
+
 - **Summary:** Added Rule 7 to AGENT_RULES.md to instruct the agent to ask the user to run terminal commands to save token expenses.
 - **Changes Made:**
-   - Appended Rule 7 to AGENT_RULES.md.
+  - Appended Rule 7 to AGENT_RULES.md.
 - **Artifacts Updated:**
-   - AGENT_RULES.md
-   - FinMate_Project_Specification.md
+  - AGENT_RULES.md
+  - FinMate_Project_Specification.md
 - **Decisions:**
-   - Instruct the agent to prompt the user to execute heavy or verbose terminal commands rather than running them in the agent's sandbox, reducing token overhead.
+  - Instruct the agent to prompt the user to execute heavy or verbose terminal commands rather than running them in the agent's sandbox, reducing token overhead.
 - **Next Actions:**
-    - Proceed with remaining backlog items in backend and frontend.
+  - Proceed with remaining backlog items in backend and frontend.
 
 ### 2026-06-15 (Part 2)
+
 - **Summary:** Implemented all Backend and Frontend outstanding requirements for Expenses.
 - **Changes Made:**
-   - Implemented `calculateFriendsBalances` in `SettlementsService` and exposed `/friends` endpoint via `FriendsController` to aggregate group-wise debts with friends.
-   - Exposed the deleted group expenses endpoint `/api/v1/groups/:id/expenses/deleted` in `GroupsController`.
-   - Updated `ExpensesService.listExpenses` to filter for personal expenses (`groupId === 'personal'`).
-   - Implemented JWT token refreshing in the frontend `jwtInterceptor` to handle token expirations silently.
-   - Built a dedicated Friends Tab with aggregated lists and group-by-group breakdowns.
-   - Designed a full Personal Expenses dashboard view and logging flow.
-   - Enhanced the expense modal with Edit Mode, Personal Mode, spectator exclusions, and dynamic currency icon display.
-   - Enhanced the Group Detail Component with edit/delete actions, collapsible history/trash panels, CSV/XLSX import/export, and household timelines with carry-forward display.
+  - Implemented `calculateFriendsBalances` in `SettlementsService` and exposed `/friends` endpoint via `FriendsController` to aggregate group-wise debts with friends.
+  - Exposed the deleted group expenses endpoint `/api/v1/groups/:id/expenses/deleted` in `GroupsController`.
+  - Updated `ExpensesService.listExpenses` to filter for personal expenses (`groupId === 'personal'`).
+  - Implemented JWT token refreshing in the frontend `jwtInterceptor` to handle token expirations silently.
+  - Built a dedicated Friends Tab with aggregated lists and group-by-group breakdowns.
+  - Designed a full Personal Expenses dashboard view and logging flow.
+  - Enhanced the expense modal with Edit Mode, Personal Mode, spectator exclusions, and dynamic currency icon display.
+  - Enhanced the Group Detail Component with edit/delete actions, collapsible history/trash panels, CSV/XLSX import/export, and household timelines with carry-forward display.
 - **Artifacts Updated:**
-   - backend/src/app/settlements/settlements.service.ts
-   - backend/src/app/settlements/friends.controller.ts
-   - backend/src/app/settlements/settlements.module.ts
-   - backend/src/app/groups/groups.controller.ts
-   - backend/src/app/expenses/expenses.service.ts
-   - frontend/src/app/services/auth.service.ts
-   - frontend/src/app/interceptors/jwt.interceptor.ts
-   - frontend/src/app/app.routes.ts
-   - frontend/src/app/components/friends/friends.component.ts
-   - frontend/src/app/components/dashboard/dashboard.component.ts
-   - frontend/src/app/components/dashboard/dashboard.component.html
-   - frontend/src/app/components/groups/create-expense-modal.component.ts
-   - frontend/src/app/components/groups/create-expense-modal.component.html
-   - frontend/src/app/components/groups/group-detail.component.ts
+  - backend/src/app/settlements/settlements.service.ts
+  - backend/src/app/settlements/friends.controller.ts
+  - backend/src/app/settlements/settlements.module.ts
+  - backend/src/app/groups/groups.controller.ts
+  - backend/src/app/expenses/expenses.service.ts
+  - frontend/src/app/services/auth.service.ts
+  - frontend/src/app/interceptors/jwt.interceptor.ts
+  - frontend/src/app/app.routes.ts
+  - frontend/src/app/components/friends/friends.component.ts
+  - frontend/src/app/components/dashboard/dashboard.component.ts
+  - frontend/src/app/components/dashboard/dashboard.component.html
+  - frontend/src/app/components/groups/create-expense-modal.component.ts
+  - frontend/src/app/components/groups/create-expense-modal.component.html
+  - frontend/src/app/components/groups/group-detail.component.ts
 - **Decisions:**
-   - Aggregate group-by-group debts on the backend and return standard structures to keep the Friends screen simple and lightweight.
-   - Handle JWT refreshes within the HttpClient interceptor to avoid session disruption on 15m expiration.
+  - Aggregate group-by-group debts on the backend and return standard structures to keep the Friends screen simple and lightweight.
+  - Handle JWT refreshes within the HttpClient interceptor to avoid session disruption on 15m expiration.
 - **Next Actions:**
-   - Verify code compiles and all Jest tests pass.
+  - Verify code compiles and all Jest tests pass.
 
 ### 2026-06-15 (Part 3)
+
 - **Summary:** Addressed and resolved all Jest unit test failures in both frontend and backend.
 - **Changes Made:**
-   - Fixed missing dependency injection (`AuditLogRepository`) in `GroupsService` and `ExpensesService` backend unit test suites.
-   - Fixed outdated assertion in backend expenses service spec to check for soft deletion (`softRemove`) instead of entity save.
-   - Resolved TS compile errors in backend `expenses.controller.spec.ts` by casting mock requests to `any`.
-   - Corrected frontend `app.spec.ts` import from `App` to `AppComponent` and replaced welcome text assertions with verification of component instantiation.
-   - Polyfilled `globalThis.crypto` and `subtle` with Node's native `webcrypto` in `encryption.service.spec.ts` for the JSDOM/Jest environment.
+  - Fixed missing dependency injection (`AuditLogRepository`) in `GroupsService` and `ExpensesService` backend unit test suites.
+  - Fixed outdated assertion in backend expenses service spec to check for soft deletion (`softRemove`) instead of entity save.
+  - Resolved TS compile errors in backend `expenses.controller.spec.ts` by casting mock requests to `any`.
+  - Corrected frontend `app.spec.ts` import from `App` to `AppComponent` and replaced welcome text assertions with verification of component instantiation.
+  - Polyfilled `globalThis.crypto` and `subtle` with Node's native `webcrypto` in `encryption.service.spec.ts` for the JSDOM/Jest environment.
 - **Artifacts Updated:**
-   - backend/src/app/groups/groups.service.spec.ts
-   - backend/src/app/expenses/expenses.service.spec.ts
-   - backend/src/app/expenses/expenses.controller.spec.ts
-   - frontend/src/app/app.spec.ts
-   - frontend/src/app/services/encryption.service.spec.ts
-   - FinMate_Project_Specification.md
+  - backend/src/app/groups/groups.service.spec.ts
+  - backend/src/app/expenses/expenses.service.spec.ts
+  - backend/src/app/expenses/expenses.controller.spec.ts
+  - frontend/src/app/app.spec.ts
+  - frontend/src/app/services/encryption.service.spec.ts
+  - FinMate_Project_Specification.md
 - **Decisions:**
-   - Standardize polyfilling SubtleCrypto in frontend crypto tests using Node's standard `webcrypto` module.
+  - Standardize polyfilling SubtleCrypto in frontend crypto tests using Node's standard `webcrypto` module.
 - **Next Actions:**
-   - Implement the remaining database/service-level Server-Side Encryption (SSE) for expense amount columns as detailed in the Encryption Boundary Table.
+  - Implement the remaining database/service-level Server-Side Encryption (SSE) for expense amount columns as detailed in the Encryption Boundary Table.
 
 ### 2026-06-15 (Part 4)
+
 - **Summary:** Implemented database/service-level Server-Side Encryption (SSE) at rest for expense amount columns (`amount_total` in `expenses` and `amount_owed` in `expense_splits`).
 - **Changes Made:**
-   - Created `EntityEncryptionHolder` and `encryptionTransformer` value transformer in `@finmate/data-models`.
-   - Wired `EncryptionService` to register itself with the shared data-models holder on initialization.
-   - Updated `Expense` and `ExpenseSplit` entities to apply `encryptionTransformer` on amount columns.
-   - Refactored `getMonthlySummary`, `getYearlySummary`, and `getCategoryDistribution` in `ExpensesService` to perform in-memory decryption and grouping.
-   - Added a new database migration to alter amount columns from `DECIMAL(12,2)` to `VARCHAR(255)`.
-   - Added unit tests in `encryption.service.spec.ts` for the custom transformer.
+  - Created `EntityEncryptionHolder` and `encryptionTransformer` value transformer in `@finmate/data-models`.
+  - Wired `EncryptionService` to register itself with the shared data-models holder on initialization.
+  - Updated `Expense` and `ExpenseSplit` entities to apply `encryptionTransformer` on amount columns.
+  - Refactored `getMonthlySummary`, `getYearlySummary`, and `getCategoryDistribution` in `ExpensesService` to perform in-memory decryption and grouping.
+  - Added a new database migration to alter amount columns from `DECIMAL(12,2)` to `VARCHAR(255)`.
+  - Added unit tests in `encryption.service.spec.ts` for the custom transformer.
 - **Artifacts Updated:**
-   - shared/data-models/src/lib/encryption.transformer.ts
-   - shared/data-models/src/index.ts
-   - shared/data-models/src/lib/expense.entity.ts
-   - shared/data-models/src/lib/expense-split.entity.ts
-   - backend/src/app/encryption/encryption.service.ts
-   - backend/src/app/expenses/expenses.service.ts
-   - backend/src/app/app.module.ts
-   - backend/src/ormconfig.ts
-   - backend/src/app/encryption/encryption.service.spec.ts
-   - FinMate_Project_Specification.md
+  - shared/data-models/src/lib/encryption.transformer.ts
+  - shared/data-models/src/index.ts
+  - shared/data-models/src/lib/expense.entity.ts
+  - shared/data-models/src/lib/expense-split.entity.ts
+  - backend/src/app/encryption/encryption.service.ts
+  - backend/src/app/expenses/expenses.service.ts
+  - backend/src/app/app.module.ts
+  - backend/src/ormconfig.ts
+  - backend/src/app/encryption/encryption.service.spec.ts
+  - FinMate_Project_Specification.md
 - **Decisions:**
-   - Change database amount columns to `VARCHAR(255)` to accommodate base64 GCM ciphertexts.
-   - Decrypt and aggregate values in memory for analytics to avoid breaking SQL numeric operations.
+  - Change database amount columns to `VARCHAR(255)` to accommodate base64 GCM ciphertexts.
+  - Decrypt and aggregate values in memory for analytics to avoid breaking SQL numeric operations.
 - **Next Actions:**
-   - Verify application by executing tests.
+  - Verify application by executing tests.
 
 ---
 
@@ -1249,25 +1309,26 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 **Status:** Implementation (Coding) Phase
 
 ### 2026-06-15 (Part 5)
+
 - **Summary:** Completed frontend integrations, ledger features, zero-knowledge attachment uploads, dynamic category icons (Food, Travel, Utilities, Entertainment, Shopping, Housing, Others), and JWT rotation synchronization in NGXS state.
 - **Changes Made:**
-   - Coded state variables, pagination parameters, categories, and helpers in `GroupDetailComponent` to support the template ledger.
-   - Implemented dynamic category icon rendering for `Shopping` and `Housing` categories with standard custom SVG icons in ledger views and dashboard.
-   - Built zero-knowledge client-side encrypted file uploader simulation in `CreateExpenseModalComponent` and wired attachment list keys to creation/modification endpoints.
-   - Designed a new `RefreshTokenSuccess` action and handler in NGXS `AuthState` to synchronize access token rotation in store state upon background JWT refresh.
+  - Coded state variables, pagination parameters, categories, and helpers in `GroupDetailComponent` to support the template ledger.
+  - Implemented dynamic category icon rendering for `Shopping` and `Housing` categories with standard custom SVG icons in ledger views and dashboard.
+  - Built zero-knowledge client-side encrypted file uploader simulation in `CreateExpenseModalComponent` and wired attachment list keys to creation/modification endpoints.
+  - Designed a new `RefreshTokenSuccess` action and handler in NGXS `AuthState` to synchronize access token rotation in store state upon background JWT refresh.
 - **Artifacts Updated:**
-   - frontend/src/app/components/groups/group-detail.component.ts
-   - frontend/src/app/components/groups/create-expense-modal.component.ts
-   - frontend/src/app/components/groups/create-expense-modal.component.html
-   - frontend/src/app/components/dashboard/dashboard.component.html
-   - frontend/src/app/state/auth.state.ts
-   - frontend/src/app/interceptors/jwt.interceptor.ts
-   - FinMate_Project_Specification.md
+  - frontend/src/app/components/groups/group-detail.component.ts
+  - frontend/src/app/components/groups/create-expense-modal.component.ts
+  - frontend/src/app/components/groups/create-expense-modal.component.html
+  - frontend/src/app/components/dashboard/dashboard.component.html
+  - frontend/src/app/state/auth.state.ts
+  - frontend/src/app/interceptors/jwt.interceptor.ts
+  - FinMate_Project_Specification.md
 - **Decisions:**
-   - Propagate refreshed JWTs to the client global store synchronously to prevent stale requests from guards and auth selectors.
-   - Extend standard categories dropdown to include `Shopping` and `Housing` to cover real-life household group ledger scenarios.
+  - Propagate refreshed JWTs to the client global store synchronously to prevent stale requests from guards and auth selectors.
+  - Extend standard categories dropdown to include `Shopping` and `Housing` to cover real-life household group ledger scenarios.
 - **Next Actions:**
-   - Verify production deployment.
+  - Verify production deployment.
 
 ---
 
@@ -1277,67 +1338,71 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 **Status:** Verification Phase
 
 ### 2026-06-15 (Part 6)
+
 - **Summary:** Added backend unit tests for Phase 5 verification rules (currency matching, spectator splits, household month lock, carry-forward, restore policies).
 - **Changes Made:**
-   - Appended unit test suite inside [expenses.service.spec.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.spec.ts) to validate group currency mismatch, spectator split validation, household month lock logic, carry-forward summary math, and soft-delete restore windows.
+  - Appended unit test suite inside [expenses.service.spec.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.spec.ts) to validate group currency mismatch, spectator split validation, household month lock logic, carry-forward summary math, and soft-delete restore windows.
 - **Artifacts Updated:**
-   - [expenses.service.spec.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.spec.ts)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [expenses.service.spec.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.spec.ts)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Locked down core business rules on the backend with Jest tests before proceeding to final rollout.
+  - Locked down core business rules on the backend with Jest tests before proceeding to final rollout.
 - **Next Actions:**
-   - Prompt the user to run backend tests and verify the codebase.
+  - Prompt the user to run backend tests and verify the codebase.
 
 ---
 
 ### 2026-06-15 (Part 7)
+
 - **Summary:** Resolved 500 internal server errors in group history, deleted expenses, and settlements endpoints.
 - **Changes Made:**
-   - Modified [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts) to query `log.group` instead of `log.group_id` and order by `log.createdAt` instead of `log.created_at` in `getGroupHistory`.
-   - Modified [expenses.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts) to query `group.id` instead of `expense.group_id` and query/order by `expense.deletedAt` instead of `expense.deleted_at` in `listDeletedExpenses`.
-   - Modified [settlements.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/settlements/settlements.service.ts) to query `settlement.group` instead of `settlement.group_id` in `listSettlements`.
+  - Modified [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts) to query `log.group` instead of `log.group_id` and order by `log.createdAt` instead of `log.created_at` in `getGroupHistory`.
+  - Modified [expenses.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts) to query `group.id` instead of `expense.group_id` and query/order by `expense.deletedAt` instead of `expense.deleted_at` in `listDeletedExpenses`.
+  - Modified [settlements.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/settlements/settlements.service.ts) to query `settlement.group` instead of `settlement.group_id` in `listSettlements`.
 - **Artifacts Updated:**
-   - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
-   - [expenses.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts)
-   - [settlements.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/settlements/settlements.service.ts)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
+  - [expenses.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts)
+  - [settlements.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/settlements/settlements.service.ts)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Use TypeORM camelCase property names instead of database snake_case column names for both relation lookups and sorting conditions in QueryBuilder to prevent EntityPropertyNotFoundError.
+  - Use TypeORM camelCase property names instead of database snake_case column names for both relation lookups and sorting conditions in QueryBuilder to prevent EntityPropertyNotFoundError.
 - **Next Actions:**
-   - Prompt the user to re-test the history and deleted expenses endpoints.
+  - Prompt the user to re-test the history and deleted expenses endpoints.
 
 ---
 
 ### 2026-06-15 (Part 8)
+
 - **Summary:** Replaced browser's native `confirm()` alerts with a reusable custom confirmation modal component.
 - **Changes Made:**
-   - Created standalone [confirm-modal.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/common/confirm-modal.component.ts) with dynamic visual themes (danger, warning, info) and glassmorphism styling.
-   - Refactored [dashboard.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.ts) and [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.html) to confirm personal expense deletions using the new modal.
-   - Refactored [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/groups/group-detail.component.ts) to confirm group expense deletions using the new modal.
+  - Created standalone [confirm-modal.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/common/confirm-modal.component.ts) with dynamic visual themes (danger, warning, info) and glassmorphism styling.
+  - Refactored [dashboard.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.ts) and [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.html) to confirm personal expense deletions using the new modal.
+  - Refactored [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/groups/group-detail.component.ts) to confirm group expense deletions using the new modal.
 - **Artifacts Updated:**
-   - [confirm-modal.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/common/confirm-modal.component.ts)
-   - [dashboard.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.ts)
-   - [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.html)
-   - [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/groups/group-detail.component.ts)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [confirm-modal.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/common/confirm-modal.component.ts)
+  - [dashboard.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.ts)
+  - [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/dashboard/dashboard.component.html)
+  - [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/components/groups/group-detail.component.ts)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Standardize delete alerts onto a common ConfirmModal Component for consistent aesthetics, matching dark/light glass themes.
+  - Standardize delete alerts onto a common ConfirmModal Component for consistent aesthetics, matching dark/light glass themes.
 - **Next Actions:**
-   - Verify UI changes in local dev environment.
+  - Verify UI changes in local dev environment.
 
 ---
 
 ### 2026-06-15 (Part 9)
+
 - **Summary:** Added Rule 8 to AGENT_RULES.md to instruct the agent to output full code files in chat and request the user to write/create them to avoid token write overheads.
 - **Changes Made:**
-   - Appended Rule 8 to [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md).
+  - Appended Rule 8 to [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md).
 - **Artifacts Updated:**
-   - [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Avoid direct write_to_file calls for large files/components. Present complete code in chat with creation command instructions to manage token expenses.
+  - Avoid direct write_to_file calls for large files/components. Present complete code in chat with creation command instructions to manage token expenses.
 - **Next Actions:**
-   - Follow Rule 8 on all future component/file creations.
+  - Follow Rule 8 on all future component/file creations.
 
 ---
 
@@ -1347,338 +1412,355 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 **Status:** Verification Phase
 
 ### 2026-06-16 (Part 1)
+
 - **Summary:** Refactored the frontend architecture to isolate HTTP API calls, centralize common components, implement config-driven navigation, use lazy-loaded routes, and update rules.
 - **Changes Made:**
-   - Created dedicated services `GroupsService`, `ExpensesService`, and `FriendsService` in `frontend/src/app/services` to isolate all HTTP calls from components.
-   - Built a reusable `SubmitButtonComponent` under `common/submit-button/` to consistently handle form submission loaders and states.
-   - Centralized `ConflictDiffModalComponent` and `AnalyticsChartsComponent` under `common/` directories, updating imports and relative imports.
-   - Refactored `DashboardComponent`, `GroupsListComponent`, `GroupDetailComponent`, `FriendsComponent`, `LoginComponent`, and `RegisterComponent` to consume the new service layer and submit buttons.
-   - Dynamic nav items loop using `NAV_ITEMS` config introduced in `MainLayoutComponent` desktop/mobile views.
-   - Lazy-loaded leaf components configured in `app.routes.ts` (`loadComponent`).
-   - Added architectural decoupling, slicing, and lazy-loading rules to `AGENT_RULES.md`.
+  - Created dedicated services `GroupsService`, `ExpensesService`, and `FriendsService` in `frontend/src/app/services` to isolate all HTTP calls from components.
+  - Built a reusable `SubmitButtonComponent` under `common/submit-button/` to consistently handle form submission loaders and states.
+  - Centralized `ConflictDiffModalComponent` and `AnalyticsChartsComponent` under `common/` directories, updating imports and relative imports.
+  - Refactored `DashboardComponent`, `GroupsListComponent`, `GroupDetailComponent`, `FriendsComponent`, `LoginComponent`, and `RegisterComponent` to consume the new service layer and submit buttons.
+  - Dynamic nav items loop using `NAV_ITEMS` config introduced in `MainLayoutComponent` desktop/mobile views.
+  - Lazy-loaded leaf components configured in `app.routes.ts` (`loadComponent`).
+  - Added architectural decoupling, slicing, and lazy-loading rules to `AGENT_RULES.md`.
 - **Artifacts Updated:**
-   - `frontend/src/app/services/groups.service.ts`
-   - `frontend/src/app/services/expenses.service.ts`
-   - `frontend/src/app/services/friends.service.ts`
-   - `frontend/src/app/components/common/submit-button/submit-button.component.ts`
-   - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.ts`
-   - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.html`
-   - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.spec.ts`
-   - `frontend/src/app/components/common/analytics-charts/analytics-charts.component.ts`
-   - `frontend/src/app/components/layouts/main-layout.component.ts`
-   - `frontend/src/app/components/layouts/main-layout.component.html`
-   - `frontend/src/app/app.routes.ts`
-   - `frontend/src/app/components/dashboard/dashboard.component.ts`
-   - `frontend/src/app/components/groups/groups-list.component.ts`
-   - `frontend/src/app/components/groups/groups-list.component.html`
-   - `frontend/src/app/components/groups/group-detail.component.ts`
-   - `frontend/src/app/components/groups/create-expense-modal.component.ts`
-   - `frontend/src/app/components/groups/create-expense-modal.component.html`
-   - `frontend/src/app/components/friends/friends.component.ts`
-   - `frontend/src/app/components/auth/register.component.ts`
-   - `frontend/src/app/components/auth/register.component.html`
-   - `frontend/src/app/components/auth/login.component.ts`
-   - `frontend/src/app/components/auth/login.component.html`
-   - `frontend/src/app/interceptors/conflict-modal.service.ts`
-   - `AGENT_RULES.md`
-   - `FinMate_Project_Specification.md`
+  - `frontend/src/app/services/groups.service.ts`
+  - `frontend/src/app/services/expenses.service.ts`
+  - `frontend/src/app/services/friends.service.ts`
+  - `frontend/src/app/components/common/submit-button/submit-button.component.ts`
+  - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.ts`
+  - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.html`
+  - `frontend/src/app/components/common/conflict-diff-modal/conflict-diff-modal.component.spec.ts`
+  - `frontend/src/app/components/common/analytics-charts/analytics-charts.component.ts`
+  - `frontend/src/app/components/layouts/main-layout.component.ts`
+  - `frontend/src/app/components/layouts/main-layout.component.html`
+  - `frontend/src/app/app.routes.ts`
+  - `frontend/src/app/components/dashboard/dashboard.component.ts`
+  - `frontend/src/app/components/groups/groups-list.component.ts`
+  - `frontend/src/app/components/groups/groups-list.component.html`
+  - `frontend/src/app/components/groups/group-detail.component.ts`
+  - `frontend/src/app/components/groups/create-expense-modal.component.ts`
+  - `frontend/src/app/components/groups/create-expense-modal.component.html`
+  - `frontend/src/app/components/friends/friends.component.ts`
+  - `frontend/src/app/components/auth/register.component.ts`
+  - `frontend/src/app/components/auth/register.component.html`
+  - `frontend/src/app/components/auth/login.component.ts`
+  - `frontend/src/app/components/auth/login.component.html`
+  - `frontend/src/app/interceptors/conflict-modal.service.ts`
+  - `AGENT_RULES.md`
+  - `FinMate_Project_Specification.md`
 - **Decisions:**
-   - Leverage dynamic route loading to speed up initial bundle load.
-   - Decouple all data retrieval onto thin services to facilitate offline-first logic/indexing updates in future.
+  - Leverage dynamic route loading to speed up initial bundle load.
+  - Decouple all data retrieval onto thin services to facilitate offline-first logic/indexing updates in future.
 - **Next Actions:**
-   - Ask the user to run frontend test suite (`npx nx test frontend`) to verify the refactored code build.
+  - Ask the user to run frontend test suite (`npx nx test frontend`) to verify the refactored code build.
 
 ---
 
 ### 2026-06-18 (Part 1)
+
 - **Summary:** Updated Agent Working Rules to enforce requesting the user to run terminal commands for all use cases to save token expenses.
 - **Changes Made:**
-   - Modified Rule 7 in [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md) to require the agent to ask the user to execute all terminal commands rather than running them directly.
+  - Modified Rule 7 in [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md) to require the agent to ask the user to execute all terminal commands rather than running them directly.
 - **Artifacts Updated:**
-   - [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [AGENT_RULES.md](file:///g:/prvn/Projects/FinMate/AGENT_RULES.md)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Enforced a stricter policy on command execution where all terminal commands must be run by the user.
+  - Enforced a stricter policy on command execution where all terminal commands must be run by the user.
 - **Next Actions:**
-   - Prompt the user to run commands as needed.
+  - Prompt the user to run commands as needed.
 
 ### 2026-06-18 (Part 2)
+
 - **Summary:** Created consolidated Expenses Module plan and moved detailed CSV/XLSX schemas, Settlement Logic, and Concurrency scenarios out of the main specification file.
 - **Changes Made:**
-   - Created and populated [expsnsis-module-plan.md](file:///g:/prvn/Projects/FinMate/expsnsis-module-plan.md) with all entity schemas, DTO structures, calculations, and services.
-   - Removed detailed CSV/XLSX export/import schema tables and rules from the main project specification file, replacing them with a hyperlink reference to the new consolidated plan.
-   - Migrated detailed Settlement Logic (balance math, rounding behavior, tie-breakers, greedy debt matching pseudocode, and worked examples) to the module plan, leaving a summary link in the main spec.
-   - Migrated detailed Expense Concurrency (non-overlapping automerge worked scenario) to the module plan, leaving a reference link in the main spec.
+  - Created and populated [expsnsis-module-plan.md](file:///g:/prvn/Projects/FinMate/expsnsis-module-plan.md) with all entity schemas, DTO structures, calculations, and services.
+  - Removed detailed CSV/XLSX export/import schema tables and rules from the main project specification file, replacing them with a hyperlink reference to the new consolidated plan.
+  - Migrated detailed Settlement Logic (balance math, rounding behavior, tie-breakers, greedy debt matching pseudocode, and worked examples) to the module plan, leaving a summary link in the main spec.
+  - Migrated detailed Expense Concurrency (non-overlapping automerge worked scenario) to the module plan, leaving a reference link in the main spec.
 - **Artifacts Updated:**
-   - [expsnsis-module-plan.md](file:///g:/prvn/Projects/FinMate/expsnsis-module-plan.md)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [expsnsis-module-plan.md](file:///g:/prvn/Projects/FinMate/expsnsis-module-plan.md)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Keep the main project specification file high-level by moving all detailed expenses and settlement specs into the module plan file.
+  - Keep the main project specification file high-level by moving all detailed expenses and settlement specs into the module plan file.
 - **Next Actions:**
-   - Review the planned Group Member Invitation flow on the frontend.
+  - Review the planned Group Member Invitation flow on the frontend.
 
 ---
 
 ### 2026-06-18 (Part 3)
+
 - **Summary:** Updated specification domain models and core features to include group updates, lookup invitations, QR links, dashboard personal expenses, and household contribution features.
 - **Changes Made:**
-   - Updated `User` domain model in spec to include `username` and `phone_number`.
-   - Updated `Group` domain model in spec to include `invite_token`.
-   - Added new `GroupMemberContribution` domain model in spec.
-   - Added Core Features for multi-identifier invites, QR codes, invite dashboard manager, and household monthly contributions/carry-forward setting.
+  - Updated `User` domain model in spec to include `username` and `phone_number`.
+  - Updated `Group` domain model in spec to include `invite_token`.
+  - Added new `GroupMemberContribution` domain model in spec.
+  - Added Core Features for multi-identifier invites, QR codes, invite dashboard manager, and household monthly contributions/carry-forward setting.
 - **Artifacts Updated:**
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Expose carry-forward option as a single ON/OFF toggle in settings. Add a progress chart comparison widget to the main Group Dashboard.
+  - Expose carry-forward option as a single ON/OFF toggle in settings. Add a progress chart comparison widget to the main Group Dashboard.
 - **Next Actions:**
-   - Update `expsnsis-module-plan.md` with technical business logic and mathematical descriptions for household contributions and bar graphs.
+  - Update `expsnsis-module-plan.md` with technical business logic and mathematical descriptions for household contributions and bar graphs.
 
 ### 2026-06-18 (Part 4)
+
 - **Summary:** Implemented group member staged invitations queue, centralized application name, and added optional displayName to backend invite member process.
 - **Changes Made:**
-   - Created [app.constants.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/core/constants/app.constants.ts) to define central app name variable.
-   - Updated [MainLayoutComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts) and [AuthLayoutComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.ts) to bind dynamic app name properties to their respective templates.
-   - Updated `InviteMemberDto` in [group.dto.ts](file:///g:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/group.dto.ts) to support an optional `displayName`.
-   - Updated [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts) to save `displayName` on placeholder invited user creation.
-   - Refactored [GroupMembersComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts) and [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html) to stage invitations in a local queue, support custom search dropdown choices, include an inline "Add New Contact" modal, and bulk submit via `forkJoin`.
+  - Created [app.constants.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/core/constants/app.constants.ts) to define central app name variable.
+  - Updated [MainLayoutComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts) and [AuthLayoutComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.ts) to bind dynamic app name properties to their respective templates.
+  - Updated `InviteMemberDto` in [group.dto.ts](file:///g:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/group.dto.ts) to support an optional `displayName`.
+  - Updated [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts) to save `displayName` on placeholder invited user creation.
+  - Refactored [GroupMembersComponent](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts) and [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html) to stage invitations in a local queue, support custom search dropdown choices, include an inline "Add New Contact" modal, and bulk submit via `forkJoin`.
 - **Artifacts Updated:**
-   - [app.constants.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/core/constants/app.constants.ts)
-   - [main-layout.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts)
-   - [main-layout.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.html)
-   - [auth-layout.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.ts)
-   - [auth-layout.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.html)
-   - [group.dto.ts](file:///g:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/group.dto.ts)
-   - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
-   - [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts)
-   - [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [app.constants.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/core/constants/app.constants.ts)
+  - [main-layout.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts)
+  - [main-layout.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.html)
+  - [auth-layout.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.ts)
+  - [auth-layout.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/auth-layout.component.html)
+  - [group.dto.ts](file:///g:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/group.dto.ts)
+  - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
+  - [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts)
+  - [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Centralize app name for ease of rebranding.
-   - Enforce a staging phase for bulk invitations before calling backend APIs.
+  - Centralize app name for ease of rebranding.
+  - Enforce a staging phase for bulk invitations before calling backend APIs.
 - **Next Actions:**
-   - Prompt the user to run backend and frontend test suites.
+  - Prompt the user to run backend and frontend test suites.
 
 ### 2026-06-19
+
 - **Summary:** Added members list display to group invitations and pending dashboard invitations, and fixed groups service unit tests.
 - **Changes Made:**
-   - Modified `getInviteDetails` and `getPendingInvitations` in `groups.service.ts` to retrieve the active/invited group members list (mapping display names, clean emails, phone numbers, roles, and join status).
-   - Rendered the group members list on the frontend join group landing page (`join-group.component.html`) and inside the dashboard pending invitations banner (`dashboard.component.html`).
-   - Fixed `groups.service.spec.ts` unit tests by adding mock `user` objects to mock group members, preventing TypeError exceptions on `displayName` property checks.
+  - Modified `getInviteDetails` and `getPendingInvitations` in `groups.service.ts` to retrieve the active/invited group members list (mapping display names, clean emails, phone numbers, roles, and join status).
+  - Rendered the group members list on the frontend join group landing page (`join-group.component.html`) and inside the dashboard pending invitations banner (`dashboard.component.html`).
+  - Fixed `groups.service.spec.ts` unit tests by adding mock `user` objects to mock group members, preventing TypeError exceptions on `displayName` property checks.
 - **Artifacts Updated:**
-   - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
-   - [groups.service.spec.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.spec.ts)
-   - [join-group.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/join-group/join-group.component.html)
-   - [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [groups.service.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.ts)
+  - [groups.service.spec.ts](file:///g:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.spec.ts)
+  - [join-group.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/join-group/join-group.component.html)
+  - [dashboard.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Retrieve basic group member details (hiding dummy/placeholder email prefixes to ensure user privacy) so that invitees can review existing group members before deciding to accept.
-   - Standardize invitation details on both the direct link joining screen and the user's home dashboard banner.
+  - Retrieve basic group member details (hiding dummy/placeholder email prefixes to ensure user privacy) so that invitees can review existing group members before deciding to accept.
+  - Standardize invitation details on both the direct link joining screen and the user's home dashboard banner.
 - **Next Actions:**
-   - Ask the user to run backend tests again and check if everything passes.
+  - Ask the user to run backend tests again and check if everything passes.
 
 ### 2026-06-19 (Part 2)
+
 - **Summary:** Switched Household Target Contributions inputs to direct amounts (auto-calculating percentages with rounding adjustment) and added member role management settings.
 - **Changes Made:**
-   - Modified [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/group-detail/group-detail.component.ts) to display target monthly contribution amount inputs instead of percentage inputs, and implemented `calculatePercentagesFromAmounts` to dynamically compute percentages and distribute the rounding remainder so that they sum to exactly 100.00%.
-   - Updated [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts) to decode current user JWT and implement privilege checking helper methods (`canChangeRole`, `canRemoveMember`).
-   - Modified [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html) to render `<select>` dropdowns for changing roles or transferring ownership, and restricted member kicking to authorized users only.
+  - Modified [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/group-detail/group-detail.component.ts) to display target monthly contribution amount inputs instead of percentage inputs, and implemented `calculatePercentagesFromAmounts` to dynamically compute percentages and distribute the rounding remainder so that they sum to exactly 100.00%.
+  - Updated [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts) to decode current user JWT and implement privilege checking helper methods (`canChangeRole`, `canRemoveMember`).
+  - Modified [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html) to render `<select>` dropdowns for changing roles or transferring ownership, and restricted member kicking to authorized users only.
 - **Artifacts Updated:**
-   - [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/group-detail/group-detail.component.ts)
-   - [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts)
-   - [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [group-detail.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/pages/group-detail/group-detail.component.ts)
+  - [group-members.component.ts](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.ts)
+  - [group-members.component.html](file:///g:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/group-members/group-members.component.html)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Target monthly contributions are entered as money amounts in settings, but are calculated and stored as percentages summing to 100.00%.
-   - Role updates (Admin, Contributor/Member, Spectator, Viewer) and kick permissions are checked against standard member hierarchies (Admins cannot modify other Admins/Owners).
+  - Target monthly contributions are entered as money amounts in settings, but are calculated and stored as percentages summing to 100.00%.
+  - Role updates (Admin, Contributor/Member, Spectator, Viewer) and kick permissions are checked against standard member hierarchies (Admins cannot modify other Admins/Owners).
 - **Next Actions:**
-   - Ask the user to run frontend build commands to verify build health.
+  - Ask the user to run frontend build commands to verify build health.
 
 ### 2026-06-20
+
 - **Summary:** Consolidated project agent instructions into a single repository rule file.
 - **Changes Made:**
-   - Merged the existing project-specific agent rules with token-efficiency and information-first guidance.
-   - Resolved conflicting terminal-command guidance by allowing targeted command execution while preferring user-provided minimal output when information is missing.
-   - Preserved project-specific technology stack, coding standards, planning approval workflow, dependency verification, progress log, and verification requirements.
+  - Merged the existing project-specific agent rules with token-efficiency and information-first guidance.
+  - Resolved conflicting terminal-command guidance by allowing targeted command execution while preferring user-provided minimal output when information is missing.
+  - Preserved project-specific technology stack, coding standards, planning approval workflow, dependency verification, progress log, and verification requirements.
 - **Artifacts Updated:**
-   - [agent_rules.md](file:///g:/prvn/Projects/FinMate/agent_rules.md)
-   - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [agent_rules.md](file:///g:/prvn/Projects/FinMate/agent_rules.md)
+  - [FinMate_Project_Specification.md](file:///g:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Use `agent_rules.md` as the single source of truth for AI agent behavior across Codex, Claude Code, Cursor, Roo Code, Cline, OpenHands, Copilot, and similar tools.
-   - Remove duplicate root rule files to avoid conflicting instructions.
+  - Use `agent_rules.md` as the single source of truth for AI agent behavior across Codex, Claude Code, Cursor, Roo Code, Cline, OpenHands, Copilot, and similar tools.
+  - Remove duplicate root rule files to avoid conflicting instructions.
 - **Next Actions:**
-   - Use `agent_rules.md` for future agent workflow, planning, implementation, and verification decisions.
+  - Use `agent_rules.md` for future agent workflow, planning, implementation, and verification decisions.
 
 ### 2026-06-20 (Part 2)
+
 - **Summary:** Completed architecture remediation cleanup items from `task.md` for Angular module imports, frontend service typing, backend auth typing, and expense-service import hygiene.
 - **Changes Made:**
-   - Replaced production `CommonModule` imports with specific Angular imports in standalone frontend components.
-   - Added shared API response contracts in `@finmate/data-models` and applied them to auth, friends, groups, expenses, dashboard, group detail, invite, and conflict-resolution flows.
-   - Added backend `RequestWithUser` and `JwtPayload` interfaces and removed `any` typing from backend auth controller, strategy, guard, and token handling.
-   - Removed JWT fallback secrets from auth startup paths and replaced the expense service runtime `require()` with a top-level import.
-   - Deleted the stale `frontend/src/app/nx-welcome.ts` component.
+  - Replaced production `CommonModule` imports with specific Angular imports in standalone frontend components.
+  - Added shared API response contracts in `@finmate/data-models` and applied them to auth, friends, groups, expenses, dashboard, group detail, invite, and conflict-resolution flows.
+  - Added backend `RequestWithUser` and `JwtPayload` interfaces and removed `any` typing from backend auth controller, strategy, guard, and token handling.
+  - Removed JWT fallback secrets from auth startup paths and replaced the expense service runtime `require()` with a top-level import.
+  - Deleted the stale `frontend/src/app/nx-welcome.ts` component.
 - **Artifacts Updated:**
-   - [api-responses.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/lib/api-responses.ts)
-   - [index.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/index.ts)
-   - [auth.service.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/auth.service.ts)
-   - [auth.controller.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/auth.controller.ts)
-   - [jwt.strategy.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/strategies/jwt.strategy.ts)
-   - [jwt-auth.guard.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/guards/jwt-auth.guard.ts)
-   - [request-with-user.interface.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/common/interfaces/request-with-user.interface.ts)
-   - [jwt-payload.interface.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/common/interfaces/jwt-payload.interface.ts)
-   - [expenses.service.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts)
-   - [task.md](file:///d:/prvn/Projects/FinMate/task.md)
+  - [api-responses.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/lib/api-responses.ts)
+  - [index.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/index.ts)
+  - [auth.service.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/auth.service.ts)
+  - [auth.controller.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/auth.controller.ts)
+  - [jwt.strategy.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/strategies/jwt.strategy.ts)
+  - [jwt-auth.guard.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/auth/guards/jwt-auth.guard.ts)
+  - [request-with-user.interface.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/common/interfaces/request-with-user.interface.ts)
+  - [jwt-payload.interface.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/common/interfaces/jwt-payload.interface.ts)
+  - [expenses.service.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.service.ts)
+  - [task.md](file:///d:/prvn/Projects/FinMate/task.md)
 - **Decisions:**
-   - Treat full `ExpensesService` and `GroupsService` decomposition as a separate architecture refactor because it is larger than the focused cleanup pass.
-   - Leave remaining test mock casts for a separate test-hardening pass since production type-safety targets are clean.
+  - Treat full `ExpensesService` and `GroupsService` decomposition as a separate architecture refactor because it is larger than the focused cleanup pass.
+  - Leave remaining test mock casts for a separate test-hardening pass since production type-safety targets are clean.
 - **Next Actions:**
-   - Implement Phase 3 service decomposition and frontend `ErrorInterceptor` in a dedicated approved task.
+  - Implement Phase 3 service decomposition and frontend `ErrorInterceptor` in a dedicated approved task.
 
 ### 2026-06-20 (Part 3)
+
 - **Summary:** Implemented the remaining Phase 3 architecture remediation tasks from `task.md`.
 - **Changes Made:**
-   - Added focused expense services for CRUD, analytics, carry-forward/deleted-expense access, and access helpers, then wired expense controllers to the focused services.
-   - Added focused group services for CRUD, membership/invites, audit history, and household contributions, then wired group controllers to those services.
-   - Added a backend groups `dto/` barrel for local controller DTO imports.
-   - Added a global Angular `errorInterceptor`, registered it in `app.config.ts`, and added a focused unit test for structured API error events.
-   - Persisted the main layout theme preference in `localStorage`.
-   - Added a reusable `IconComponent` and moved main layout navigation/theme SVG path rendering through it.
-   - Marked the remaining Phase 3 tasks complete in `task.md`.
+  - Added focused expense services for CRUD, analytics, carry-forward/deleted-expense access, and access helpers, then wired expense controllers to the focused services.
+  - Added focused group services for CRUD, membership/invites, audit history, and household contributions, then wired group controllers to those services.
+  - Added a backend groups `dto/` barrel for local controller DTO imports.
+  - Added a global Angular `errorInterceptor`, registered it in `app.config.ts`, and added a focused unit test for structured API error events.
+  - Persisted the main layout theme preference in `localStorage`.
+  - Added a reusable `IconComponent` and moved main layout navigation/theme SVG path rendering through it.
+  - Marked the remaining Phase 3 tasks complete in `task.md`.
 - **Artifacts Updated:**
-   - [expenses/services](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/services)
-   - [groups/services](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/services)
-   - [groups/dto/index.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/dto/index.ts)
-   - [error.interceptor.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/interceptors/error.interceptor.ts)
-   - [error.interceptor.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/interceptors/error.interceptor.spec.ts)
-   - [icon.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/icon/icon.component.ts)
-   - [main-layout.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts)
-   - [main-layout.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.html)
-   - [task.md](file:///d:/prvn/Projects/FinMate/task.md)
+  - [expenses/services](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/services)
+  - [groups/services](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/services)
+  - [groups/dto/index.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/dto/index.ts)
+  - [error.interceptor.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/interceptors/error.interceptor.ts)
+  - [error.interceptor.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/interceptors/error.interceptor.spec.ts)
+  - [icon.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/icon/icon.component.ts)
+  - [main-layout.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.ts)
+  - [main-layout.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/layouts/main-layout.component.html)
+  - [task.md](file:///d:/prvn/Projects/FinMate/task.md)
 - **Decisions:**
-   - Preserve the existing broad backend service APIs as compatibility facades while routing controllers through focused services to reduce route-level responsibility coupling safely.
-   - Emit normalized frontend HTTP errors as a browser event so UI notification handling can subscribe without coupling the interceptor to a specific toast implementation.
+  - Preserve the existing broad backend service APIs as compatibility facades while routing controllers through focused services to reduce route-level responsibility coupling safely.
+  - Emit normalized frontend HTTP errors as a browser event so UI notification handling can subscribe without coupling the interceptor to a specific toast implementation.
 - **Next Actions:**
-   - Continue migrating internal logic from the compatibility facades into the focused backend services in smaller follow-up changes if deeper service-size reduction is required.
+  - Continue migrating internal logic from the compatibility facades into the focused backend services in smaller follow-up changes if deeper service-size reduction is required.
 
 ### 2026-06-20 (Part 4)
+
 - **Summary:** Updated repository agent rules with explicit efficiency, approval, exploration, and scope-control guidance.
 - **Changes Made:**
-   - Added a dedicated approval requirements section covering package installs, dependencies, migrations, deletions, renames, architecture changes, large edits, boilerplate, and new frameworks.
-   - Added a dedicated repository exploration section requiring targeted file reads with clear task relevance.
-   - Removed duplicate exploration bullets from token-efficiency guidance and tightened dependency approval wording.
+  - Added a dedicated approval requirements section covering package installs, dependencies, migrations, deletions, renames, architecture changes, large edits, boilerplate, and new frameworks.
+  - Added a dedicated repository exploration section requiring targeted file reads with clear task relevance.
+  - Removed duplicate exploration bullets from token-efficiency guidance and tightened dependency approval wording.
 - **Artifacts Updated:**
-   - [agent_rules.md](file:///d:/prvn/Projects/FinMate/agent_rules.md)
-   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [agent_rules.md](file:///d:/prvn/Projects/FinMate/agent_rules.md)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Preserve existing FinMate stack, coding standards, architecture decisions, implementation approval workflow, and progress-log requirements.
-   - Keep project-specific workflow rules higher priority than generic efficiency guidance.
+  - Preserve existing FinMate stack, coding standards, architecture decisions, implementation approval workflow, and progress-log requirements.
+  - Keep project-specific workflow rules higher priority than generic efficiency guidance.
 - **Next Actions:**
-   - Use `agent_rules.md` as the authoritative source for future agent behavior.
+  - Use `agent_rules.md` as the authoritative source for future agent behavior.
 
 ### 2026-06-20 (Part 5)
+
 - **Summary:** Fixed the dashboard greeting to prefer the authenticated user's display name over the email prefix.
 - **Changes Made:**
-   - Updated `DashboardComponent` to set `userName` from `user.displayName` when available, falling back to the email local-part only when no display name exists.
+  - Updated `DashboardComponent` to set `userName` from `user.displayName` when available, falling back to the email local-part only when no display name exists.
 - **Artifacts Updated:**
-   - [frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts)
-   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Keep the change localized to the dashboard instead of broadening auth state or test data shapes.
+  - Keep the change localized to the dashboard instead of broadening auth state or test data shapes.
 - **Next Actions:**
-   - Re-run the focused dashboard unit test to confirm the expectation now matches the component behavior.
+  - Re-run the focused dashboard unit test to confirm the expectation now matches the component behavior.
 
 ### 2026-06-20 (Part 6)
+
 - **Summary:** Restored backend test compatibility after the expenses service split and groups transaction refactor.
 - **Changes Made:**
-   - Updated `ExpensesController` unit test providers to mock `ExpensesCrudService` and `ExpensesAnalyticsService` instead of the pre-split aggregate service.
-   - Added a `getRepository()` stub to the mocked TypeORM transaction manager used by the groups service ownership-transfer test.
+  - Updated `ExpensesController` unit test providers to mock `ExpensesCrudService` and `ExpensesAnalyticsService` instead of the pre-split aggregate service.
+  - Added a `getRepository()` stub to the mocked TypeORM transaction manager used by the groups service ownership-transfer test.
 - **Artifacts Updated:**
-   - [backend/src/app/expenses/expenses.controller.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.controller.spec.ts)
-   - [backend/src/app/groups/groups.service.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.spec.ts)
-   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [backend/src/app/expenses/expenses.controller.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/expenses.controller.spec.ts)
+  - [backend/src/app/groups/groups.service.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/groups/groups.service.spec.ts)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Keep the fix confined to test scaffolding rather than changing controller/service behavior.
+  - Keep the fix confined to test scaffolding rather than changing controller/service behavior.
 - **Next Actions:**
-   - Re-run `npx.cmd nx test backend` to verify both previously failing suites pass.
+  - Re-run `npx.cmd nx test backend` to verify both previously failing suites pass.
 
 ---
 
 ### 2026-06-21 (Part 1)
+
 - **Summary:** Updated repository agent rules with UI component reuse guidelines (Rule of Three & Card layouts) and corrected the shared components directory path.
 - **Changes Made:**
-   - Updated component reuse guidelines under Angular coding standards in [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md) to explicitly require common shared components when any card layout is repeated 3 or more times across different components.
+  - Updated component reuse guidelines under Angular coding standards in [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md) to explicitly require common shared components when any card layout is repeated 3 or more times across different components.
 - **Artifacts Updated:**
-   - [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md)
-   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Enforce the "Rule of Three" and card layout replication threshold of 3+ times to guarantee visual/behavioral consistency across different pages/features.
+  - Enforce the "Rule of Three" and card layout replication threshold of 3+ times to guarantee visual/behavioral consistency across different pages/features.
 - **Next Actions:**
-   - Adhere to the updated component and card reuse rules in future UI implementations.
+  - Adhere to the updated component and card reuse rules in future UI implementations.
 
 ---
 
 ### 2026-06-21 (Part 2)
+
 - **Summary:** Extracted repeated statistics card elements into a reusable shared component, split into separate TS/HTML/Spec files, fixed dashboard unit tests, added form controls reuse guidelines, and updated PWA meta capability tags in index.html.
 - **Changes Made:**
-   - Created standalone [StatsCardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.ts) leveraging Signal inputs, separating its template into [stats-card.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.html) and adding unit tests in [stats-card.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.spec.ts).
-   - Refactored [DashboardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts) and [dashboard.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html) to bind stats cards to `<app-stats-card>`.
-   - Refactored [FriendsComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/friends/pages/friends/friends.component.ts) to bind summary cards to `<app-stats-card>`.
-   - Updated [dashboard.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.spec.ts) to mock `activeTab`, `showCreateExpenseModal`, and `expenseCreated$` to fix unit test failures.
-   - Appended mobile web-app capability `<meta>` tag to [index.html](file:///d:/prvn/Projects/FinMate/frontend/src/index.html).
-   - Added guidelines for form controls reuse (button, input, select) to [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md).
+  - Created standalone [StatsCardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.ts) leveraging Signal inputs, separating its template into [stats-card.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.html) and adding unit tests in [stats-card.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.spec.ts).
+  - Refactored [DashboardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts) and [dashboard.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html) to bind stats cards to `<app-stats-card>`.
+  - Refactored [FriendsComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/friends/pages/friends/friends.component.ts) to bind summary cards to `<app-stats-card>`.
+  - Updated [dashboard.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.spec.ts) to mock `activeTab`, `showCreateExpenseModal`, and `expenseCreated$` to fix unit test failures.
+  - Appended mobile web-app capability `<meta>` tag to [index.html](file:///d:/prvn/Projects/FinMate/frontend/src/index.html).
+  - Added guidelines for form controls reuse (button, input, select) to [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md).
 - **Artifacts Updated:**
-   - [StatsCardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.ts) [NEW]
-   - [stats-card.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.html) [NEW]
-   - [stats-card.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.spec.ts) [NEW]
-   - [dashboard.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts)
-   - [dashboard.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html)
-   - [dashboard.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.spec.ts)
-   - [friends.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/friends/pages/friends/friends.component.ts)
-   - [index.html](file:///d:/prvn/Projects/FinMate/frontend/src/index.html)
-   - [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md)
-   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [StatsCardComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.ts) [NEW]
+  - [stats-card.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.html) [NEW]
+  - [stats-card.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/shared/components/stats-card/stats-card.component.spec.ts) [NEW]
+  - [dashboard.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts)
+  - [dashboard.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html)
+  - [dashboard.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.spec.ts)
+  - [friends.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/friends/pages/friends/friends.component.ts)
+  - [index.html](file:///d:/prvn/Projects/FinMate/frontend/src/index.html)
+  - [AGENT_RULES.md](file:///d:/prvn/Projects/FinMate/AGENT_RULES.md)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Standardize summary metrics onto `StatsCardComponent` to keep styling and layouts uniform.
-   - Separate component code templates and require testing `.spec.ts` files to ensure robust testing coverage in the frontend suite.
-   - Restrict custom form component wrappers to complex dropdowns and status-aware buttons, preferring CSS classes/Tailwind on native inputs to avoid ControlValueAccessor boilerplate.
+  - Standardize summary metrics onto `StatsCardComponent` to keep styling and layouts uniform.
+  - Separate component code templates and require testing `.spec.ts` files to ensure robust testing coverage in the frontend suite.
+  - Restrict custom form component wrappers to complex dropdowns and status-aware buttons, preferring CSS classes/Tailwind on native inputs to avoid ControlValueAccessor boilerplate.
 - **Next Actions:**
-    - Verify frontend build and run frontend tests.
+  - Verify frontend build and run frontend tests.
 
 ---
 
 ### 2026-06-21 (Part 3)
+
 - **Summary:** Integrated zero-knowledge client-side encryption into the Expenses Module. Transaction titles and descriptions are now encrypted locally before transmission and decrypted locally on retrieval, keeping them private from the backend.
 - **Changes Made:**
-   - Added key caching (`deriveAndStoreKey`, `loadKeyFromSession`, `clearKey`, `getKey`) with `sessionStorage` persistence in JWK format to [encryption.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.ts).
-   - Set derived key `extractable: true` for JWK export/import across page refreshes.
-   - Integrated master key derivation on login and clearance on logout in [auth.state.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/auth/auth.state.ts).
-   - Added `encryptPayload` helper and transparent encrypt/decrypt in `createExpense`, `updateExpense`, `getExpenses`, and `restoreExpense` in [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts).
-   - Fixed relative import paths in `expenses.service.ts` (4-level → 3-level for `core/` imports).
-   - Added unit tests for key caching lifecycle in [encryption.service.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.spec.ts).
+  - Added key caching (`deriveAndStoreKey`, `loadKeyFromSession`, `clearKey`, `getKey`) with `sessionStorage` persistence in JWK format to [encryption.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.ts).
+  - Set derived key `extractable: true` for JWK export/import across page refreshes.
+  - Integrated master key derivation on login and clearance on logout in [auth.state.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/auth/auth.state.ts).
+  - Added `encryptPayload` helper and transparent encrypt/decrypt in `createExpense`, `updateExpense`, `getExpenses`, and `restoreExpense` in [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts).
+  - Fixed relative import paths in `expenses.service.ts` (4-level → 3-level for `core/` imports).
+  - Added unit tests for key caching lifecycle in [encryption.service.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.spec.ts).
 - **Artifacts Updated:**
-   - [encryption.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.ts)
-   - [encryption.service.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.spec.ts)
-   - [auth.state.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/auth/auth.state.ts)
-   - [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts)
-   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [encryption.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.ts)
+  - [encryption.service.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.spec.ts)
+  - [auth.state.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/auth/auth.state.ts)
+  - [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Store derived key in `sessionStorage` (JWK format) scoped per user email to survive page refreshes within a tab session without re-prompting for password.
-   - Encryption failures in `getExpenses` silently return the original (encrypted) expense to avoid breaking the UI when decryption keys are unavailable.
+  - Store derived key in `sessionStorage` (JWK format) scoped per user email to survive page refreshes within a tab session without re-prompting for password.
+  - Encryption failures in `getExpenses` silently return the original (encrypted) expense to avoid breaking the UI when decryption keys are unavailable.
 - **Next Actions:**
-   - Manual verification: login, create expense, confirm encrypted payloads in Network tab, and verify decrypted display in UI.
+  - Manual verification: login, create expense, confirm encrypted payloads in Network tab, and verify decrypted display in UI.
 
 ---
 
 ### 2026-06-22 (Part 1)
+
 - **Summary:** Installed and configured Swagger on the Nest.js backend with Helmet Content Security Policy compatibility.
 - **Changes Made:**
-   - Installed `@nestjs/swagger` and `swagger-ui-express` dependencies in root [package.json](file:///d:/prvn/Projects/FinMate/package.json).
-   - Configured Swagger DocumentBuilder and initialization on path `/docs` in [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts).
-   - Modified Helmet security headers configuration in [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts) to adjust CSP directives (adding `'unsafe-inline'` to `styleSrc` and `scriptSrc`, and updating `imgSrc`) so Swagger UI inline resources load successfully.
+  - Installed `@nestjs/swagger` and `swagger-ui-express` dependencies in root [package.json](file:///d:/prvn/Projects/FinMate/package.json).
+  - Configured Swagger DocumentBuilder and initialization on path `/docs` in [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts).
+  - Modified Helmet security headers configuration in [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts) to adjust CSP directives (adding `'unsafe-inline'` to `styleSrc` and `scriptSrc`, and updating `imgSrc`) so Swagger UI inline resources load successfully.
 - **Artifacts Updated:**
-   - [package.json](file:///d:/prvn/Projects/FinMate/package.json)
-   - [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts)
-   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+  - [package.json](file:///d:/prvn/Projects/FinMate/package.json)
+  - [main.ts](file:///d:/prvn/Projects/FinMate/backend/src/main.ts)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-   - Customize Helmet's global Content Security Policy directives to support Swagger UI's inline styles and scripts rather than disabling CSP completely, preserving API security.
+  - Customize Helmet's global Content Security Policy directives to support Swagger UI's inline styles and scripts rather than disabling CSP completely, preserving API security.
 - **Next Actions:**
-   - Run the backend service and test the `/docs` UI.
+  - Run the backend service and test the `/docs` UI.

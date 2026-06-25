@@ -53,7 +53,9 @@ export class AddRecurringExpenses1718500000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_recurring_expenses_occurrence"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_recurring_expenses_occurrence"`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "recurring_expense_splits"`);
     await queryRunner.query(`DROP TABLE IF EXISTS "recurring_expenses"`);
   }

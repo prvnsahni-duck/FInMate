@@ -18,7 +18,11 @@ export class ExpensesCarryForwardService {
     groupId: string,
     ledgerMonth: string,
   ): Promise<any[]> {
-    return this.expensesService.getCarryForwardSummary(userId, groupId, ledgerMonth);
+    return this.expensesService.getCarryForwardSummary(
+      userId,
+      groupId,
+      ledgerMonth,
+    );
   }
 
   async closeMonth(
@@ -35,7 +39,11 @@ export class ExpensesCarryForwardService {
     page: number,
     limit: number,
   ): Promise<PaginatedResponse<Record<string, unknown>>> {
-    return this.expensesService.listDeletedExpenses(userId, groupId, page, limit);
+    return this.expensesService.listDeletedExpenses(
+      userId,
+      groupId,
+      page,
+      limit,
+    );
   }
 }
-

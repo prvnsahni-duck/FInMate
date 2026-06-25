@@ -5,7 +5,7 @@ import { AnalyticsChartsComponent } from '../../../groups/components/analytics-c
   selector: 'app-dashboard-analytics',
   standalone: true,
   imports: [AnalyticsChartsComponent],
-  templateUrl: './dashboard-analytics.component.html'
+  templateUrl: './dashboard-analytics.component.html',
 })
 export class DashboardAnalyticsComponent {
   @Input() userProfile: any = null;

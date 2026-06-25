@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AiService } from './ai.service';
 import { ConfigService } from '@nestjs/config';
-import { BadRequestException, GatewayTimeoutException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  GatewayTimeoutException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import axios from 'axios';
 
 jest.mock('axios');
@@ -37,7 +41,8 @@ describe('AiService', () => {
 
   describe('redactUuids', () => {
     it('should replace single and multiple UUIDs with [REDACTED_ID]', () => {
-      const input = 'User 12345678-abcd-1234-abcd-1234567890ab belongs to group 87654321-4321-4321-4321-1234567890cd.';
+      const input =
+        'User 12345678-abcd-1234-abcd-1234567890ab belongs to group 87654321-4321-4321-4321-1234567890cd.';
       const expected = 'User [REDACTED_ID] belongs to group [REDACTED_ID].';
       expect(service.redactUuids(input)).toBe(expected);
     });
@@ -59,7 +64,9 @@ describe('AiService', () => {
       // Re-instantiate service to read the new config value
       const testService = new AiService(configService);
 
-      await expect(testService.callOpenAiProxy('hello')).rejects.toThrow(BadRequestException);
+      await expect(testService.callOpenAiProxy('hello')).rejects.toThrow(
+        BadRequestException,
+      );
       try {
         await testService.callOpenAiProxy('hello');
       } catch (err: any) {
@@ -71,8 +78,12 @@ describe('AiService', () => {
       configService.get.mockReturnValue('sk-key123');
       const testService = new AiService(configService);
 
-      await expect(testService.callOpenAiProxy('')).rejects.toThrow(BadRequestException);
-      await expect(testService.callOpenAiProxy('   ')).rejects.toThrow(BadRequestException);
+      await expect(testService.callOpenAiProxy('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(testService.callOpenAiProxy('   ')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should call OpenAI API, redact inputs, and return content reply successfully', async () => {
@@ -92,10 +103,16 @@ describe('AiService', () => {
       };
       mockedAxios.post.mockResolvedValueOnce(mockResponse);
 
-      const prompt = 'Analyze group 12345678-abcd-1234-abcd-1234567890ab receipt.';
-      const systemInstruction = 'You are a bot helper for user 87654321-4321-4321-4321-1234567890cd.';
+      const prompt =
+        'Analyze group 12345678-abcd-1234-abcd-1234567890ab receipt.';
+      const systemInstruction =
+        'You are a bot helper for user 87654321-4321-4321-4321-1234567890cd.';
 
-      const result = await testService.callOpenAiProxy(prompt, systemInstruction, 'gpt-4');
+      const result = await testService.callOpenAiProxy(
+        prompt,
+        systemInstruction,
+        'gpt-4',
+      );
 
       expect(result.text).toBe('Here is your receipt category: Food.');
       expect(mockedAxios.post).toHaveBeenCalledTimes(1);
@@ -104,7 +121,10 @@ describe('AiService', () => {
         {
           model: 'gpt-4',
           messages: [
-            { role: 'system', content: 'You are a bot helper for user [REDACTED_ID].' },
+            {
+              role: 'system',
+              content: 'You are a bot helper for user [REDACTED_ID].',
+            },
             { role: 'user', content: 'Analyze group [REDACTED_ID] receipt.' },
           ],
         },
@@ -112,7 +132,7 @@ describe('AiService', () => {
           headers: expect.objectContaining({
             Authorization: 'Bearer sk-key123',
           }),
-        })
+        }),
       );
     });
 

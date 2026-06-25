@@ -9,7 +9,7 @@ describe('DashboardSettingsComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [DashboardSettingsComponent],
-      schemas: [NO_ERRORS_SCHEMA]
+      schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DashboardSettingsComponent);
@@ -19,7 +19,7 @@ describe('DashboardSettingsComponent', () => {
     component.newBudget = 2000;
     component.currencyOptions = [
       { value: 'USD', label: 'USD ($)' },
-      { value: 'EUR', label: 'EUR (€)' }
+      { value: 'EUR', label: 'EUR (€)' },
     ];
   });
 
@@ -32,7 +32,7 @@ describe('DashboardSettingsComponent', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     const inputs = compiled.querySelectorAll('input[type="number"]');
-    
+
     // Monthly Income input
     expect((inputs[0] as HTMLInputElement).value).toBe('5000');
     // Monthly Budget input
@@ -42,10 +42,10 @@ describe('DashboardSettingsComponent', () => {
   it('should emit saveIncomeEvent when save button is clicked', () => {
     fixture.detectChanges();
     const emitSpy = jest.spyOn(component.saveIncomeEvent, 'emit');
-    
+
     const saveBtn = fixture.nativeElement.querySelector('button');
     saveBtn.click();
-    
+
     expect(emitSpy).toHaveBeenCalled();
   });
 });

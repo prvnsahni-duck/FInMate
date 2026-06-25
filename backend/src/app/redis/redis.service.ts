@@ -1,4 +1,10 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient, RedisClientType } from 'redis';
 
@@ -8,21 +14,22 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client!: RedisClientType;
 
   constructor(private readonly configService: ConfigService) {
-    let url = this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
-    
+    let url =
+      this.configService.get<string>('REDIS_URL') || 'redis://localhost:6379';
+
     // Clean up surrounding quotes and whitespace
     url = url.trim().replace(/^['"]|['"]$/g, '');
-    
+
     // Auto-prefix protocol if missing
     if (!url.startsWith('redis://') && !url.startsWith('rediss://')) {
       url = `redis://${url}`;
     }
-    
+
     const maskedUrl = url.replace(/:[^:@\s]+@/, ':****@');
     this.logger.log(`Initializing Redis client with URL: ${maskedUrl}`);
-    
+
     this.client = createClient({ url });
-    
+
     this.client.on('error', (err) => {
       this.logger.error(`Redis client error: ${err.message}`, err.stack);
     });
@@ -33,7 +40,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       await this.client.connect();
       this.logger.log('Connected to Redis successfully');
     } catch (err: any) {
-      this.logger.error(`Failed to connect to Redis: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to connect to Redis: ${err.message}`,
+        err.stack,
+      );
     }
   }
 
@@ -42,7 +52,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       await this.client.disconnect();
       this.logger.log('Disconnected from Redis');
     } catch (err: any) {
-      this.logger.error(`Failed to disconnect from Redis: ${err.message}`, err.stack);
+      this.logger.error(
+        `Failed to disconnect from Redis: ${err.message}`,
+        err.stack,
+      );
     }
   }
 
@@ -54,8 +67,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         await this.client.set(key, value);
       }
     } catch (err: any) {
-      this.logger.error(`Redis set operation failed: ${err.message}`, err.stack);
-      throw new ServiceUnavailableException('Cache service is temporarily unavailable');
+      this.logger.error(
+        `Redis set operation failed: ${err.message}`,
+        err.stack,
+      );
+      throw new ServiceUnavailableException(
+        'Cache service is temporarily unavailable',
+      );
     }
   }
 
@@ -63,8 +81,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try {
       return (await this.client.get(key)) as any;
     } catch (err: any) {
-      this.logger.error(`Redis get operation failed: ${err.message}`, err.stack);
-      throw new ServiceUnavailableException('Cache service is temporarily unavailable');
+      this.logger.error(
+        `Redis get operation failed: ${err.message}`,
+        err.stack,
+      );
+      throw new ServiceUnavailableException(
+        'Cache service is temporarily unavailable',
+      );
     }
   }
 
@@ -72,12 +95,21 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.client.del(key);
     } catch (err: any) {
-      this.logger.error(`Redis del operation failed: ${err.message}`, err.stack);
-      throw new ServiceUnavailableException('Cache service is temporarily unavailable');
+      this.logger.error(
+        `Redis del operation failed: ${err.message}`,
+        err.stack,
+      );
+      throw new ServiceUnavailableException(
+        'Cache service is temporarily unavailable',
+      );
     }
   }
 
-  async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+  async setNx(
+    key: string,
+    value: string,
+    ttlSeconds: number,
+  ): Promise<boolean> {
     try {
       const result = await this.client.set(key, value, {
         NX: true,
@@ -85,7 +117,10 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       });
       return result === 'OK';
     } catch (err: any) {
-      this.logger.error(`Redis setNx operation failed: ${err.message}`, err.stack);
+      this.logger.error(
+        `Redis setNx operation failed: ${err.message}`,
+        err.stack,
+      );
       return false;
     }
   }

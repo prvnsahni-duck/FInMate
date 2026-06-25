@@ -24,7 +24,9 @@ export interface CategoryTotal {
 export class ExpensesAnalyticsService {
   constructor(private readonly expensesService: ExpensesService) {}
 
-  async getMonthlySummary(filter: AnalyticsFilter & { year: number }): Promise<MonthlyTotal[]> {
+  async getMonthlySummary(
+    filter: AnalyticsFilter & { year: number },
+  ): Promise<MonthlyTotal[]> {
     return this.expensesService.getMonthlySummary(filter);
   }
 
@@ -32,7 +34,9 @@ export class ExpensesAnalyticsService {
     return this.expensesService.getYearlySummary(filter);
   }
 
-  async getCategoryDistribution(filter: AnalyticsFilter): Promise<CategoryTotal[]> {
+  async getCategoryDistribution(
+    filter: AnalyticsFilter,
+  ): Promise<CategoryTotal[]> {
     return this.expensesService.getCategoryDistribution(filter);
   }
 
@@ -43,4 +47,3 @@ export class ExpensesAnalyticsService {
     return this.expensesService.getCombinedMonthlyAnalytics(userId, month);
   }
 }
-

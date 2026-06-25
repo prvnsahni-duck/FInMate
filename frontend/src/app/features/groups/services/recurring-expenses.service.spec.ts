@@ -1,5 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import {
+  HttpClientTestingModule,
+  HttpTestingController,
+} from '@angular/common/http/testing';
 import { RecurringExpensesService } from './recurring-expenses.service';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import { Store } from '@ngxs/store';
@@ -11,14 +14,18 @@ describe('RecurringExpensesService', () => {
   let encryptionServiceSpy: jest.Mocked<ClientEncryptionService>;
 
   const storeMock = {
-    selectSnapshot: jest.fn().mockImplementation(() => ({ email: 'test@finmate.local' })),
+    selectSnapshot: jest
+      .fn()
+      .mockImplementation(() => ({ email: 'test@finmate.local' })),
   };
 
   beforeEach(() => {
     const encSpy = {
       loadKeyFromSession: jest.fn().mockResolvedValue('test-key'),
       encrypt: jest.fn().mockResolvedValue('encrypted-value'),
-      decryptExpense: jest.fn().mockImplementation((val) => Promise.resolve(val)),
+      decryptExpense: jest
+        .fn()
+        .mockImplementation((val) => Promise.resolve(val)),
     };
 
     TestBed.configureTestingModule({
@@ -32,7 +39,9 @@ describe('RecurringExpensesService', () => {
 
     service = TestBed.inject(RecurringExpensesService);
     httpMock = TestBed.inject(HttpTestingController);
-    encryptionServiceSpy = TestBed.inject(ClientEncryptionService) as jest.Mocked<ClientEncryptionService>;
+    encryptionServiceSpy = TestBed.inject(
+      ClientEncryptionService,
+    ) as jest.Mocked<ClientEncryptionService>;
   });
 
   afterEach(() => {

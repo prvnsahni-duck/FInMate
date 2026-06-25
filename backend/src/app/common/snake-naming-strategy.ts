@@ -1,15 +1,25 @@
 import { DefaultNamingStrategy, NamingStrategyInterface } from 'typeorm';
 
-export class SnakeNamingStrategy extends DefaultNamingStrategy implements NamingStrategyInterface {
+export class SnakeNamingStrategy
+  extends DefaultNamingStrategy
+  implements NamingStrategyInterface
+{
   private camelToSnake(str: string): string {
     return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
   }
 
-  override columnName(propertyName: string, customName: string, embeddedPrefixes: string[]): string {
+  override columnName(
+    propertyName: string,
+    customName: string,
+    embeddedPrefixes: string[],
+  ): string {
     return customName ? customName : this.camelToSnake(propertyName);
   }
 
-  override joinColumnName(relationName: string, referencedColumnName: string): string {
+  override joinColumnName(
+    relationName: string,
+    referencedColumnName: string,
+  ): string {
     return this.camelToSnake(relationName + '_' + referencedColumnName);
   }
 

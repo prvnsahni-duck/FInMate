@@ -6,4 +6,3 @@ export class ExpensesAccessService {
     return role !== 'viewer';
   }
 }
-

@@ -24,4 +24,3 @@ export class IconComponent {
   path = input.required<string>();
   className = input<string>('w-5 h-5');
 }
-

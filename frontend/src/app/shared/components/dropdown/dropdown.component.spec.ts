@@ -8,12 +8,12 @@ describe('DropdownComponent', () => {
   const mockOptions: DropdownOption[] = [
     { value: 'USD', label: 'USD ($)', description: 'US Dollar' },
     { value: 'INR', label: 'INR (₹)', description: 'Indian Rupee' },
-    { value: 'EUR', label: 'EUR (€)', description: 'Euro' }
+    { value: 'EUR', label: 'EUR (€)', description: 'Euro' },
   ];
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DropdownComponent]
+      imports: [DropdownComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DropdownComponent);
@@ -29,7 +29,7 @@ describe('DropdownComponent', () => {
   it('should display placeholder when no option is selected', () => {
     component.placeholder = 'Choose currency';
     fixture.detectChanges();
-    
+
     const triggerBtn = fixture.nativeElement.querySelector('button');
     expect(triggerBtn.textContent).toContain('Choose currency');
   });
@@ -45,7 +45,7 @@ describe('DropdownComponent', () => {
   it('should toggle dropdown when trigger button is clicked', () => {
     fixture.detectChanges();
     const triggerBtn = fixture.nativeElement.querySelector('button');
-    
+
     triggerBtn.click();
     fixture.detectChanges();
     expect(component.isOpen).toBe(true);
@@ -85,19 +85,23 @@ describe('DropdownComponent', () => {
     const triggerBtn = fixture.nativeElement.querySelector('button');
     triggerBtn.click();
     fixture.detectChanges();
-    
+
     expect(component.focusedIndex).toBe(0); // USD is at index 0
 
     // Dispatch ArrowDown keydown event on host element
     const hostEl = fixture.nativeElement;
-    hostEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    hostEl.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+    );
     fixture.detectChanges();
     expect(component.focusedIndex).toBe(1); // INR is at index 1
 
     // Enter should select option
     const changeSpy = jest.fn();
     component.registerOnChange(changeSpy);
-    hostEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    hostEl.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    );
     fixture.detectChanges();
 
     expect(component.value()).toBe('INR');
@@ -115,7 +119,9 @@ describe('DropdownComponent', () => {
 
     // Dispatch Escape keydown event on host element
     const hostEl = fixture.nativeElement;
-    hostEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    hostEl.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
     fixture.detectChanges();
     expect(component.isOpen).toBe(false);
   });

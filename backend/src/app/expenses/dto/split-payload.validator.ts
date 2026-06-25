@@ -1,7 +1,12 @@
-import { ValidationArguments, ValidatorConstraint, ValidatorConstraintInterface } from 'class-validator';
+import {
+  ValidationArguments,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+} from 'class-validator';
 import { EXPENSE_SPLIT_TYPES, ExpenseSplitInputDto } from './expense-split.dto';
 
-const toCents = (value: number): number => Math.round((value + Number.EPSILON) * 100);
+const toCents = (value: number): number =>
+  Math.round((value + Number.EPSILON) * 100);
 
 @ValidatorConstraint({ name: 'splitPayloadValidator', async: false })
 export class SplitPayloadValidator implements ValidatorConstraintInterface {
@@ -44,11 +49,15 @@ export class SplitPayloadValidator implements ValidatorConstraintInterface {
         return false;
       }
 
-      if (!Number.isFinite(Number(split.shareValue)) || Number(split.shareValue) <= 0) {
+      if (
+        !Number.isFinite(Number(split.shareValue)) ||
+        Number(split.shareValue) <= 0
+      ) {
         return false;
       }
 
-      const participantKey = split.participantUserId || split.participantGroupMemberId;
+      const participantKey =
+        split.participantUserId || split.participantGroupMemberId;
       if (!participantKey) {
         return false;
       }
@@ -59,9 +68,15 @@ export class SplitPayloadValidator implements ValidatorConstraintInterface {
       seenParticipants.add(participantKey);
     }
 
-    const sum = splits.reduce((acc, split) => acc + Number(split.shareValue), 0);
+    const sum = splits.reduce(
+      (acc, split) => acc + Number(split.shareValue),
+      0,
+    );
 
-    if (splitType === 'equal' && !splits.every((split) => Number(split.shareValue) === 1)) {
+    if (
+      splitType === 'equal' &&
+      !splits.every((split) => Number(split.shareValue) === 1)
+    ) {
       return false;
     }
 

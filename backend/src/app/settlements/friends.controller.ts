@@ -10,7 +10,12 @@ export class FriendsController {
 
   @Get()
   async getFriendsBalances(@Req() req: any) {
-    const result = await this.settlementsService.calculateFriendsBalances(req.user.id);
-    return new SuccessResponse('Friends balances calculated successfully', result);
+    const result = await this.settlementsService.calculateFriendsBalances(
+      req.user.id,
+    );
+    return new SuccessResponse(
+      'Friends balances calculated successfully',
+      result,
+    );
   }
 }

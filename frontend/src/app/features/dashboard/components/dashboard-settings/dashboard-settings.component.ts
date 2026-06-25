@@ -1,12 +1,15 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
+import {
+  DropdownComponent,
+  DropdownOption,
+} from '../../../../shared/components/dropdown/dropdown.component';
 
 @Component({
   selector: 'app-dashboard-settings',
   standalone: true,
   imports: [FormsModule, DropdownComponent],
-  templateUrl: './dashboard-settings.component.html'
+  templateUrl: './dashboard-settings.component.html',
 })
 export class DashboardSettingsComponent {
   @Input() newCurrency = 'USD';

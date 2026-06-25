@@ -1,4 +1,13 @@
-import { Controller, Get, Patch, Body, UseGuards, Req, NotFoundException, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Patch,
+  Body,
+  UseGuards,
+  Req,
+  NotFoundException,
+  Query,
+} from '@nestjs/common';
 import { UpdateProfileDto } from '@finmate/data-models';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -11,8 +20,11 @@ export class UsersController {
 
   @Get('search')
   async search(@Query('query') query: string, @Req() req: any) {
-    const results = await this.usersService.searchUsers(query || '', req.user.id);
-    const serialized = results.map(user => this.serializeUser(user));
+    const results = await this.usersService.searchUsers(
+      query || '',
+      req.user.id,
+    );
+    const serialized = results.map((user) => this.serializeUser(user));
     return new SuccessResponse('Users searched successfully', serialized);
   }
 
@@ -27,12 +39,18 @@ export class UsersController {
       user: this.serializeUser(user),
       profile,
     };
-    return new SuccessResponse('Current user profile retrieved successfully', data);
+    return new SuccessResponse(
+      'Current user profile retrieved successfully',
+      data,
+    );
   }
 
   @Patch('me')
   async updateMe(@Body() updateProfileDto: UpdateProfileDto, @Req() req: any) {
-    const result = await this.usersService.updateProfile(req.user.id, updateProfileDto);
+    const result = await this.usersService.updateProfile(
+      req.user.id,
+      updateProfileDto,
+    );
     const data = {
       user: this.serializeUser(result.user),
       profile: result.profile,

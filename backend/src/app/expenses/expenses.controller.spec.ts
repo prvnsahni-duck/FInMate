@@ -31,7 +31,10 @@ describe('ExpensesController', () => {
       controllers: [ExpensesController],
       providers: [
         { provide: ExpensesCrudService, useValue: mockExpensesCrudService },
-        { provide: ExpensesAnalyticsService, useValue: mockExpensesAnalyticsService },
+        {
+          provide: ExpensesAnalyticsService,
+          useValue: mockExpensesAnalyticsService,
+        },
       ],
     })
       .overrideGuard(JwtAuthGuard)
@@ -39,8 +42,12 @@ describe('ExpensesController', () => {
       .compile();
 
     controller = module.get<ExpensesController>(ExpensesController);
-    crudService = module.get(ExpensesCrudService) as jest.Mocked<ExpensesCrudService>;
-    analyticsService = module.get(ExpensesAnalyticsService) as jest.Mocked<ExpensesAnalyticsService>;
+    crudService = module.get(
+      ExpensesCrudService,
+    ) as jest.Mocked<ExpensesCrudService>;
+    analyticsService = module.get(
+      ExpensesAnalyticsService,
+    ) as jest.Mocked<ExpensesAnalyticsService>;
   });
 
   it('should be defined', () => {
@@ -50,9 +57,19 @@ describe('ExpensesController', () => {
   it('should parse pagination defaults and pass filters to service', async () => {
     crudService.listExpenses.mockResolvedValue({} as any);
 
-    await controller.findAll(undefined, undefined, 'cursor-1', 'group-1', 'Food', 'posted', '2026-06-01', '2026-06-10', {
-      user: { id: 'user-1' },
-    } as any);
+    await controller.findAll(
+      undefined,
+      undefined,
+      'cursor-1',
+      'group-1',
+      'Food',
+      'posted',
+      '2026-06-01',
+      '2026-06-10',
+      {
+        user: { id: 'user-1' },
+      } as any,
+    );
 
     expect(crudService.listExpenses).toHaveBeenCalledWith('user-1', {
       page: 1,
@@ -70,38 +87,62 @@ describe('ExpensesController', () => {
     const dto: any = { title: 'Dinner' };
     crudService.createExpense.mockResolvedValue({ id: 'exp-1' });
 
-    const result = await controller.create(dto, { user: { id: 'user-1' } } as any);
+    const result = await controller.create(dto, {
+      user: { id: 'user-1' },
+    } as any);
 
-    expect(result).toEqual(new SuccessResponse('Expense created successfully', { id: 'exp-1' }));
+    expect(result).toEqual(
+      new SuccessResponse('Expense created successfully', { id: 'exp-1' }),
+    );
     expect(crudService.createExpense).toHaveBeenCalledWith('user-1', dto);
   });
 
   it('should forward delete call', async () => {
     crudService.deleteExpense.mockResolvedValue();
 
-    const result = await controller.remove('exp-1', { user: { id: 'user-1' } } as any);
+    const result = await controller.remove('exp-1', {
+      user: { id: 'user-1' },
+    } as any);
 
-    expect(result).toEqual(new SuccessResponse('Expense deleted successfully', {}));
+    expect(result).toEqual(
+      new SuccessResponse('Expense deleted successfully', {}),
+    );
     expect(crudService.deleteExpense).toHaveBeenCalledWith('user-1', 'exp-1');
   });
 
   it('should forward get by id call', async () => {
     crudService.getExpenseById.mockResolvedValue({ id: 'exp-1' } as any);
 
-    const result = await controller.findOne('exp-1', { user: { id: 'user-1' } } as any);
+    const result = await controller.findOne('exp-1', {
+      user: { id: 'user-1' },
+    } as any);
 
-    expect(result).toEqual(new SuccessResponse('Expense retrieved successfully', { id: 'exp-1' }));
+    expect(result).toEqual(
+      new SuccessResponse('Expense retrieved successfully', { id: 'exp-1' }),
+    );
     expect(crudService.getExpenseById).toHaveBeenCalledWith('user-1', 'exp-1');
   });
 
   it('should forward update call', async () => {
-    crudService.updateExpense.mockResolvedValue({ id: 'exp-1', title: 'Updated' } as any);
-
-    const result = await controller.update('exp-1', { title: 'Updated', version: 1 } as any, {
-      user: { id: 'user-1' },
+    crudService.updateExpense.mockResolvedValue({
+      id: 'exp-1',
+      title: 'Updated',
     } as any);
 
-    expect(result).toEqual(new SuccessResponse('Expense updated successfully', { id: 'exp-1', title: 'Updated' }));
+    const result = await controller.update(
+      'exp-1',
+      { title: 'Updated', version: 1 } as any,
+      {
+        user: { id: 'user-1' },
+      } as any,
+    );
+
+    expect(result).toEqual(
+      new SuccessResponse('Expense updated successfully', {
+        id: 'exp-1',
+        title: 'Updated',
+      }),
+    );
     expect(crudService.updateExpense).toHaveBeenCalledWith('user-1', 'exp-1', {
       title: 'Updated',
       version: 1,

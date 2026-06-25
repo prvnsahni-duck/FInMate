@@ -162,14 +162,12 @@ describe('optimisticLockInterceptor', () => {
     jest.spyOn(automerge, 'detectOverlap').mockReturnValue(['body']);
     jest.spyOn(modalService, 'open').mockReturnValue(of(cancelledResolution));
 
-    http
-      .patch('/api/v1/notes/abc', { body: 'local', version: 1 })
-      .subscribe({
-        error: (err: HttpErrorResponse) => {
-          expect(err.status).toBe(412);
-          done();
-        },
-      });
+    http.patch('/api/v1/notes/abc', { body: 'local', version: 1 }).subscribe({
+      error: (err: HttpErrorResponse) => {
+        expect(err.status).toBe(412);
+        done();
+      },
+    });
 
     // 1 — Original PATCH → 412
     const originalReq = httpTesting.expectOne(

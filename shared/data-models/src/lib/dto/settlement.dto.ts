@@ -1,11 +1,25 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsNumber, Min, IsUUID, IsEnum, IsInt, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsOptional,
+  IsNumber,
+  Min,
+  IsUUID,
+  IsEnum,
+  IsInt,
+  IsDateString,
+} from 'class-validator';
 
 export class ProposeSettlementDto {
   @IsUUID('4', { message: 'Recipient User ID must be a valid UUID' })
   @IsNotEmpty({ message: 'Recipient ID is required' })
   toUserId!: string;
 
-  @IsNumber({}, { message: 'Transfer amount must be a valid numeric currency value' })
+  @IsNumber(
+    {},
+    { message: 'Transfer amount must be a valid numeric currency value' },
+  )
   @Min(0.01, { message: 'Transfer amount must be greater than zero' })
   amount!: number;
 
@@ -20,11 +34,19 @@ export class ProposeSettlementDto {
 }
 
 export class UpdateSettlementDto {
-  @IsEnum(['confirmed', 'cancelled'], { message: 'Invalid settlement status update option' })
+  @IsEnum(['confirmed', 'cancelled'], {
+    message: 'Invalid settlement status update option',
+  })
   @IsNotEmpty({ message: 'Settlement status update choice is required' })
   status!: 'confirmed' | 'cancelled';
 
-  @IsDateString({}, { message: 'Settlement confirmation date must be a valid ISO date string (YYYY-MM-DD)' })
+  @IsDateString(
+    {},
+    {
+      message:
+        'Settlement confirmation date must be a valid ISO date string (YYYY-MM-DD)',
+    },
+  )
   @IsOptional()
   settledOn?: string;
 

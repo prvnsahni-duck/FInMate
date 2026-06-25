@@ -1,12 +1,29 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsEnum, IsBoolean, IsInt, IsEmail, IsArray, ValidateNested, IsNumber, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  IsInt,
+  IsEmail,
+  IsArray,
+  ValidateNested,
+  IsNumber,
+  IsUUID,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class GroupInitialMemberDto {
   @IsString()
-  @IsNotEmpty({ message: 'Member identifier (email, username, or phone) is required' })
+  @IsNotEmpty({
+    message: 'Member identifier (email, username, or phone) is required',
+  })
   identifier!: string;
 
-  @IsEnum(['admin', 'member', 'viewer', 'spectator'], { message: 'Invalid member role option' })
+  @IsEnum(['admin', 'member', 'viewer', 'spectator'], {
+    message: 'Invalid member role option',
+  })
   @IsOptional()
   role?: 'admin' | 'member' | 'viewer' | 'spectator';
 }
@@ -21,7 +38,9 @@ export class CreateGroupDto {
   @IsOptional()
   description?: string;
 
-  @IsEnum(['private', 'invite_only', 'public_readonly'], { message: 'Invalid group visibility option' })
+  @IsEnum(['private', 'invite_only', 'public_readonly'], {
+    message: 'Invalid group visibility option',
+  })
   @IsOptional()
   visibility?: 'private' | 'invite_only' | 'public_readonly';
 
@@ -31,7 +50,9 @@ export class CreateGroupDto {
   currency?: string;
 
   /** Group type: `normal` (default) or `household` (month-based ledger). */
-  @IsEnum(['normal', 'household'], { message: 'Invalid group type. Must be normal or household' })
+  @IsEnum(['normal', 'household'], {
+    message: 'Invalid group type. Must be normal or household',
+  })
   @IsOptional()
   groupType?: 'normal' | 'household';
 
@@ -60,7 +81,9 @@ export class UpdateGroupDto {
   @IsOptional()
   description?: string;
 
-  @IsEnum(['private', 'invite_only', 'public_readonly'], { message: 'Invalid group visibility option' })
+  @IsEnum(['private', 'invite_only', 'public_readonly'], {
+    message: 'Invalid group visibility option',
+  })
   @IsOptional()
   visibility?: 'private' | 'invite_only' | 'public_readonly';
 
@@ -104,17 +127,23 @@ export class InviteMemberDto {
    * Role for the invited member.
    * - `spectator`: can create/update expenses but is excluded from all splits.
    */
-  @IsEnum(['admin', 'member', 'viewer', 'spectator'], { message: 'Invalid member role option' })
+  @IsEnum(['admin', 'member', 'viewer', 'spectator'], {
+    message: 'Invalid member role option',
+  })
   @IsOptional()
   role?: 'admin' | 'member' | 'viewer' | 'spectator';
 }
 
 export class UpdateMemberDto {
-  @IsEnum(['owner', 'admin', 'member', 'viewer', 'spectator'], { message: 'Invalid member role option' })
+  @IsEnum(['owner', 'admin', 'member', 'viewer', 'spectator'], {
+    message: 'Invalid member role option',
+  })
   @IsOptional()
   role?: 'owner' | 'admin' | 'member' | 'viewer' | 'spectator';
 
-  @IsEnum(['invited', 'active', 'left', 'removed'], { message: 'Invalid member join status option' })
+  @IsEnum(['invited', 'active', 'left', 'removed'], {
+    message: 'Invalid member join status option',
+  })
   @IsOptional()
   joinStatus?: 'invited' | 'active' | 'left' | 'removed';
 }

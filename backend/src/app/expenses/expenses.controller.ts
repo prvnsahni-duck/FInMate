@@ -31,8 +31,14 @@ export class ExpensesController {
   // ─── CRUD ─────────────────────────────────────────────────────────────────
 
   @Post()
-  async create(@Body() dto: CreateExpenseDto, @Req() req: Request & { user: { id: string } }) {
-    const result = await this.expensesCrudService.createExpense(req.user.id, dto);
+  async create(
+    @Body() dto: CreateExpenseDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.expensesCrudService.createExpense(
+      req.user.id,
+      dto,
+    );
     return new SuccessResponse('Expense created successfully', result);
   }
 
@@ -71,7 +77,10 @@ export class ExpensesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.expensesCrudService.getExpenseById(req.user.id, id);
+    const result = await this.expensesCrudService.getExpenseById(
+      req.user.id,
+      id,
+    );
     return new SuccessResponse('Expense retrieved successfully', result);
   }
 
@@ -81,7 +90,11 @@ export class ExpensesController {
     @Body() dto: UpdateExpenseDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.expensesCrudService.updateExpense(req.user.id, id, dto);
+    const result = await this.expensesCrudService.updateExpense(
+      req.user.id,
+      id,
+      dto,
+    );
     return new SuccessResponse('Expense updated successfully', result);
   }
 
@@ -103,7 +116,10 @@ export class ExpensesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.expensesCrudService.restoreExpense(req.user.id, id);
+    const result = await this.expensesCrudService.restoreExpense(
+      req.user.id,
+      id,
+    );
     return new SuccessResponse('Expense restored successfully', result);
   }
 
@@ -112,12 +128,20 @@ export class ExpensesController {
   /** Monthly expense totals for a given year. */
   @Get('analytics/monthly')
   async monthlySummary(
-    @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe) year: number,
+    @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe)
+    year: number,
     @Query('groupId') groupId: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.expensesAnalyticsService.getMonthlySummary({ userId: req.user.id, groupId, year });
-    return new SuccessResponse('Monthly analytics summary retrieved successfully', result);
+    const result = await this.expensesAnalyticsService.getMonthlySummary({
+      userId: req.user.id,
+      groupId,
+      year,
+    });
+    return new SuccessResponse(
+      'Monthly analytics summary retrieved successfully',
+      result,
+    );
   }
 
   /** Yearly expense totals across all years. */
@@ -126,8 +150,14 @@ export class ExpensesController {
     @Query('groupId') groupId: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.expensesAnalyticsService.getYearlySummary({ userId: req.user.id, groupId });
-    return new SuccessResponse('Yearly analytics summary retrieved successfully', result);
+    const result = await this.expensesAnalyticsService.getYearlySummary({
+      userId: req.user.id,
+      groupId,
+    });
+    return new SuccessResponse(
+      'Yearly analytics summary retrieved successfully',
+      result,
+    );
   }
 
   /** Category distribution totals, optionally filtered by date range. */
@@ -138,8 +168,16 @@ export class ExpensesController {
     @Query('endDate') endDate: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.expensesAnalyticsService.getCategoryDistribution({ userId: req.user.id, groupId, startDate, endDate });
-    return new SuccessResponse('Category distribution analytics retrieved successfully', result);
+    const result = await this.expensesAnalyticsService.getCategoryDistribution({
+      userId: req.user.id,
+      groupId,
+      startDate,
+      endDate,
+    });
+    return new SuccessResponse(
+      'Category distribution analytics retrieved successfully',
+      result,
+    );
   }
 
   /** Combined category-level aggregated monthly expenditures (personal + group splits). */
@@ -149,7 +187,14 @@ export class ExpensesController {
     @Req() req: Request & { user: { id: string } },
   ) {
     const targetMonth = month ?? new Date().toISOString().slice(0, 7);
-    const result = await this.expensesAnalyticsService.getCombinedMonthlyAnalytics(req.user.id, targetMonth);
-    return new SuccessResponse('All monthly summary analytics retrieved successfully', result);
+    const result =
+      await this.expensesAnalyticsService.getCombinedMonthlyAnalytics(
+        req.user.id,
+        targetMonth,
+      );
+    return new SuccessResponse(
+      'All monthly summary analytics retrieved successfully',
+      result,
+    );
   }
 }

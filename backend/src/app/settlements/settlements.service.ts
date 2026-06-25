@@ -1,7 +1,23 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, PreconditionFailedException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  PreconditionFailedException,
+} from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, In, DataSource, EntityManager } from 'typeorm';
-import { Group, GroupMember, Expense, ExpenseSplit, Settlement, ProposeSettlementDto, UpdateSettlementDto, AuditLog, User } from '@finmate/data-models';
+import {
+  Group,
+  GroupMember,
+  Expense,
+  ExpenseSplit,
+  Settlement,
+  ProposeSettlementDto,
+  UpdateSettlementDto,
+  AuditLog,
+  User,
+} from '@finmate/data-models';
 import { createHash } from 'crypto';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 
@@ -72,7 +88,10 @@ export class SettlementsService {
     }
   }
 
-  simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedTransaction[] {
+  simplifyDebts(
+    balances: MemberBalance[],
+    currency: string,
+  ): SimplifiedTransaction[] {
     // 1. Filter out users with zero balances (within a 0.01 tolerance)
     let activeBalances = balances
       .map((b) => ({
@@ -135,8 +154,10 @@ export class SettlementsService {
       // Refresh active balances list by filtering out settled users
       activeBalances = activeBalances
         .map((b) => {
-          if (b.userId === debtor.userId) return { ...b, balance: debtor.balance };
-          if (b.userId === creditor.userId) return { ...b, balance: creditor.balance };
+          if (b.userId === debtor.userId)
+            return { ...b, balance: debtor.balance };
+          if (b.userId === creditor.userId)
+            return { ...b, balance: creditor.balance };
           return b;
         })
         .filter((b) => Math.abs(b.balance) >= 0.01);
@@ -158,7 +179,9 @@ export class SettlementsService {
     }
 
     // Verify group exists
-    const groupExists = await this.groupRepository.findOne({ where: { id: groupId } });
+    const groupExists = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
     if (!groupExists) {
       throw new NotFoundException('Group not found');
     }
@@ -181,7 +204,12 @@ export class SettlementsService {
       expenseIds.length > 0
         ? await this.expenseSplitRepository.find({
             where: { expense: { id: In(expenseIds) } },
-            relations: ['expense', 'participantUser', 'participantGroupMember', 'participantGroupMember.user'],
+            relations: [
+              'expense',
+              'participantUser',
+              'participantGroupMember',
+              'participantGroupMember.user',
+            ],
           })
         : [];
 
@@ -197,7 +225,10 @@ export class SettlementsService {
     settlements.forEach((s) => currencies.add(s.currency));
 
     // Mapping of userId -> User Entity / displayName to format response
-    const userMap = new Map<string, { id: string; displayName?: string; email: string }>();
+    const userMap = new Map<
+      string,
+      { id: string; displayName?: string; email: string }
+    >();
     allMembers.forEach((m) => userMap.set(m.user.id, m.user));
     expenses.forEach((e) => userMap.set(e.paidByUser.id, e.paidByUser));
     splits.forEach((s) => {
@@ -224,15 +255,22 @@ export class SettlementsService {
       for (const expense of expenses) {
         if (expense.currency !== currency) continue;
         const payerId = expense.paidByUser.id;
-        balanceMap.set(payerId, (balanceMap.get(payerId) || 0) + Number(expense.amountTotal));
+        balanceMap.set(
+          payerId,
+          (balanceMap.get(payerId) || 0) + Number(expense.amountTotal),
+        );
       }
 
       // Subtract split owes
       for (const split of splits) {
         if (split.expense.currency !== currency) continue;
-        const participantId = split.participantUser?.id || split.participantGroupMember?.user?.id;
+        const participantId =
+          split.participantUser?.id || split.participantGroupMember?.user?.id;
         if (!participantId) continue;
-        balanceMap.set(participantId, (balanceMap.get(participantId) || 0) - Number(split.amountOwed));
+        balanceMap.set(
+          participantId,
+          (balanceMap.get(participantId) || 0) - Number(split.amountOwed),
+        );
       }
 
       // Add settlements
@@ -240,8 +278,14 @@ export class SettlementsService {
         if (settlement.currency !== currency) continue;
         const fromId = settlement.fromUser.id;
         const toId = settlement.toUser.id;
-        balanceMap.set(fromId, (balanceMap.get(fromId) || 0) + Number(settlement.amount));
-        balanceMap.set(toId, (balanceMap.get(toId) || 0) - Number(settlement.amount));
+        balanceMap.set(
+          fromId,
+          (balanceMap.get(fromId) || 0) + Number(settlement.amount),
+        );
+        balanceMap.set(
+          toId,
+          (balanceMap.get(toId) || 0) - Number(settlement.amount),
+        );
       }
 
       // Convert to MemberBalance array
@@ -274,24 +318,39 @@ export class SettlementsService {
     };
   }
 
-  async proposeSettlement(userId: string, groupId: string, dto: ProposeSettlementDto, context?: { ip?: string; userAgent?: string }): Promise<Settlement> {
+  async proposeSettlement(
+    userId: string,
+    groupId: string,
+    dto: ProposeSettlementDto,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<Settlement> {
     // 1. Validate caller active membership in group
     const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+      where: {
+        group: { id: groupId },
+        user: { id: userId },
+        joinStatus: 'active',
+      },
       relations: ['user'],
     });
     if (!callerMember) {
       throw new ForbiddenException('You do not have access to this group');
     }
 
-    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
     if (!group) {
       throw new NotFoundException('Group not found');
     }
 
     // 2. Validate recipient active/invited membership in group
     const recipientMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: dto.toUserId }, joinStatus: In(['active', 'invited']) },
+      where: {
+        group: { id: groupId },
+        user: { id: dto.toUserId },
+        joinStatus: In(['active', 'invited']),
+      },
       relations: ['user'],
     });
     if (!recipientMember) {
@@ -299,26 +358,31 @@ export class SettlementsService {
     }
 
     // Currency check
-    if (group.currency && dto.currency.toUpperCase() !== group.currency.toUpperCase()) {
+    if (
+      group.currency &&
+      dto.currency.toUpperCase() !== group.currency.toUpperCase()
+    ) {
       throw new BadRequestException({
         errorCode: 'SETTLE_CURRENCY_MISMATCH',
         message: `Settlement currency must match the group's base currency (${group.currency})`,
       });
     }
 
-    const savedSettlement = await this.dataSource.transaction(async (manager) => {
-      const settlement = manager.create(Settlement, {
-        group,
-        fromUser: callerMember.user,
-        toUser: recipientMember.user,
-        amount: dto.amount,
-        currency: dto.currency.toUpperCase(),
-        status: 'proposed',
-        note: dto.note,
-      });
+    const savedSettlement = await this.dataSource.transaction(
+      async (manager) => {
+        const settlement = manager.create(Settlement, {
+          group,
+          fromUser: callerMember.user,
+          toUser: recipientMember.user,
+          amount: dto.amount,
+          currency: dto.currency.toUpperCase(),
+          status: 'proposed',
+          note: dto.note,
+        });
 
-      return manager.save(Settlement, settlement);
-    });
+        return manager.save(Settlement, settlement);
+      },
+    );
 
     void this.writeAuditLog({
       actorUser: callerMember.user,
@@ -345,7 +409,11 @@ export class SettlementsService {
   ): Promise<PaginatedResponse<Settlement>> {
     // Validate caller active membership
     const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+      where: {
+        group: { id: groupId },
+        user: { id: userId },
+        joinStatus: 'active',
+      },
     });
     if (!callerMember) {
       throw new ForbiddenException('You do not have access to this group');
@@ -364,7 +432,13 @@ export class SettlementsService {
       .take(limit)
       .getMany();
 
-    return paginate(settlements, total, page, limit, `/api/v1/groups/${groupId}/settlements`);
+    return paginate(
+      settlements,
+      total,
+      page,
+      limit,
+      `/api/v1/groups/${groupId}/settlements`,
+    );
   }
 
   async updateSettlement(
@@ -372,61 +446,76 @@ export class SettlementsService {
     groupId: string,
     id: string,
     dto: UpdateSettlementDto,
-    context?: { ip?: string; userAgent?: string }
+    context?: { ip?: string; userAgent?: string },
   ): Promise<Settlement> {
-    const { savedSettlement, callerUser, action } = await this.dataSource.transaction(async (manager) => {
-      // Validate caller active membership
-      const callerMember = await manager.findOne(GroupMember, {
-        where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
-        relations: ['user'],
-      });
-      if (!callerMember) {
-        throw new ForbiddenException('You do not have access to this group');
-      }
-
-      const settlement = await manager.findOne(Settlement, {
-        where: { id, group: { id: groupId } },
-        relations: ['fromUser', 'toUser'],
-      });
-      if (!settlement) {
-        throw new NotFoundException('Settlement not found');
-      }
-
-      // Concurrency control: verify version matches
-      if (settlement.version !== dto.version) {
-        throw new PreconditionFailedException({
-          errorCode: 'CON_VERSION_CONFLICT',
-          message: 'Version conflict: the resource has been modified by another request',
+    const { savedSettlement, callerUser, action } =
+      await this.dataSource.transaction(async (manager) => {
+        // Validate caller active membership
+        const callerMember = await manager.findOne(GroupMember, {
+          where: {
+            group: { id: groupId },
+            user: { id: userId },
+            joinStatus: 'active',
+          },
+          relations: ['user'],
         });
-      }
+        if (!callerMember) {
+          throw new ForbiddenException('You do not have access to this group');
+        }
 
-      let auditAction = '';
-      if (dto.status === 'confirmed') {
-        // ONLY the creditor (toUser) can confirm receipt
-        if (settlement.toUser.id !== userId) {
-          throw new ForbiddenException({
-            errorCode: 'RES_FORBIDDEN',
-            message: 'Only the creditor can confirm receipt of the settlement',
+        const settlement = await manager.findOne(Settlement, {
+          where: { id, group: { id: groupId } },
+          relations: ['fromUser', 'toUser'],
+        });
+        if (!settlement) {
+          throw new NotFoundException('Settlement not found');
+        }
+
+        // Concurrency control: verify version matches
+        if (settlement.version !== dto.version) {
+          throw new PreconditionFailedException({
+            errorCode: 'CON_VERSION_CONFLICT',
+            message:
+              'Version conflict: the resource has been modified by another request',
           });
         }
-        settlement.status = 'confirmed';
-        settlement.settledOn = dto.settledOn || new Date().toISOString().split('T')[0];
-        auditAction = 'settlement.confirmed';
-      } else if (dto.status === 'cancelled') {
-        // Either debtor (fromUser) or creditor (toUser) can cancel
-        if (settlement.fromUser.id !== userId && settlement.toUser.id !== userId) {
-          throw new ForbiddenException({
-            errorCode: 'RES_FORBIDDEN',
-            message: 'Only the debtor or creditor can cancel the settlement',
-          });
-        }
-        settlement.status = 'cancelled';
-        auditAction = 'settlement.cancelled';
-      }
 
-      const updated = await manager.save(Settlement, settlement);
-      return { savedSettlement: updated, callerUser: callerMember.user, action: auditAction };
-    });
+        let auditAction = '';
+        if (dto.status === 'confirmed') {
+          // ONLY the creditor (toUser) can confirm receipt
+          if (settlement.toUser.id !== userId) {
+            throw new ForbiddenException({
+              errorCode: 'RES_FORBIDDEN',
+              message:
+                'Only the creditor can confirm receipt of the settlement',
+            });
+          }
+          settlement.status = 'confirmed';
+          settlement.settledOn =
+            dto.settledOn || new Date().toISOString().split('T')[0];
+          auditAction = 'settlement.confirmed';
+        } else if (dto.status === 'cancelled') {
+          // Either debtor (fromUser) or creditor (toUser) can cancel
+          if (
+            settlement.fromUser.id !== userId &&
+            settlement.toUser.id !== userId
+          ) {
+            throw new ForbiddenException({
+              errorCode: 'RES_FORBIDDEN',
+              message: 'Only the debtor or creditor can cancel the settlement',
+            });
+          }
+          settlement.status = 'cancelled';
+          auditAction = 'settlement.cancelled';
+        }
+
+        const updated = await manager.save(Settlement, settlement);
+        return {
+          savedSettlement: updated,
+          callerUser: callerMember.user,
+          action: auditAction,
+        };
+      });
 
     if (action) {
       void this.writeAuditLog({
@@ -458,18 +547,21 @@ export class SettlementsService {
       relations: ['group'],
     });
 
-    const friendsMap = new Map<string, {
-      friendId: string;
-      displayName: string;
-      email: string;
-      netBalance: number;
-      currencyDetails: {
-        groupId: string;
-        groupName: string;
-        amount: number;
-        currency: string;
-      }[]
-    }>();
+    const friendsMap = new Map<
+      string,
+      {
+        friendId: string;
+        displayName: string;
+        email: string;
+        netBalance: number;
+        currencyDetails: {
+          groupId: string;
+          groupName: string;
+          amount: number;
+          currency: string;
+        }[];
+      }
+    >();
 
     for (const membership of memberships) {
       const groupId = membership.group.id;
@@ -498,7 +590,8 @@ export class SettlementsService {
             });
             if (!friendMember || !friendMember.user) continue;
 
-            const rawDisplayName = friendMember.user.displayName || friendMember.user.email;
+            const rawDisplayName =
+              friendMember.user.displayName || friendMember.user.email;
             entry = {
               friendId: key,
               displayName: `${rawDisplayName} (${s.currency.toUpperCase()})`,
@@ -520,7 +613,10 @@ export class SettlementsService {
     }
 
     for (const friend of friendsMap.values()) {
-      friend.netBalance = friend.currencyDetails.reduce((sum, d) => sum + d.amount, 0);
+      friend.netBalance = friend.currencyDetails.reduce(
+        (sum, d) => sum + d.amount,
+        0,
+      );
       friend.netBalance = Math.round(friend.netBalance * 100) / 100;
     }
 

@@ -1,10 +1,20 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, Check } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  Check,
+} from 'typeorm';
 import { Expense } from './expense.entity';
 import { User } from './user.entity';
 import { GroupMember } from './group-member.entity';
 
 @Entity('expense_splits')
-@Check('("participantUserId" IS NOT NULL AND "participantGroupMemberId" IS NULL) OR ("participantUserId" IS NULL AND "participantGroupMemberId" IS NOT NULL)')
+@Check(
+  '("participantUserId" IS NOT NULL AND "participantGroupMemberId" IS NULL) OR ("participantUserId" IS NULL AND "participantGroupMemberId" IS NOT NULL)',
+)
 export class ExpenseSplit {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

@@ -14,15 +14,12 @@ describe('LoginComponent', () => {
 
   beforeEach(async () => {
     mockStore = {
-      dispatch: jest.fn().mockReturnValue(of({}))
+      dispatch: jest.fn().mockReturnValue(of({})),
     } as any;
 
     await TestBed.configureTestingModule({
       imports: [LoginComponent, ReactiveFormsModule],
-      providers: [
-        { provide: Store, useValue: mockStore },
-        provideRouter([])
-      ]
+      providers: [{ provide: Store, useValue: mockStore }, provideRouter([])],
     }).compileComponents();
 
     fixture = TestBed.createComponent(LoginComponent);
@@ -68,7 +65,9 @@ describe('LoginComponent', () => {
   it('should set error message on failed onSubmit', () => {
     component.loginForm.controls['email'].setValue('test@example.com');
     component.loginForm.controls['password'].setValue('wrong-password');
-    mockStore.dispatch.mockReturnValue(throwError(() => ({ error: { message: 'Invalid credentials' } })));
+    mockStore.dispatch.mockReturnValue(
+      throwError(() => ({ error: { message: 'Invalid credentials' } })),
+    );
 
     component.onSubmit();
 

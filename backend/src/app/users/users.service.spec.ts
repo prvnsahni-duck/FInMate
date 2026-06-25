@@ -47,7 +47,10 @@ describe('UsersService', () => {
       providers: [
         UsersService,
         { provide: getRepositoryToken(User), useValue: mockUserRepository },
-        { provide: getRepositoryToken(Profile), useValue: mockProfileRepository },
+        {
+          provide: getRepositoryToken(Profile),
+          useValue: mockProfileRepository,
+        },
         { provide: DataSource, useValue: mockDataSource },
         { provide: EncryptionService, useValue: mockEncryptionService },
       ],
@@ -68,16 +71,20 @@ describe('UsersService', () => {
     it('should throw ConflictException if email already exists', async () => {
       userRepository.findOne.mockResolvedValue({ id: 'existing-id' } as any);
 
-      await expect(service.createUser('test@example.com', 'password')).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.createUser('test@example.com', 'password'),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should hash password and save user and profile in transaction', async () => {
       userRepository.findOne.mockResolvedValue(null);
       (argon2.hash as jest.Mock).mockResolvedValue('hashed-password');
 
-      const result = await service.createUser('test@example.com', 'password', 'Test User');
+      const result = await service.createUser(
+        'test@example.com',
+        'password',
+        'Test User',
+      );
 
       expect(argon2.hash).toHaveBeenCalledWith('password');
       expect(dataSource.transaction).toHaveBeenCalled();
@@ -106,7 +113,9 @@ describe('UsersService', () => {
       const result = await service.findProfileByUserId('user-id');
       expect(result).toBeDefined();
       expect(result?.avatarUrl).toBe('https://example.com/avatar.png');
-      expect(encryptionService.decrypt).toHaveBeenCalledWith('encrypted:https://example.com/avatar.png');
+      expect(encryptionService.decrypt).toHaveBeenCalledWith(
+        'encrypted:https://example.com/avatar.png',
+      );
     });
   });
 
@@ -114,14 +123,18 @@ describe('UsersService', () => {
     it('should throw NotFoundException if user not found', async () => {
       userRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.updateProfile('user-id', {})).rejects.toThrow(NotFoundException);
+      await expect(service.updateProfile('user-id', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw NotFoundException if profile not found', async () => {
       userRepository.findOne.mockResolvedValue({ id: 'user-id' } as any);
       profileRepository.findOne.mockResolvedValue(null);
 
-      await expect(service.updateProfile('user-id', {})).rejects.toThrow(NotFoundException);
+      await expect(service.updateProfile('user-id', {})).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should update user and profile settings, encrypting avatarUrl', async () => {
@@ -152,7 +165,9 @@ describe('UsersService', () => {
       expect(mockUser.displayName).toBe('New Name');
       expect(mockProfile.locale).toBe('en-US');
       expect(mockProfile.defaultCurrency).toBe('EUR');
-      expect(encryptionService.encrypt).toHaveBeenCalledWith('https://example.com/new.png');
+      expect(encryptionService.encrypt).toHaveBeenCalledWith(
+        'https://example.com/new.png',
+      );
       expect(result.user.displayName).toBe('New Name');
       expect(result.profile.avatarUrl).toBe('https://example.com/new.png');
       expect(result.profile.defaultCurrency).toBe('EUR');

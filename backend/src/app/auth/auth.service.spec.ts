@@ -7,7 +7,11 @@ import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { AuditLog } from '@finmate/data-models';
-import { UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  UnauthorizedException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { generateTotp } from './utils/totp.util';
 import { createHash } from 'crypto';
@@ -67,7 +71,10 @@ describe('AuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: EncryptionService, useValue: mockEncryptionService },
-        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
+        {
+          provide: getRepositoryToken(AuditLog),
+          useValue: mockAuditLogRepository,
+        },
       ],
     }).compile();
 
@@ -96,9 +103,17 @@ describe('AuthService', () => {
 
       usersService.createUser.mockResolvedValue(mockUser);
 
-      const result = await service.register('test@example.com', 'password', 'Test User');
+      const result = await service.register(
+        'test@example.com',
+        'password',
+        'Test User',
+      );
 
-      expect(usersService.createUser).toHaveBeenCalledWith('test@example.com', 'password', 'Test User');
+      expect(usersService.createUser).toHaveBeenCalledWith(
+        'test@example.com',
+        'password',
+        'Test User',
+      );
       expect(result).toEqual({
         id: 'user-id',
         email: 'test@example.com',
@@ -114,9 +129,9 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException if user not found', async () => {
       usersService.findByEmail.mockResolvedValue(null);
 
-      await expect(service.login('test@example.com', 'password')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        service.login('test@example.com', 'password'),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException if password incorrect', async () => {
@@ -129,9 +144,9 @@ describe('AuthService', () => {
       usersService.findByEmail.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(false);
 
-      await expect(service.login('test@example.com', 'password')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        service.login('test@example.com', 'password'),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should return token pair and user if credentials are valid and 2FA not enabled', async () => {
@@ -148,7 +163,9 @@ describe('AuthService', () => {
 
       usersService.findByEmail.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
-      jwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
+      jwtService.sign
+        .mockReturnValueOnce('access-token')
+        .mockReturnValueOnce('refresh-token');
 
       const result = await service.login('test@example.com', 'password');
 
@@ -181,9 +198,9 @@ describe('AuthService', () => {
       usersService.findByEmail.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
 
-      await expect(service.login('test@example.com', 'password')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.login('test@example.com', 'password'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw BadRequestException if 2FA is enabled but code is invalid', async () => {
@@ -199,9 +216,9 @@ describe('AuthService', () => {
       usersService.findByEmail.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
 
-      await expect(service.login('test@example.com', 'password', '111111')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.login('test@example.com', 'password', '111111'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should log in successfully if 2FA is enabled and correct code is provided', async () => {
@@ -219,12 +236,18 @@ describe('AuthService', () => {
 
       usersService.findByEmail.mockResolvedValue(mockUser);
       (argon2.verify as jest.Mock).mockResolvedValue(true);
-      jwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
+      jwtService.sign
+        .mockReturnValueOnce('access-token')
+        .mockReturnValueOnce('refresh-token');
 
       const currentStep = Math.floor(Date.now() / 1000 / 30);
       const correctCode = generateTotp('KVKFKRCSN5RHK33O', currentStep);
 
-      const result = await service.login('test@example.com', 'password', correctCode);
+      const result = await service.login(
+        'test@example.com',
+        'password',
+        correctCode,
+      );
 
       expect(result.accessToken).toBe('access-token');
       expect(result.refreshToken).toBe('refresh-token');
@@ -242,7 +265,9 @@ describe('AuthService', () => {
       const result = await service.enable2Fa(mockUser);
 
       expect(result.secret).toHaveLength(16);
-      expect(result.qrCodeUrl).toContain('otpauth://totp/FinMate:test@example.com');
+      expect(result.qrCodeUrl).toContain(
+        'otpauth://totp/FinMate:test@example.com',
+      );
       expect(usersService.updateUser).toHaveBeenCalled();
     });
 
@@ -253,7 +278,9 @@ describe('AuthService', () => {
         isTwoFactorEnabled: false,
       } as any;
 
-      await expect(service.verify2Fa(mockUser, '000000')).rejects.toThrow(BadRequestException);
+      await expect(service.verify2Fa(mockUser, '000000')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('verify2Fa should succeed with valid code and enable 2FA', async () => {
@@ -280,7 +307,9 @@ describe('AuthService', () => {
         isTwoFactorEnabled: true,
       } as any;
 
-      await expect(service.disable2Fa(mockUser, '000000')).rejects.toThrow(BadRequestException);
+      await expect(service.disable2Fa(mockUser, '000000')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('disable2Fa should succeed with valid code and disable 2FA', async () => {
@@ -306,30 +335,42 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException if refresh token is expired or invalid', async () => {
       jwtService.verifyAsync.mockRejectedValue(new Error('verify error'));
 
-      await expect(service.refresh('expired-token')).rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh('expired-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should throw UnauthorizedException if token not active in Redis', async () => {
-      jwtService.verifyAsync.mockResolvedValue({ userId: 'user-id', refreshId: 'ref-id' });
+      jwtService.verifyAsync.mockResolvedValue({
+        userId: 'user-id',
+        refreshId: 'ref-id',
+      });
       redisService.get.mockResolvedValue(null);
 
-      await expect(service.refresh('some-token')).rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh('some-token')).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('should rotate tokens and store new session in Redis if token is valid', async () => {
-      jwtService.verifyAsync.mockResolvedValue({ userId: 'user-id', refreshId: 'ref-id' });
+      jwtService.verifyAsync.mockResolvedValue({
+        userId: 'user-id',
+        refreshId: 'ref-id',
+      });
       redisService.get.mockResolvedValue('some-argon-hash');
       (argon2.verify as jest.Mock).mockResolvedValue(true);
       (argon2.hash as jest.Mock).mockResolvedValue('new-argon-hash');
-      
+
       const mockUser = {
         id: 'user-id',
         email: 'test@example.com',
         status: 'active',
       } as any;
       usersService.findById.mockResolvedValue(mockUser);
-      
-      jwtService.sign.mockReturnValueOnce('new-access-token').mockReturnValueOnce('new-refresh-token');
+
+      jwtService.sign
+        .mockReturnValueOnce('new-access-token')
+        .mockReturnValueOnce('new-refresh-token');
 
       const result = await service.refresh('old-token');
 
@@ -345,7 +386,10 @@ describe('AuthService', () => {
 
   describe('logout', () => {
     it('should delete key in Redis', async () => {
-      jwtService.decode.mockReturnValue({ userId: 'user-id', refreshId: 'ref-id' });
+      jwtService.decode.mockReturnValue({
+        userId: 'user-id',
+        refreshId: 'ref-id',
+      });
 
       await service.logout('some-token', 'user-id');
 
@@ -354,9 +398,14 @@ describe('AuthService', () => {
     });
 
     it('should throw ForbiddenException if user attempts to log out another user', async () => {
-      jwtService.decode.mockReturnValue({ userId: 'other-user-id', refreshId: 'ref-id' });
+      jwtService.decode.mockReturnValue({
+        userId: 'other-user-id',
+        refreshId: 'ref-id',
+      });
 
-      await expect(service.logout('some-token', 'user-id')).rejects.toThrow(ForbiddenException);
+      await expect(service.logout('some-token', 'user-id')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 });

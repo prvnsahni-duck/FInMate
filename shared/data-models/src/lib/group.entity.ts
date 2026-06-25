@@ -1,4 +1,12 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, VersionColumn } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  VersionColumn,
+} from 'typeorm';
 import { User } from './user.entity';
 
 @Entity('groups')
@@ -53,4 +61,3 @@ export class Group {
   @UpdateDateColumn()
   updatedAt!: Date;
 }
-

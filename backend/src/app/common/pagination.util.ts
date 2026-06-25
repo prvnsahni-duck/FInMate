@@ -25,7 +25,7 @@ export function paginate<T>(
 ): PaginatedResponse<T> {
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const page = currentPage < 1 ? 1 : currentPage;
-  
+
   const getUrl = (p: number) => {
     const query = new URL(path, 'http://localhost'); // dummy base to parse URL relative path
     query.searchParams.set('page', p.toString());

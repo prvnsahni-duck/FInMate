@@ -12,8 +12,15 @@
   },
   "private": true,
   "supportedArchitectures": {
-    "os": ["current", "linux"],
-    "cpu": ["current", "x64", "arm64"]
+    "os": [
+      "current",
+      "linux"
+    ],
+    "cpu": [
+      "current",
+      "x64",
+      "arm64"
+    ]
   },
   "devDependencies": {
     "@angular-devkit/core": "~21.2.0",

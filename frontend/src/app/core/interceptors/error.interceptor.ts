@@ -37,7 +37,9 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
 
         if (typeof window !== 'undefined') {
           window.dispatchEvent(
-            new CustomEvent<AppHttpErrorEventDetail>(APP_HTTP_ERROR_EVENT, { detail }),
+            new CustomEvent<AppHttpErrorEventDetail>(APP_HTTP_ERROR_EVENT, {
+              detail,
+            }),
           );
         }
       }
@@ -46,4 +48,3 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
     }),
   );
 };
-

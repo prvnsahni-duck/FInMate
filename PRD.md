@@ -3,36 +3,45 @@
 ## 📌 Product Overview
 
 ### Product Vision
+
 FinMate is a comprehensive personal finance and lifestyle companion designed to help individuals, households, and groups track, analyze, and settle expenses seamlessly. By combining private zero-knowledge encryption, collaborative group ledgers, structured savings goals, and secure AI-driven financial insights, FinMate makes everyday money management intuitive, collaborative, and highly secure across both web and mobile platforms.
 
 ### Problem Statement
+
 Modern personal finance applications suffer from three critical pain points:
+
 1. **Security & Privacy Concerns**: Users are reluctant to store sensitive transactional details online. Most platforms scan and monetize user financial data.
 2. **Poor Group Coordination**: Splitting group costs (e.g., roommate expenses, trips, household budgets) involves manual settlement math, back-and-forth communication, and complex balance calculations.
 3. **Siloed Financial Planning**: Personal expenses, group bills, notes, receipts, and saving targets are split across multiple disjointed apps, leading to fragmented financial tracking.
 
 ### Target Users
+
 - **Individual Budgeters**: Users who want to log personal transactions, view category summaries, and track savings goals with absolute privacy.
 - **Shared Households / Roommates**: Co-habitants managing monthly rent, utilities, and grocery bills with custom contribution agreements.
 - **Travelers & Event Organizers**: Friends sharing costs for vacations or social gatherings who need smart debt simplification.
 
 ### User Personas
+
 #### Persona 1: Amit (The Privacy-Conscious Saver)
+
 - **Role**: Software Engineer
 - **Goals**: Track personal discretionary spending and save for a new laptop while ensuring financial data remains completely private.
 - **Pain Point**: Apprehensive about financial tracking apps selling transaction histories.
 
 #### Persona 2: Priya & Raj (The Shared Household)
+
 - **Role**: Young married couple managing a shared apartment
 - **Goals**: Coordinate household contributions month-over-month according to dynamic income split percentages, carrying over surpluses or deficits easily.
 - **Pain Point**: Constant calculations about who paid for groceries vs. utilities and how much is owed at the end of the month.
 
 ### Business Goals
+
 - Build user trust through a Zero-Knowledge architecture where credentials and details are encrypted client-side.
 - Achieve viral growth through collaborative group invitiation features (QR codes, invite links, email invites).
 - Establish a premium subscription framework (Premium User tier) for advanced features like automated bank sync (future phase) and high-volume file attachments.
 
 ### Success Metrics
+
 - **Active User Growth**: Month-over-Month (MoM) growth in active users.
 - **Group Retention**: Percentage of created groups that log transactions for more than 2 billing cycles.
 - **Performance Compliance**: Sub-1.5s First Contentful Paint (FCP) and Lighthouse scores > 90.
@@ -42,70 +51,75 @@ Modern personal finance applications suffer from three critical pain points:
 ## 🛠️ Features
 
 ### A. Expense Management (Personal & Group)
-* **Purpose**: Provide a central ledger for recording all expenditures.
-* **User Value**: Single dashboard for tracking where every rupee goes, with automated division of joint bills.
-* **Functional Requirements**:
+
+- **Purpose**: Provide a central ledger for recording all expenditures.
+- **User Value**: Single dashboard for tracking where every rupee goes, with automated division of joint bills.
+- **Functional Requirements**:
   - Support creation, read, update, and void operations on expenses.
   - Automatically calculate split shares based on type (`equal`, `fixed`, `percent`, `share`).
   - Encrypt transaction titles and descriptions client-side using AES-256-GCM.
-* **Non-Functional Requirements**:
+- **Non-Functional Requirements**:
   - Total calculations and split checks must execute under 50ms.
   - Encryption keys must never be transmitted to the server.
-* **Acceptance Criteria**:
+- **Acceptance Criteria**:
   - Personal expenses (without groups) aggregate into a monthly summary visible on the user dashboard.
   - Splitting an expense allocates rounding pennies to the payer or alphabetically first UUID.
-* **Edge Cases**:
+- **Edge Cases**:
   - Splitting an amount that doesn't divide evenly (e.g. $10.00 between 3 people). Rounding allocation is detailed in the Settlement rules.
-* **Dependencies**: User Auth, Database sync.
+- **Dependencies**: User Auth, Database sync.
 
 ### B. Shared Group Module
-* **Purpose**: Collaborative multi-user ledgers for shared expense tracking.
-* **User Value**: Eliminates arguments and manual math for shared trips or living arrangements.
-* **Functional Requirements**:
+
+- **Purpose**: Collaborative multi-user ledgers for shared expense tracking.
+- **User Value**: Eliminates arguments and manual math for shared trips or living arrangements.
+- **Functional Requirements**:
   - Group creation with privacy levels: `private`, `invite_only`, `public_readonly`.
   - Multi-identifier invitations (email, username, phone number).
   - Invite via link and QR code routing to joining page.
   - Custom member monthly target contribution percentages for household groups.
   - Single-toggle settings for Carry-Forward behavior (ON rolls over surplus/deficit; OFF resets to zero).
-* **Acceptance Criteria**:
+- **Acceptance Criteria**:
   - Owners and Admins can promote/demote/kick members and revoke pending invitations.
   - Group invite landing page displays the list of existing group members.
-* **Edge Cases**:
+- **Edge Cases**:
   - Inviting a user not yet registered: creates a placeholder user in `invited` status.
   - Leaving a group as the sole Owner: blocks action until ownership is transferred.
-* **Dependencies**: Expenses Module, RBAC Engine.
+- **Dependencies**: Expenses Module, RBAC Engine.
 
 ### C. Import/Export (CSV/XLSX)
-* **Purpose**: Support offline bulk editing and migrations.
-* **User Value**: Zero-effort migration from other tools and backup capability.
-* **Functional Requirements**:
+
+- **Purpose**: Support offline bulk editing and migrations.
+- **User Value**: Zero-effort migration from other tools and backup capability.
+- **Functional Requirements**:
   - Export full group ledger to CSV or XLSX format.
   - Import CSV/XLSX spreadsheets conforming to the API schema.
   - Process imports atomically inside a single database transaction.
-* **Acceptance Criteria**:
+- **Acceptance Criteria**:
   - Exported templates can be re-imported without modification.
   - Validation failures on any row roll back the entire import.
-* **Dependencies**: Group Module, File Storage.
+- **Dependencies**: Group Module, File Storage.
 
 ### D. Goals & Saving Tracker
-* **Purpose**: Help users allocate funds toward saving targets.
-* **User Value**: Direct visualization of progress encourages financial discipline.
-* **Functional Requirements**:
+
+- **Purpose**: Help users allocate funds toward saving targets.
+- **User Value**: Direct visualization of progress encourages financial discipline.
+- **Functional Requirements**:
   - Users can create, edit, pause, and delete saving goals.
   - Encrypt goal titles client-side.
-* **Acceptance Criteria**:
+- **Acceptance Criteria**:
   - Goal progress updates dynamically as savings are added or withdrawn.
-* **Dependencies**: User Auth.
+- **Dependencies**: User Auth.
 
 ### E. AI Assistant (Opt-in)
-* **Purpose**: Provide intelligent categorization and summarization.
-* **User Value**: Natural language query interface to ask questions about spending and get automatic categorization.
-* **Functional Requirements**:
+
+- **Purpose**: Provide intelligent categorization and summarization.
+- **User Value**: Natural language query interface to ask questions about spending and get automatic categorization.
+- **Functional Requirements**:
   - Sweep metadata headers to exclude IDs before routing prompts to external zero-retention AI providers.
   - Ephemeral processing only: backend never writes plain-text prompt contents to database.
-* **Acceptance Criteria**:
+- **Acceptance Criteria**:
   - AI features are completely disabled until user toggles `ai_opt_in = true`.
-* **Dependencies**: OpenAI API.
+- **Dependencies**: OpenAI API.
 
 ---
 
@@ -142,6 +156,7 @@ Modern personal finance applications suffer from three critical pain points:
 ## 🗺️ Product Roadmap
 
 ### MVP (Phase 1)
+
 - User Registration, JWT Authentication, and 2FA.
 - Personal Expense logging and Category Analytics.
 - Groups Module with standard Equal/Fixed/Percentage splits.
@@ -150,6 +165,7 @@ Modern personal finance applications suffer from three critical pain points:
 - Basic smart settlement algorithm (greedy matching).
 
 ### Phase 2
+
 - Custom monthly contribution percentages for Household groups.
 - Carry-forward setting logic and dashboard comparison progress bars.
 - Group-joining via QR links and member invitations staging queue.
@@ -158,6 +174,7 @@ Modern personal finance applications suffer from three critical pain points:
 - PWA support and offline service worker caching.
 
 ### Future Features (Phase 3+)
+
 - Integration of Capacitor for native iOS/Android packaging.
 - Automatic Bank Sync APIs (via Plaid/Yodlee).
 - Multi-currency conversion rates with real-time API syncing.

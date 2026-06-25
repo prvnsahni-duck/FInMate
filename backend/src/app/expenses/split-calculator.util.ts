@@ -9,7 +9,8 @@ export interface CalculatedSplit {
   amountOwed: number;
 }
 
-const toCents = (amount: number): number => Math.round((amount + Number.EPSILON) * 100);
+const toCents = (amount: number): number =>
+  Math.round((amount + Number.EPSILON) * 100);
 const fromCents = (cents: number): number => cents / 100;
 
 const splitParticipantKey = (split: ExpenseSplitInputDto): string => {
@@ -17,7 +18,9 @@ const splitParticipantKey = (split: ExpenseSplitInputDto): string => {
   return key || '';
 };
 
-export const validateSplitParticipants = (splits: ExpenseSplitInputDto[]): void => {
+export const validateSplitParticipants = (
+  splits: ExpenseSplitInputDto[],
+): void => {
   for (const split of splits) {
     const hasUser = !!split.participantUserId;
     const hasGroupMember = !!split.participantGroupMemberId;
@@ -73,7 +76,10 @@ export const calculateDeterministicSplits = (
       amountCents: toCents(s.shareValue),
     }));
 
-    const fixedSum = calculated.reduce((acc, curr) => acc + curr.amountCents, 0);
+    const fixedSum = calculated.reduce(
+      (acc, curr) => acc + curr.amountCents,
+      0,
+    );
     if (fixedSum !== totalCents) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',

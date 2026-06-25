@@ -22,36 +22,41 @@ describe('DashboardComponent', () => {
   const mockUser = {
     id: 'user-1',
     email: 'john@example.com',
-    displayName: 'John Doe'
+    displayName: 'John Doe',
   };
 
   const mockExpenses = [
-    { id: 'exp-1', title: 'Groceries', amountTotal: 150, expenseDate: new Date() },
-    { id: 'exp-2', title: 'Rent', amountTotal: 1200, expenseDate: new Date() }
+    {
+      id: 'exp-1',
+      title: 'Groceries',
+      amountTotal: 150,
+      expenseDate: new Date(),
+    },
+    { id: 'exp-2', title: 'Rent', amountTotal: 1200, expenseDate: new Date() },
   ];
 
   const mockAnalytics = [
-    { month: new Date().toISOString().slice(0, 7), total: 1350 }
+    { month: new Date().toISOString().slice(0, 7), total: 1350 },
   ];
 
   const mockProfile = {
     profile: {
       monthlyIncome: 5000,
       monthlyBudget: 2000,
-      defaultCurrency: 'USD'
-    }
+      defaultCurrency: 'USD',
+    },
   };
 
   beforeEach(async () => {
     mockStore = {
-      selectSnapshot: jest.fn().mockReturnValue(mockUser)
+      selectSnapshot: jest.fn().mockReturnValue(mockUser),
     } as any;
 
     mockGroupsService = {
       getGroups: jest.fn().mockReturnValue(of({ meta: { totalItems: 3 } })),
       getPendingInvitations: jest.fn().mockReturnValue(of([])),
       updateMember: jest.fn().mockReturnValue(of({})),
-      removeMember: jest.fn().mockReturnValue(of({}))
+      removeMember: jest.fn().mockReturnValue(of({})),
     } as any;
 
     mockExpensesService = {
@@ -61,12 +66,12 @@ describe('DashboardComponent', () => {
       deleteExpense: jest.fn().mockReturnValue(of({})),
       expenseCreated$: of(),
       activeTab: signal('Home'),
-      showCreateExpenseModal: signal(false)
+      showCreateExpenseModal: signal(false),
     };
 
     mockAuthService = {
       getMe: jest.fn().mockReturnValue(of(mockProfile)),
-      updateProfile: jest.fn().mockReturnValue(of(mockProfile))
+      updateProfile: jest.fn().mockReturnValue(of(mockProfile)),
     } as any;
 
     await TestBed.configureTestingModule({
@@ -76,14 +81,16 @@ describe('DashboardComponent', () => {
         { provide: GroupsService, useValue: mockGroupsService },
         { provide: ExpensesService, useValue: mockExpensesService },
         { provide: AuthService, useValue: mockAuthService },
-        provideRouter([])
-      ]
-    }).overrideComponent(DashboardComponent, {
-      set: {
-        imports: [CommonModule, FormsModule, CurrencyPipe, DatePipe],
-        schemas: [NO_ERRORS_SCHEMA]
-      }
-    }).compileComponents();
+        provideRouter([]),
+      ],
+    })
+      .overrideComponent(DashboardComponent, {
+        set: {
+          imports: [CommonModule, FormsModule, CurrencyPipe, DatePipe],
+          schemas: [NO_ERRORS_SCHEMA],
+        },
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(DashboardComponent);
     component = fixture.componentInstance;
@@ -129,8 +136,8 @@ describe('DashboardComponent', () => {
       profile: {
         monthlyIncome: 6000,
         monthlyBudget: 3000,
-        defaultCurrency: 'EUR'
-      }
+        defaultCurrency: 'EUR',
+      },
     };
     mockAuthService.updateProfile.mockReturnValue(of(updatedProfile));
 
@@ -139,7 +146,7 @@ describe('DashboardComponent', () => {
     expect(mockAuthService.updateProfile).toHaveBeenCalledWith({
       defaultCurrency: 'EUR',
       monthlyIncome: 6000,
-      monthlyBudget: 3000
+      monthlyBudget: 3000,
     });
     expect(component.isEditingIncome).toBe(false);
     expect(component.incomePercentage).toBe(23); // 1350 / 6000 = 22.5 => 23
@@ -152,7 +159,11 @@ describe('DashboardComponent', () => {
 
     component.acceptInvitation(mockInvite);
 
-    expect(mockGroupsService.updateMember).toHaveBeenCalledWith('group-1', 'member-1', { joinStatus: 'active' });
+    expect(mockGroupsService.updateMember).toHaveBeenCalledWith(
+      'group-1',
+      'member-1',
+      { joinStatus: 'active' },
+    );
   });
 
   it('should decline a group invitation', () => {
@@ -161,7 +172,10 @@ describe('DashboardComponent', () => {
 
     component.declineInvitation(mockInvite);
 
-    expect(mockGroupsService.removeMember).toHaveBeenCalledWith('group-1', 'member-1');
+    expect(mockGroupsService.removeMember).toHaveBeenCalledWith(
+      'group-1',
+      'member-1',
+    );
   });
 
   it('should delete a personal expense', () => {

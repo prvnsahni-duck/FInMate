@@ -8,7 +8,11 @@ if (typeof globalThis !== 'undefined' && !globalThis.crypto) {
     value: webcrypto,
     writable: true,
   });
-} else if (typeof globalThis !== 'undefined' && globalThis.crypto && !globalThis.crypto.subtle) {
+} else if (
+  typeof globalThis !== 'undefined' &&
+  globalThis.crypto &&
+  !globalThis.crypto.subtle
+) {
   Object.defineProperty(globalThis.crypto, 'subtle', {
     value: webcrypto.subtle,
     writable: true,
@@ -42,8 +46,12 @@ describe('ClientEncryptionService', () => {
   });
 
   it('should throw an error if password or email is empty during derivation', async () => {
-    await expect(service.deriveMasterKey('', 'user@example.com')).rejects.toThrow('Password must not be empty');
-    await expect(service.deriveMasterKey('pass', '')).rejects.toThrow('Email must not be empty');
+    await expect(
+      service.deriveMasterKey('', 'user@example.com'),
+    ).rejects.toThrow('Password must not be empty');
+    await expect(service.deriveMasterKey('pass', '')).rejects.toThrow(
+      'Email must not be empty',
+    );
   });
 
   it('should encrypt and decrypt a plaintext string consistently', async () => {
@@ -56,7 +64,7 @@ describe('ClientEncryptionService', () => {
 
     expect(encrypted).toBeDefined();
     expect(encrypted).toContain(':');
-    
+
     const parts = encrypted.split(':');
     expect(parts.length).toBe(2);
     expect(parts[0].length).toBeGreaterThan(10); // base64 IV
@@ -71,8 +79,12 @@ describe('ClientEncryptionService', () => {
     const email = 'user@example.com';
     const key = await service.deriveMasterKey(password, email);
 
-    await expect(service.decrypt('justciphertextnoiv', key)).rejects.toThrow('Invalid ciphertext format');
-    await expect(service.decrypt('iv:ciphertext:tag', key)).rejects.toThrow('Invalid ciphertext format');
+    await expect(service.decrypt('justciphertextnoiv', key)).rejects.toThrow(
+      'Invalid ciphertext format',
+    );
+    await expect(service.decrypt('iv:ciphertext:tag', key)).rejects.toThrow(
+      'Invalid ciphertext format',
+    );
   });
 
   it('should type-safely encrypt and decrypt Expense objects', async () => {
@@ -98,7 +110,10 @@ describe('ClientEncryptionService', () => {
     expect(encryptedExpense.description).not.toBe(expense.description);
     expect(encryptedExpense.description).toContain(':');
 
-    const decryptedExpense = await service.decryptExpense(encryptedExpense, key);
+    const decryptedExpense = await service.decryptExpense(
+      encryptedExpense,
+      key,
+    );
     expect(decryptedExpense.title).toBe(expense.title);
     expect(decryptedExpense.description).toBe(expense.description);
     expect(decryptedExpense.id).toBe(expense.id);
@@ -155,14 +170,20 @@ describe('ClientEncryptionService', () => {
     const settlement = {
       id: 'settlement-1',
       note: 'Payment for Goa flight tickets',
-      amount: 120.50,
+      amount: 120.5,
     };
 
-    const encryptedSettlement = await service.encryptSettlement(settlement, key);
+    const encryptedSettlement = await service.encryptSettlement(
+      settlement,
+      key,
+    );
     expect(encryptedSettlement.amount).toBe(settlement.amount);
     expect(encryptedSettlement.note).not.toBe(settlement.note);
 
-    const decryptedSettlement = await service.decryptSettlement(encryptedSettlement, key);
+    const decryptedSettlement = await service.decryptSettlement(
+      encryptedSettlement,
+      key,
+    );
     expect(decryptedSettlement.note).toBe(settlement.note);
   });
 
@@ -176,7 +197,9 @@ describe('ClientEncryptionService', () => {
     expect(service.getKey()).toBe(key);
 
     // Verify it is NOT in sessionStorage
-    const stored = sessionStorage.getItem(`finmate_crypto_key_${email.toLowerCase()}`);
+    const stored = sessionStorage.getItem(
+      `finmate_crypto_key_${email.toLowerCase()}`,
+    );
     expect(stored).toBeNull();
 
     // 2. Clear key from memory
@@ -187,7 +210,7 @@ describe('ClientEncryptionService', () => {
     const key2 = await service.deriveAndStoreKey(password, email);
     const loadedKey = await service.loadKeyFromSession(email);
     expect(loadedKey).toBe(key2);
-    
+
     // Cleanup
     service.clearKey(email);
   });

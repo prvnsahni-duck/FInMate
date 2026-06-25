@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { CreateGroupDto, Group, UpdateGroupDto, User } from '@finmate/data-models';
+import {
+  CreateGroupDto,
+  Group,
+  UpdateGroupDto,
+  User,
+} from '@finmate/data-models';
 import { PaginatedResponse } from '../../common/pagination.util';
 import { GroupsService } from '../groups.service';
 
@@ -7,7 +12,11 @@ import { GroupsService } from '../groups.service';
 export class GroupsCrudService {
   constructor(private readonly groupsService: GroupsService) {}
 
-  async createGroup(owner: User, dto: CreateGroupDto, context?: { ip?: string; userAgent?: string }): Promise<Group> {
+  async createGroup(
+    owner: User,
+    dto: CreateGroupDto,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<Group> {
     return this.groupsService.createGroup(owner, dto, context);
   }
 
@@ -24,7 +33,12 @@ export class GroupsCrudService {
     return this.groupsService.findGroupById(userId, groupId);
   }
 
-  async updateGroup(userId: string, groupId: string, dto: UpdateGroupDto, context?: { ip?: string; userAgent?: string }): Promise<Group> {
+  async updateGroup(
+    userId: string,
+    groupId: string,
+    dto: UpdateGroupDto,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<Group> {
     return this.groupsService.updateGroup(userId, groupId, dto, context);
   }
 
@@ -32,4 +46,3 @@ export class GroupsCrudService {
     return this.groupsService.regenerateInviteToken(userId, groupId);
   }
 }
-

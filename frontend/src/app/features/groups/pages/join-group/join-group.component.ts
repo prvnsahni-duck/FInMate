@@ -8,7 +8,7 @@ import { InviteDetailsResponse } from '@finmate/data-models';
   selector: 'app-join-group',
   standalone: true,
   imports: [NgClass, RouterLink],
-  templateUrl: './join-group.component.html'
+  templateUrl: './join-group.component.html',
 })
 export class JoinGroupComponent implements OnInit {
   private route = inject(ActivatedRoute);
@@ -39,9 +39,11 @@ export class JoinGroupComponent implements OnInit {
         this.isLoading = false;
       },
       error: (err) => {
-        this.errorMessage = err.error?.message || 'Failed to fetch invitation details. The link may have expired or is invalid.';
+        this.errorMessage =
+          err.error?.message ||
+          'Failed to fetch invitation details. The link may have expired or is invalid.';
         this.isLoading = false;
-      }
+      },
     });
   }
 
@@ -57,8 +59,9 @@ export class JoinGroupComponent implements OnInit {
       },
       error: (err) => {
         this.isJoining = false;
-        this.errorMessage = err.error?.message || 'Failed to join group. Please try again.';
-      }
+        this.errorMessage =
+          err.error?.message || 'Failed to join group. Please try again.';
+      },
     });
   }
 

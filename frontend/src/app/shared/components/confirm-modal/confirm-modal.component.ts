@@ -5,8 +5,8 @@ import { NgClass } from '@angular/common';
   selector: 'app-confirm-modal',
   standalone: true,
   imports: [NgClass],
-  templateUrl: "./confirm-modal.component.html",
-  styleUrl: "./confirm-modal.component.scss"
+  templateUrl: './confirm-modal.component.html',
+  styleUrl: './confirm-modal.component.scss',
 })
 export class ConfirmModalComponent {
   @Input() title = 'Are you sure?';

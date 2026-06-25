@@ -1,5 +1,4 @@
 <div class="space-y-8 animate-fade-in">
-  
   <!-- HOME TAB VIEW -->
   @if (activeTab === 'Home') {
     <app-dashboard-home
@@ -20,7 +19,9 @@
       [incomeProgressWidth]="incomeProgressWidth"
       [budgetProgressWidth]="budgetProgressWidth"
       [isBudgetExceeded]="isBudgetExceeded"
-      (openExpenseModalEvent)="openExpenseModal($event.expense, $event.category)"
+      (openExpenseModalEvent)="
+        openExpenseModal($event.expense, $event.category)
+      "
       (toggleEditIncomeEvent)="toggleEditIncome()"
       (saveIncomeEvent)="saveIncome()"
       (acceptInvitationEvent)="acceptInvitation($event)"
@@ -64,7 +65,6 @@
       [incomePercentage]="incomePercentage"
     ></app-dashboard-profile>
   }
-
 </div>
 
 <!-- Modal Components -->

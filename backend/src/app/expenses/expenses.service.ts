@@ -6,7 +6,16 @@ import {
   PreconditionFailedException,
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
-import { Attachment, AuditLog, Expense, ExpenseSplit, Group, GroupMember, GroupMemberContribution, User } from '@finmate/data-models';
+import {
+  Attachment,
+  AuditLog,
+  Expense,
+  ExpenseSplit,
+  Group,
+  GroupMember,
+  GroupMemberContribution,
+  User,
+} from '@finmate/data-models';
 import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import { calculateDeterministicSplits } from './split-calculator.util';
@@ -90,14 +99,24 @@ export class ExpensesService {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
 
-  private async getGroupMembership(userId: string, groupId: string): Promise<GroupMember | null> {
+  private async getGroupMembership(
+    userId: string,
+    groupId: string,
+  ): Promise<GroupMember | null> {
     return this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: In(['active', 'invited']) },
+      where: {
+        group: { id: groupId },
+        user: { id: userId },
+        joinStatus: In(['active', 'invited']),
+      },
       relations: ['user', 'group'],
     });
   }
 
-  private async buildGroupParticipantMaps(groupId: string, manager: EntityManager): Promise<{
+  private async buildGroupParticipantMaps(
+    groupId: string,
+    manager: EntityManager,
+  ): Promise<{
     groupMemberById: Map<string, GroupMember>;
     activeOrInvitedByUserId: Map<string, GroupMember>;
   }> {
@@ -119,7 +138,11 @@ export class ExpensesService {
     return { groupMemberById, activeOrInvitedByUserId };
   }
 
-  private async ensureExpenseAccess(userId: string, expense: Expense, write = false): Promise<void> {
+  private async ensureExpenseAccess(
+    userId: string,
+    expense: Expense,
+    write = false,
+  ): Promise<void> {
     if (!expense.group) {
       if (expense.ownerUser.id !== userId) {
         throw new ForbiddenException('You do not have access to this expense');
@@ -143,12 +166,19 @@ export class ExpensesService {
 
       // Members/spectators can only modify their own expenses (either created or paid by them)
       if (membership.role === 'member' || membership.role === 'spectator') {
-        if (expense.ownerUser.id !== userId && expense.paidByUser.id !== userId) {
-          throw new ForbiddenException('Members can only modify their own expenses');
+        if (
+          expense.ownerUser.id !== userId &&
+          expense.paidByUser.id !== userId
+        ) {
+          throw new ForbiddenException(
+            'Members can only modify their own expenses',
+          );
         }
       }
 
-      const group = await this.groupRepository.findOne({ where: { id: expense.group.id } });
+      const group = await this.groupRepository.findOne({
+        where: { id: expense.group.id },
+      });
       if (!group) {
         throw new NotFoundException('Group not found');
       }
@@ -197,7 +227,9 @@ export class ExpensesService {
     }
   }
 
-  private async mapExpenseResponse(expense: Expense): Promise<Record<string, unknown>> {
+  private async mapExpenseResponse(
+    expense: Expense,
+  ): Promise<Record<string, unknown>> {
     const splits = await this.expenseSplitRepository.find({
       where: { expense: { id: expense.id } },
       relations: ['participantUser', 'participantGroupMember'],
@@ -260,24 +292,43 @@ export class ExpensesService {
 
   private async persistSplits(
     expense: Expense,
-    dto: Pick<CreateExpenseDto, 'splits' | 'amountTotal' | 'paidByUserId' | 'groupId'>,
+    dto: Pick<
+      CreateExpenseDto,
+      'splits' | 'amountTotal' | 'paidByUserId' | 'groupId'
+    >,
     manager: EntityManager,
   ): Promise<void> {
     const payerKey = dto.groupId
-      ? (await manager.getRepository(GroupMember).findOne({
-          where: { group: { id: dto.groupId }, user: { id: dto.paidByUserId }, joinStatus: In(['active', 'invited']) },
-        }))?.id
+      ? (
+          await manager.getRepository(GroupMember).findOne({
+            where: {
+              group: { id: dto.groupId },
+              user: { id: dto.paidByUserId },
+              joinStatus: In(['active', 'invited']),
+            },
+          })
+        )?.id
       : dto.paidByUserId;
 
-    const calculated = calculateDeterministicSplits(dto.amountTotal, dto.splits, payerKey);
+    const calculated = calculateDeterministicSplits(
+      dto.amountTotal,
+      dto.splits,
+      payerKey,
+    );
 
     if (!dto.groupId) {
-      const participantIds = [...new Set(dto.splits.map((split) => split.participantUserId || ''))].filter(Boolean);
-      const users = await manager.getRepository(User).find({ where: { id: In(participantIds) } });
+      const participantIds = [
+        ...new Set(dto.splits.map((split) => split.participantUserId || '')),
+      ].filter(Boolean);
+      const users = await manager
+        .getRepository(User)
+        .find({ where: { id: In(participantIds) } });
       const userMap = new Map(users.map((u) => [u.id, u]));
 
       for (const split of calculated) {
-        const participantUser = split.participantUserId ? userMap.get(split.participantUserId) : undefined;
+        const participantUser = split.participantUserId
+          ? userMap.get(split.participantUserId)
+          : undefined;
         if (!participantUser) {
           throw new BadRequestException({
             errorCode: 'VAL_INVALID_INPUT',
@@ -299,7 +350,8 @@ export class ExpensesService {
       return;
     }
 
-    const { groupMemberById, activeOrInvitedByUserId } = await this.buildGroupParticipantMaps(dto.groupId, manager);
+    const { groupMemberById, activeOrInvitedByUserId } =
+      await this.buildGroupParticipantMaps(dto.groupId, manager);
 
     for (const split of calculated) {
       // Resolve the participant
@@ -343,7 +395,10 @@ export class ExpensesService {
   // ─── CRUD Operations ───────────────────────────────────────────────────────
 
   /** Create a personal or group expense. */
-  async createExpense(userId: string, dto: CreateExpenseDto): Promise<Record<string, unknown>> {
+  async createExpense(
+    userId: string,
+    dto: CreateExpenseDto,
+  ): Promise<Record<string, unknown>> {
     if (!dto.splits || !Array.isArray(dto.splits) || dto.splits.length === 0) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
@@ -351,12 +406,16 @@ export class ExpensesService {
       });
     }
 
-    const ownerUser = await this.userRepository.findOne({ where: { id: userId } });
+    const ownerUser = await this.userRepository.findOne({
+      where: { id: userId },
+    });
     if (!ownerUser) {
       throw new NotFoundException('User not found');
     }
 
-    const paidByUser = await this.userRepository.findOne({ where: { id: dto.paidByUserId } });
+    const paidByUser = await this.userRepository.findOne({
+      where: { id: dto.paidByUserId },
+    });
     if (!paidByUser) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
@@ -379,7 +438,9 @@ export class ExpensesService {
         throw new ForbiddenException('Viewers cannot create expenses');
       }
 
-      group = await this.groupRepository.findOne({ where: { id: dto.groupId } });
+      group = await this.groupRepository.findOne({
+        where: { id: dto.groupId },
+      });
       if (!group) {
         throw new NotFoundException('Group not found');
       }
@@ -391,7 +452,10 @@ export class ExpensesService {
       }
 
       // ── Currency validation ─────────────────────────────────────────────
-      if (group.currency && dto.currency.toUpperCase() !== group.currency.toUpperCase()) {
+      if (
+        group.currency &&
+        dto.currency.toUpperCase() !== group.currency.toUpperCase()
+      ) {
         throw new BadRequestException({
           errorCode: 'EXP_CURRENCY_MISMATCH',
           message: `Expense currency must match the group's base currency (${group.currency})`,
@@ -399,7 +463,11 @@ export class ExpensesService {
       }
 
       const payerInGroup = await this.groupMemberRepository.findOne({
-        where: { group: { id: dto.groupId }, user: { id: dto.paidByUserId }, joinStatus: In(['active', 'invited']) },
+        where: {
+          group: { id: dto.groupId },
+          user: { id: dto.paidByUserId },
+          joinStatus: In(['active', 'invited']),
+        },
       });
       if (!payerInGroup) {
         throw new BadRequestException({
@@ -409,13 +477,18 @@ export class ExpensesService {
       }
     } else {
       if (dto.paidByUserId !== userId) {
-        throw new ForbiddenException('Personal expenses must be paid by the authenticated user');
+        throw new ForbiddenException(
+          'Personal expenses must be paid by the authenticated user',
+        );
       }
-      const hasGroupMemberParticipant = dto.splits.some((split) => !!split.participantGroupMemberId);
+      const hasGroupMemberParticipant = dto.splits.some(
+        (split) => !!split.participantGroupMemberId,
+      );
       if (hasGroupMemberParticipant) {
         throw new BadRequestException({
           errorCode: 'VAL_INVALID_INPUT',
-          message: 'Personal expenses cannot include participantGroupMemberId in splits',
+          message:
+            'Personal expenses cannot include participantGroupMemberId in splits',
         });
       }
     }
@@ -434,7 +507,10 @@ export class ExpensesService {
           expenseDate: dto.expenseDate,
           status: dto.status || 'posted',
           // Auto-assign ledgerMonth for household groups
-          ledgerMonth: group?.groupType === 'household' ? dto.expenseDate.slice(0, 7) : undefined,
+          ledgerMonth:
+            group?.groupType === 'household'
+              ? dto.expenseDate.slice(0, 7)
+              : undefined,
           isCarryForward: false,
         }),
       );
@@ -472,28 +548,42 @@ export class ExpensesService {
       action: 'expense.created',
       entityId: saved.id,
       groupId: group?.id,
-      metadata: { title: saved.title, amountTotal: Number(saved.amountTotal), currency: saved.currency },
+      metadata: {
+        title: saved.title,
+        amountTotal: Number(saved.amountTotal),
+        currency: saved.currency,
+      },
     });
 
     return this.mapExpenseResponse(saved);
   }
 
   /** List expenses with pagination and filtering. */
-  async listExpenses(userId: string, params: ExpenseListParams): Promise<PaginatedResponse<Record<string, unknown>>> {
-    if (!this.isValidDateFormat(params.startDate) || !this.isValidDateFormat(params.endDate)) {
+  async listExpenses(
+    userId: string,
+    params: ExpenseListParams,
+  ): Promise<PaginatedResponse<Record<string, unknown>>> {
+    if (
+      !this.isValidDateFormat(params.startDate) ||
+      !this.isValidDateFormat(params.endDate)
+    ) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
         message: 'Date filters must use YYYY-MM-DD format',
       });
     }
 
-    const page = Number.isFinite(params.page) && params.page > 0 ? params.page : 1;
-    const limit = Number.isFinite(params.limit) && params.limit > 0 ? params.limit : 20;
+    const page =
+      Number.isFinite(params.page) && params.page > 0 ? params.page : 1;
+    const limit =
+      Number.isFinite(params.limit) && params.limit > 0 ? params.limit : 20;
 
-    const membershipGroupIds = (await this.groupMemberRepository.find({
-      where: { user: { id: userId }, joinStatus: In(['active', 'invited']) },
-      relations: ['group'],
-    })).map((m) => m.group.id);
+    const membershipGroupIds = (
+      await this.groupMemberRepository.find({
+        where: { user: { id: userId }, joinStatus: In(['active', 'invited']) },
+        relations: ['group'],
+      })
+    ).map((m) => m.group.id);
 
     if (params.groupId && params.groupId !== 'personal') {
       const allowed = membershipGroupIds.includes(params.groupId);
@@ -511,7 +601,9 @@ export class ExpensesService {
         new Brackets((qb) => {
           qb.where('(ownerUser.id = :userId AND group.id IS NULL)', { userId });
           if (membershipGroupIds.length > 0) {
-            qb.orWhere('group.id IN (:...groupIds)', { groupIds: membershipGroupIds });
+            qb.orWhere('group.id IN (:...groupIds)', {
+              groupIds: membershipGroupIds,
+            });
           }
         }),
       );
@@ -525,7 +617,9 @@ export class ExpensesService {
     }
 
     if (params.category) {
-      query.andWhere('expense.category = :category', { category: params.category });
+      query.andWhere('expense.category = :category', {
+        category: params.category,
+      });
     }
 
     if (params.status) {
@@ -533,18 +627,24 @@ export class ExpensesService {
     }
 
     if (params.startDate) {
-      query.andWhere('expense.expenseDate >= :startDate', { startDate: params.startDate });
+      query.andWhere('expense.expenseDate >= :startDate', {
+        startDate: params.startDate,
+      });
     }
 
     if (params.endDate) {
-      query.andWhere('expense.expenseDate <= :endDate', { endDate: params.endDate });
+      query.andWhere('expense.expenseDate <= :endDate', {
+        endDate: params.endDate,
+      });
     }
 
     if (params.cursor) {
       query.andWhere('expense.id < :cursor', { cursor: params.cursor });
     }
 
-    query.orderBy('expense.expenseDate', 'DESC').addOrderBy('expense.createdAt', 'DESC');
+    query
+      .orderBy('expense.expenseDate', 'DESC')
+      .addOrderBy('expense.createdAt', 'DESC');
 
     const total = await query.getCount();
     const expenses = await query
@@ -552,7 +652,9 @@ export class ExpensesService {
       .take(limit)
       .getMany();
 
-    const mapped = await Promise.all(expenses.map((expense) => this.mapExpenseResponse(expense)));
+    const mapped = await Promise.all(
+      expenses.map((expense) => this.mapExpenseResponse(expense)),
+    );
 
     return paginate(mapped, total, page, limit, '/api/v1/expenses', {
       groupId: params.groupId,
@@ -565,7 +667,10 @@ export class ExpensesService {
   }
 
   /** Get a single expense by ID. */
-  async getExpenseById(userId: string, id: string): Promise<Record<string, unknown>> {
+  async getExpenseById(
+    userId: string,
+    id: string,
+  ): Promise<Record<string, unknown>> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
       relations: ['paidByUser', 'ownerUser', 'group'],
@@ -580,7 +685,11 @@ export class ExpensesService {
   }
 
   /** Update an expense's fields and/or splits. */
-  async updateExpense(userId: string, id: string, dto: UpdateExpenseDto): Promise<Record<string, unknown>> {
+  async updateExpense(
+    userId: string,
+    id: string,
+    dto: UpdateExpenseDto,
+  ): Promise<Record<string, unknown>> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
       relations: ['paidByUser', 'ownerUser', 'group'],
@@ -595,21 +704,32 @@ export class ExpensesService {
     if (expense.version !== dto.version) {
       throw new PreconditionFailedException({
         errorCode: 'CON_VERSION_CONFLICT',
-        message: 'Version conflict: the resource has been modified by another request',
+        message:
+          'Version conflict: the resource has been modified by another request',
       });
     }
 
-    if ((dto.amountTotal !== undefined || dto.currency !== undefined) && dto.splits === undefined) {
+    if (
+      (dto.amountTotal !== undefined || dto.currency !== undefined) &&
+      dto.splits === undefined
+    ) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
-        message: 'Updating amountTotal or currency requires providing updated splits',
+        message:
+          'Updating amountTotal or currency requires providing updated splits',
       });
     }
 
     // Currency validation (group expenses)
     if (dto.currency !== undefined && expense.group) {
-      const grp = await this.groupRepository.findOne({ where: { id: expense.group.id } });
-      if (grp && grp.currency && dto.currency.toUpperCase() !== grp.currency.toUpperCase()) {
+      const grp = await this.groupRepository.findOne({
+        where: { id: expense.group.id },
+      });
+      if (
+        grp &&
+        grp.currency &&
+        dto.currency.toUpperCase() !== grp.currency.toUpperCase()
+      ) {
         throw new BadRequestException({
           errorCode: 'EXP_CURRENCY_MISMATCH',
           message: `Expense currency must match the group's base currency (${grp.currency})`,
@@ -618,7 +738,9 @@ export class ExpensesService {
     }
 
     if (dto.paidByUserId) {
-      const paidByUser = await this.userRepository.findOne({ where: { id: dto.paidByUserId } });
+      const paidByUser = await this.userRepository.findOne({
+        where: { id: dto.paidByUserId },
+      });
       if (!paidByUser) {
         throw new BadRequestException({
           errorCode: 'VAL_INVALID_INPUT',
@@ -626,11 +748,17 @@ export class ExpensesService {
         });
       }
       if (!expense.group && dto.paidByUserId !== userId) {
-        throw new ForbiddenException('Personal expenses must be paid by the authenticated user');
+        throw new ForbiddenException(
+          'Personal expenses must be paid by the authenticated user',
+        );
       }
       if (expense.group) {
         const payerMember = await this.groupMemberRepository.findOne({
-          where: { group: { id: expense.group.id }, user: { id: dto.paidByUserId }, joinStatus: In(['active', 'invited']) },
+          where: {
+            group: { id: expense.group.id },
+            user: { id: dto.paidByUserId },
+            joinStatus: In(['active', 'invited']),
+          },
         });
         if (!payerMember) {
           throw new BadRequestException({
@@ -646,35 +774,50 @@ export class ExpensesService {
     if (dto.title !== undefined) expense.title = dto.title;
     if (dto.description !== undefined) expense.description = dto.description;
     if (dto.amountTotal !== undefined) expense.amountTotal = dto.amountTotal;
-    if (dto.currency !== undefined) expense.currency = dto.currency.toUpperCase();
+    if (dto.currency !== undefined)
+      expense.currency = dto.currency.toUpperCase();
     if (dto.category !== undefined) expense.category = dto.category;
     if (dto.expenseDate !== undefined) expense.expenseDate = dto.expenseDate;
     if (dto.status !== undefined) expense.status = dto.status;
 
-    const actorUser = await this.userRepository.findOne({ where: { id: userId } });
+    const actorUser = await this.userRepository.findOne({
+      where: { id: userId },
+    });
 
     const saved = await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(Expense).save(expense);
 
       if (dto.splits) {
-        if (!expense.group && dto.splits.some((split) => !!split.participantGroupMemberId)) {
+        if (
+          !expense.group &&
+          dto.splits.some((split) => !!split.participantGroupMemberId)
+        ) {
           throw new BadRequestException({
             errorCode: 'VAL_INVALID_INPUT',
-            message: 'Personal expenses cannot include participantGroupMemberId in splits',
+            message:
+              'Personal expenses cannot include participantGroupMemberId in splits',
           });
         }
 
-        await manager.getRepository(ExpenseSplit).delete({ expense: { id: expense.id } as Partial<Expense> });
-        await this.persistSplits(expense, {
-          splits: dto.splits,
-          amountTotal: dto.amountTotal ?? Number(expense.amountTotal),
-          paidByUserId: dto.paidByUserId ?? expense.paidByUser.id,
-          groupId: expense.group?.id,
-        }, manager);
+        await manager
+          .getRepository(ExpenseSplit)
+          .delete({ expense: { id: expense.id } as Partial<Expense> });
+        await this.persistSplits(
+          expense,
+          {
+            splits: dto.splits,
+            amountTotal: dto.amountTotal ?? Number(expense.amountTotal),
+            paidByUserId: dto.paidByUserId ?? expense.paidByUser.id,
+            groupId: expense.group?.id,
+          },
+          manager,
+        );
       }
 
       if (dto.attachmentKeys) {
-        await manager.getRepository(Attachment).delete({ expense: { id: expense.id } as Partial<Expense> });
+        await manager
+          .getRepository(Attachment)
+          .delete({ expense: { id: expense.id } as Partial<Expense> });
         for (const key of dto.attachmentKeys) {
           await manager.getRepository(Attachment).save(
             manager.getRepository(Attachment).create({
@@ -706,7 +849,11 @@ export class ExpensesService {
         action: 'expense.updated',
         entityId: saved.id,
         groupId: expense.group?.id,
-        metadata: { previousTitle, newTitle: saved.title, amountTotal: Number(saved.amountTotal) },
+        metadata: {
+          previousTitle,
+          newTitle: saved.title,
+          amountTotal: Number(saved.amountTotal),
+        },
       });
     }
 
@@ -730,7 +877,9 @@ export class ExpensesService {
 
     await this.ensureExpenseAccess(userId, expense, true);
 
-    const actorUser = await this.userRepository.findOne({ where: { id: userId } });
+    const actorUser = await this.userRepository.findOne({
+      where: { id: userId },
+    });
 
     if (expense.status === 'draft') {
       await this.expenseRepository.delete({ id: expense.id });
@@ -748,7 +897,11 @@ export class ExpensesService {
         action: 'expense.deleted',
         entityId: expense.id,
         groupId: expense.group?.id,
-        metadata: { title: expense.title, amountTotal: Number(expense.amountTotal), currency: expense.currency },
+        metadata: {
+          title: expense.title,
+          amountTotal: Number(expense.amountTotal),
+          currency: expense.currency,
+        },
       });
     }
   }
@@ -759,7 +912,10 @@ export class ExpensesService {
    * Restore window: the expense must have been deleted within the current
    * calendar month OR within the first 7 days of the following month.
    */
-  async restoreExpense(userId: string, id: string): Promise<Record<string, unknown>> {
+  async restoreExpense(
+    userId: string,
+    id: string,
+  ): Promise<Record<string, unknown>> {
     // withDeleted: true so we can find soft-deleted records
     const expense = await this.expenseRepository.findOne({
       where: { id },
@@ -774,7 +930,8 @@ export class ExpensesService {
     if (!expense.deletedAt) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
-        message: 'This expense has not been deleted and does not need restoring',
+        message:
+          'This expense has not been deleted and does not need restoring',
       });
     }
 
@@ -784,9 +941,20 @@ export class ExpensesService {
     // ── Restore window check ─────────────────────────────────────────────────
     const now = new Date();
     const deletedAt = expense.deletedAt;
-    const deletedMonth = new Date(deletedAt.getFullYear(), deletedAt.getMonth(), 1);
+    const deletedMonth = new Date(
+      deletedAt.getFullYear(),
+      deletedAt.getMonth(),
+      1,
+    );
     // Grace period = last day of deletion month + 7 days
-    const graceEnd = new Date(deletedAt.getFullYear(), deletedAt.getMonth() + 1, 7, 23, 59, 59);
+    const graceEnd = new Date(
+      deletedAt.getFullYear(),
+      deletedAt.getMonth() + 1,
+      7,
+      23,
+      59,
+      59,
+    );
 
     if (now > graceEnd) {
       throw new ForbiddenException({
@@ -798,7 +966,9 @@ export class ExpensesService {
     // Suppress unused variable warning
     void deletedMonth;
 
-    const actorUser = await this.userRepository.findOne({ where: { id: userId } });
+    const actorUser = await this.userRepository.findOne({
+      where: { id: userId },
+    });
 
     // Restore: clear deleted_at and reset status to posted
     await this.expenseRepository.restore({ id: expense.id });
@@ -830,7 +1000,10 @@ export class ExpensesService {
   }
 
   /** Check that the user can restore this expense (access check without write-lock enforcement). */
-  private async ensureRestoreAccess(userId: string, expense: Expense): Promise<void> {
+  private async ensureRestoreAccess(
+    userId: string,
+    expense: Expense,
+  ): Promise<void> {
     if (!expense.group) {
       if (expense.ownerUser.id !== userId) {
         throw new ForbiddenException('You do not have access to this expense');
@@ -848,7 +1021,9 @@ export class ExpensesService {
     // Members can only restore their own; admins/owners can restore any
     if (membership.role === 'member' || membership.role === 'spectator') {
       if (expense.ownerUser.id !== userId) {
-        throw new ForbiddenException('Members can only restore their own expenses');
+        throw new ForbiddenException(
+          'Members can only restore their own expenses',
+        );
       }
     }
   }
@@ -859,7 +1034,9 @@ export class ExpensesService {
    * Monthly expense summary: totals per month for a given year.
    * Only `posted` expenses are included.
    */
-  async getMonthlySummary(filter: AnalyticsFilter & { year: number }): Promise<MonthlyTotal[]> {
+  async getMonthlySummary(
+    filter: AnalyticsFilter & { year: number },
+  ): Promise<MonthlyTotal[]> {
     const { userId, groupId, year } = filter;
 
     await this.assertGroupAccess(userId, groupId);
@@ -867,8 +1044,18 @@ export class ExpensesService {
     const startDate = `${year}-01-01`;
     const endDate = `${year}-12-31`;
 
-    const expenses = await this.buildBaseAnalyticsQuery(userId, groupId, startDate, endDate)
-      .select(['expense.id', 'expense.expenseDate', 'expense.amountTotal', 'expense.currency'])
+    const expenses = await this.buildBaseAnalyticsQuery(
+      userId,
+      groupId,
+      startDate,
+      endDate,
+    )
+      .select([
+        'expense.id',
+        'expense.expenseDate',
+        'expense.amountTotal',
+        'expense.currency',
+      ])
       .getMany();
 
     const groups = new Map<string, { total: number; currency: string }>();
@@ -903,7 +1090,12 @@ export class ExpensesService {
     await this.assertGroupAccess(userId, groupId);
 
     const expenses = await this.buildBaseAnalyticsQuery(userId, groupId)
-      .select(['expense.id', 'expense.expenseDate', 'expense.amountTotal', 'expense.currency'])
+      .select([
+        'expense.id',
+        'expense.expenseDate',
+        'expense.amountTotal',
+        'expense.currency',
+      ])
       .getMany();
 
     const groups = new Map<string, { total: number; currency: string }>();
@@ -932,13 +1124,25 @@ export class ExpensesService {
    * Category distribution: totals per category.
    * Only `posted` expenses are included.
    */
-  async getCategoryDistribution(filter: AnalyticsFilter): Promise<CategoryTotal[]> {
+  async getCategoryDistribution(
+    filter: AnalyticsFilter,
+  ): Promise<CategoryTotal[]> {
     const { userId, groupId, startDate, endDate } = filter;
 
     await this.assertGroupAccess(userId, groupId);
 
-    const expenses = await this.buildBaseAnalyticsQuery(userId, groupId, startDate, endDate)
-      .select(['expense.id', 'expense.category', 'expense.amountTotal', 'expense.currency'])
+    const expenses = await this.buildBaseAnalyticsQuery(
+      userId,
+      groupId,
+      startDate,
+      endDate,
+    )
+      .select([
+        'expense.id',
+        'expense.category',
+        'expense.amountTotal',
+        'expense.currency',
+      ])
       .getMany();
 
     const groups = new Map<string, { total: number; currency: string }>();
@@ -962,7 +1166,12 @@ export class ExpensesService {
     return results.sort((a, b) => b.total - a.total);
   }
 
-  private buildBaseAnalyticsQuery(userId: string, groupId?: string, startDate?: string, endDate?: string) {
+  private buildBaseAnalyticsQuery(
+    userId: string,
+    groupId?: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
     const query = this.expenseRepository
       .createQueryBuilder('expense')
       .leftJoin('expense.ownerUser', 'ownerUser')
@@ -986,7 +1195,10 @@ export class ExpensesService {
     return query;
   }
 
-  private async assertGroupAccess(userId: string, groupId?: string): Promise<void> {
+  private async assertGroupAccess(
+    userId: string,
+    groupId?: string,
+  ): Promise<void> {
     if (!groupId) return;
     const membership = await this.getGroupMembership(userId, groupId);
     if (!membership) {
@@ -1002,10 +1214,22 @@ export class ExpensesService {
     userId: string,
     groupId: string,
     ledgerMonth: string,
-  ): Promise<{ userId: string; displayName: string | null; netBalance: number; currency: string; paid: number; expected: number; percentage: number }[]> {
+  ): Promise<
+    {
+      userId: string;
+      displayName: string | null;
+      netBalance: number;
+      currency: string;
+      paid: number;
+      expected: number;
+      percentage: number;
+    }[]
+  > {
     await this.assertGroupAccess(userId, groupId);
 
-    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
     if (!group) throw new NotFoundException('Group not found');
     if (group.groupType !== 'household') {
       throw new BadRequestException({
@@ -1030,7 +1254,10 @@ export class ExpensesService {
     const normalExpenses = expenses.filter((exp) => !exp.isCarryForward);
 
     // Compute total monthly spending S from normal expenses only
-    const S = normalExpenses.reduce((sum, exp) => sum + Number(exp.amountTotal), 0);
+    const S = normalExpenses.reduce(
+      (sum, exp) => sum + Number(exp.amountTotal),
+      0,
+    );
 
     // Compute normal paid amounts per active user
     const paidMap = new Map<string, number>();
@@ -1043,7 +1270,8 @@ export class ExpensesService {
     }
 
     // Look up monthly contribution percentages
-    const contributions = await this.dataSource.getRepository(GroupMemberContribution)
+    const contributions = await this.dataSource
+      .getRepository(GroupMemberContribution)
       .createQueryBuilder('contribution')
       .innerJoinAndSelect('contribution.groupMember', 'groupMember')
       .where('groupMember.group_id = :groupId', { groupId })
@@ -1066,7 +1294,12 @@ export class ExpensesService {
     const carrySplits = carryExpenseIds.length
       ? await this.expenseSplitRepository.find({
           where: { expense: { id: In(carryExpenseIds) } },
-          relations: ['expense', 'participantUser', 'participantGroupMember', 'participantGroupMember.user'],
+          relations: [
+            'expense',
+            'participantUser',
+            'participantGroupMember',
+            'participantGroupMember.user',
+          ],
         })
       : [];
 
@@ -1080,18 +1313,25 @@ export class ExpensesService {
 
     for (const exp of carryExpenses) {
       const payerId = exp.paidByUser.id;
-      carryPaidMap.set(payerId, (carryPaidMap.get(payerId) ?? 0) + Number(exp.amountTotal));
+      carryPaidMap.set(
+        payerId,
+        (carryPaidMap.get(payerId) ?? 0) + Number(exp.amountTotal),
+      );
     }
 
     for (const split of carrySplits) {
-      const participantId = split.participantUser?.id || split.participantGroupMember?.user?.id;
+      const participantId =
+        split.participantUser?.id || split.participantGroupMember?.user?.id;
       if (participantId) {
-        carryOwedMap.set(participantId, (carryOwedMap.get(participantId) ?? 0) + Number(split.amountOwed));
+        carryOwedMap.set(
+          participantId,
+          (carryOwedMap.get(participantId) ?? 0) + Number(split.amountOwed),
+        );
       }
     }
 
     return activeMembers.map((m) => {
-      const pct = contributionMap.get(m.id) ?? (100 / activeMembers.length);
+      const pct = contributionMap.get(m.id) ?? 100 / activeMembers.length;
       const TuNormal = S * (pct / 100);
       const PuNormal = paidMap.get(m.user.id) ?? 0;
 
@@ -1113,7 +1353,15 @@ export class ExpensesService {
     });
   }
 
-  private simplifyDebts(balances: { userId: string; balance: number }[], currency: string): { fromUserId: string; toUserId: string; amount: number; currency: string }[] {
+  private simplifyDebts(
+    balances: { userId: string; balance: number }[],
+    currency: string,
+  ): {
+    fromUserId: string;
+    toUserId: string;
+    amount: number;
+    currency: string;
+  }[] {
     let activeBalances = balances
       .map((b) => ({
         userId: b.userId,
@@ -1121,7 +1369,12 @@ export class ExpensesService {
       }))
       .filter((b) => Math.abs(b.balance) >= 0.01);
 
-    const transactions: { fromUserId: string; toUserId: string; amount: number; currency: string }[] = [];
+    const transactions: {
+      fromUserId: string;
+      toUserId: string;
+      amount: number;
+      currency: string;
+    }[] = [];
 
     while (true) {
       const debtors = activeBalances
@@ -1168,8 +1421,10 @@ export class ExpensesService {
 
       activeBalances = activeBalances
         .map((b) => {
-          if (b.userId === debtor.userId) return { ...b, balance: debtor.balance };
-          if (b.userId === creditor.userId) return { ...b, balance: creditor.balance };
+          if (b.userId === debtor.userId)
+            return { ...b, balance: debtor.balance };
+          if (b.userId === creditor.userId)
+            return { ...b, balance: creditor.balance };
           return b;
         })
         .filter((b) => Math.abs(b.balance) >= 0.01);
@@ -1192,11 +1447,18 @@ export class ExpensesService {
       },
       relations: ['user'],
     });
-    if (!callerMember || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
-      throw new ForbiddenException('Only owners and admins can close a billing month');
+    if (
+      !callerMember ||
+      (callerMember.role !== 'owner' && callerMember.role !== 'admin')
+    ) {
+      throw new ForbiddenException(
+        'Only owners and admins can close a billing month',
+      );
     }
 
-    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
     if (!group) throw new NotFoundException('Group not found');
     if (group.groupType !== 'household') {
       throw new BadRequestException({
@@ -1221,7 +1483,11 @@ export class ExpensesService {
 
     // Verify duplicate closure
     const existingCarryForward = await this.expenseRepository.count({
-      where: { group: { id: groupId }, ledgerMonth: nextLedgerMonth, isCarryForward: true },
+      where: {
+        group: { id: groupId },
+        ledgerMonth: nextLedgerMonth,
+        isCarryForward: true,
+      },
     });
     if (existingCarryForward > 0) {
       throw new BadRequestException({
@@ -1233,7 +1499,11 @@ export class ExpensesService {
     let carryForwardExpenseCount = 0;
 
     if (group.carryForwardEnabled) {
-      const summary = await this.getCarryForwardSummary(userId, groupId, ledgerMonth);
+      const summary = await this.getCarryForwardSummary(
+        userId,
+        groupId,
+        ledgerMonth,
+      );
       const balances = summary.map((s) => ({
         userId: s.userId,
         balance: s.netBalance,
@@ -1245,8 +1515,12 @@ export class ExpensesService {
       if (simplified.length > 0) {
         await this.dataSource.transaction(async (manager) => {
           for (const tx of simplified) {
-            const debtorUser = await manager.getRepository(User).findOne({ where: { id: tx.fromUserId } });
-            const creditorUser = await manager.getRepository(User).findOne({ where: { id: tx.toUserId } });
+            const debtorUser = await manager
+              .getRepository(User)
+              .findOne({ where: { id: tx.fromUserId } });
+            const creditorUser = await manager
+              .getRepository(User)
+              .findOne({ where: { id: tx.toUserId } });
             if (!debtorUser || !creditorUser) continue;
 
             const expense = manager.create(Expense, {
@@ -1295,7 +1569,12 @@ export class ExpensesService {
    * List soft-deleted expenses (for group history / restore UI).
    * Returns only expenses with deletedAt set, within the given group.
    */
-  async listDeletedExpenses(userId: string, groupId: string, page: number, limit: number): Promise<PaginatedResponse<Record<string, unknown>>> {
+  async listDeletedExpenses(
+    userId: string,
+    groupId: string,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResponse<Record<string, unknown>>> {
     await this.assertGroupAccess(userId, groupId);
 
     const p = page > 0 ? page : 1;
@@ -1318,12 +1597,24 @@ export class ExpensesService {
       .take(l)
       .getMany();
 
-    const mapped = await Promise.all(expenses.map((e) => this.mapExpenseResponse(e)));
-    return paginate(mapped, total, p, l, `/api/v1/groups/${groupId}/expenses/deleted`, {});
+    const mapped = await Promise.all(
+      expenses.map((e) => this.mapExpenseResponse(e)),
+    );
+    return paginate(
+      mapped,
+      total,
+      p,
+      l,
+      `/api/v1/groups/${groupId}/expenses/deleted`,
+      {},
+    );
   }
 
   /** Combined category-level aggregated monthly expenditures (personal + group splits) */
-  async getCombinedMonthlyAnalytics(userId: string, month: string): Promise<{ category: string; amount: number; currency: string }[]> {
+  async getCombinedMonthlyAnalytics(
+    userId: string,
+    month: string,
+  ): Promise<{ category: string; amount: number; currency: string }[]> {
     // 1. Get all group-less posted expenses paid by the user in this month
     const paidPersonalExpenses = await this.expenseRepository
       .createQueryBuilder('expense')
@@ -1331,7 +1622,9 @@ export class ExpensesService {
       .where('expense.group IS NULL')
       .andWhere('paidByUser.id = :userId', { userId })
       .andWhere('expense.status = :status', { status: 'posted' })
-      .andWhere('expense.expenseDate LIKE :monthPrefix', { monthPrefix: `${month}%` })
+      .andWhere('expense.expenseDate LIKE :monthPrefix', {
+        monthPrefix: `${month}%`,
+      })
       .getMany();
 
     // 2. Fetch splits for those personal expenses to identify which are 100% personal vs direct splits
@@ -1342,7 +1635,9 @@ export class ExpensesService {
           relations: ['expense'],
         })
       : [];
-    const personalExpenseHasSplits = new Set(personalSplits.map((s) => s.expense.id));
+    const personalExpenseHasSplits = new Set(
+      personalSplits.map((s) => s.expense.id),
+    );
 
     // 3. Get all splits where the user is a participant (either direct user split or group member split)
     const userSplits = await this.expenseSplitRepository
@@ -1350,10 +1645,13 @@ export class ExpensesService {
       .innerJoinAndSelect('split.expense', 'expense')
       .leftJoin('split.participantGroupMember', 'groupMember')
       .where('expense.status = :status', { status: 'posted' })
-      .andWhere('(expense.ledgerMonth = :month OR expense.expenseDate LIKE :monthPrefix)', { month, monthPrefix: `${month}%` })
+      .andWhere(
+        '(expense.ledgerMonth = :month OR expense.expenseDate LIKE :monthPrefix)',
+        { month, monthPrefix: `${month}%` },
+      )
       .andWhere(
         '(split.participantUserId = :userId OR groupMember.user_id = :userId)',
-        { userId }
+        { userId },
       )
       .getMany();
 

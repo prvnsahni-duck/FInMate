@@ -7,7 +7,7 @@ describe('StatsCardComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [StatsCardComponent]
+      imports: [StatsCardComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(StatsCardComponent);
@@ -27,7 +27,9 @@ describe('StatsCardComponent', () => {
     fixture.detectChanges();
 
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h3')?.textContent?.trim()).toBe('Total Balance');
+    expect(compiled.querySelector('h3')?.textContent?.trim()).toBe(
+      'Total Balance',
+    );
     expect(compiled.querySelector('p')?.textContent?.trim()).toBe('$1,000.00');
     expect(compiled.querySelector('path')?.getAttribute('d')).toBe('M3 22h18');
   });

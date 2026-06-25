@@ -1,17 +1,44 @@
-import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges, inject } from '@angular/core';
-import { ReactiveFormsModule, FormsModule, FormBuilder, Validators } from '@angular/forms';
+import {
+  Component,
+  Input,
+  Output,
+  EventEmitter,
+  OnChanges,
+  SimpleChanges,
+  inject,
+} from '@angular/core';
+import {
+  ReactiveFormsModule,
+  FormsModule,
+  FormBuilder,
+  Validators,
+} from '@angular/forms';
 import { jwtDecode } from 'jwt-decode';
 import { RecurringExpensesService } from '../../services/recurring-expenses.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
-import { CreateRecurringExpenseDto, RecurringExpenseSplitInputDto, GroupMember, JwtPayload, UpdateRecurringExpenseDto } from '@finmate/data-models';
-import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
+import {
+  CreateRecurringExpenseDto,
+  RecurringExpenseSplitInputDto,
+  GroupMember,
+  JwtPayload,
+  UpdateRecurringExpenseDto,
+} from '@finmate/data-models';
+import {
+  DropdownComponent,
+  DropdownOption,
+} from '../../../../shared/components/dropdown/dropdown.component';
 
 @Component({
   selector: 'app-recurring-expense-form',
   standalone: true,
-  imports: [ReactiveFormsModule, FormsModule, SubmitButtonComponent, DropdownComponent],
+  imports: [
+    ReactiveFormsModule,
+    FormsModule,
+    SubmitButtonComponent,
+    DropdownComponent,
+  ],
   templateUrl: './recurring-expense-form.component.html',
-  styleUrls: ['./recurring-expense-form.component.css']
+  styleUrls: ['./recurring-expense-form.component.css'],
 })
 export class RecurringExpenseFormComponent implements OnChanges {
   private recurringExpensesService = inject(RecurringExpensesService);
@@ -20,7 +47,7 @@ export class RecurringExpenseFormComponent implements OnChanges {
   currencyOptions: DropdownOption[] = [
     { value: 'USD', label: 'USD ($)' },
     { value: 'INR', label: 'INR (₹)' },
-    { value: 'EUR', label: 'EUR (€)' }
+    { value: 'EUR', label: 'EUR (€)' },
   ];
 
   categoryOptions: DropdownOption[] = [
@@ -30,20 +57,20 @@ export class RecurringExpenseFormComponent implements OnChanges {
     { value: 'Subscription', label: 'Subscription' },
     { value: 'Travel & Commute', label: 'Travel & Commute' },
     { value: 'Entertainment', label: 'Entertainment' },
-    { value: 'Others', label: 'Others' }
+    { value: 'Others', label: 'Others' },
   ];
 
   frequencyOptions: DropdownOption[] = [
     { value: 'daily', label: 'Daily' },
     { value: 'weekly', label: 'Weekly' },
     { value: 'monthly', label: 'Monthly' },
-    { value: 'yearly', label: 'Yearly' }
+    { value: 'yearly', label: 'Yearly' },
   ];
 
   get payerOptions(): DropdownOption[] {
-    return this.availablePayers.map(p => ({
+    return this.availablePayers.map((p) => ({
       value: p.id,
-      label: p.name
+      label: p.name,
     }));
   }
 
@@ -62,9 +89,15 @@ export class RecurringExpenseFormComponent implements OnChanges {
   form = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(160)]],
     description: [''],
-    amountTotal: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    amountTotal: [
+      null as number | null,
+      [Validators.required, Validators.min(0.01)],
+    ],
     currency: ['', [Validators.required]],
-    category: ['Food & Drinks', [Validators.required, Validators.maxLength(64)]],
+    category: [
+      'Food & Drinks',
+      [Validators.required, Validators.maxLength(64)],
+    ],
     frequency: ['monthly' as const, [Validators.required]],
     startDate: [this.getTodayDateString(), [Validators.required]],
     endDate: [''],
@@ -99,7 +132,10 @@ export class RecurringExpenseFormComponent implements OnChanges {
 
   get availablePayers() {
     if (this.groupId) {
-      return this.members.map(m => ({ id: m.user.id, name: m.user.displayName || m.user.email }));
+      return this.members.map((m) => ({
+        id: m.user.id,
+        name: m.user.displayName || m.user.email,
+      }));
     } else {
       const currentUserId = this.getCurrentUserId();
       return currentUserId ? [{ id: currentUserId, name: 'You' }] : [];
@@ -109,8 +145,11 @@ export class RecurringExpenseFormComponent implements OnChanges {
   get availableParticipants() {
     if (this.groupId) {
       return this.members
-        .filter(m => m.role !== 'spectator')
-        .map(m => ({ id: m.user.id, name: m.user.displayName || m.user.email }));
+        .filter((m) => m.role !== 'spectator')
+        .map((m) => ({
+          id: m.user.id,
+          name: m.user.displayName || m.user.email,
+        }));
     } else {
       const currentUserId = this.getCurrentUserId();
       return currentUserId ? [{ id: currentUserId, name: 'You' }] : [];
@@ -144,14 +183,20 @@ export class RecurringExpenseFormComponent implements OnChanges {
 
     if (changes['members'] && this.members) {
       this.selectedUserIds.clear();
-      this.members.forEach(m => {
-        if ((m.joinStatus === 'active' || m.joinStatus === 'invited') && m.role !== 'spectator') {
+      this.members.forEach((m) => {
+        if (
+          (m.joinStatus === 'active' || m.joinStatus === 'invited') &&
+          m.role !== 'spectator'
+        ) {
           this.selectedUserIds.add(m.user.id);
         }
       });
-      
+
       const currentUserId = this.getCurrentUserId();
-      if (currentUserId && this.members.some(m => m.user.id === currentUserId)) {
+      if (
+        currentUserId &&
+        this.members.some((m) => m.user.id === currentUserId)
+      ) {
         this.form.patchValue({ paidByUserId: currentUserId });
       } else if (this.members.length > 0) {
         this.form.patchValue({ paidByUserId: this.members[0].user.id });
@@ -186,10 +231,12 @@ export class RecurringExpenseFormComponent implements OnChanges {
       this.errorMessage = '';
 
       const val = this.form.value;
-      const splits: RecurringExpenseSplitInputDto[] = Array.from(this.selectedUserIds).map(userId => ({
+      const splits: RecurringExpenseSplitInputDto[] = Array.from(
+        this.selectedUserIds,
+      ).map((userId) => ({
         participantUserId: userId,
         splitType: 'equal' as const,
-        shareValue: 1
+        shareValue: 1,
       }));
 
       const payload: CreateRecurringExpenseDto = {
@@ -203,14 +250,17 @@ export class RecurringExpenseFormComponent implements OnChanges {
         endDate: val.endDate || undefined,
         paidByUserId: val.paidByUserId!,
         groupId: this.groupId ?? undefined,
-        splits
+        splits,
       };
 
       const request$ = this.template
-        ? this.recurringExpensesService.updateRecurringExpense(this.template.id, {
-            ...payload,
-            version: this.template.version
-          } satisfies UpdateRecurringExpenseDto)
+        ? this.recurringExpensesService.updateRecurringExpense(
+            this.template.id,
+            {
+              ...payload,
+              version: this.template.version,
+            } satisfies UpdateRecurringExpenseDto,
+          )
         : this.recurringExpensesService.createRecurringExpense(payload);
 
       request$.subscribe({
@@ -220,8 +270,9 @@ export class RecurringExpenseFormComponent implements OnChanges {
         },
         error: (err) => {
           this.isSubmitting = false;
-          this.errorMessage = err.error?.message || 'Failed to save recurring expense';
-        }
+          this.errorMessage =
+            err.error?.message || 'Failed to save recurring expense';
+        },
       });
     }
   }

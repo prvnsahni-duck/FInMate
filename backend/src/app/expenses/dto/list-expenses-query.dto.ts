@@ -1,4 +1,12 @@
-import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 // Local query DTO skeleton for listing/filtering expenses.
 export class ListExpensesQueryDto {

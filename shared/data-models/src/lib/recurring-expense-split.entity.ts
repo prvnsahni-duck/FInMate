@@ -1,10 +1,20 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, Check } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToOne,
+  Check,
+} from 'typeorm';
 import { RecurringExpense } from './recurring-expense.entity';
 import { User } from './user.entity';
 import { GroupMember } from './group-member.entity';
 
 @Entity('recurring_expense_splits')
-@Check('("participantUserId" IS NOT NULL AND "participantGroupMemberId" IS NULL) OR ("participantUserId" IS NULL AND "participantGroupMemberId" IS NOT NULL)')
+@Check(
+  '("participantUserId" IS NOT NULL AND "participantGroupMemberId" IS NULL) OR ("participantUserId" IS NULL AND "participantGroupMemberId" IS NOT NULL)',
+)
 export class RecurringExpenseSplit {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

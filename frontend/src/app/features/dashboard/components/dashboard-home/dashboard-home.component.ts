@@ -3,6 +3,7 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StatsCardComponent } from '../../../../shared/components/stats-card/stats-card.component';
 import { IconComponent } from '../../../../shared/components/icon/icon.component';
+import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
 
 @Component({
   selector: 'app-dashboard-home',
@@ -63,41 +64,5 @@ export class DashboardHomeComponent {
   inboxIconPath =
     'M20 12h-4l-3 3h-2l-3-3H4V6h16v6z M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2z';
 
-  getCategoryBadgeClass(category: string): string {
-    switch (category) {
-      case 'Food & Drinks':
-        return 'bg-success/10 text-success border border-success/20';
-      case 'Travel':
-        return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20';
-      case 'Utilities':
-        return 'bg-accent/10 text-accent border border-accent/20';
-      case 'Entertainment':
-        return 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20';
-      case 'Shopping':
-        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
-      case 'Housing':
-        return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20';
-      default:
-        return 'bg-secondary/10 text-secondary/75 border border-secondary/20';
-    }
-  }
-
-  getCategoryIconPath(category: string): string {
-    switch (category) {
-      case 'Food & Drinks':
-        return 'M17 2v7h2V2h2v7a4 4 0 01-4 4v9h-2v-9a4 4 0 01-4-4V2h2v7h2V2h2z M6 2v8h2v12H6v-12H4V2h2z';
-      case 'Travel':
-        return 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z';
-      case 'Utilities':
-        return 'M13 10V3L4 14h7v7l9-11h-7z';
-      case 'Entertainment':
-        return 'M21 12a9 9 0 11-18 0 9 9 0 0118 0z M10 8l7 4-7 4V8z';
-      case 'Shopping':
-        return 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z';
-      case 'Housing':
-        return 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6';
-      default:
-        return 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2';
-    }
-  }
+  categoryOptions = CATEGORY_OPTIONS;
 }

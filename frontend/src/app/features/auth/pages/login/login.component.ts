@@ -10,7 +10,7 @@ import { LoginDto } from '@finmate/data-models';
   selector: 'app-login',
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink, SubmitButtonComponent],
-  templateUrl: './login.component.html'
+  templateUrl: './login.component.html',
 })
 export class LoginComponent {
   private fb = inject(FormBuilder);
@@ -19,7 +19,7 @@ export class LoginComponent {
 
   loginForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
-    password: ['', [Validators.required]]
+    password: ['', [Validators.required]],
   });
 
   isLoading = false;
@@ -29,7 +29,7 @@ export class LoginComponent {
     if (this.loginForm.valid) {
       this.isLoading = true;
       this.errorMessage = '';
-      
+
       const value = this.loginForm.getRawValue();
       const payload: LoginDto = {
         email: value.email ?? '',
@@ -42,8 +42,9 @@ export class LoginComponent {
         },
         error: (err) => {
           this.isLoading = false;
-          this.errorMessage = err.error?.message || 'Login failed. Please try again.';
-        }
+          this.errorMessage =
+            err.error?.message || 'Login failed. Please try again.';
+        },
       });
     }
   }

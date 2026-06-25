@@ -58,7 +58,9 @@ describe('RedisService', () => {
     });
 
     it('returns false and logs error on redis client error', async () => {
-      mockRedisClient.set.mockRejectedValueOnce(new Error('Redis command timeout'));
+      mockRedisClient.set.mockRejectedValueOnce(
+        new Error('Redis command timeout'),
+      );
       const result = await service.setNx('test-key', 'test-val', 10);
       expect(result).toBe(false);
     });

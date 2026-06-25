@@ -1,6 +1,16 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuditLog, Attachment, Expense, ExpenseSplit, Group, GroupMember, User, RecurringExpense, RecurringExpenseSplit } from '@finmate/data-models';
+import {
+  AuditLog,
+  Attachment,
+  Expense,
+  ExpenseSplit,
+  Group,
+  GroupMember,
+  User,
+  RecurringExpense,
+  RecurringExpenseSplit,
+} from '@finmate/data-models';
 import { ExpensesController } from './expenses.controller';
 import { ExpensesService } from './expenses.service';
 import { RecurringExpensesController } from './recurring-expenses.controller';

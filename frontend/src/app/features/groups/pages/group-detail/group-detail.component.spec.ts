@@ -28,7 +28,7 @@ describe('GroupDetailComponent', () => {
     groupType: 'household',
     carryForwardEnabled: true,
     visibility: 'private',
-    version: 1
+    version: 1,
   };
 
   const mockMembers: GroupMember[] = [
@@ -36,26 +36,42 @@ describe('GroupDetailComponent', () => {
       id: 'member-owner',
       joinStatus: 'active',
       role: 'owner',
-      user: { id: 'user-owner', email: 'owner@household.com', displayName: 'Owner User' }
+      user: {
+        id: 'user-owner',
+        email: 'owner@household.com',
+        displayName: 'Owner User',
+      },
     } as any,
     {
       id: 'member-admin',
       joinStatus: 'active',
       role: 'admin',
-      user: { id: 'user-admin', email: 'admin@household.com', displayName: 'Admin User' }
+      user: {
+        id: 'user-admin',
+        email: 'admin@household.com',
+        displayName: 'Admin User',
+      },
     } as any,
     {
       id: 'member-contributor',
       joinStatus: 'active',
       role: 'member',
-      user: { id: 'user-contributor', email: 'contributor@household.com', displayName: 'Contributor User' }
+      user: {
+        id: 'user-contributor',
+        email: 'contributor@household.com',
+        displayName: 'Contributor User',
+      },
     } as any,
     {
       id: 'member-viewer',
       joinStatus: 'active',
       role: 'viewer',
-      user: { id: 'user-viewer', email: 'viewer@household.com', displayName: 'Viewer User' }
-    } as any
+      user: {
+        id: 'user-viewer',
+        email: 'viewer@household.com',
+        displayName: 'Viewer User',
+      },
+    } as any,
   ];
 
   beforeEach(async () => {
@@ -65,32 +81,46 @@ describe('GroupDetailComponent', () => {
     mockGroupsService = {
       getGroup: jest.fn().mockReturnValue(of(mockGroup)),
       getMembers: jest.fn().mockReturnValue(of(mockMembers)),
-      getBalances: jest.fn().mockReturnValue(of({ balances: [], suggestedSettlements: [] })),
+      getBalances: jest
+        .fn()
+        .mockReturnValue(of({ balances: [], suggestedSettlements: [] })),
       getHistoryLogs: jest.fn().mockReturnValue(of({ data: [] })),
       getDeletedExpenses: jest.fn().mockReturnValue(of({ data: [] })),
       getCarryForward: jest.fn().mockReturnValue(of([])),
-      getContributions: jest.fn().mockReturnValue(of([
-        { memberId: 'member-owner', displayName: 'Owner User', percentage: 50 },
-        { memberId: 'member-admin', displayName: 'Admin User', percentage: 50 }
-      ])),
+      getContributions: jest.fn().mockReturnValue(
+        of([
+          {
+            memberId: 'member-owner',
+            displayName: 'Owner User',
+            percentage: 50,
+          },
+          {
+            memberId: 'member-admin',
+            displayName: 'Admin User',
+            percentage: 50,
+          },
+        ]),
+      ),
       updateContributions: jest.fn().mockReturnValue(of({})),
       updateMember: jest.fn().mockReturnValue(of({})),
-      removeMember: jest.fn().mockReturnValue(of({}))
+      removeMember: jest.fn().mockReturnValue(of({})),
     } as any;
 
     mockExpensesService = {
-      getExpenses: jest.fn().mockReturnValue(of({ data: [], meta: { totalItems: 0 } }))
+      getExpenses: jest
+        .fn()
+        .mockReturnValue(of({ data: [], meta: { totalItems: 0 } })),
     } as any;
 
     mockRecurringExpensesService = {
       getRecurringExpenses: jest.fn().mockReturnValue(of([])),
       createRecurringExpense: jest.fn().mockReturnValue(of({})),
       updateRecurringExpense: jest.fn().mockReturnValue(of({})),
-      deleteRecurringExpense: jest.fn().mockReturnValue(of(null))
+      deleteRecurringExpense: jest.fn().mockReturnValue(of(null)),
     };
 
     mockActivatedRoute = {
-      paramMap: of(convertToParamMap({ id: 'group-1' }))
+      paramMap: of(convertToParamMap({ id: 'group-1' })),
     };
 
     await TestBed.configureTestingModule({
@@ -98,20 +128,25 @@ describe('GroupDetailComponent', () => {
       providers: [
         { provide: GroupsService, useValue: mockGroupsService },
         { provide: ExpensesService, useValue: mockExpensesService },
-        { provide: RecurringExpensesService, useValue: mockRecurringExpensesService },
+        {
+          provide: RecurringExpensesService,
+          useValue: mockRecurringExpensesService,
+        },
         provideRouter([]),
-        { provide: ActivatedRoute, useValue: mockActivatedRoute } // Listed LAST to override provideRouter
-      ]
-    }).overrideComponent(GroupDetailComponent, {
-      set: {
-        imports: [CurrencyPipe, DatePipe, FormsModule],
-        schemas: [NO_ERRORS_SCHEMA]
-      }
-    }).compileComponents();
+        { provide: ActivatedRoute, useValue: mockActivatedRoute }, // Listed LAST to override provideRouter
+      ],
+    })
+      .overrideComponent(GroupDetailComponent, {
+        set: {
+          imports: [CurrencyPipe, DatePipe, FormsModule],
+          schemas: [NO_ERRORS_SCHEMA],
+        },
+      })
+      .compileComponents();
 
     fixture = TestBed.createComponent(GroupDetailComponent);
     component = fixture.componentInstance;
-    
+
     // Default currentUserId spy
     jest.spyOn(component, 'getCurrentUserId').mockReturnValue('user-owner');
   });
@@ -143,7 +178,7 @@ describe('GroupDetailComponent', () => {
     component.contributionsList = [
       { memberId: 'm1', displayName: 'User 1', amount: 3, percentage: 0 },
       { memberId: 'm2', displayName: 'User 2', amount: 3, percentage: 0 },
-      { memberId: 'm3', displayName: 'User 3', amount: 3, percentage: 0 }
+      { memberId: 'm3', displayName: 'User 3', amount: 3, percentage: 0 },
     ];
 
     // 3 / 9 = 33.333... %
@@ -168,9 +203,9 @@ describe('GroupDetailComponent', () => {
     jest.spyOn(component, 'getCurrentUserId').mockReturnValue('user-admin');
     fixture.detectChanges(); // sets currentUserId, caller role is admin
 
-    const contributor = mockMembers.find(m => m.role === 'member')!;
-    const owner = mockMembers.find(m => m.role === 'owner')!;
-    const otherAdmin = mockMembers.find(m => m.role === 'admin')!;
+    const contributor = mockMembers.find((m) => m.role === 'member')!;
+    const owner = mockMembers.find((m) => m.role === 'owner')!;
+    const otherAdmin = mockMembers.find((m) => m.role === 'admin')!;
 
     expect(component.canChangeRole(contributor)).toBe(true);
     expect(component.canChangeRole(owner)).toBe(true);
@@ -184,21 +219,28 @@ describe('GroupDetailComponent', () => {
 
   it('should call updateMember when updateMemberRole is called', () => {
     fixture.detectChanges();
-    const contributor = mockMembers.find(m => m.role === 'member')!;
+    const contributor = mockMembers.find((m) => m.role === 'member')!;
     const mockEvent = { target: { value: 'admin' } };
 
     component.updateMemberRole(contributor, mockEvent);
 
-    expect(mockGroupsService.updateMember).toHaveBeenCalledWith('group-1', contributor.id, { role: 'admin' });
+    expect(mockGroupsService.updateMember).toHaveBeenCalledWith(
+      'group-1',
+      contributor.id,
+      { role: 'admin' },
+    );
   });
 
   it('should call removeMember when removeOrRevokeMember is confirmed', () => {
     fixture.detectChanges();
-    const contributor = mockMembers.find(m => m.role === 'member')!;
+    const contributor = mockMembers.find((m) => m.role === 'member')!;
     jest.spyOn(window, 'confirm').mockReturnValue(true);
 
     component.removeOrRevokeMember(contributor);
 
-    expect(mockGroupsService.removeMember).toHaveBeenCalledWith('group-1', contributor.id);
+    expect(mockGroupsService.removeMember).toHaveBeenCalledWith(
+      'group-1',
+      contributor.id,
+    );
   });
 });

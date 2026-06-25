@@ -3,7 +3,7 @@ import { Component, Input } from '@angular/core';
 @Component({
   selector: 'app-dashboard-profile',
   standalone: true,
-  templateUrl: './dashboard-profile.component.html'
+  templateUrl: './dashboard-profile.component.html',
 })
 export class DashboardProfileComponent {
   @Input() userName = '';

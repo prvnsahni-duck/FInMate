@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -20,7 +25,8 @@ export class GroupRolesGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    const groupId = request.params.id || request.params.groupId || request.body.groupId;
+    const groupId =
+      request.params.id || request.params.groupId || request.body.groupId;
 
     if (!user || !groupId) {
       throw new ForbiddenException({
@@ -30,12 +36,20 @@ export class GroupRolesGuard implements CanActivate {
     }
 
     let membership = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: user.id }, joinStatus: 'active' },
+      where: {
+        group: { id: groupId },
+        user: { id: user.id },
+        joinStatus: 'active',
+      },
     });
 
     if (!membership) {
       membership = await this.groupMemberRepository.findOne({
-        where: { group: { id: groupId }, user: { id: user.id }, joinStatus: 'invited' },
+        where: {
+          group: { id: groupId },
+          user: { id: user.id },
+          joinStatus: 'invited',
+        },
       });
 
       if (!membership) {
@@ -45,8 +59,11 @@ export class GroupRolesGuard implements CanActivate {
         });
       }
 
-      const isSelfUpdate = request.method === 'PATCH' && request.params.memberId === membership.id;
-      const isSelfRemove = request.method === 'DELETE' && request.params.memberId === membership.id;
+      const isSelfUpdate =
+        request.method === 'PATCH' && request.params.memberId === membership.id;
+      const isSelfRemove =
+        request.method === 'DELETE' &&
+        request.params.memberId === membership.id;
       if (!isSelfUpdate && !isSelfRemove) {
         throw new ForbiddenException({
           errorCode: 'RES_FORBIDDEN',

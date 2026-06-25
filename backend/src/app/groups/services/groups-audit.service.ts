@@ -15,4 +15,3 @@ export class GroupsAuditService {
     return this.groupsService.getGroupHistory(userId, groupId, page, limit);
   }
 }
-

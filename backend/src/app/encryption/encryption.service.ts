@@ -1,6 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  createHash,
+} from 'crypto';
 import { EntityEncryptionHolder } from '@finmate/data-models';
 
 @Injectable()
@@ -9,10 +14,12 @@ export class EncryptionService {
   private readonly key: Buffer;
 
   constructor(private readonly configService: ConfigService) {
-    const rawSecret = this.configService.get<string>('ENCRYPTION_KEY') || 'default_encryption_key_for_finmate_development_phase';
+    const rawSecret =
+      this.configService.get<string>('ENCRYPTION_KEY') ||
+      'default_encryption_key_for_finmate_development_phase';
     // Ensure key is exactly 32 bytes by hashing the secret using SHA-256
     this.key = createHash('sha256').update(rawSecret).digest();
-    
+
     // Register this instance with the static data-models encryption holder
     EntityEncryptionHolder.setService(this);
   }
@@ -21,10 +28,10 @@ export class EncryptionService {
     try {
       const iv = randomBytes(12);
       const cipher = createCipheriv('aes-256-gcm', this.key, iv);
-      
+
       let encrypted = cipher.update(text, 'utf8', 'hex');
       encrypted += cipher.final('hex');
-      
+
       const authTag = cipher.getAuthTag().toString('hex');
       return `${iv.toString('hex')}:${encrypted}:${authTag}`;
     } catch (err: any) {
@@ -49,7 +56,7 @@ export class EncryptionService {
 
       let decrypted = decipher.update(encrypted, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
-      
+
       return decrypted;
     } catch (err: any) {
       this.logger.error(`Decryption failed: ${err.message}`, err.stack);

@@ -4,11 +4,17 @@ import { SuccessResponse } from '../common/response.util';
 
 @Controller('invite-links')
 export class InviteController {
-  constructor(private readonly groupsMembershipService: GroupsMembershipService) {}
+  constructor(
+    private readonly groupsMembershipService: GroupsMembershipService,
+  ) {}
 
   @Get(':inviteToken')
   async getDetails(@Param('inviteToken', ParseUUIDPipe) inviteToken: string) {
-    const result = await this.groupsMembershipService.getInviteDetails(inviteToken);
-    return new SuccessResponse('Invite link details retrieved successfully', result);
+    const result =
+      await this.groupsMembershipService.getInviteDetails(inviteToken);
+    return new SuccessResponse(
+      'Invite link details retrieved successfully',
+      result,
+    );
   }
 }

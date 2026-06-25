@@ -21,11 +21,18 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideBrowserGlobalErrorListeners(),
     provideRouter(appRoutes),
-    provideHttpClient(withInterceptors([responseInterceptor, jwtInterceptor, optimisticLockInterceptor, errorInterceptor])),
+    provideHttpClient(
+      withInterceptors([
+        responseInterceptor,
+        jwtInterceptor,
+        optimisticLockInterceptor,
+        errorInterceptor,
+      ]),
+    ),
     provideStore(
       [AuthState, RecurringExpensesState], // Register AuthState and RecurringExpensesState
       withNgxsReduxDevtoolsPlugin(),
-      withNgxsLoggerPlugin()
-    )
+      withNgxsLoggerPlugin(),
+    ),
   ],
 };

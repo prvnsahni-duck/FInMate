@@ -1,7 +1,19 @@
-import { HttpClient, HttpErrorResponse, provideHttpClient, withInterceptors } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  provideHttpClient,
+  withInterceptors,
+} from '@angular/common/http';
+import {
+  HttpTestingController,
+  provideHttpClientTesting,
+} from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { APP_HTTP_ERROR_EVENT, AppHttpErrorEventDetail, errorInterceptor } from './error.interceptor';
+import {
+  APP_HTTP_ERROR_EVENT,
+  AppHttpErrorEventDetail,
+  errorInterceptor,
+} from './error.interceptor';
 
 describe('errorInterceptor', () => {
   let http: HttpClient;
@@ -41,9 +53,13 @@ describe('errorInterceptor', () => {
 
     const req = httpTesting.expectOne('/api/test');
     req.flush(
-      { statusCode: 400, errorCode: 'VAL_INVALID_INPUT', message: 'Invalid amount', retryable: false },
+      {
+        statusCode: 400,
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Invalid amount',
+        retryable: false,
+      },
       { status: 400, statusText: 'Bad Request' },
     );
   });
 });
-

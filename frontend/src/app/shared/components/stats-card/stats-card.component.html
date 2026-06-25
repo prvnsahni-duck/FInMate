@@ -1,12 +1,18 @@
-<div class="card-glass p-6 relative overflow-hidden hover:scale-[1.01] transition-all duration-300">
+<div
+  class="card-glass p-6 relative overflow-hidden hover:scale-[1.01] transition-all duration-300"
+>
   <div class="flex justify-between items-center">
     <div>
-      <h3 class="text-secondary/50 text-[11px] font-extrabold uppercase tracking-wider mb-1">
+      <h3
+        class="text-secondary/50 text-[11px] font-extrabold uppercase tracking-wider mb-1"
+      >
         {{ title() }}
       </h3>
       <p
         class="text-3xl font-extrabold tracking-tight"
-        [class.text-secondary]="type() === 'primary' || type() === 'default' || type() === 'accent'"
+        [class.text-secondary]="
+          type() === 'primary' || type() === 'default' || type() === 'accent'
+        "
         [class.text-error]="type() === 'error'"
         [class.text-success]="type() === 'success'"
       >
@@ -17,11 +23,16 @@
       <div
         class="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm"
         [ngClass]="{
-          'bg-primary/10 text-primary border-primary/20 shadow-primary/5': type() === 'primary',
-          'bg-error/10 text-error border-error/20 shadow-error/5': type() === 'error',
-          'bg-accent/10 text-accent border-accent/20 shadow-accent/5': type() === 'accent',
-          'bg-success/10 text-success border-success/20 shadow-success/5': type() === 'success',
-          'bg-secondary/10 text-secondary border-secondary/20 shadow-secondary/5': type() === 'default'
+          'bg-primary/10 text-primary border-primary/20 shadow-primary/5':
+            type() === 'primary',
+          'bg-error/10 text-error border-error/20 shadow-error/5':
+            type() === 'error',
+          'bg-accent/10 text-accent border-accent/20 shadow-accent/5':
+            type() === 'accent',
+          'bg-success/10 text-success border-success/20 shadow-success/5':
+            type() === 'success',
+          'bg-secondary/10 text-secondary border-secondary/20 shadow-secondary/5':
+            type() === 'default',
         }"
       >
         <app-icon [path]="icon()!" className="w-6 h-6"></app-icon>

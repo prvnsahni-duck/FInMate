@@ -6,5 +6,5 @@ import { JoinGroupComponent } from './pages/join-group/join-group.component';
 export const groupsRoutes: Routes = [
   { path: '', component: GroupsListComponent },
   { path: 'join/:inviteToken', component: JoinGroupComponent },
-  { path: ':id', component: GroupDetailComponent }
+  { path: ':id', component: GroupDetailComponent },
 ];

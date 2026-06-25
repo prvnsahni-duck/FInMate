@@ -1,4 +1,14 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsNumber, Min, IsEnum, IsInt, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsOptional,
+  IsNumber,
+  Min,
+  IsEnum,
+  IsInt,
+  IsDateString,
+} from 'class-validator';
 
 export class CreateGoalDto {
   @IsString()
@@ -6,11 +16,17 @@ export class CreateGoalDto {
   @MaxLength(160, { message: 'Goal title cannot exceed 160 characters' })
   title!: string;
 
-  @IsNumber({}, { message: 'Target amount must be a valid numeric currency value' })
+  @IsNumber(
+    {},
+    { message: 'Target amount must be a valid numeric currency value' },
+  )
   @Min(0.01, { message: 'Target amount must be greater than zero' })
   targetAmount!: number;
 
-  @IsNumber({}, { message: 'Saved amount must be a valid numeric currency value' })
+  @IsNumber(
+    {},
+    { message: 'Saved amount must be a valid numeric currency value' },
+  )
   @IsOptional()
   @Min(0, { message: 'Saved amount cannot be negative' })
   savedAmount?: number;
@@ -20,7 +36,10 @@ export class CreateGoalDto {
   @MaxLength(3, { message: 'Currency code must be exactly 3 characters' })
   currency!: string;
 
-  @IsDateString({}, { message: 'Target date must be a valid ISO date string (YYYY-MM-DD)' })
+  @IsDateString(
+    {},
+    { message: 'Target date must be a valid ISO date string (YYYY-MM-DD)' },
+  )
   @IsOptional()
   targetDate?: string;
 }
@@ -31,11 +50,17 @@ export class UpdateGoalDto {
   @MaxLength(160, { message: 'Goal title cannot exceed 160 characters' })
   title?: string;
 
-  @IsNumber({}, { message: 'Target amount must be a valid numeric currency value' })
+  @IsNumber(
+    {},
+    { message: 'Target amount must be a valid numeric currency value' },
+  )
   @Min(0.01, { message: 'Target amount must be greater than zero' })
   targetAmount?: number;
 
-  @IsNumber({}, { message: 'Saved amount must be a valid numeric currency value' })
+  @IsNumber(
+    {},
+    { message: 'Saved amount must be a valid numeric currency value' },
+  )
   @IsOptional()
   @Min(0, { message: 'Saved amount cannot be negative' })
   savedAmount?: number;
@@ -45,11 +70,16 @@ export class UpdateGoalDto {
   @MaxLength(3, { message: 'Currency code must be exactly 3 characters' })
   currency?: string;
 
-  @IsDateString({}, { message: 'Target date must be a valid ISO date string (YYYY-MM-DD)' })
+  @IsDateString(
+    {},
+    { message: 'Target date must be a valid ISO date string (YYYY-MM-DD)' },
+  )
   @IsOptional()
   targetDate?: string;
 
-  @IsEnum(['active', 'achieved', 'paused', 'cancelled'], { message: 'Invalid goal status option' })
+  @IsEnum(['active', 'achieved', 'paused', 'cancelled'], {
+    message: 'Invalid goal status option',
+  })
   @IsOptional()
   status?: 'active' | 'achieved' | 'paused' | 'cancelled';
 

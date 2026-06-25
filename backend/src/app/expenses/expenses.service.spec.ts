@@ -1,7 +1,20 @@
-import { BadRequestException, ForbiddenException, NotFoundException, PreconditionFailedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  PreconditionFailedException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
-import { Attachment, AuditLog, Expense, ExpenseSplit, Group, GroupMember, User } from '@finmate/data-models';
+import {
+  Attachment,
+  AuditLog,
+  Expense,
+  ExpenseSplit,
+  Group,
+  GroupMember,
+  User,
+} from '@finmate/data-models';
 import { Repository } from 'typeorm';
 import { ExpensesService } from './expenses.service';
 
@@ -77,7 +90,12 @@ describe('ExpensesService', () => {
         if (entity === User) return mockUserRepository;
         if (entity === Attachment) return mockAttachmentRepository;
         if (entity === AuditLog) return mockAuditLogRepository;
-        if (entity && (entity.name === 'GroupMemberContribution' || (typeof entity === 'function' && entity.name === 'GroupMemberContribution'))) {
+        if (
+          entity &&
+          (entity.name === 'GroupMemberContribution' ||
+            (typeof entity === 'function' &&
+              entity.name === 'GroupMemberContribution'))
+        ) {
           return mockContributionRepository;
         }
       }),
@@ -85,19 +103,36 @@ describe('ExpensesService', () => {
 
     const mockDataSource = {
       transaction: jest.fn(async (cb) => await cb(mockEntityManager)),
-      getRepository: jest.fn((entity) => mockEntityManager.getRepository(entity)),
+      getRepository: jest.fn((entity) =>
+        mockEntityManager.getRepository(entity),
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExpensesService,
-        { provide: getRepositoryToken(Expense), useValue: mockExpenseRepository },
-        { provide: getRepositoryToken(ExpenseSplit), useValue: mockSplitRepository },
+        {
+          provide: getRepositoryToken(Expense),
+          useValue: mockExpenseRepository,
+        },
+        {
+          provide: getRepositoryToken(ExpenseSplit),
+          useValue: mockSplitRepository,
+        },
         { provide: getRepositoryToken(Group), useValue: mockGroupRepository },
-        { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepository },
+        {
+          provide: getRepositoryToken(GroupMember),
+          useValue: mockGroupMemberRepository,
+        },
         { provide: getRepositoryToken(User), useValue: mockUserRepository },
-        { provide: getRepositoryToken(Attachment), useValue: mockAttachmentRepository },
-        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
+        {
+          provide: getRepositoryToken(Attachment),
+          useValue: mockAttachmentRepository,
+        },
+        {
+          provide: getRepositoryToken(AuditLog),
+          useValue: mockAuditLogRepository,
+        },
         { provide: getDataSourceToken(), useValue: mockDataSource },
       ],
     }).compile();
@@ -128,7 +163,9 @@ describe('ExpensesService', () => {
         category: 'Food',
         paidByUserId: 'other-id',
         expenseDate: '2026-06-10',
-        splits: [{ participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 }],
+        splits: [
+          { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
+        ],
       } as any),
     ).rejects.toThrow(ForbiddenException);
   });
@@ -153,7 +190,9 @@ describe('ExpensesService', () => {
         paidByUserId: 'caller-id',
         groupId: 'group-id',
         expenseDate: '2026-06-10',
-        splits: [{ participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 }],
+        splits: [
+          { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
+        ],
       } as any),
     ).rejects.toThrow(ForbiddenException);
   });
@@ -171,7 +210,13 @@ describe('ExpensesService', () => {
         category: 'Food',
         paidByUserId: 'caller-id',
         expenseDate: '2026-06-10',
-        splits: [{ participantGroupMemberId: 'member-1', splitType: 'equal', shareValue: 1 }],
+        splits: [
+          {
+            participantGroupMemberId: 'member-1',
+            splitType: 'equal',
+            shareValue: 1,
+          },
+        ],
       } as any),
     ).rejects.toThrow(BadRequestException);
   });
@@ -186,7 +231,10 @@ describe('ExpensesService', () => {
       role: 'member',
       joinStatus: 'active',
     } as any);
-    groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id', isArchived: true } as any);
+    groupRepository.findOne.mockResolvedValueOnce({
+      id: 'group-id',
+      isArchived: true,
+    } as any);
 
     await expect(
       service.createExpense('caller-id', {
@@ -197,7 +245,9 @@ describe('ExpensesService', () => {
         paidByUserId: 'caller-id',
         groupId: 'group-id',
         expenseDate: '2026-06-10',
-        splits: [{ participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 }],
+        splits: [
+          { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
+        ],
       } as any),
     ).rejects.toThrow(ForbiddenException);
   });
@@ -221,7 +271,9 @@ describe('ExpensesService', () => {
   it('should throw not found for unknown expense', async () => {
     expenseRepository.findOne.mockResolvedValue(null);
 
-    await expect(service.getExpenseById('caller-id', 'missing')).rejects.toThrow(NotFoundException);
+    await expect(
+      service.getExpenseById('caller-id', 'missing'),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('should require splits when amount changes on update', async () => {
@@ -295,7 +347,10 @@ describe('ExpensesService', () => {
         joinStatus: 'active',
       } as any)
       .mockResolvedValueOnce(null);
-    groupRepository.findOne.mockResolvedValue({ id: 'group-id', isArchived: false } as any);
+    groupRepository.findOne.mockResolvedValue({
+      id: 'group-id',
+      isArchived: false,
+    } as any);
     userRepository.findOne.mockResolvedValue({ id: 'other-user' } as any);
 
     await expect(
@@ -434,7 +489,13 @@ describe('ExpensesService', () => {
           paidByUserId: 'caller-id',
           groupId: 'group-id',
           expenseDate: '2026-06-10',
-          splits: [{ participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 }],
+          splits: [
+            {
+              participantUserId: 'caller-id',
+              splitType: 'equal',
+              shareValue: 1,
+            },
+          ],
         } as any),
       ).rejects.toThrow(BadRequestException);
     });
@@ -464,8 +525,11 @@ describe('ExpensesService', () => {
         user: { id: 'spectator-id' },
       };
 
-      const mockGroupMemberRepositoryFind = groupMemberRepository.find as jest.Mock;
-      mockGroupMemberRepositoryFind.mockResolvedValueOnce([mockSpectatorMember]);
+      const mockGroupMemberRepositoryFind =
+        groupMemberRepository.find as jest.Mock;
+      mockGroupMemberRepositoryFind.mockResolvedValueOnce([
+        mockSpectatorMember,
+      ]);
 
       await expect(
         service.createExpense('caller-id', {
@@ -476,7 +540,13 @@ describe('ExpensesService', () => {
           paidByUserId: 'caller-id',
           groupId: 'group-id',
           expenseDate: '2026-06-10',
-          splits: [{ participantUserId: 'spectator-id', splitType: 'equal', shareValue: 1 }],
+          splits: [
+            {
+              participantUserId: 'spectator-id',
+              splitType: 'equal',
+              shareValue: 1,
+            },
+          ],
         } as any),
       ).rejects.toThrow(BadRequestException);
     });
@@ -531,8 +601,16 @@ describe('ExpensesService', () => {
       } as any);
 
       groupMemberRepository.find.mockResolvedValue([
-        { id: 'member-a', user: { id: 'user-a', displayName: 'User A' }, joinStatus: 'active' },
-        { id: 'member-b', user: { id: 'user-b', displayName: 'User B' }, joinStatus: 'active' },
+        {
+          id: 'member-a',
+          user: { id: 'user-a', displayName: 'User A' },
+          joinStatus: 'active',
+        },
+        {
+          id: 'member-b',
+          user: { id: 'user-b', displayName: 'User B' },
+          joinStatus: 'active',
+        },
       ] as any);
 
       // Expenses in the group for 2026-06
@@ -546,12 +624,16 @@ describe('ExpensesService', () => {
         },
       ] as any);
 
-      const balances = await service.getCarryForwardSummary('caller-id', 'group-id', '2026-06');
-      
+      const balances = await service.getCarryForwardSummary(
+        'caller-id',
+        'group-id',
+        '2026-06',
+      );
+
       // User A paid 150, owed 75 => net balance +75
       // User B paid 0, owed 75 => net balance -75
-      const userABal = balances.find(b => b.userId === 'user-a');
-      const userBBal = balances.find(b => b.userId === 'user-b');
+      const userABal = balances.find((b) => b.userId === 'user-a');
+      const userBBal = balances.find((b) => b.userId === 'user-b');
 
       expect(userABal?.netBalance).toBe(75);
       expect(userBBal?.netBalance).toBe(-75);
@@ -691,8 +773,24 @@ describe('ExpensesService', () => {
         expenseRepository.count = jest.fn().mockResolvedValue(0);
 
         groupMemberRepository.find.mockResolvedValue([
-          { id: 'member-a', user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' }, joinStatus: 'active' },
-          { id: 'member-b', user: { id: 'user-b', displayName: 'User B', email: 'b@finmate.com' }, joinStatus: 'active' },
+          {
+            id: 'member-a',
+            user: {
+              id: 'user-a',
+              displayName: 'User A',
+              email: 'a@finmate.com',
+            },
+            joinStatus: 'active',
+          },
+          {
+            id: 'member-b',
+            user: {
+              id: 'user-b',
+              displayName: 'User B',
+              email: 'b@finmate.com',
+            },
+            joinStatus: 'active',
+          },
         ] as any);
 
         expenseRepository.find.mockResolvedValue([
@@ -706,7 +804,11 @@ describe('ExpensesService', () => {
           },
         ] as any);
 
-        const result = await service.closeMonth('caller-id', 'group-id', '2026-06');
+        const result = await service.closeMonth(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
 
         expect(result.nextLedgerMonth).toBe('2026-07');
         expect(result.carryForwardExpenseCount).toBe(1);
@@ -714,4 +816,3 @@ describe('ExpensesService', () => {
     });
   });
 });
-

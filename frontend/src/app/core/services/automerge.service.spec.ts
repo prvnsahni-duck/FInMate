@@ -37,7 +37,9 @@ describe('AutomergeService', () => {
       const localPayload: Partial<TestResource> = {
         body: 'My local body edit',
       };
-      expect(service.detectOverlap(localPayload, serverState)).toEqual(['body']);
+      expect(service.detectOverlap(localPayload, serverState)).toEqual([
+        'body',
+      ]);
     });
 
     it('returns multiple conflicting fields when several differ', () => {
@@ -61,9 +63,9 @@ describe('AutomergeService', () => {
 
     it('returns only truly conflicting fields when payload is mixed', () => {
       const localPayload: Partial<TestResource> = {
-        title: 'My title',       // differs from server → conflict
-        category: 'Food',        // matches server → no conflict
-        body: 'My local body',   // differs from server → conflict
+        title: 'My title', // differs from server → conflict
+        category: 'Food', // matches server → no conflict
+        body: 'My local body', // differs from server → conflict
       };
       const result = service.detectOverlap(localPayload, serverState);
       expect(result).toContain('title');

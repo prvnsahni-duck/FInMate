@@ -6,6 +6,6 @@ export class SuccessResponse<T = any> {
     public readonly message: string,
     data?: T,
   ) {
-    this.data = (data !== undefined && data !== null) ? data : ({} as any);
+    this.data = data !== undefined && data !== null ? data : ({} as any);
   }
 }

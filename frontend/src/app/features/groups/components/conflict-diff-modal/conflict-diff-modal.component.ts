@@ -9,7 +9,10 @@ import {
 } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ConflictContext, ConflictResolution } from '../../../../shared/models/conflict.types';
+import {
+  ConflictContext,
+  ConflictResolution,
+} from '../../../../shared/models/conflict.types';
 
 type ResolutionStrategy = 'keep-mine' | 'keep-theirs' | 'manual';
 
@@ -25,7 +28,9 @@ interface DiffLine {
   templateUrl: './conflict-diff-modal.component.html',
   styleUrl: './conflict-diff-modal.component.scss',
 })
-export class ConflictDiffModalComponent<T extends Record<string, unknown>> implements OnInit {
+export class ConflictDiffModalComponent<T extends Record<string, unknown>>
+  implements OnInit
+{
   @Input({ required: true }) context!: ConflictContext<T>;
   @Output() resolved = new EventEmitter<ConflictResolution<T>>();
 
@@ -33,7 +38,9 @@ export class ConflictDiffModalComponent<T extends Record<string, unknown>> imple
   manualText = signal<string>('');
 
   /** The single overlapping field being displayed (first one if multiple). */
-  readonly primaryField = computed(() => this.context.overlappingFields[0] ?? '');
+  readonly primaryField = computed(
+    () => this.context.overlappingFields[0] ?? '',
+  );
 
   readonly localValue = computed(() =>
     String(this.context.localPayload[this.primaryField()] ?? ''),
@@ -80,7 +87,11 @@ export class ConflictDiffModalComponent<T extends Record<string, unknown>> imple
       const mergedPayload = {
         version: newVersion,
       } as unknown as Partial<T>;
-      this.resolved.emit({ strategy: 'keep-theirs', mergedPayload, newVersion });
+      this.resolved.emit({
+        strategy: 'keep-theirs',
+        mergedPayload,
+        newVersion,
+      });
     } else {
       const field = this.primaryField() as keyof T;
       const mergedPayload = {

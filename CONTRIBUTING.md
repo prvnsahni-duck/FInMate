@@ -22,13 +22,13 @@ main (production-ready)
 
 ### Branch Naming
 
-| Prefix | Purpose | Example |
-|--------|---------|---------|
-| `feature/` | New features | `feature/expense-receipts` |
-| `fix/` | Bug fixes | `fix/split-rounding-error` |
-| `chore/` | Maintenance, refactoring, deps | `chore/upgrade-angular-21` |
-| `docs/` | Documentation only | `docs/api-endpoints` |
-| `hotfix/` | Critical production fixes | `hotfix/auth-token-expiry` |
+| Prefix     | Purpose                        | Example                    |
+| ---------- | ------------------------------ | -------------------------- |
+| `feature/` | New features                   | `feature/expense-receipts` |
+| `fix/`     | Bug fixes                      | `fix/split-rounding-error` |
+| `chore/`   | Maintenance, refactoring, deps | `chore/upgrade-angular-21` |
+| `docs/`    | Documentation only             | `docs/api-endpoints`       |
+| `hotfix/`  | Critical production fixes      | `hotfix/auth-token-expiry` |
 
 ### Rules
 
@@ -51,17 +51,17 @@ We follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ### Types
 
-| Type | Description |
-|------|-------------|
-| `feat` | A new feature |
-| `fix` | A bug fix |
-| `docs` | Documentation changes only |
-| `style` | Code style changes (formatting, missing semi-colons) |
+| Type       | Description                                             |
+| ---------- | ------------------------------------------------------- |
+| `feat`     | A new feature                                           |
+| `fix`      | A bug fix                                               |
+| `docs`     | Documentation changes only                              |
+| `style`    | Code style changes (formatting, missing semi-colons)    |
 | `refactor` | Code change that neither fixes a bug nor adds a feature |
-| `perf` | Performance improvement |
-| `test` | Adding or updating tests |
-| `chore` | Build process, dependencies, or tooling changes |
-| `ci` | CI/CD configuration changes |
+| `perf`     | Performance improvement                                 |
+| `test`     | Adding or updating tests                                |
+| `chore`    | Build process, dependencies, or tooling changes         |
+| `ci`       | CI/CD configuration changes                             |
 
 ### Scopes
 
@@ -95,9 +95,11 @@ test(frontend): add unit tests for encryption service
 
 ```markdown
 ## Summary
+
 Brief description of the change.
 
 ## Type
+
 - [ ] Feature
 - [ ] Bug Fix
 - [ ] Refactor
@@ -105,10 +107,12 @@ Brief description of the change.
 - [ ] Chore
 
 ## Changes
+
 - File 1: description
 - File 2: description
 
 ## Testing
+
 - [ ] Unit tests added/updated
 - [ ] Manual testing performed
 - [ ] Build verified

@@ -1,4 +1,9 @@
-import { Injectable, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -27,7 +32,8 @@ export class AuthService {
     private readonly auditLogRepository: Repository<AuditLog>,
   ) {
     const jwtSecret = this.configService.get<string>('JWT_SECRET');
-    const jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET');
+    const jwtRefreshSecret =
+      this.configService.get<string>('JWT_REFRESH_SECRET');
 
     if (!jwtSecret) {
       throw new Error('JWT_SECRET environment variable is required');
@@ -75,11 +81,20 @@ export class AuthService {
   }
 
   async register(email: string, passwordPlain: string, displayName?: string) {
-    const savedUser = await this.usersService.createUser(email, passwordPlain, displayName);
+    const savedUser = await this.usersService.createUser(
+      email,
+      passwordPlain,
+      displayName,
+    );
     return this.serializeUser(savedUser);
   }
 
-  async login(email: string, passwordPlain: string, mfaCode?: string, context?: { ip?: string; userAgent?: string }) {
+  async login(
+    email: string,
+    passwordPlain: string,
+    mfaCode?: string,
+    context?: { ip?: string; userAgent?: string },
+  ) {
     const user = await this.usersService.findByEmail(email);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -89,7 +104,10 @@ export class AuthService {
       throw new UnauthorizedException('User account is not active');
     }
 
-    const isPasswordCorrect = await argon2.verify(user.passwordHash, passwordPlain);
+    const isPasswordCorrect = await argon2.verify(
+      user.passwordHash,
+      passwordPlain,
+    );
     if (!isPasswordCorrect) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -103,7 +121,9 @@ export class AuthService {
         });
       }
 
-      const decryptedSecret = user.twoFactorSecret ? this.encryptionService.decrypt(user.twoFactorSecret) : '';
+      const decryptedSecret = user.twoFactorSecret
+        ? this.encryptionService.decrypt(user.twoFactorSecret)
+        : '';
       const isMfaValid = verifyTotp(decryptedSecret, mfaCode);
       if (!isMfaValid) {
         throw new BadRequestException({
@@ -167,7 +187,11 @@ export class AuthService {
     };
   }
 
-  async verify2Fa(user: User, code: string, context?: { ip?: string; userAgent?: string }) {
+  async verify2Fa(
+    user: User,
+    code: string,
+    context?: { ip?: string; userAgent?: string },
+  ) {
     if (!user.twoFactorSecret) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
@@ -175,7 +199,9 @@ export class AuthService {
       });
     }
 
-    const decryptedSecret = this.encryptionService.decrypt(user.twoFactorSecret);
+    const decryptedSecret = this.encryptionService.decrypt(
+      user.twoFactorSecret,
+    );
     const isValid = verifyTotp(decryptedSecret, code);
     if (!isValid) {
       throw new BadRequestException({
@@ -198,7 +224,11 @@ export class AuthService {
     return { success: true };
   }
 
-  async disable2Fa(user: User, code: string, context?: { ip?: string; userAgent?: string }) {
+  async disable2Fa(
+    user: User,
+    code: string,
+    context?: { ip?: string; userAgent?: string },
+  ) {
     if (!user.isTwoFactorEnabled || !user.twoFactorSecret) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
@@ -206,7 +236,9 @@ export class AuthService {
       });
     }
 
-    const decryptedSecret = this.encryptionService.decrypt(user.twoFactorSecret);
+    const decryptedSecret = this.encryptionService.decrypt(
+      user.twoFactorSecret,
+    );
     const isValid = verifyTotp(decryptedSecret, code);
     if (!isValid) {
       throw new BadRequestException({
@@ -292,7 +324,10 @@ export class AuthService {
     let payload: JwtPayload | null = null;
     try {
       const decoded = this.jwtService.decode(refreshToken);
-      payload = typeof decoded === 'object' && decoded !== null ? decoded as JwtPayload : null;
+      payload =
+        typeof decoded === 'object' && decoded !== null
+          ? (decoded as JwtPayload)
+          : null;
     } catch (err) {
       // ignore parsing error
     }
@@ -301,8 +336,12 @@ export class AuthService {
       if (payload.userId !== currentUserId) {
         throw new ForbiddenException('Cannot log out another user session');
       }
-      const sha256Id = createHash('sha256').update(payload.refreshId).digest('hex');
-      await this.redisService.del(`refresh_token:${payload.userId}:${sha256Id}`);
+      const sha256Id = createHash('sha256')
+        .update(payload.refreshId)
+        .digest('hex');
+      await this.redisService.del(
+        `refresh_token:${payload.userId}:${sha256Id}`,
+      );
     }
   }
 

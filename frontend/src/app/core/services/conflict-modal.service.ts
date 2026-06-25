@@ -30,11 +30,12 @@ export class ConflictModalService {
       const hostElement = document.createElement('div');
       document.body.appendChild(hostElement);
 
-      const componentRef: ComponentRef<ConflictDiffModalComponent<Record<string, unknown>>> =
-        createComponent(ConflictDiffModalComponent, {
-          environmentInjector: this.environmentInjector,
-          hostElement,
-        });
+      const componentRef: ComponentRef<
+        ConflictDiffModalComponent<Record<string, unknown>>
+      > = createComponent(ConflictDiffModalComponent, {
+        environmentInjector: this.environmentInjector,
+        hostElement,
+      });
 
       componentRef.instance.context = context;
       this.appRef.attachView(componentRef.hostView);

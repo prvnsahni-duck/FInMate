@@ -7,7 +7,7 @@ function base32Decode(base32: string): Buffer {
   let bits = 0;
   let value = 0;
   let index = 0;
-  
+
   // Allocate buffer for base32 decode (each char is 5 bits, 8 chars make 5 bytes)
   const buffer = Buffer.alloc(Math.floor((length * 5) / 8));
 

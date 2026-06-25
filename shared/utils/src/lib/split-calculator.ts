@@ -60,7 +60,9 @@ export class SplitCalculator {
 
     // 3. Process Share and Equal Splits
     let totalShares = 0;
-    const shareSplits = state.filter((x) => x.type === 'share' || x.type === 'equal');
+    const shareSplits = state.filter(
+      (x) => x.type === 'share' || x.type === 'equal',
+    );
     for (const s of shareSplits) {
       if (s.type === 'equal') {
         totalShares += 1;
@@ -74,7 +76,9 @@ export class SplitCalculator {
     if (totalShares > 0) {
       for (const s of shareSplits) {
         const theirShares = s.type === 'equal' ? 1 : s.value || 0;
-        const cents = Math.floor(remainingCentsForShares * (theirShares / totalShares));
+        const cents = Math.floor(
+          remainingCentsForShares * (theirShares / totalShares),
+        );
         s.centsOwed = cents;
         allocatedCents += cents;
       }
@@ -101,7 +105,9 @@ export class SplitCalculator {
     } else if (unallocatedCents < 0) {
       // In case floating point precision issue caused slight over-allocation,
       // though floor() usually prevents this unless user gave over 100%
-      throw new Error('Overallocation error: check percentages or fixed amounts');
+      throw new Error(
+        'Overallocation error: check percentages or fixed amounts',
+      );
     }
 
     // 5. Format results

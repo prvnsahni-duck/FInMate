@@ -17,7 +17,7 @@ import {
 import { signal } from '@angular/core';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ExpensesService {
   private http = inject(HttpClient);
@@ -32,7 +32,9 @@ export class ExpensesService {
   /**
    * Encrypts CreateExpenseDto or UpdateExpenseDto outgoing payloads.
    */
-  private async encryptPayload(payload: CreateExpenseDto | UpdateExpenseDto): Promise<any> {
+  private async encryptPayload(
+    payload: CreateExpenseDto | UpdateExpenseDto,
+  ): Promise<any> {
     const user = this.store.selectSnapshot(AuthState.getUser);
     const email = user?.email;
     if (email) {
@@ -40,10 +42,16 @@ export class ExpensesService {
       if (key) {
         const encrypted = { ...payload };
         if (payload.title) {
-          encrypted.title = await this.encryptionService.encrypt(payload.title, key);
+          encrypted.title = await this.encryptionService.encrypt(
+            payload.title,
+            key,
+          );
         }
         if (payload.description) {
-          encrypted.description = await this.encryptionService.encrypt(payload.description, key);
+          encrypted.description = await this.encryptionService.encrypt(
+            payload.description,
+            key,
+          );
         }
         return encrypted;
       }
@@ -56,10 +64,16 @@ export class ExpensesService {
    */
   getExpenses(
     groupId: string,
-    options: { page?: number; limit?: number; category?: string; startDate?: string; endDate?: string } = {}
+    options: {
+      page?: number;
+      limit?: number;
+      category?: string;
+      startDate?: string;
+      endDate?: string;
+    } = {},
   ): Observable<GetExpensesResponse> {
     let params = new HttpParams().set('groupId', groupId);
-    
+
     if (options.page !== undefined) {
       params = params.set('page', options.page.toString());
     }
@@ -76,27 +90,32 @@ export class ExpensesService {
       params = params.set('endDate', options.endDate);
     }
 
-    return this.http.get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params }).pipe(
-      mergeMap(async (res) => {
-        const user = this.store.selectSnapshot(AuthState.getUser);
-        const email = user?.email;
-        if (email && res.data) {
-          const key = await this.encryptionService.loadKeyFromSession(email);
-          if (key) {
-            res.data = await Promise.all(
-              res.data.map(async (expense) => {
-                try {
-                  return await this.encryptionService.decryptExpense(expense as any, key) as any;
-                } catch (e) {
-                  return expense;
-                }
-              })
-            );
+    return this.http
+      .get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params })
+      .pipe(
+        mergeMap(async (res) => {
+          const user = this.store.selectSnapshot(AuthState.getUser);
+          const email = user?.email;
+          if (email && res.data) {
+            const key = await this.encryptionService.loadKeyFromSession(email);
+            if (key) {
+              res.data = await Promise.all(
+                res.data.map(async (expense) => {
+                  try {
+                    return (await this.encryptionService.decryptExpense(
+                      expense as any,
+                      key,
+                    )) as any;
+                  } catch (e) {
+                    return expense;
+                  }
+                }),
+              );
+            }
           }
-        }
-        return res;
-      })
-    );
+          return res;
+        }),
+      );
   }
 
   /**
@@ -105,7 +124,7 @@ export class ExpensesService {
   createExpense(payload: CreateExpenseDto): Observable<Expense> {
     return from(this.encryptPayload(payload)).pipe(
       mergeMap((encryptedPayload) =>
-        this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload)
+        this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload),
       ),
       mergeMap(async (expense) => {
         const user = this.store.selectSnapshot(AuthState.getUser);
@@ -114,12 +133,15 @@ export class ExpensesService {
           const key = await this.encryptionService.loadKeyFromSession(email);
           if (key) {
             try {
-              return await this.encryptionService.decryptExpense(expense as any, key) as any;
+              return (await this.encryptionService.decryptExpense(
+                expense as any,
+                key,
+              )) as any;
             } catch (e) {}
           }
         }
         return expense;
-      })
+      }),
     );
   }
 
@@ -129,7 +151,10 @@ export class ExpensesService {
   updateExpense(id: string, payload: UpdateExpenseDto): Observable<Expense> {
     return from(this.encryptPayload(payload)).pipe(
       mergeMap((encryptedPayload) =>
-        this.http.patch<Expense>(`${this.baseUrl}/expenses/${id}`, encryptedPayload)
+        this.http.patch<Expense>(
+          `${this.baseUrl}/expenses/${id}`,
+          encryptedPayload,
+        ),
       ),
       mergeMap(async (expense) => {
         const user = this.store.selectSnapshot(AuthState.getUser);
@@ -138,12 +163,15 @@ export class ExpensesService {
           const key = await this.encryptionService.loadKeyFromSession(email);
           if (key) {
             try {
-              return await this.encryptionService.decryptExpense(expense as any, key) as any;
+              return (await this.encryptionService.decryptExpense(
+                expense as any,
+                key,
+              )) as any;
             } catch (e) {}
           }
         }
         return expense;
-      })
+      }),
     );
   }
 
@@ -158,21 +186,26 @@ export class ExpensesService {
    * Restore a deleted expense.
    */
   restoreExpense(id: string): Observable<Expense> {
-    return this.http.post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {}).pipe(
-      mergeMap(async (expense) => {
-        const user = this.store.selectSnapshot(AuthState.getUser);
-        const email = user?.email;
-        if (email) {
-          const key = await this.encryptionService.loadKeyFromSession(email);
-          if (key) {
-            try {
-              return await this.encryptionService.decryptExpense(expense as any, key) as any;
-            } catch (e) {}
+    return this.http
+      .post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {})
+      .pipe(
+        mergeMap(async (expense) => {
+          const user = this.store.selectSnapshot(AuthState.getUser);
+          const email = user?.email;
+          if (email) {
+            const key = await this.encryptionService.loadKeyFromSession(email);
+            if (key) {
+              try {
+                return (await this.encryptionService.decryptExpense(
+                  expense as any,
+                  key,
+                )) as any;
+              } catch (e) {}
+            }
           }
-        }
-        return expense;
-      })
-    );
+          return expense;
+        }),
+      );
   }
 
   /**
@@ -201,9 +234,12 @@ export class ExpensesService {
    * Export expenses ledger.
    */
   exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> {
-    return this.http.get(`${this.baseUrl}/export/expenses?groupId=${groupId}&format=${format}`, {
-      responseType: 'blob'
-    });
+    return this.http.get(
+      `${this.baseUrl}/export/expenses?groupId=${groupId}&format=${format}`,
+      {
+        responseType: 'blob',
+      },
+    );
   }
 
   /**

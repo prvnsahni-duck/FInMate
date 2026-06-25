@@ -32,7 +32,7 @@ export interface ConflictContext<T extends Record<string, unknown>> {
  * Discriminated union describing how the user chose to resolve the conflict.
  */
 export type ConflictResolution<T extends Record<string, unknown>> =
-  | { strategy: 'keep-mine';   mergedPayload: Partial<T>; newVersion: number }
+  | { strategy: 'keep-mine'; mergedPayload: Partial<T>; newVersion: number }
   | { strategy: 'keep-theirs'; mergedPayload: Partial<T>; newVersion: number }
-  | { strategy: 'manual';      mergedPayload: Partial<T>; newVersion: number }
+  | { strategy: 'manual'; mergedPayload: Partial<T>; newVersion: number }
   | { strategy: 'cancelled' };

@@ -1,4 +1,17 @@
-import { IsString, IsNotEmpty, MaxLength, IsOptional, IsEnum, IsNumber, Min, IsUUID, IsArray, ValidateNested, IsInt, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  MaxLength,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  Min,
+  IsUUID,
+  IsArray,
+  ValidateNested,
+  IsInt,
+  IsDateString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsCiphertext } from './is-ciphertext.decorator';
 
@@ -7,15 +20,22 @@ export class RecurringExpenseSplitInputDto {
   @IsOptional()
   participantUserId?: string;
 
-  @IsUUID('4', { message: 'Participant Group Member ID must be a valid UUID v4' })
+  @IsUUID('4', {
+    message: 'Participant Group Member ID must be a valid UUID v4',
+  })
   @IsOptional()
   participantGroupMemberId?: string;
 
-  @IsEnum(['equal', 'fixed', 'percent', 'share'], { message: 'Invalid split algorithm type' })
+  @IsEnum(['equal', 'fixed', 'percent', 'share'], {
+    message: 'Invalid split algorithm type',
+  })
   @IsNotEmpty({ message: 'Split type is required' })
   splitType!: 'equal' | 'fixed' | 'percent' | 'share';
 
-  @IsNumber({}, { message: 'Share value must be a valid numeric calculation decimal' })
+  @IsNumber(
+    {},
+    { message: 'Share value must be a valid numeric calculation decimal' },
+  )
   @Min(0, { message: 'Share value cannot be negative' })
   shareValue!: number;
 }
@@ -32,7 +52,10 @@ export class CreateRecurringExpenseDto {
   @IsCiphertext({ message: 'Expense description must be a valid ciphertext' })
   description?: string;
 
-  @IsNumber({}, { message: 'Total amount must be a valid numeric currency value' })
+  @IsNumber(
+    {},
+    { message: 'Total amount must be a valid numeric currency value' },
+  )
   @Min(0.01, { message: 'Total amount must be greater than zero' })
   amountTotal!: number;
 
@@ -54,15 +77,23 @@ export class CreateRecurringExpenseDto {
   @IsOptional()
   groupId?: string;
 
-  @IsEnum(['daily', 'weekly', 'monthly', 'yearly'], { message: 'Invalid frequency option' })
+  @IsEnum(['daily', 'weekly', 'monthly', 'yearly'], {
+    message: 'Invalid frequency option',
+  })
   @IsNotEmpty({ message: 'Frequency is required' })
   frequency!: 'daily' | 'weekly' | 'monthly' | 'yearly';
 
-  @IsDateString({}, { message: 'Start date must be a valid ISO date string (YYYY-MM-DD)' })
+  @IsDateString(
+    {},
+    { message: 'Start date must be a valid ISO date string (YYYY-MM-DD)' },
+  )
   @IsNotEmpty({ message: 'Start date is required' })
   startDate!: string;
 
-  @IsDateString({}, { message: 'End date must be a valid ISO date string (YYYY-MM-DD)' })
+  @IsDateString(
+    {},
+    { message: 'End date must be a valid ISO date string (YYYY-MM-DD)' },
+  )
   @IsOptional()
   endDate?: string;
 
@@ -84,7 +115,10 @@ export class UpdateRecurringExpenseDto {
   @IsCiphertext({ message: 'Expense description must be a valid ciphertext' })
   description?: string;
 
-  @IsNumber({}, { message: 'Total amount must be a valid numeric currency value' })
+  @IsNumber(
+    {},
+    { message: 'Total amount must be a valid numeric currency value' },
+  )
   @Min(0.01, { message: 'Total amount must be greater than zero' })
   amountTotal?: number;
 
@@ -102,19 +136,29 @@ export class UpdateRecurringExpenseDto {
   @IsOptional()
   paidByUserId?: string;
 
-  @IsEnum(['daily', 'weekly', 'monthly', 'yearly'], { message: 'Invalid frequency option' })
+  @IsEnum(['daily', 'weekly', 'monthly', 'yearly'], {
+    message: 'Invalid frequency option',
+  })
   @IsOptional()
   frequency?: 'daily' | 'weekly' | 'monthly' | 'yearly';
 
-  @IsDateString({}, { message: 'Start date must be a valid ISO date string (YYYY-MM-DD)' })
+  @IsDateString(
+    {},
+    { message: 'Start date must be a valid ISO date string (YYYY-MM-DD)' },
+  )
   @IsOptional()
   startDate?: string;
 
-  @IsDateString({}, { message: 'End date must be a valid ISO date string (YYYY-MM-DD)' })
+  @IsDateString(
+    {},
+    { message: 'End date must be a valid ISO date string (YYYY-MM-DD)' },
+  )
   @IsOptional()
   endDate?: string;
 
-  @IsEnum(['active', 'paused', 'completed'], { message: 'Invalid status option' })
+  @IsEnum(['active', 'paused', 'completed'], {
+    message: 'Invalid status option',
+  })
   @IsOptional()
   status?: 'active' | 'paused' | 'completed';
 

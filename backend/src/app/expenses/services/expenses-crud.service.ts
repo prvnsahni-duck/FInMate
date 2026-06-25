@@ -18,19 +18,32 @@ export interface ExpenseListParams {
 export class ExpensesCrudService {
   constructor(private readonly expensesService: ExpensesService) {}
 
-  async createExpense(userId: string, dto: CreateExpenseDto): Promise<Record<string, unknown>> {
+  async createExpense(
+    userId: string,
+    dto: CreateExpenseDto,
+  ): Promise<Record<string, unknown>> {
     return this.expensesService.createExpense(userId, dto);
   }
 
-  async listExpenses(userId: string, params: ExpenseListParams): Promise<PaginatedResponse<Record<string, unknown>>> {
+  async listExpenses(
+    userId: string,
+    params: ExpenseListParams,
+  ): Promise<PaginatedResponse<Record<string, unknown>>> {
     return this.expensesService.listExpenses(userId, params);
   }
 
-  async getExpenseById(userId: string, id: string): Promise<Record<string, unknown>> {
+  async getExpenseById(
+    userId: string,
+    id: string,
+  ): Promise<Record<string, unknown>> {
     return this.expensesService.getExpenseById(userId, id);
   }
 
-  async updateExpense(userId: string, id: string, dto: UpdateExpenseDto): Promise<Record<string, unknown>> {
+  async updateExpense(
+    userId: string,
+    id: string,
+    dto: UpdateExpenseDto,
+  ): Promise<Record<string, unknown>> {
     return this.expensesService.updateExpense(userId, id, dto);
   }
 
@@ -38,8 +51,10 @@ export class ExpensesCrudService {
     return this.expensesService.deleteExpense(userId, id);
   }
 
-  async restoreExpense(userId: string, id: string): Promise<Record<string, unknown>> {
+  async restoreExpense(
+    userId: string,
+    id: string,
+  ): Promise<Record<string, unknown>> {
     return this.expensesService.restoreExpense(userId, id);
   }
 }
-

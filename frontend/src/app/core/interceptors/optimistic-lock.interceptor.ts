@@ -47,7 +47,9 @@ export const optimisticLockInterceptor: HttpInterceptorFn = (req, next) => {
       const localVersion = (localPayload['version'] as number) ?? 0;
 
       return bypassClient.get<Record<string, unknown>>(req.url).pipe(
-        map((res: any) => res?.success === true && res?.data !== undefined ? res.data : res),
+        map((res: any) =>
+          res?.success === true && res?.data !== undefined ? res.data : res,
+        ),
         switchMap((serverState) => {
           const overlappingFields = automerge.detectOverlap(
             localPayload,

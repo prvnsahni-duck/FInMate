@@ -10,7 +10,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * 3. expenses — add `ledger_month` (CHAR(7), nullable) and `is_carry_forward` (boolean).
  * 4. expenses — add composite index on (group_id, ledger_month).
  */
-export class AddGroupTypeAndSpectatorAndHousehold1718200000000 implements MigrationInterface {
+export class AddGroupTypeAndSpectatorAndHousehold1718200000000
+  implements MigrationInterface
+{
   name = 'AddGroupTypeAndSpectatorAndHousehold1718200000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -57,14 +59,24 @@ export class AddGroupTypeAndSpectatorAndHousehold1718200000000 implements Migrat
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Drop index
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_expenses_group_ledger_month"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_expenses_group_ledger_month"`,
+    );
 
     // Revert expenses columns
-    await queryRunner.query(`ALTER TABLE "expenses" DROP COLUMN IF EXISTS "is_carry_forward"`);
-    await queryRunner.query(`ALTER TABLE "expenses" DROP COLUMN IF EXISTS "ledger_month"`);
+    await queryRunner.query(
+      `ALTER TABLE "expenses" DROP COLUMN IF EXISTS "is_carry_forward"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "expenses" DROP COLUMN IF EXISTS "ledger_month"`,
+    );
 
     // Revert groups columns
-    await queryRunner.query(`ALTER TABLE "groups" DROP COLUMN IF EXISTS "carry_forward_enabled"`);
-    await queryRunner.query(`ALTER TABLE "groups" DROP COLUMN IF EXISTS "group_type"`);
+    await queryRunner.query(
+      `ALTER TABLE "groups" DROP COLUMN IF EXISTS "carry_forward_enabled"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "groups" DROP COLUMN IF EXISTS "group_type"`,
+    );
   }
 }

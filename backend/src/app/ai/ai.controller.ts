@@ -28,7 +28,7 @@ export class AiController {
     const result = await this.aiService.callOpenAiProxy(
       dto.prompt,
       dto.systemInstruction,
-      dto.model
+      dto.model,
     );
     return new SuccessResponse('AI response generated successfully', result);
   }

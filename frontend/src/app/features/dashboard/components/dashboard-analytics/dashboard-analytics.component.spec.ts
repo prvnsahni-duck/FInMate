@@ -9,7 +9,7 @@ describe('DashboardAnalyticsComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [DashboardAnalyticsComponent],
-      schemas: [NO_ERRORS_SCHEMA]
+      schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DashboardAnalyticsComponent);
@@ -25,6 +25,8 @@ describe('DashboardAnalyticsComponent', () => {
   it('should render the charts title', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Personal Expenses Analytics');
+    expect(compiled.querySelector('h1')?.textContent).toContain(
+      'Personal Expenses Analytics',
+    );
   });
 });

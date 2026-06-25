@@ -11,11 +11,11 @@ module.exports = {
   theme: {
     extend: {
       screens: {
-        'xs': '375px',
-        'sm': '640px',
-        'md': '768px',
-        'lg': '1024px',
-        'xl': '1280px',
+        xs: '375px',
+        sm: '640px',
+        md: '768px',
+        lg: '1024px',
+        xl: '1280px',
         '2xl': '1536px',
       },
       colors: {
@@ -36,16 +36,17 @@ module.exports = {
           neon2: 'rgb(var(--color-accent))',
           light: '#f8fafc',
           lightCard: '#ffffff',
-        }
+        },
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-dark': 'linear-gradient(to right bottom, rgb(var(--color-bg)), rgb(var(--color-card)))',
+        'gradient-dark':
+          'linear-gradient(to right bottom, rgb(var(--color-bg)), rgb(var(--color-card)))',
         'gradient-light': 'linear-gradient(to right bottom, #f8fafc, #e2e8f0)',
-        'gradient-neon': 'linear-gradient(to right, rgb(var(--color-primary)), rgb(var(--color-accent)))',
-      }
+        'gradient-neon':
+          'linear-gradient(to right, rgb(var(--color-primary)), rgb(var(--color-accent)))',
+      },
     },
   },
   plugins: [],
 };
-

@@ -14,15 +14,12 @@ describe('RegisterComponent', () => {
 
   beforeEach(async () => {
     mockStore = {
-      dispatch: jest.fn().mockReturnValue(of({}))
+      dispatch: jest.fn().mockReturnValue(of({})),
     } as any;
 
     await TestBed.configureTestingModule({
       imports: [RegisterComponent, ReactiveFormsModule],
-      providers: [
-        { provide: Store, useValue: mockStore },
-        provideRouter([])
-      ]
+      providers: [{ provide: Store, useValue: mockStore }, provideRouter([])],
     }).compileComponents();
 
     fixture = TestBed.createComponent(RegisterComponent);
@@ -74,7 +71,9 @@ describe('RegisterComponent', () => {
 
     expect(component.isLoading).toBe(false);
     expect(mockStore.dispatch).toHaveBeenCalled();
-    expect(component.successMessage).toBe('Account created successfully! Please sign in.');
+    expect(component.successMessage).toBe(
+      'Account created successfully! Please sign in.',
+    );
 
     jest.advanceTimersByTime(2000);
     expect(router.navigate).toHaveBeenCalledWith(['/auth/login']);
@@ -85,7 +84,9 @@ describe('RegisterComponent', () => {
     component.registerForm.controls['displayName'].setValue('John Doe');
     component.registerForm.controls['email'].setValue('john@example.com');
     component.registerForm.controls['password'].setValue('SecurePassword123!');
-    mockStore.dispatch.mockReturnValue(throwError(() => ({ error: { message: 'Email already exists' } })));
+    mockStore.dispatch.mockReturnValue(
+      throwError(() => ({ error: { message: 'Email already exists' } })),
+    );
 
     component.onSubmit();
 

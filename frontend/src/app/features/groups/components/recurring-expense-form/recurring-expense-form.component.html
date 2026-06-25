@@ -1,5 +1,7 @@
 <div class="recurring-expense-form-container">
-  <h2 class="form-title">{{ template ? 'Edit Recurring Expense' : 'Create Recurring Expense' }}</h2>
+  <h2 class="form-title">
+    {{ template ? 'Edit Recurring Expense' : 'Create Recurring Expense' }}
+  </h2>
 
   @if (errorMessage) {
     <div class="error-banner">{{ errorMessage }}</div>
@@ -10,12 +12,24 @@
     <div class="form-row">
       <div class="form-field">
         <label for="title">Title *</label>
-        <input id="title" type="text" formControlName="title" placeholder="e.g. Netflix Subscription" class="finmate-input" />
+        <input
+          id="title"
+          type="text"
+          formControlName="title"
+          placeholder="e.g. Netflix Subscription"
+          class="finmate-input"
+        />
       </div>
 
       <div class="form-field">
         <label for="description">Description</label>
-        <input id="description" type="text" formControlName="description" placeholder="Optional notes" class="finmate-input" />
+        <input
+          id="description"
+          type="text"
+          formControlName="description"
+          placeholder="Optional notes"
+          class="finmate-input"
+        />
       </div>
     </div>
 
@@ -25,18 +39,35 @@
         <label for="amountTotal">Amount Total *</label>
         <div class="amount-input-wrapper">
           <span class="currency-symbol">{{ currencySymbol }}</span>
-          <input id="amountTotal" type="number" formControlName="amountTotal" placeholder="0.00" step="0.01" class="finmate-input" />
+          <input
+            id="amountTotal"
+            type="number"
+            formControlName="amountTotal"
+            placeholder="0.00"
+            step="0.01"
+            class="finmate-input"
+          />
         </div>
       </div>
 
       <div class="form-field">
         <label for="currency">Currency *</label>
-        <app-dropdown id="currency" formControlName="currency" [options]="currencyOptions" placeholder="Select currency..."></app-dropdown>
+        <app-dropdown
+          id="currency"
+          formControlName="currency"
+          [options]="currencyOptions"
+          placeholder="Select currency..."
+        ></app-dropdown>
       </div>
 
       <div class="form-field">
         <label for="category">Category *</label>
-        <app-dropdown id="category" formControlName="category" [options]="categoryOptions" placeholder="Select category..."></app-dropdown>
+        <app-dropdown
+          id="category"
+          formControlName="category"
+          [options]="categoryOptions"
+          placeholder="Select category..."
+        ></app-dropdown>
       </div>
     </div>
 
@@ -44,12 +75,22 @@
     <div class="form-row">
       <div class="form-field">
         <label for="paidByUserId">Paid By *</label>
-        <app-dropdown id="paidByUserId" formControlName="paidByUserId" [options]="payerOptions" placeholder="Select payer..."></app-dropdown>
+        <app-dropdown
+          id="paidByUserId"
+          formControlName="paidByUserId"
+          [options]="payerOptions"
+          placeholder="Select payer..."
+        ></app-dropdown>
       </div>
 
       <div class="form-field">
         <label for="frequency">Frequency *</label>
-        <app-dropdown id="frequency" formControlName="frequency" [options]="frequencyOptions" placeholder="Select frequency..."></app-dropdown>
+        <app-dropdown
+          id="frequency"
+          formControlName="frequency"
+          [options]="frequencyOptions"
+          placeholder="Select frequency..."
+        ></app-dropdown>
       </div>
     </div>
 
@@ -57,12 +98,22 @@
     <div class="form-row">
       <div class="form-field">
         <label for="startDate">Start Date *</label>
-        <input id="startDate" type="date" formControlName="startDate" class="finmate-input" />
+        <input
+          id="startDate"
+          type="date"
+          formControlName="startDate"
+          class="finmate-input"
+        />
       </div>
 
       <div class="form-field">
         <label for="endDate">End Date (Optional)</label>
-        <input id="endDate" type="date" formControlName="endDate" class="finmate-input" />
+        <input
+          id="endDate"
+          type="date"
+          formControlName="endDate"
+          class="finmate-input"
+        />
       </div>
     </div>
 
@@ -72,7 +123,11 @@
       <div class="checklist-grid">
         @for (member of availableParticipants; track member.id) {
           <div class="checklist-item" (click)="toggleParticipant(member.id)">
-            <input type="checkbox" [checked]="selectedUserIds.has(member.id)" readonly />
+            <input
+              type="checkbox"
+              [checked]="selectedUserIds.has(member.id)"
+              readonly
+            />
             <span>{{ member.name }}</span>
           </div>
         }
@@ -81,8 +136,18 @@
 
     <!-- Actions -->
     <div class="form-actions">
-      <button type="button" (click)="cancel.emit()" class="btn-secondary" [disabled]="isSubmitting">Cancel</button>
-      <app-submit-button [isLoading]="isSubmitting" [disabled]="!form.valid || selectedUserIds.size === 0">
+      <button
+        type="button"
+        (click)="cancel.emit()"
+        class="btn-secondary"
+        [disabled]="isSubmitting"
+      >
+        Cancel
+      </button>
+      <app-submit-button
+        [isLoading]="isSubmitting"
+        [disabled]="!form.valid || selectedUserIds.size === 0"
+      >
         {{ template ? 'Save Changes' : 'Create Template' }}
       </app-submit-button>
     </div>

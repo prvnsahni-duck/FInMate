@@ -1,4 +1,11 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, Check } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  ManyToOne,
+  Check,
+} from 'typeorm';
 import { User } from './user.entity';
 import { Expense } from './expense.entity';
 import { Note } from './note.entity';
@@ -6,7 +13,9 @@ import { Goal } from './goal.entity';
 import { Group } from './group.entity';
 
 @Entity('attachments')
-@Check('"expenseId" IS NOT NULL OR "noteId" IS NOT NULL OR "goalId" IS NOT NULL OR "groupId" IS NOT NULL')
+@Check(
+  '"expenseId" IS NOT NULL OR "noteId" IS NOT NULL OR "goalId" IS NOT NULL OR "groupId" IS NOT NULL',
+)
 export class Attachment {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

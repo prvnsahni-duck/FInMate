@@ -38,16 +38,29 @@ export class GroupsController {
   @Post()
   async create(
     @Body() createGroupDto: CreateGroupDto,
-    @Req() req: Request & { user: { id: string } & Record<string, unknown>; ip?: string; socket: { remoteAddress?: string } },
+    @Req()
+    req: Request & {
+      user: { id: string } & Record<string, unknown>;
+      ip?: string;
+      socket: { remoteAddress?: string };
+    },
   ) {
     const context = {
-      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
       userAgent: req.headers['user-agent'] as string,
     };
-    const result = await this.groupsCrudService.createGroup(req.user as unknown as Parameters<typeof this.groupsCrudService.createGroup>[0], createGroupDto, context);
+    const result = await this.groupsCrudService.createGroup(
+      req.user as unknown as Parameters<
+        typeof this.groupsCrudService.createGroup
+      >[0],
+      createGroupDto,
+      context,
+    );
     return new SuccessResponse('Group created successfully', result);
   }
-
 
   @Get()
   async findAll(
@@ -60,29 +73,52 @@ export class GroupsController {
     let limitNum = limit ? parseInt(limit, 10) : 20;
     if (isNaN(pageNum) || pageNum <= 0) pageNum = 1;
     if (isNaN(limitNum) || limitNum <= 0) limitNum = 20;
-    const isArchivedBool = isArchived === 'true' ? true : isArchived === 'false' ? false : undefined;
+    const isArchivedBool =
+      isArchived === 'true' ? true : isArchived === 'false' ? false : undefined;
 
-    const result = await this.groupsCrudService.listGroups(req!.user.id, pageNum, limitNum, isArchivedBool);
+    const result = await this.groupsCrudService.listGroups(
+      req!.user.id,
+      pageNum,
+      limitNum,
+      isArchivedBool,
+    );
     return new SuccessResponse('Groups retrieved successfully', result);
   }
 
   @Post('join/:inviteToken')
   async joinGroupByToken(
     @Param('inviteToken', ParseUUIDPipe) inviteToken: string,
-    @Req() req: Request & { user: { id: string }; ip?: string; socket: { remoteAddress?: string } },
+    @Req()
+    req: Request & {
+      user: { id: string };
+      ip?: string;
+      socket: { remoteAddress?: string };
+    },
   ) {
     const context = {
-      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
       userAgent: req.headers['user-agent'] as string,
     };
-    const result = await this.groupsMembershipService.joinGroupByToken(req.user.id, inviteToken, context);
+    const result = await this.groupsMembershipService.joinGroupByToken(
+      req.user.id,
+      inviteToken,
+      context,
+    );
     return new SuccessResponse('Joined group successfully', result);
   }
 
   @Get('invitations/pending')
   async findPendingInvitations(@Req() req: Request & { user: { id: string } }) {
-    const result = await this.groupsMembershipService.getPendingInvitations(req.user.id);
-    return new SuccessResponse('Pending group invitations retrieved successfully', result);
+    const result = await this.groupsMembershipService.getPendingInvitations(
+      req.user.id,
+    );
+    return new SuccessResponse(
+      'Pending group invitations retrieved successfully',
+      result,
+    );
   }
 
   @Get(':id')
@@ -98,13 +134,26 @@ export class GroupsController {
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateGroupDto: UpdateGroupDto,
-    @Req() req: Request & { user: { id: string }; ip?: string; socket: { remoteAddress?: string } },
+    @Req()
+    req: Request & {
+      user: { id: string };
+      ip?: string;
+      socket: { remoteAddress?: string };
+    },
   ) {
     const context = {
-      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
       userAgent: req.headers['user-agent'] as string,
     };
-    const result = await this.groupsCrudService.updateGroup(req.user.id, id, updateGroupDto, context);
+    const result = await this.groupsCrudService.updateGroup(
+      req.user.id,
+      id,
+      updateGroupDto,
+      context,
+    );
     return new SuccessResponse('Group updated successfully', result);
   }
 
@@ -113,7 +162,10 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.groupsCrudService.regenerateInviteToken(req.user.id, id);
+    const result = await this.groupsCrudService.regenerateInviteToken(
+      req.user.id,
+      id,
+    );
     return new SuccessResponse('Invite token regenerated successfully', result);
   }
 
@@ -130,7 +182,12 @@ export class GroupsController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.groupsAuditService.getGroupHistory(req.user.id, id, page, limit);
+    const result = await this.groupsAuditService.getGroupHistory(
+      req.user.id,
+      id,
+      page,
+      limit,
+    );
     return new SuccessResponse('Group history retrieved successfully', result);
   }
 
@@ -144,8 +201,16 @@ export class GroupsController {
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.expensesCarryForwardService.listDeletedExpenses(req.user.id, id, page, limit);
-    return new SuccessResponse('Deleted expenses retrieved successfully', result);
+    const result = await this.expensesCarryForwardService.listDeletedExpenses(
+      req.user.id,
+      id,
+      page,
+      limit,
+    );
+    return new SuccessResponse(
+      'Deleted expenses retrieved successfully',
+      result,
+    );
   }
 
   // ─── Carry-Forward Summary ────────────────────────────────────────────────
@@ -162,8 +227,16 @@ export class GroupsController {
   ) {
     // Default to current month if not provided
     const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
-    const result = await this.expensesCarryForwardService.getCarryForwardSummary(req.user.id, id, ledgerMonth);
-    return new SuccessResponse('Carry-forward summary retrieved successfully', result);
+    const result =
+      await this.expensesCarryForwardService.getCarryForwardSummary(
+        req.user.id,
+        id,
+        ledgerMonth,
+      );
+    return new SuccessResponse(
+      'Carry-forward summary retrieved successfully',
+      result,
+    );
   }
 
   @Post(':id/close-month')
@@ -175,8 +248,15 @@ export class GroupsController {
     if (!body || !body.ledgerMonth) {
       throw new BadRequestException('ledgerMonth is required');
     }
-    const result = await this.expensesCarryForwardService.closeMonth(req.user.id, id, body.ledgerMonth);
-    return new SuccessResponse('Billing month closed and carry-forward balances rolled over successfully', result);
+    const result = await this.expensesCarryForwardService.closeMonth(
+      req.user.id,
+      id,
+      body.ledgerMonth,
+    );
+    return new SuccessResponse(
+      'Billing month closed and carry-forward balances rolled over successfully',
+      result,
+    );
   }
 
   @Get(':id/contributions')
@@ -186,8 +266,15 @@ export class GroupsController {
     @Req() req: Request & { user: { id: string } },
   ) {
     const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
-    const result = await this.groupsContributionsService.getContributions(req.user.id, id, ledgerMonth);
-    return new SuccessResponse('Group contribution shares retrieved successfully', result);
+    const result = await this.groupsContributionsService.getContributions(
+      req.user.id,
+      id,
+      ledgerMonth,
+    );
+    return new SuccessResponse(
+      'Group contribution shares retrieved successfully',
+      result,
+    );
   }
 
   @Post(':id/contributions')
@@ -196,7 +283,14 @@ export class GroupsController {
     @Body() dto: UpdateContributionDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    const result = await this.groupsContributionsService.updateContributions(req.user.id, id, dto);
-    return new SuccessResponse('Group contribution shares updated successfully', result);
+    const result = await this.groupsContributionsService.updateContributions(
+      req.user.id,
+      id,
+      dto,
+    );
+    return new SuccessResponse(
+      'Group contribution shares updated successfully',
+      result,
+    );
   }
 }

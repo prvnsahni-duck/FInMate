@@ -2,14 +2,17 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { FormsModule } from '@angular/forms';
 import { By } from '@angular/platform-browser';
 import { ConflictDiffModalComponent } from './conflict-diff-modal.component';
-import { ConflictContext, ConflictResolution } from '../../../../shared/models/conflict.types';
+import {
+  ConflictContext,
+  ConflictResolution,
+} from '../../../../shared/models/conflict.types';
 
 const makeContext = (
   overrides: Partial<ConflictContext<Record<string, unknown>>> = {},
 ): ConflictContext<Record<string, unknown>> => ({
   resourceUrl: '/api/v1/notes/abc-123',
   localPayload: { body: 'My local edit', version: 5 },
-  serverState:  { body: 'Server edit', title: 'Note', version: 6 },
+  serverState: { body: 'Server edit', title: 'Note', version: 6 },
   localVersion: 5,
   overlappingFields: ['body'],
   ...overrides,
@@ -40,9 +43,15 @@ describe('ConflictDiffModalComponent', () => {
   });
 
   it('shows the three strategy buttons when no strategy is selected', () => {
-    expect(fixture.debugElement.query(By.css('#cdm-btn-keep-mine'))).toBeTruthy();
-    expect(fixture.debugElement.query(By.css('#cdm-btn-keep-theirs'))).toBeTruthy();
-    expect(fixture.debugElement.query(By.css('#cdm-btn-manual-merge'))).toBeTruthy();
+    expect(
+      fixture.debugElement.query(By.css('#cdm-btn-keep-mine')),
+    ).toBeTruthy();
+    expect(
+      fixture.debugElement.query(By.css('#cdm-btn-keep-theirs')),
+    ).toBeTruthy();
+    expect(
+      fixture.debugElement.query(By.css('#cdm-btn-manual-merge')),
+    ).toBeTruthy();
   });
 
   it('shows the confirm bar and hides strategy buttons after a strategy is selected', () => {
@@ -125,6 +134,8 @@ describe('ConflictDiffModalComponent', () => {
     component.activeStrategy.set(null);
     fixture.detectChanges();
 
-    expect(fixture.debugElement.query(By.css('#cdm-btn-keep-mine'))).toBeTruthy();
+    expect(
+      fixture.debugElement.query(By.css('#cdm-btn-keep-mine')),
+    ).toBeTruthy();
   });
 });

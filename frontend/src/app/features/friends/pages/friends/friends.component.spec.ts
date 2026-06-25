@@ -20,9 +20,9 @@ describe('FriendsComponent', () => {
           groupId: 'group-1',
           groupName: 'Trip to Tokyo',
           amount: 150,
-          currency: 'USD'
-        }
-      ]
+          currency: 'USD',
+        },
+      ],
     },
     {
       friendId: 'friend-2',
@@ -34,24 +34,24 @@ describe('FriendsComponent', () => {
           groupId: 'group-1',
           groupName: 'Trip to Tokyo',
           amount: -50,
-          currency: 'USD'
-        }
-      ]
-    }
+          currency: 'USD',
+        },
+      ],
+    },
   ];
 
   beforeEach(async () => {
     mockFriendsService = {
       getFriends: jest.fn().mockReturnValue(of(mockFriendsData)),
-      searchUsers: jest.fn()
+      searchUsers: jest.fn(),
     } as any;
 
     await TestBed.configureTestingModule({
       imports: [FriendsComponent],
       providers: [
         { provide: FriendsService, useValue: mockFriendsService },
-        provideRouter([])
-      ]
+        provideRouter([]),
+      ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(FriendsComponent);
@@ -86,7 +86,9 @@ describe('FriendsComponent', () => {
   });
 
   it('should handle error when fetching friends', () => {
-    mockFriendsService.getFriends.mockReturnValue(throwError(() => new Error('Error fetching friends')));
+    mockFriendsService.getFriends.mockReturnValue(
+      throwError(() => new Error('Error fetching friends')),
+    );
     fixture.detectChanges();
 
     expect(component.isLoading).toBe(false);

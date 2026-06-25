@@ -3,7 +3,12 @@ import { State, Action, StateContext, Selector } from '@ngxs/store';
 import { jwtDecode } from 'jwt-decode';
 import { AuthService } from './auth.service';
 import { tap } from 'rxjs/operators';
-import { JwtPayload, LoginDto, LoginResponse, RegisterDto } from '@finmate/data-models';
+import {
+  JwtPayload,
+  LoginDto,
+  LoginResponse,
+  RegisterDto,
+} from '@finmate/data-models';
 import { ClientEncryptionService } from '../services/encryption.service';
 
 export class Login {
@@ -22,7 +27,10 @@ export class Logout {
 
 export class RefreshTokenSuccess {
   static readonly type = '[Auth] Refresh Token Success';
-  constructor(public accessToken: string, public refreshToken?: string) {}
+  constructor(
+    public accessToken: string,
+    public refreshToken?: string,
+  ) {}
 }
 
 export interface AuthStateModel {
@@ -36,8 +44,10 @@ export interface AuthStateModel {
   defaults: {
     token: localStorage.getItem('finmate_token'),
     refreshToken: localStorage.getItem('finmate_refresh_token'),
-    user: localStorage.getItem('finmate_token') ? jwtDecode<JwtPayload>(localStorage.getItem('finmate_token') as string) : null
-  }
+    user: localStorage.getItem('finmate_token')
+      ? jwtDecode<JwtPayload>(localStorage.getItem('finmate_token') as string)
+      : null,
+  },
 })
 @Injectable()
 export class AuthState {
@@ -65,14 +75,16 @@ export class AuthState {
         ctx.patchState({
           token: result.accessToken,
           refreshToken: result.refreshToken,
-          user: jwtDecode<JwtPayload>(result.accessToken)
+          user: jwtDecode<JwtPayload>(result.accessToken),
         });
 
         // Derive and store key client-side asynchronously
-        this.encryptionService.deriveAndStoreKey(action.payload.password, action.payload.email).catch(err => {
-          console.error('Failed to derive master key on login', err);
-        });
-      })
+        this.encryptionService
+          .deriveAndStoreKey(action.payload.password, action.payload.email)
+          .catch((err) => {
+            console.error('Failed to derive master key on login', err);
+          });
+      }),
     );
   }
 
@@ -84,8 +96,10 @@ export class AuthState {
   @Action(Logout)
   logout(ctx: StateContext<AuthStateModel>) {
     const state = ctx.getState();
-    const logout$ = state.refreshToken ? this.authService.logout(state.refreshToken) : null;
-    
+    const logout$ = state.refreshToken
+      ? this.authService.logout(state.refreshToken)
+      : null;
+
     if (state.user?.email) {
       this.encryptionService.clearKey(state.user.email);
     }
@@ -96,14 +110,17 @@ export class AuthState {
     ctx.setState({
       token: null,
       refreshToken: null,
-      user: null
+      user: null,
     });
 
     return logout$;
   }
 
   @Action(RefreshTokenSuccess)
-  refreshTokenSuccess(ctx: StateContext<AuthStateModel>, action: RefreshTokenSuccess) {
+  refreshTokenSuccess(
+    ctx: StateContext<AuthStateModel>,
+    action: RefreshTokenSuccess,
+  ) {
     localStorage.setItem('finmate_token', action.accessToken);
     if (action.refreshToken) {
       localStorage.setItem('finmate_refresh_token', action.refreshToken);
@@ -111,7 +128,7 @@ export class AuthState {
     ctx.patchState({
       token: action.accessToken,
       refreshToken: action.refreshToken || ctx.getState().refreshToken,
-      user: jwtDecode<JwtPayload>(action.accessToken)
+      user: jwtDecode<JwtPayload>(action.accessToken),
     });
   }
 }

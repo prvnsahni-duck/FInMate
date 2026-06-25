@@ -7,11 +7,11 @@ services:
       POSTGRES_PASSWORD: finmate_password
       POSTGRES_DB: finmate_dev
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U finmate_user -d finmate_dev"]
+      test: ['CMD-SHELL', 'pg_isready -U finmate_user -d finmate_dev']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -19,11 +19,11 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -31,13 +31,13 @@ services:
   # ── Application ───────────────────────────────────────────────────────────────
   api:
     build:
-      context: .                          # workspace root (Nx needs the full monorepo)
+      context: . # workspace root (Nx needs the full monorepo)
       dockerfile: backend/Dockerfile
     ports:
-      - "3000:3000"
+      - '3000:3000'
     environment:
       NODE_ENV: production
-      PORT: "3000"
+      PORT: '3000'
       DATABASE_URL: postgresql://finmate_user:finmate_password@postgres:5432/finmate_dev
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_me}
@@ -56,10 +56,10 @@ services:
 
   web:
     build:
-      context: .                          # workspace root (Nx needs the full monorepo)
+      context: . # workspace root (Nx needs the full monorepo)
       dockerfile: frontend/Dockerfile
     ports:
-      - "8080:80"
+      - '8080:80'
     depends_on:
       - api
     restart: unless-stopped

@@ -1,20 +1,29 @@
-<div class="min-h-screen w-full flex items-center justify-center bg-finmate-bg text-secondary transition-colors duration-300">
-  
+<div
+  class="min-h-screen w-full flex items-center justify-center bg-finmate-bg text-secondary transition-colors duration-300"
+>
   <!-- Background Decorative Elements -->
-  <div class="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-primary/10 blur-[120px] pointer-events-none z-0"></div>
-  <div class="fixed bottom-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full bg-accent/10 blur-[100px] pointer-events-none z-0"></div>
+  <div
+    class="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-primary/10 blur-[120px] pointer-events-none z-0"
+  ></div>
+  <div
+    class="fixed bottom-[-10%] right-[-10%] w-[400px] h-[400px] rounded-full bg-accent/10 blur-[100px] pointer-events-none z-0"
+  ></div>
 
   <!-- Content Container -->
   <div class="relative z-10 w-full max-w-md p-6">
     <div class="text-center mb-8">
       <h1 class="text-4xl font-extrabold tracking-tight mb-2">
-        <span class="bg-gradient-neon text-transparent bg-clip-text">{{ appName }}</span>
+        <span class="bg-gradient-neon text-transparent bg-clip-text">{{
+          appName
+        }}</span>
       </h1>
       <p class="text-secondary/60 text-sm">Your Personal Finance Companion</p>
     </div>
-    
+
     <!-- Router outlet for Login / Register forms -->
-    <div class="bg-finmate-card/70 backdrop-blur-xl shadow-2xl rounded-3xl p-8 border border-secondary/15">
+    <div
+      class="bg-finmate-card/70 backdrop-blur-xl shadow-2xl rounded-3xl p-8 border border-secondary/15"
+    >
       <router-outlet></router-outlet>
     </div>
   </div>

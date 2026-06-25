@@ -5,6 +5,7 @@ This file serves as the single source of truth for the complete **Expenses Modul
 ---
 
 ## 🧩 1. Module Overview & Architecture
+
 The Expenses Module manages personal and group-based financial transactions. It supports dynamic split calculations, soft-delete restoration windows, zero-knowledge attachment syncing, audit logging, and concurrency control.
 
 ```mermaid
@@ -21,8 +22,9 @@ graph TD
 ## 🗄️ 2. Database Entities & Data Models
 
 ### A. Expense Entity (`expense.entity.ts`)
-*   **Path**: `shared/data-models/src/lib/expense.entity.ts`
-*   **Description**: Stores the header details of an expense. Text fields (`title`, `description`) are client-side encrypted (Zero-Knowledge), while amount fields are server-side encrypted (SSE) using a TypeORM value transformer.
+
+- **Path**: `shared/data-models/src/lib/expense.entity.ts`
+- **Description**: Stores the header details of an expense. Text fields (`title`, `description`) are client-side encrypted (Zero-Knowledge), while amount fields are server-side encrypted (SSE) using a TypeORM value transformer.
 
 ```typescript
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, CreateDateColumn, UpdateDateColumn, VersionColumn, Index, DeleteDateColumn } from 'typeorm';
@@ -100,8 +102,9 @@ export class Expense {
 ```
 
 ### B. Expense Split Entity (`expense-split.entity.ts`)
-*   **Path**: `shared/data-models/src/lib/expense-split.entity.ts`
-*   **Description**: Stores the calculated owed shares for each participant. Contains a database CHECK constraint ensuring that exactly one participant field (User ID or Group Member ID) is non-null.
+
+- **Path**: `shared/data-models/src/lib/expense-split.entity.ts`
+- **Description**: Stores the calculated owed shares for each participant. Contains a database CHECK constraint ensuring that exactly one participant field (User ID or Group Member ID) is non-null.
 
 ```typescript
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, Check } from 'typeorm';
@@ -152,8 +155,9 @@ export class ExpenseSplit {
 ```
 
 ### C. Group Member Contribution Entity (`group-member-contribution.entity.ts`)
-*   **Path**: `shared/data-models/src/lib/group-member-contribution.entity.ts`
-*   **Description**: Stores the custom percentage share of a group member for a given household ledger month. Sum of percentages of all active members in a month must equal exactly 100.00.
+
+- **Path**: `shared/data-models/src/lib/group-member-contribution.entity.ts`
+- **Description**: Stores the custom percentage share of a group member for a given household ledger month. Sum of percentages of all active members in a month must equal exactly 100.00.
 
 ```typescript
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, Unique, CreateDateColumn, UpdateDateColumn } from 'typeorm';
@@ -185,8 +189,9 @@ export class GroupMemberContribution {
 ---
 
 ## 📩 3. Data Transfer Objects (DTOs)
-*   **Path**: `shared/data-models/src/lib/dto/expense.dto.ts`
-*   **Description**: Validates payloads on incoming request bodies using `class-validator` and handles nested transformation with `class-transformer`.
+
+- **Path**: `shared/data-models/src/lib/dto/expense.dto.ts`
+- **Description**: Validates payloads on incoming request bodies using `class-validator` and handles nested transformation with `class-transformer`.
 
 ```typescript
 import { IsString, IsNotEmpty, MaxLength, IsOptional, IsEnum, IsNumber, Min, IsUUID, IsArray, ValidateNested, IsInt, IsDateString } from 'class-validator';
@@ -339,8 +344,9 @@ export class UpdateContributionDto {
 ---
 
 ## 🧮 4. Calculations & Split Algorithms
-*   **Path**: `backend/src/app/expenses/split-calculator.util.ts`
-*   **Description**: Handles splitting currencies deterministically. Rounds all outputs to two decimal places and handles remainder pennies by allocating them to the payer (or alphabetically first UUID participant).
+
+- **Path**: `backend/src/app/expenses/split-calculator.util.ts`
+- **Description**: Handles splitting currencies deterministically. Rounds all outputs to two decimal places and handles remainder pennies by allocating them to the payer (or alphabetically first UUID participant).
 
 ```typescript
 import { BadRequestException } from '@nestjs/common';
@@ -375,11 +381,7 @@ export const validateSplitParticipants = (splits: ExpenseSplitInputDto[]): void 
   }
 };
 
-export const calculateDeterministicSplits = (
-  amountTotal: number,
-  splits: ExpenseSplitInputDto[],
-  payerKey?: string,
-): CalculatedSplit[] => {
+export const calculateDeterministicSplits = (amountTotal: number, splits: ExpenseSplitInputDto[], payerKey?: string): CalculatedSplit[] => {
   if (!splits.length) {
     throw new BadRequestException({
       errorCode: 'VAL_INVALID_INPUT',
@@ -497,10 +499,12 @@ export const calculateDeterministicSplits = (
 ---
 
 ## 🔌 5. Frontend Service Layer
-*   **Path**: `frontend/src/app/features/groups/services/expenses.service.ts`
-*   **Description**: HTTP client wrapper for components to query backend API controllers. Integrates with `ClientEncryptionService` and `AuthState` to transparently encrypt outgoing `title`/`description` fields and decrypt them on retrieval.
+
+- **Path**: `frontend/src/app/features/groups/services/expenses.service.ts`
+- **Description**: HTTP client wrapper for components to query backend API controllers. Integrates with `ClientEncryptionService` and `AuthState` to transparently encrypt outgoing `title`/`description` fields and decrypt them on retrieval.
 
 **Key integration points:**
+
 1.  Injects `Store` (NGXS) and `ClientEncryptionService`.
 2.  `encryptPayload(payload)` — private helper that loads the master key from `sessionStorage` via `loadKeyFromSession(email)` and encrypts `title`/`description` before HTTP transmission.
 3.  Outgoing `createExpense` / `updateExpense` — pipes through `from(encryptPayload(...))` → `mergeMap` HTTP call → async decrypt response.
@@ -515,17 +519,10 @@ import { environment } from '../../../../environments/environment';
 import { Store } from '@ngxs/store';
 import { AuthState } from '../../../core/auth/auth.state';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
-import {
-  CategoryAnalyticsPoint,
-  CreateExpenseDto,
-  Expense,
-  GetExpensesResponse,
-  MonthlyAnalyticsPoint,
-  UpdateExpenseDto,
-} from '@finmate/data-models';
+import { CategoryAnalyticsPoint, CreateExpenseDto, Expense, GetExpensesResponse, MonthlyAnalyticsPoint, UpdateExpenseDto } from '@finmate/data-models';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class ExpensesService {
   private http = inject(HttpClient);
@@ -559,10 +556,7 @@ export class ExpensesService {
     return payload;
   }
 
-  getExpenses(
-    groupId: string,
-    options: { page?: number; limit?: number; category?: string; startDate?: string; endDate?: string } = {}
-  ): Observable<GetExpensesResponse> {
+  getExpenses(groupId: string, options: { page?: number; limit?: number; category?: string; startDate?: string; endDate?: string } = {}): Observable<GetExpensesResponse> {
     let params = new HttpParams().set('groupId', groupId);
     // ... param assembly omitted for brevity ...
 
@@ -576,24 +570,22 @@ export class ExpensesService {
             res.data = await Promise.all(
               res.data.map(async (expense) => {
                 try {
-                  return await this.encryptionService.decryptExpense(expense as any, key) as any;
+                  return (await this.encryptionService.decryptExpense(expense as any, key)) as any;
                 } catch (e) {
                   return expense; // Graceful fallback
                 }
-              })
+              }),
             );
           }
         }
         return res;
-      })
+      }),
     );
   }
 
   createExpense(payload: CreateExpenseDto): Observable<Expense> {
     return from(this.encryptPayload(payload)).pipe(
-      mergeMap((encryptedPayload) =>
-        this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload)
-      ),
+      mergeMap((encryptedPayload) => this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload)),
       mergeMap(async (expense) => {
         // Decrypt the returned expense for immediate UI display
         const user = this.store.selectSnapshot(AuthState.getUser);
@@ -601,39 +593,53 @@ export class ExpensesService {
         if (email) {
           const key = await this.encryptionService.loadKeyFromSession(email);
           if (key) {
-            try { return await this.encryptionService.decryptExpense(expense as any, key) as any; } catch (e) {}
+            try {
+              return (await this.encryptionService.decryptExpense(expense as any, key)) as any;
+            } catch (e) {}
           }
         }
         return expense;
-      })
+      }),
     );
   }
 
   updateExpense(id: string, payload: UpdateExpenseDto): Observable<Expense> {
     return from(this.encryptPayload(payload)).pipe(
-      mergeMap((encryptedPayload) =>
-        this.http.patch<Expense>(`${this.baseUrl}/expenses/${id}`, encryptedPayload)
-      ),
+      mergeMap((encryptedPayload) => this.http.patch<Expense>(`${this.baseUrl}/expenses/${id}`, encryptedPayload)),
       mergeMap(async (expense) => {
         const user = this.store.selectSnapshot(AuthState.getUser);
         const email = user?.email;
         if (email) {
           const key = await this.encryptionService.loadKeyFromSession(email);
           if (key) {
-            try { return await this.encryptionService.decryptExpense(expense as any, key) as any; } catch (e) {}
+            try {
+              return (await this.encryptionService.decryptExpense(expense as any, key)) as any;
+            } catch (e) {}
           }
         }
         return expense;
-      })
+      }),
     );
   }
 
-  deleteExpense(id: string): Observable<void> { /* unchanged */ }
-  restoreExpense(id: string): Observable<Expense> { /* same decrypt pattern as createExpense */ }
-  getMonthlyAnalytics(groupId?: string): Observable<MonthlyAnalyticsPoint[]> { /* unchanged */ }
-  getCategoryAnalytics(groupId?: string): Observable<CategoryAnalyticsPoint[]> { /* unchanged */ }
-  exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> { /* unchanged */ }
-  importExpenses(formData: FormData): Observable<void> { /* unchanged */ }
+  deleteExpense(id: string): Observable<void> {
+    /* unchanged */
+  }
+  restoreExpense(id: string): Observable<Expense> {
+    /* same decrypt pattern as createExpense */
+  }
+  getMonthlyAnalytics(groupId?: string): Observable<MonthlyAnalyticsPoint[]> {
+    /* unchanged */
+  }
+  getCategoryAnalytics(groupId?: string): Observable<CategoryAnalyticsPoint[]> {
+    /* unchanged */
+  }
+  exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> {
+    /* unchanged */
+  }
+  importExpenses(formData: FormData): Observable<void> {
+    /* unchanged */
+  }
 }
 ```
 
@@ -644,25 +650,28 @@ export class ExpensesService {
 This section covers how users are added to groups, detailing both the existing backend structures and the planned frontend implementation.
 
 ### A. Backend Implementation (Existing)
-*   **Controller**: `MembersController` (`@Controller('groups/:id/members')`)
-*   **Service**: `GroupsService`
-    *   `inviteMember(userId, groupId, dto: InviteMemberDto)`:
-        *   Accepts `email` and optional `role` (`admin`, `member`, `viewer`).
-        *   Enforces RBAC: Only group **Owners** and **Admins** can invite.
-        *   If the user exists: updates/re-invites `GroupMember` with `joinStatus: 'invited'`.
-        *   If the user does not exist: creates a placeholder `User` with `status: 'invited'` and saves the membership.
-    *   `listMembers(userId, groupId)`:
-        *   Lists all memberships.
-    *   `updateMember(userId, groupId, memberId, dto: UpdateMemberDto)`:
-        *   *Self-update*: Accepting invitation (`joinStatus: 'active'`) or leaving (`joinStatus: 'left'`).
-        *   *Admin-update*: Promoting/demoting `role`, or removing (`joinStatus: 'removed'`).
-    *   `removeMember(userId, groupId, memberId)`:
-        *   Removes or leaves membership.
+
+- **Controller**: `MembersController` (`@Controller('groups/:id/members')`)
+- **Service**: `GroupsService`
+  - `inviteMember(userId, groupId, dto: InviteMemberDto)`:
+    - Accepts `email` and optional `role` (`admin`, `member`, `viewer`).
+    - Enforces RBAC: Only group **Owners** and **Admins** can invite.
+    - If the user exists: updates/re-invites `GroupMember` with `joinStatus: 'invited'`.
+    - If the user does not exist: creates a placeholder `User` with `status: 'invited'` and saves the membership.
+  - `listMembers(userId, groupId)`:
+    - Lists all memberships.
+  - `updateMember(userId, groupId, memberId, dto: UpdateMemberDto)`:
+    - _Self-update_: Accepting invitation (`joinStatus: 'active'`) or leaving (`joinStatus: 'left'`).
+    - _Admin-update_: Promoting/demoting `role`, or removing (`joinStatus: 'removed'`).
+  - `removeMember(userId, groupId, memberId)`:
+    - Removes or leaves membership.
 
 ### B. Frontend Implementation Plan (Pending)
 
 #### 1. Service Integration
+
 Add the following endpoints to frontend `GroupsService` (`frontend/src/app/features/groups/services/groups.service.ts`):
+
 ```typescript
 inviteMember(groupId: string, email: string, role: string): Observable<GroupMember> {
   return this.http.post<GroupMember>(`/api/groups/${groupId}/members`, { email, role });
@@ -678,14 +687,16 @@ removeMember(groupId: string, memberId: string): Observable<void> {
 ```
 
 #### 2. UI Components Update
-*   **Modify `GroupMembersComponent`** (`frontend/src/app/features/groups/components/group-members/group-members.component.ts`) from a read-only list to support management actions:
-    *   **Invite Form**: Add an inline input field for email and a role dropdown (visible only to Owners/Admins) to send invites.
-    *   **Role Management**: Render a select dropdown for active members to allow Owners/Admins to promote or demote roles.
-    *   **Kick Action**: Render a "Remove" button next to members, visible to Owners/Admins (disabled for self/owner).
+
+- **Modify `GroupMembersComponent`** (`frontend/src/app/features/groups/components/group-members/group-members.component.ts`) from a read-only list to support management actions:
+  - **Invite Form**: Add an inline input field for email and a role dropdown (visible only to Owners/Admins) to send invites.
+  - **Role Management**: Render a select dropdown for active members to allow Owners/Admins to promote or demote roles.
+  - **Kick Action**: Render a "Remove" button next to members, visible to Owners/Admins (disabled for self/owner).
 
 #### 3. Dashboard / Invitations List Component
-*   Create a "Pending Invitations" dashboard/section in the layout, letting users see active invitations sent to them.
-*   Provide simple "Accept" and "Decline" buttons.
+
+- Create a "Pending Invitations" dashboard/section in the layout, letting users see active invitations sent to them.
+- Provide simple "Accept" and "Decline" buttons.
 
 ---
 
@@ -694,26 +705,31 @@ removeMember(groupId: string, memberId: string): Observable<void> {
 Enables household groups to establish custom monthly spending targets for each user, calculate month-end balances based on these targets, and display relative visual status.
 
 ### A. Core Calculations & Target-matching
+
 In a household group, the total posted expenses $S$ for a ledger month represents the group's monthly expenditure.
-* Each participant $u$'s target contribution is calculated as:
+
+- Each participant $u$'s target contribution is calculated as:
   $$T_u = S \times \text{percentage}_u$$
-* The actual amount user $u$ contributed (paid) is $P_u$.
-* The status delta is:
+- The actual amount user $u$ contributed (paid) is $P_u$.
+- The status delta is:
   $$D_u = P_u - T_u$$
-* If $D_u > 0$: User $u$ has over-contributed (spent more than their share) by $+D_u$.
-* If $D_u < 0$: User $u$ has under-contributed by $-D_u$.
+- If $D_u > 0$: User $u$ has over-contributed (spent more than their share) by $+D_u$.
+- If $D_u < 0$: User $u$ has under-contributed by $-D_u$.
 
 ### B. Month-End Rollover setting
-* **Single Toggle Settings**: A setting `carryForwardEnabled` (boolean) on the Group entity controls the ledger month closure behavior:
-  * **Enabled (ON)**: At the end of the month, the delta balance $D_u$ is carried forward into the next month's ledger as a system-generated carry-forward expense (amount = $D_u$ underpayer pays overpayer).
-  * **Disabled (OFF)**: Deltas are not rolled over. Members must settle the balances directly using the smart settlement recommendations, resetting starting balances for the new month to 0.
+
+- **Single Toggle Settings**: A setting `carryForwardEnabled` (boolean) on the Group entity controls the ledger month closure behavior:
+  - **Enabled (ON)**: At the end of the month, the delta balance $D_u$ is carried forward into the next month's ledger as a system-generated carry-forward expense (amount = $D_u$ underpayer pays overpayer).
+  - **Disabled (OFF)**: Deltas are not rolled over. Members must settle the balances directly using the smart settlement recommendations, resetting starting balances for the new month to 0.
 
 ### C. Dashboard Comparison Bar Graph (Visual representation)
+
 On the main Group Dashboard, a comparison widget renders a progress bar for each active member:
-* **Expected Base**: Shows actual paid amount $P_u$ relative to their expected target $T_u$.
-* **Visual Status Colors**:
-  * If $D_u > 0$ (Over-contributed): The bar is filled up to $T_u$ and the extra segment $+D_u$ is rendered in **green** with a `+` label.
-  * If $D_u < 0$ (Under-contributed): The bar is filled up to $P_u$, and the remaining segment to meet the target $T_u$ is highlighted in **red/orange** with a `-` label indicating the remaining amount left to pay/contribute.
+
+- **Expected Base**: Shows actual paid amount $P_u$ relative to their expected target $T_u$.
+- **Visual Status Colors**:
+  - If $D_u > 0$ (Over-contributed): The bar is filled up to $T_u$ and the extra segment $+D_u$ is rendered in **green** with a `+` label.
+  - If $D_u < 0$ (Under-contributed): The bar is filled up to $P_u$, and the remaining segment to meet the target $T_u$ is highlighted in **red/orange** with a `-` label indicating the remaining amount left to pay/contribute.
 
 ---
 
@@ -722,32 +738,34 @@ On the main Group Dashboard, a comparison widget renders a progress bar for each
 Enables offline bulk editing and migrations. Exported files align with the import schema, allowing zero-modification re-imports of the exact same records.
 
 ### 📋 CSV Schema v1 (and XLSX Template Columns)
+
 Both CSV and XLSX files share the same column layout and header names:
 
-| Column Index | Column Header | Data Type | Constraint / Validation | Description |
-| :--- | :--- | :--- | :--- | :--- |
-| 1 | `date` | Date | Required. Format: `YYYY-MM-DD`. Must be in the past or today. | The calendar date of the expense. |
-| 2 | `title` | String | Required. Max 160 characters. | Short name of the expense. |
-| 3 | `amount` | Decimal | Required. Positive number (> 0.00). Max 2 decimal places. | Total expenditure amount. |
-| 4 | `currency` | String | Required. ISO 4217 code (3 chars, uppercase, e.g. `INR`, `USD`). | Transaction currency. |
-| 5 | `category` | String | Required. Max 64 characters. | Expense category (e.g. Travel, Food). |
-| 6 | `payer_email` | String | Required. Valid email format. Must belong to an active member. | The user who paid the amount. |
-| 7 | `split_type` | String | Required. Enum: `equal`, `fixed`, `percent`, `share`. | Distribution algorithm model. |
-| 8 | `shares_data` | String | Optional. Semicolon-separated list: `email:value;email:value`. | Allocation parameters. If empty, defaults to equal splits among all active group members. |
-| 9 | `description` | String | Optional. Text format. | Additional contextual notes. |
+| Column Index | Column Header | Data Type | Constraint / Validation                                          | Description                                                                               |
+| :----------- | :------------ | :-------- | :--------------------------------------------------------------- | :---------------------------------------------------------------------------------------- |
+| 1            | `date`        | Date      | Required. Format: `YYYY-MM-DD`. Must be in the past or today.    | The calendar date of the expense.                                                         |
+| 2            | `title`       | String    | Required. Max 160 characters.                                    | Short name of the expense.                                                                |
+| 3            | `amount`      | Decimal   | Required. Positive number (> 0.00). Max 2 decimal places.        | Total expenditure amount.                                                                 |
+| 4            | `currency`    | String    | Required. ISO 4217 code (3 chars, uppercase, e.g. `INR`, `USD`). | Transaction currency.                                                                     |
+| 5            | `category`    | String    | Required. Max 64 characters.                                     | Expense category (e.g. Travel, Food).                                                     |
+| 6            | `payer_email` | String    | Required. Valid email format. Must belong to an active member.   | The user who paid the amount.                                                             |
+| 7            | `split_type`  | String    | Required. Enum: `equal`, `fixed`, `percent`, `share`.            | Distribution algorithm model.                                                             |
+| 8            | `shares_data` | String    | Optional. Semicolon-separated list: `email:value;email:value`.   | Allocation parameters. If empty, defaults to equal splits among all active group members. |
+| 9            | `description` | String    | Optional. Text format.                                           | Additional contextual notes.                                                              |
 
 ### 🛡️ Validation & Atomic Processing Rules
+
 1. **Row-Level Structural Integrity**:
-   * **Emails Resolution**: All emails in `payer_email` and `shares_data` must resolve to registered user records currently active in the group.
-   * **Currency Check**: Must match currency codes active in the group parameters.
-   * **Split Math Validation**:
-     * `equal`: Shares data can be omitted or define participant emails with values of `1` (weights).
-     * `fixed`: Sum of values in `shares_data` must equal the exact value of the `amount` column.
-     * `percent`: Sum of values in `shares_data` must equal exactly `100.00`.
-     * `share`: Shares sum can be arbitrary; fractional owed values are computed relative to the total share sum.
+   - **Emails Resolution**: All emails in `payer_email` and `shares_data` must resolve to registered user records currently active in the group.
+   - **Currency Check**: Must match currency codes active in the group parameters.
+   - **Split Math Validation**:
+     - `equal`: Shares data can be omitted or define participant emails with values of `1` (weights).
+     - `fixed`: Sum of values in `shares_data` must equal the exact value of the `amount` column.
+     - `percent`: Sum of values in `shares_data` must equal exactly `100.00`.
+     - `share`: Shares sum can be arbitrary; fractional owed values are computed relative to the total share sum.
 2. **Transactional Atomicity**:
-   * API uploads are processed within a single database transaction boundary.
-   * If any validation check fails (e.g., cell parsing error, unknown member email, invalid split math), the entire file import is rejected and rolled back. No partial records are committed.
+   - API uploads are processed within a single database transaction boundary.
+   - If any validation check fails (e.g., cell parsing error, unknown member email, invalid split math), the entire file import is rejected and rolled back. No partial records are committed.
 
 ---
 
@@ -756,20 +774,24 @@ Both CSV and XLSX files share the same column layout and header names:
 This section defines the mathematical formulas, rounding specifications, tie-breaking ordering rules, and the greedy matching algorithm used to simplify group debts.
 
 ### 🪙 1. Net Balance Computation
+
 A user's net balance within a group is calculated as the sum of all their paid expenses minus the sum of their owes from splits, and adjusted by confirmed settlements:
 
 $$\text{Net Balance}(U) = \sum \text{PaidExpenses}(U) - \sum \text{OwedAmount}(U) + \sum \text{ReceivedSettlements}(U) - \sum \text{PaidSettlements}(U)$$
 
 Where:
-*   `PaidExpenses(U)`: Sum of `amount_total` for all expenses in the group paid by user $U$.
-*   `OwedAmount(U)`: Sum of `amount_owed` for all expense splits in the group assigned to user $U$.
-*   `ReceivedSettlements(U)`: Sum of confirmed settlements where user $U$ is the creditor (`to_user_id == U`).
-*   `PaidSettlements(U)`: Sum of confirmed settlements where user $U$ is the debtor (`from_user_id == U`).
 
-*Note: Proposed or cancelled settlements are excluded from the balance calculation.*
+- `PaidExpenses(U)`: Sum of `amount_total` for all expenses in the group paid by user $U$.
+- `OwedAmount(U)`: Sum of `amount_owed` for all expense splits in the group assigned to user $U$.
+- `ReceivedSettlements(U)`: Sum of confirmed settlements where user $U$ is the creditor (`to_user_id == U`).
+- `PaidSettlements(U)`: Sum of confirmed settlements where user $U$ is the debtor (`from_user_id == U`).
+
+_Note: Proposed or cancelled settlements are excluded from the balance calculation._
 
 ### 🪙 2. Rounding Behavior and Remainder Allocation
+
 All database monetary columns are stored using `decimal(12,2)`. To prevent loss of pennies during division (e.g. splitting $10.00 equally between 3 people):
+
 1.  **Split Calculation**: Each participant's share is calculated as:
     $$\text{Share} = \text{round\_half\_up}\left(\frac{\text{amount\_total}}{N}, 2\right)$$
 2.  **Remainder Detection**: The sum of shares is subtracted from `amount_total` to find the rounding remainder:
@@ -777,11 +799,14 @@ All database monetary columns are stored using `decimal(12,2)`. To prevent loss 
 3.  **Deterministic Allocation**: The remainder (always $< \$0.01$ per person in magnitude) is allocated to the payer (`paid_by_user_id`). If the payer is not part of the split, it is allocated to the participant with the lexicographically smallest UUID `user_id` (alphabetically first).
 
 ### 🔀 3. Deterministic Sorting & Tie-Breaking
+
 To guarantee that the simplification algorithm produces identical outputs on both client and server:
-*   **Creditors List**: Users with a net balance $> 0.00$. Sorted descending by balance. If two balances are equal, they are sorted alphabetically by `user_id` (UUID string) ascending.
-*   **Debtors List**: Users with a net balance $< 0.00$. Sorted ascending by balance (most negative first). If two balances are equal, they are sorted alphabetically by `user_id` ascending.
+
+- **Creditors List**: Users with a net balance $> 0.00$. Sorted descending by balance. If two balances are equal, they are sorted alphabetically by `user_id` (UUID string) ascending.
+- **Debtors List**: Users with a net balance $< 0.00$. Sorted ascending by balance (most negative first). If two balances are equal, they are sorted alphabetically by `user_id` ascending.
 
 ### 🤖 4. Simplification Algorithm (Greedy Matching Pseudocode)
+
 ```typescript
 interface MemberBalance {
   userId: string;
@@ -797,15 +822,15 @@ interface SimplifiedTransaction {
 
 function simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedTransaction[] {
   // 1. Filter out users with zero balances (within a 0.005 tolerance for floating points)
-  let activeBalances = balances.filter(b => Math.abs(b.balance) >= 0.01);
-  
+  let activeBalances = balances.filter((b) => Math.abs(b.balance) >= 0.01);
+
   // 2. Prepare transaction list
   const transactions: SimplifiedTransaction[] = [];
-  
+
   while (true) {
     // 3. Separate and sort debtors and creditors
     let debtors = activeBalances
-      .filter(b => b.balance < 0)
+      .filter((b) => b.balance < 0)
       .sort((a, b) => {
         if (Math.abs(a.balance - b.balance) < 0.0001) {
           return a.userId.localeCompare(b.userId); // Tie-break lexicographically
@@ -814,7 +839,7 @@ function simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedT
       });
 
     let creditors = activeBalances
-      .filter(b => b.balance > 0)
+      .filter((b) => b.balance > 0)
       .sort((a, b) => {
         if (Math.abs(a.balance - b.balance) < 0.0001) {
           return a.userId.localeCompare(b.userId); // Tie-break lexicographically
@@ -834,16 +859,16 @@ function simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedT
     const debitAmount = Math.abs(debtor.balance);
     const creditAmount = creditor.balance;
     const transferAmount = Math.min(debitAmount, creditAmount);
-    
+
     // Round to 2 decimal places (standard financial rounding)
     const roundedTransfer = Math.round(transferAmount * 100) / 100;
-    
+
     if (roundedTransfer > 0) {
       transactions.push({
         fromUserId: debtor.userId,
         toUserId: creditor.userId,
         amount: roundedTransfer,
-        currency: currency
+        currency: currency,
       });
     }
 
@@ -852,11 +877,13 @@ function simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedT
     creditor.balance -= transferAmount;
 
     // Refresh active balances list by filtering out settled users
-    activeBalances = activeBalances.map(b => {
-      if (b.userId === debtor.userId) return { ...b, balance: debtor.balance };
-      if (b.userId === creditor.userId) return { ...b, balance: creditor.balance };
-      return b;
-    }).filter(b => Math.abs(b.balance) >= 0.01);
+    activeBalances = activeBalances
+      .map((b) => {
+        if (b.userId === debtor.userId) return { ...b, balance: debtor.balance };
+        if (b.userId === creditor.userId) return { ...b, balance: creditor.balance };
+        return b;
+      })
+      .filter((b) => Math.abs(b.balance) >= 0.01);
   }
 
   return transactions;
@@ -866,97 +893,105 @@ function simplifyDebts(balances: MemberBalance[], currency: string): SimplifiedT
 ### 📋 5. Worked Examples
 
 #### Example A: Simple Debt (No Tie-Breaks)
-*   **Inputs**:
-    *   `User_A` (UUID: `aaaa...`): Paid $90.00.
-    *   `User_B` (UUID: `bbbb...`): Paid $0.00, owes $30.00.
-    *   `User_C` (UUID: `cccc...`): Paid $0.00, owes $60.00.
-*   **Calculated Balances**:
-    *   `User_A`: $+90.00 - 0.00 = +90.00$ (Creditor)
-    *   `User_B`: $0.00 - 30.00 = -30.00$ (Debtor)
-    *   `User_C`: $0.00 - 60.00 = -60.00$ (Debtor)
-*   **Execution**:
-    *   Debtors sorted: `[User_C (-60.00), User_B (-30.00)]`
-    *   Creditors sorted: `[User_A (+90.00)]`
-    *   Match 1: `User_C` pays `User_A`. Amount: `min(60, 90) = 60`. `User_C` balance becomes 0 (removed). `User_A` balance becomes `+30.00`.
-    *   Match 2: `User_B` pays `User_A`. Amount: `min(30, 30) = 30`. Both become 0.
-*   **Expected Outputs**:
-    1.  `User_C` pays `User_A`: **$60.00**
-    2.  `User_B` pays `User_A`: **$30.00**
+
+- **Inputs**:
+  - `User_A` (UUID: `aaaa...`): Paid $90.00.
+  - `User_B` (UUID: `bbbb...`): Paid $0.00, owes $30.00.
+  - `User_C` (UUID: `cccc...`): Paid $0.00, owes $60.00.
+- **Calculated Balances**:
+  - `User_A`: $+90.00 - 0.00 = +90.00$ (Creditor)
+  - `User_B`: $0.00 - 30.00 = -30.00$ (Debtor)
+  - `User_C`: $0.00 - 60.00 = -60.00$ (Debtor)
+- **Execution**:
+  - Debtors sorted: `[User_C (-60.00), User_B (-30.00)]`
+  - Creditors sorted: `[User_A (+90.00)]`
+  - Match 1: `User_C` pays `User_A`. Amount: `min(60, 90) = 60`. `User_C` balance becomes 0 (removed). `User_A` balance becomes `+30.00`.
+  - Match 2: `User_B` pays `User_A`. Amount: `min(30, 30) = 30`. Both become 0.
+- **Expected Outputs**:
+  1.  `User_C` pays `User_A`: **$60.00**
+  2.  `User_B` pays `User_A`: **$30.00**
 
 #### Example B: Rounding Remainder (Equal Split of $10.00)
-*   **Inputs**:
-    *   `User_A` (UUID: `aaaa...`): Paid $10.00. Split equal among A, B, C.
-    *   `User_B` (UUID: `bbbb...`): Paid $0.00.
-    *   `User_C` (UUID: `cccc...`): Paid $0.00.
-*   **Calculations**:
-    *   Base share = $10.00 / 3 = 3.3333... \rightarrow 3.33$ each.
-    *   Sum of shares = $3.33 \times 3 = 9.99$.
-    *   Remainder = $10.00 - 9.99 = 0.01$.
-    *   The $0.01$ remainder is allocated to the payer (`User_A`).
-*   **Allocated Splits**:
-    *   `User_A` owes: $3.33 + 0.01 = 3.34$.
-    *   `User_B` owes: $3.33$.
-    *   `User_C` owes: $3.33$.
-*   **Calculated Balances**:
-    *   `User_A`: $+10.00 - 3.34 = +6.66$ (Creditor)
-    *   `User_B`: $0.00 - 3.33 = -3.33$ (Debtor)
-    *   `User_C`: $0.00 - 3.33 = -3.33$ (Debtor)
-*   **Execution**:
-    *   Debtors sorted: `[User_B (-3.33), User_C (-3.33)]` (sorted lexicographically by UUID `bbbb...` before `cccc...`).
-    *   Creditors sorted: `[User_A (+6.66)]`
-    *   Match 1: `User_B` pays `User_A`. Amount: `3.33`. `User_B` balance becomes 0. `User_A` balance becomes `+3.33`.
-    *   Match 2: `User_C` pays `User_A`. Amount: `3.33`. Both become 0.
-*   **Expected Outputs**:
-    1.  `User_B` pays `User_A`: **$3.33**
-    2.  `User_C` pays `User_A`: **$3.33**
+
+- **Inputs**:
+  - `User_A` (UUID: `aaaa...`): Paid $10.00. Split equal among A, B, C.
+  - `User_B` (UUID: `bbbb...`): Paid $0.00.
+  - `User_C` (UUID: `cccc...`): Paid $0.00.
+- **Calculations**:
+  - Base share = $10.00 / 3 = 3.3333... \rightarrow 3.33$ each.
+  - Sum of shares = $3.33 \times 3 = 9.99$.
+  - Remainder = $10.00 - 9.99 = 0.01$.
+  - The $0.01$ remainder is allocated to the payer (`User_A`).
+- **Allocated Splits**:
+  - `User_A` owes: $3.33 + 0.01 = 3.34$.
+  - `User_B` owes: $3.33$.
+  - `User_C` owes: $3.33$.
+- **Calculated Balances**:
+  - `User_A`: $+10.00 - 3.34 = +6.66$ (Creditor)
+  - `User_B`: $0.00 - 3.33 = -3.33$ (Debtor)
+  - `User_C`: $0.00 - 3.33 = -3.33$ (Debtor)
+- **Execution**:
+  - Debtors sorted: `[User_B (-3.33), User_C (-3.33)]` (sorted lexicographically by UUID `bbbb...` before `cccc...`).
+  - Creditors sorted: `[User_A (+6.66)]`
+  - Match 1: `User_B` pays `User_A`. Amount: `3.33`. `User_B` balance becomes 0. `User_A` balance becomes `+3.33`.
+  - Match 2: `User_C` pays `User_A`. Amount: `3.33`. Both become 0.
+- **Expected Outputs**:
+  1.  `User_B` pays `User_A`: **$3.33**
+  2.  `User_C` pays `User_A`: **$3.33**
 
 #### Example C: Sorting & Tie-Breaking (Multiple equal balances)
-*   **Inputs**:
-    *   `User_A` (UUID: `1111...`): owes $100.00
-    *   `User_B` (UUID: `2222...`): owes $100.00
-    *   `User_C` (UUID: `3333...`): is owed $200.00
-*   **Calculated Balances**:
-    *   `User_A`: $-100.00$ (Debtor)
-    *   `User_B`: $-100.00$ (Debtor)
-    *   `User_C`: $+200.00$ (Creditor)
-*   **Execution**:
-    *   Debtors have equal balances. Sorted lexicographically by UUID string: `User_A` (`1111...`) is sorted before `User_B` (`2222...`).
-    *   Match 1: `User_A` pays `User_C`. Amount: `100.00`. `User_A` balance becomes 0. `User_C` balance becomes `+100.00`.
-    *   Match 2: `User_B` pays `User_C`. Amount: `100.00`. Both become 0.
-*   **Expected Outputs**:
-    1.  `User_A` pays `User_C`: **$100.00**
-    2.  `User_B` pays `User_C`: **$100.00**
+
+- **Inputs**:
+  - `User_A` (UUID: `1111...`): owes $100.00
+  - `User_B` (UUID: `2222...`): owes $100.00
+  - `User_C` (UUID: `3333...`): is owed $200.00
+- **Calculated Balances**:
+  - `User_A`: $-100.00$ (Debtor)
+  - `User_B`: $-100.00$ (Debtor)
+  - `User_C`: $+200.00$ (Creditor)
+- **Execution**:
+  - Debtors have equal balances. Sorted lexicographically by UUID string: `User_A` (`1111...`) is sorted before `User_B` (`2222...`).
+  - Match 1: `User_A` pays `User_C`. Amount: `100.00`. `User_A` balance becomes 0. `User_C` balance becomes `+100.00`.
+  - Match 2: `User_B` pays `User_C`. Amount: `100.00`. Both become 0.
+- **Expected Outputs**:
+  1.  `User_A` pays `User_C`: **$100.00**
+  2.  `User_B` pays `User_C`: **$100.00**
 
 ---
 
 ## ⚡ 10. Core Business Logic Summary
 
 ### 🛡️ Access Control Policy
-*   **Personal & Direct Splits**: Governed by individual ownership. Only the creator/payer who added the personal expense (`group_id` is null) can update or delete it. If it is split directly with friends (using `participantUserId` in splits), those friends also gain read access to see the transaction in their history, balance aggregates, and ledger list.
-*   **Shared Group Context**: Enforces Role-Based Access Control (RBAC):
-    *   **Owners & Admins**: Can view, edit, delete, or restore any group expense.
-    *   **Members**: Can only edit, delete, or restore expenses they authored or paid.
-    *   **Viewers & Spectators**: Viewers have read-only access. Spectators can create/update their own expenses but are excluded from splits.
+
+- **Personal & Direct Splits**: Governed by individual ownership. Only the creator/payer who added the personal expense (`group_id` is null) can update or delete it. If it is split directly with friends (using `participantUserId` in splits), those friends also gain read access to see the transaction in their history, balance aggregates, and ledger list.
+- **Shared Group Context**: Enforces Role-Based Access Control (RBAC):
+  - **Owners & Admins**: Can view, edit, delete, or restore any group expense.
+  - **Members**: Can only edit, delete, or restore expenses they authored or paid.
+  - **Viewers & Spectators**: Viewers have read-only access. Spectators can create/update their own expenses but are excluded from splits.
 
 ### 🔐 Server-Side Encryption (SSE)
+
 Amounts are securely stored as ciphertexts inside `VARCHAR(255)` columns in the PostgreSQL database. They are transparently encrypted and decrypted using `AES-256-GCM` via TypeORM value transformers.
 To calculate analytics without decrypting every row in SQL:
+
 1. Load base fields and the encrypted values into memory.
 2. Decrypt in memory inside NestJS services before computing summaries.
 
 ### ⚠️ API Errors
-*   `VAL_INVALID_INPUT` (400): Request parameters validation failure.
-*   `EXP_CURRENCY_MISMATCH` (400): Mismatch between transaction currency and group base currency.
-*   `EXP_SPECTATOR_SPLIT` (400): Including spectator members in splits.
-*   `EXP_MONTH_LOCKED` (403): Mutation of household expenses in finalized past months.
-*   `EXP_RESTORE_WINDOW` (403): Restoring a soft-deleted expense outside the deadline window.
-*   `CON_VERSION_CONFLICT` (412): Version mismatch resulting from concurrent updates.
+
+- `VAL_INVALID_INPUT` (400): Request parameters validation failure.
+- `EXP_CURRENCY_MISMATCH` (400): Mismatch between transaction currency and group base currency.
+- `EXP_SPECTATOR_SPLIT` (400): Including spectator members in splits.
+- `EXP_MONTH_LOCKED` (403): Mutation of household expenses in finalized past months.
+- `EXP_RESTORE_WINDOW` (403): Restoring a soft-deleted expense outside the deadline window.
+- `CON_VERSION_CONFLICT` (412): Version mismatch resulting from concurrent updates.
 
 ---
 
 ## 🤝 11. Concurrency Worked Scenario
 
 ### Scenario: Non-Overlapping Automerge (Expense Update)
+
 1.  `Expense_1` is created (Version = 1, `description = "Dinner"`, `category = "Food"`).
 2.  **User A** edits `description` locally to `"Goa Celebration Dinner"`.
 3.  **User B** concurrently edits `category` locally to `"Dining"`.
@@ -964,12 +999,11 @@ To calculate analytics without decrypting every row in SQL:
 5.  User A submits their patch request containing `"version": 1`.
 6.  The server rejects User A's update since version in database (2) != version submitted (1), returning `412 CON_VERSION_CONFLICT`.
 7.  User A's client intercepts the `412` error, fetches `Expense_1` latest state (`version = 2`, `category = "Dining"`), and checks for field overlap:
-    *   *Local Edit*: `description`
-    *   *Server Edit*: `category` (no overlap)
+    - _Local Edit_: `description`
+    - _Server Edit_: `category` (no overlap)
 8.  Client merges them (`description = "Goa Celebration Dinner"`, `category = "Dining"`), sets `"version": 2`, and re-submits automatically. The update succeeds.
 
-================================================================================
-================================================================================
+# ================================================================================
 
 # 📝 Implementation Tracker & Progress Log
 
@@ -978,41 +1012,45 @@ This section records all completed and outstanding implementation work specifica
 ## 🚀 Current Module Status: IN PROGRESS (Member Invite Plan Added)
 
 ### ✅ Completed Backend Tasks
-*   **Database Schema**: Designed and migrated `expenses` and `expense_splits` tables. Amount columns (`amount_total`, `amount_owed`) use `VARCHAR(255)` to support AES-256-GCM Server-Side Encryption (SSE) via custom TypeORM transformers.
-*   **CRUD API Controller**: Exposed standard CRUD REST endpoints (`POST`, `GET` with offset pagination, `PATCH`, `DELETE`).
-*   **Split Calculations**: Built a deterministic utility that splits currencies, rounds half-up, and allocates remainder cents to the payer or alphabetical UUID.
-*   **Validation Rules**: Implemented spectator split exclusions, currency base-match validation, and household previous-month locks.
-*   **Soft Delete & Restore**: Supported soft-deletion (`void` status) and restricted restoration to deletion month + 7 days grace.
-*   **Analytics Engine**: Created monthly, yearly, and category distribution summaries with in-memory decryption.
-*   **Group Trash & History**: Added endpoints to view deleted expenses and query logs from the `AuditLog` table.
-*   **Membership Backend APIs**: Completed backend endpoints for inviting (`POST /members`), updating roles/accepting invitations (`PATCH /members/:memberId`), and removing members (`DELETE /members/:memberId`).
+
+- **Database Schema**: Designed and migrated `expenses` and `expense_splits` tables. Amount columns (`amount_total`, `amount_owed`) use `VARCHAR(255)` to support AES-256-GCM Server-Side Encryption (SSE) via custom TypeORM transformers.
+- **CRUD API Controller**: Exposed standard CRUD REST endpoints (`POST`, `GET` with offset pagination, `PATCH`, `DELETE`).
+- **Split Calculations**: Built a deterministic utility that splits currencies, rounds half-up, and allocates remainder cents to the payer or alphabetical UUID.
+- **Validation Rules**: Implemented spectator split exclusions, currency base-match validation, and household previous-month locks.
+- **Soft Delete & Restore**: Supported soft-deletion (`void` status) and restricted restoration to deletion month + 7 days grace.
+- **Analytics Engine**: Created monthly, yearly, and category distribution summaries with in-memory decryption.
+- **Group Trash & History**: Added endpoints to view deleted expenses and query logs from the `AuditLog` table.
+- **Membership Backend APIs**: Completed backend endpoints for inviting (`POST /members`), updating roles/accepting invitations (`PATCH /members/:memberId`), and removing members (`DELETE /members/:memberId`).
 
 ### ✅ Completed Frontend Tasks
-*   **HTTP Service Layer**: Relocated `ExpensesService` under feature folder to isolate all REST endpoints.
-*   **Expense Modals**: Created standalone modal component (`CreateExpenseModalComponent`) featuring Edit Mode, currency icons, attachments file-uploading, and validation.
-*   **Interactive Ledger Timeline**: Main page (`GroupDetailComponent`) groups expenses, displays category icons, filters by category/dates, and manages pagination.
-*   **Ledger Import/Export**: Integrated client-side Excel (`xlsx`) / CSV file upload and ledger exports.
-*   **Custom Modals**: Custom confirmation component (`ConfirmModalComponent`) replaces standard browser alerts.
-*   **Zero-Knowledge Encryption Integration**: Integrated transparent client-side PBKDF2 + AES-256-GCM encryption/decryption of expense `title` and `description` fields in `ExpensesService`. Master key derived on login via `AuthState`, cached in `sessionStorage` (JWK format) scoped per user email, and cleared on logout. Decryption failures gracefully return original data.
+
+- **HTTP Service Layer**: Relocated `ExpensesService` under feature folder to isolate all REST endpoints.
+- **Expense Modals**: Created standalone modal component (`CreateExpenseModalComponent`) featuring Edit Mode, currency icons, attachments file-uploading, and validation.
+- **Interactive Ledger Timeline**: Main page (`GroupDetailComponent`) groups expenses, displays category icons, filters by category/dates, and manages pagination.
+- **Ledger Import/Export**: Integrated client-side Excel (`xlsx`) / CSV file upload and ledger exports.
+- **Custom Modals**: Custom confirmation component (`ConfirmModalComponent`) replaces standard browser alerts.
+- **Zero-Knowledge Encryption Integration**: Integrated transparent client-side PBKDF2 + AES-256-GCM encryption/decryption of expense `title` and `description` fields in `ExpensesService`. Master key derived on login via `AuthState`, cached in `sessionStorage` (JWK format) scoped per user email, and cleared on logout. Decryption failures gracefully return original data.
 
 ### 📋 Next Actions / Future Scope
-*   **Group Setting & Invitation System (Approved Plan)**:
-    - [ ] Create TypeORM migration for user columns, invite token, and contributions table.
-    - [ ] Add search endpoint and lookup/invite service logic on backend.
-    - [ ] Add public invite-link details route and join-by-token API.
-    - [ ] Implement group-member contributions and carry-forward calculation updates.
-    - [ ] Build frontend routes for `/groups/join/:inviteToken`.
-    - [ ] Build Group Settings UI with Carry-Forward toggle and contribution percentages widget.
-    - [ ] Add Dashboard Invitation Manager widget.
-    - [ ] Add Household Dashboard Bar Graph widget.
-*   ~~**Zero-Knowledge Encryption Key Management**~~: ✅ Completed (2026-06-21). See "Completed Frontend Tasks" above.
-*   **Real-time Conflict Interceptor**: Automate client-side merging or display conflict diff modals upon `CON_VERSION_CONFLICT` (412) status codes.
+
+- **Group Setting & Invitation System (Approved Plan)**:
+  - [ ] Create TypeORM migration for user columns, invite token, and contributions table.
+  - [ ] Add search endpoint and lookup/invite service logic on backend.
+  - [ ] Add public invite-link details route and join-by-token API.
+  - [ ] Implement group-member contributions and carry-forward calculation updates.
+  - [ ] Build frontend routes for `/groups/join/:inviteToken`.
+  - [ ] Build Group Settings UI with Carry-Forward toggle and contribution percentages widget.
+  - [ ] Add Dashboard Invitation Manager widget.
+  - [ ] Add Household Dashboard Bar Graph widget.
+- ~~**Zero-Knowledge Encryption Key Management**~~: ✅ Completed (2026-06-21). See "Completed Frontend Tasks" above.
+- **Real-time Conflict Interceptor**: Automate client-side merging or display conflict diff modals upon `CON_VERSION_CONFLICT` (412) status codes.
 
 ---
 
 ## 📝 Change Log
 
 ### 2026-06-21
+
 - **Summary**: Integrated zero-knowledge client-side encryption into the Expenses Module frontend service layer.
 - **Changes Made**:
   - Updated Section 5 (Frontend Service Layer) code reference to reflect encryption integration with `Store`, `AuthState`, and `ClientEncryptionService`.
@@ -1022,6 +1060,7 @@ This section records all completed and outstanding implementation work specifica
   - [expsnsis-module-plan.md](file:///d:/prvn/Projects/FinMate/expsnsis-module-plan.md)
 
 ### 2026-06-18 (Part 3)
+
 - **Summary**: Added detailed schema and math specifications for Group Member invitations, lookup search, join tokens, dashboard personal expenses, household monthly contributions, and direct-friend splits.
 - **Changes Made**:
   - Inserted `GroupMemberContribution` entity into Database Entities & Models.
@@ -1030,4 +1069,3 @@ This section records all completed and outstanding implementation work specifica
   - Updated access control definitions for personal direct splits with friends.
 - **Artifacts Updated**:
   - [expsnsis-module-plan.md](file:///d:/prvn/Projects/FinMate/expsnsis-module-plan.md)
-

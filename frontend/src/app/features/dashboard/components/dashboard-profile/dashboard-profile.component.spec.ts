@@ -7,7 +7,7 @@ describe('DashboardProfileComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DashboardProfileComponent]
+      imports: [DashboardProfileComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DashboardProfileComponent);
@@ -26,7 +26,7 @@ describe('DashboardProfileComponent', () => {
   it('should display profile details correctly', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    
+
     expect(compiled.querySelector('h3')?.textContent).toContain('John');
     expect(compiled.textContent).toContain('john@example.com');
     expect(compiled.textContent).toContain('5 logged');

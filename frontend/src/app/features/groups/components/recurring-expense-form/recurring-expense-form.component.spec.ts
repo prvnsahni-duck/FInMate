@@ -17,14 +17,14 @@ describe('RecurringExpenseFormComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [ReactiveFormsModule, RecurringExpenseFormComponent],
-      providers: [
-        { provide: RecurringExpensesService, useValue: spy },
-      ],
+      providers: [{ provide: RecurringExpensesService, useValue: spy }],
     }).compileComponents();
 
     fixture = TestBed.createComponent(RecurringExpenseFormComponent);
     component = fixture.componentInstance;
-    serviceSpy = TestBed.inject(RecurringExpensesService) as jest.Mocked<RecurringExpensesService>;
+    serviceSpy = TestBed.inject(
+      RecurringExpensesService,
+    ) as jest.Mocked<RecurringExpensesService>;
 
     component.groupId = 'group-1';
     component.groupCurrency = 'USD';

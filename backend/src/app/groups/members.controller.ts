@@ -1,4 +1,17 @@
-import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards, Req, HttpCode, HttpStatus, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Req,
+  HttpCode,
+  HttpStatus,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { InviteMemberDto, UpdateMemberDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
@@ -9,7 +22,9 @@ import { SuccessResponse } from '../common/response.util';
 @Controller('groups/:id/members')
 @UseGuards(JwtAuthGuard, GroupRolesGuard)
 export class MembersController {
-  constructor(private readonly groupsMembershipService: GroupsMembershipService) {}
+  constructor(
+    private readonly groupsMembershipService: GroupsMembershipService,
+  ) {}
 
   @Post()
   @GroupRoles('owner', 'admin')
@@ -22,14 +37,22 @@ export class MembersController {
       ip: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress,
       userAgent: req.headers['user-agent'],
     };
-    const result = await this.groupsMembershipService.inviteMember(req.user.id, id, inviteMemberDto, context);
+    const result = await this.groupsMembershipService.inviteMember(
+      req.user.id,
+      id,
+      inviteMemberDto,
+      context,
+    );
     return new SuccessResponse('Member invited successfully', result);
   }
 
   @Get()
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async findAll(@Param('id', ParseUUIDPipe) id: string, @Req() req: any) {
-    const result = await this.groupsMembershipService.listMembers(req.user.id, id);
+    const result = await this.groupsMembershipService.listMembers(
+      req.user.id,
+      id,
+    );
     return new SuccessResponse('Group members retrieved successfully', result);
   }
 
@@ -45,7 +68,13 @@ export class MembersController {
       ip: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress,
       userAgent: req.headers['user-agent'],
     };
-    const result = await this.groupsMembershipService.updateMember(req.user.id, id, memberId, updateMemberDto, context);
+    const result = await this.groupsMembershipService.updateMember(
+      req.user.id,
+      id,
+      memberId,
+      updateMemberDto,
+      context,
+    );
     return new SuccessResponse('Group member updated successfully', result);
   }
 
@@ -61,7 +90,12 @@ export class MembersController {
       ip: req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress,
       userAgent: req.headers['user-agent'],
     };
-    await this.groupsMembershipService.removeMember(req.user.id, id, memberId, context);
+    await this.groupsMembershipService.removeMember(
+      req.user.id,
+      id,
+      memberId,
+      context,
+    );
     return new SuccessResponse('Member removed successfully', {});
   }
 }

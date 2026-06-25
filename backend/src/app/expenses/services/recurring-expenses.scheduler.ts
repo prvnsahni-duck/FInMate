@@ -2,7 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { DataSource, LessThanOrEqual, Repository } from 'typeorm';
-import { RecurringExpense, RecurringExpenseSplit, Expense, ExpenseSplit } from '@finmate/data-models';
+import {
+  RecurringExpense,
+  RecurringExpenseSplit,
+  Expense,
+  ExpenseSplit,
+} from '@finmate/data-models';
 import { RedisService } from '../../redis/redis.service';
 
 @Injectable()
@@ -24,10 +29,14 @@ export class RecurringExpensesScheduler {
     const lockKey = 'lock:recurring_expenses_cron';
     const acquired = await this.redisService.setNx(lockKey, 'locked', 3600);
     if (!acquired) {
-      this.logger.log('Another instance is already processing recurring expenses. Skipping.');
+      this.logger.log(
+        'Another instance is already processing recurring expenses. Skipping.',
+      );
       return;
     }
-    this.logger.log('Acquired scheduler lock. Starting recurring expenses processing...');
+    this.logger.log(
+      'Acquired scheduler lock. Starting recurring expenses processing...',
+    );
     try {
       await this.processDueExpenses();
     } finally {
@@ -46,18 +55,26 @@ export class RecurringExpensesScheduler {
       relations: ['paidByUser', 'ownerUser', 'group'],
     });
 
-    this.logger.log(`Found ${dueTemplates.length} due recurring expenses to process.`);
+    this.logger.log(
+      `Found ${dueTemplates.length} due recurring expenses to process.`,
+    );
 
     for (const template of dueTemplates) {
       try {
         await this.processSingleTemplate(template, todayStr);
       } catch (err) {
-        this.logger.error(`Error processing recurring expense ${template.id}:`, err);
+        this.logger.error(
+          `Error processing recurring expense ${template.id}:`,
+          err,
+        );
       }
     }
   }
 
-  private async processSingleTemplate(template: RecurringExpense, todayStr: string) {
+  private async processSingleTemplate(
+    template: RecurringExpense,
+    todayStr: string,
+  ) {
     // Process all occurrences up to today (handles missed runs)
     let currentOccurrenceDate = template.nextOccurrenceDate;
 
@@ -78,16 +95,21 @@ export class RecurringExpensesScheduler {
           group: template.group,
           expenseDate: occurrenceDateStr,
           status: 'posted',
-          ledgerMonth: template.group?.groupType === 'household' ? occurrenceDateStr.slice(0, 7) : undefined,
+          ledgerMonth:
+            template.group?.groupType === 'household'
+              ? occurrenceDateStr.slice(0, 7)
+              : undefined,
           isCarryForward: false,
         });
         const savedExpense = await manager.getRepository(Expense).save(expense);
 
         // 2. Load template splits
-        const templateSplits = await manager.getRepository(RecurringExpenseSplit).find({
-          where: { recurringExpense: { id: template.id } },
-          relations: ['participantUser', 'participantGroupMember'],
-        });
+        const templateSplits = await manager
+          .getRepository(RecurringExpenseSplit)
+          .find({
+            where: { recurringExpense: { id: template.id } },
+            relations: ['participantUser', 'participantGroupMember'],
+          });
 
         // 3. Create expense splits
         for (const tSplit of templateSplits) {
@@ -111,12 +133,17 @@ export class RecurringExpensesScheduler {
         await manager.getRepository(RecurringExpense).save(template);
       });
 
-      this.logger.log(`Created expense for template ${template.id} on date ${occurrenceDateStr}. Next occurrence is ${nextDate}`);
+      this.logger.log(
+        `Created expense for template ${template.id} on date ${occurrenceDateStr}. Next occurrence is ${nextDate}`,
+      );
       currentOccurrenceDate = nextDate;
     }
   }
 
-  private advanceDate(dateStr: string, frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'): string {
+  private advanceDate(
+    dateStr: string,
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly',
+  ): string {
     const d = new Date(dateStr);
     if (frequency === 'daily') {
       d.setDate(d.getDate() + 1);

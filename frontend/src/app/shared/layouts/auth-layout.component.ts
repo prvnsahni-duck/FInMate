@@ -6,9 +6,8 @@ import { APP_NAME } from '../../core/constants/app.constants';
   selector: 'app-auth-layout',
   standalone: true,
   imports: [RouterOutlet],
-  templateUrl: './auth-layout.component.html'
+  templateUrl: './auth-layout.component.html',
 })
 export class AuthLayoutComponent {
   appName = APP_NAME;
 }
-

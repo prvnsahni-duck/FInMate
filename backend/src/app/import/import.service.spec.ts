@@ -1,9 +1,26 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository, DataSource, EntityManager, SelectQueryBuilder, Brackets } from 'typeorm';
-import { Group, GroupMember, Expense, ExpenseSplit, User, AuditLog } from '@finmate/data-models';
+import {
+  Repository,
+  DataSource,
+  EntityManager,
+  SelectQueryBuilder,
+  Brackets,
+} from 'typeorm';
+import {
+  Group,
+  GroupMember,
+  Expense,
+  ExpenseSplit,
+  User,
+  AuditLog,
+} from '@finmate/data-models';
 import { ImportService } from './import.service';
-import { ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as XLSX from 'xlsx';
 
 describe('ImportService', () => {
@@ -49,10 +66,22 @@ describe('ImportService', () => {
       providers: [
         ImportService,
         { provide: getRepositoryToken(Group), useValue: mockGroupRepository },
-        { provide: getRepositoryToken(GroupMember), useValue: mockGroupMemberRepository },
-        { provide: getRepositoryToken(Expense), useValue: mockExpenseRepository },
-        { provide: getRepositoryToken(ExpenseSplit), useValue: mockExpenseSplitRepository },
-        { provide: getRepositoryToken(AuditLog), useValue: mockAuditLogRepository },
+        {
+          provide: getRepositoryToken(GroupMember),
+          useValue: mockGroupMemberRepository,
+        },
+        {
+          provide: getRepositoryToken(Expense),
+          useValue: mockExpenseRepository,
+        },
+        {
+          provide: getRepositoryToken(ExpenseSplit),
+          useValue: mockExpenseSplitRepository,
+        },
+        {
+          provide: getRepositoryToken(AuditLog),
+          useValue: mockAuditLogRepository,
+        },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -65,7 +94,11 @@ describe('ImportService', () => {
     dataSource = module.get(DataSource);
   });
 
-  const createMockFile = (content: string, filename: string, mimeType: string): Express.Multer.File => {
+  const createMockFile = (
+    content: string,
+    filename: string,
+    mimeType: string,
+  ): Express.Multer.File => {
     return {
       fieldname: 'file',
       originalname: filename,
@@ -96,63 +129,119 @@ describe('ImportService', () => {
       mockManager = {
         findOne: jest.fn(),
         find: jest.fn(),
-        create: jest.fn().mockImplementation((entity: unknown, data: unknown) => data) as unknown as jest.Mock,
-        save: jest.fn().mockImplementation((entity: unknown, data: unknown) => Promise.resolve(data)) as unknown as jest.Mock,
+        create: jest
+          .fn()
+          .mockImplementation(
+            (entity: unknown, data: unknown) => data,
+          ) as unknown as jest.Mock,
+        save: jest
+          .fn()
+          .mockImplementation((entity: unknown, data: unknown) =>
+            Promise.resolve(data),
+          ) as unknown as jest.Mock,
       };
-      dataSource.transaction.mockImplementation((isolationOrCb: unknown, maybeCb?: unknown) => {
-        const cb = (typeof isolationOrCb === 'function' ? isolationOrCb : maybeCb) as (manager: Partial<EntityManager>) => Promise<unknown>;
-        return cb(mockManager as unknown as Partial<EntityManager>);
-      });
+      dataSource.transaction.mockImplementation(
+        (isolationOrCb: unknown, maybeCb?: unknown) => {
+          const cb = (
+            typeof isolationOrCb === 'function' ? isolationOrCb : maybeCb
+          ) as (manager: Partial<EntityManager>) => Promise<unknown>;
+          return cb(mockManager as unknown as Partial<EntityManager>);
+        },
+      );
     });
 
     it('should throw BadRequestException if file is invalid type', async () => {
       const file = createMockFile('some content', 'test.txt', 'text/plain');
-      await expect(service.importExpenses('user-1', 'group-1', file)).rejects.toThrow(BadRequestException);
+      await expect(
+        service.importExpenses('user-1', 'group-1', file),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException if group does not exist', async () => {
-      const file = createMockFile('date,title,amount,currency,category,payer_email,split_type,shares_data,description\n2026-06-10,Lunch,15.50,USD,Food,a@ex.com,equal,,desc', 'test.csv', 'text/csv');
+      const file = createMockFile(
+        'date,title,amount,currency,category,payer_email,split_type,shares_data,description\n2026-06-10,Lunch,15.50,USD,Food,a@ex.com,equal,,desc',
+        'test.csv',
+        'text/csv',
+      );
       mockManager.findOne.mockResolvedValueOnce(null); // group findOne
 
-      await expect(service.importExpenses('user-1', 'group-1', file)).rejects.toThrow(NotFoundException);
+      await expect(
+        service.importExpenses('user-1', 'group-1', file),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException if group is archived', async () => {
-      const file = createMockFile('date,title,amount,currency,category,payer_email,split_type,shares_data,description\n2026-06-10,Lunch,15.50,USD,Food,a@ex.com,equal,,desc', 'test.csv', 'text/csv');
-      mockManager.findOne.mockResolvedValueOnce({ id: 'group-1', isArchived: true });
+      const file = createMockFile(
+        'date,title,amount,currency,category,payer_email,split_type,shares_data,description\n2026-06-10,Lunch,15.50,USD,Food,a@ex.com,equal,,desc',
+        'test.csv',
+        'text/csv',
+      );
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: true,
+      });
 
-      await expect(service.importExpenses('user-1', 'group-1', file)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.importExpenses('user-1', 'group-1', file),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw ForbiddenException if caller has no access', async () => {
-      const file = createMockFile('date,title,amount,currency,category,payer_email,split_type,shares_data,description\n2026-06-10,Lunch,15.50,USD,Food,a@ex.com,equal,,desc', 'test.csv', 'text/csv');
-      mockManager.findOne.mockResolvedValueOnce({ id: 'group-1', isArchived: false }); // group
+      const file = createMockFile(
+        'date,title,amount,currency,category,payer_email,split_type,shares_data,description\n2026-06-10,Lunch,15.50,USD,Food,a@ex.com,equal,,desc',
+        'test.csv',
+        'text/csv',
+      );
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: false,
+      }); // group
       mockManager.findOne.mockResolvedValueOnce(null); // callerMember (not in group)
 
-      await expect(service.importExpenses('user-1', 'group-1', file)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.importExpenses('user-1', 'group-1', file),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw ForbiddenException if caller is a viewer', async () => {
-      const file = createMockFile('date,title,amount,currency,category,payer_email,split_type,shares_data,description\n2026-06-10,Lunch,15.50,USD,Food,a@ex.com,equal,,desc', 'test.csv', 'text/csv');
-      mockManager.findOne.mockResolvedValueOnce({ id: 'group-1', isArchived: false }); // group
-      mockManager.findOne.mockResolvedValueOnce({ id: 'member-1', role: 'viewer' }); // callerMember
+      const file = createMockFile(
+        'date,title,amount,currency,category,payer_email,split_type,shares_data,description\n2026-06-10,Lunch,15.50,USD,Food,a@ex.com,equal,,desc',
+        'test.csv',
+        'text/csv',
+      );
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: false,
+      }); // group
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'member-1',
+        role: 'viewer',
+      }); // callerMember
 
-      await expect(service.importExpenses('user-1', 'group-1', file)).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.importExpenses('user-1', 'group-1', file),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should validate columns and throw VAL_INVALID_INPUT on error', async () => {
-      const csvContent = 
+      const csvContent =
         'date,title,amount,currency,category,payer_email,split_type,shares_data,description\n' +
         '2026-15-10,Short,0,US,Food,unknown@ex.com,invalid,,\n' + // invalid date, amount, currency, email, split_type
         '2026-06-10,Valid,20.00,USD,Dining,a@ex.com,percent,a@ex.com:50,\n'; // invalid percentage sum
-      
+
       const file = createMockFile(csvContent, 'test.csv', 'text/csv');
 
       const userA = { id: 'user-a', email: 'a@ex.com' };
       const mockMembers = [{ user: userA, joinStatus: 'active' }];
 
-      mockManager.findOne.mockResolvedValueOnce({ id: 'group-1', isArchived: false }); // group
-      mockManager.findOne.mockResolvedValueOnce({ id: 'member-1', role: 'member' }); // callerMember
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: false,
+      }); // group
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'member-1',
+        role: 'member',
+      }); // callerMember
       mockManager.find.mockResolvedValueOnce(mockMembers); // active members
 
       try {
@@ -161,27 +250,49 @@ describe('ImportService', () => {
       } catch (err) {
         expect(err).toBeInstanceOf(BadRequestException);
         const error = err as BadRequestException;
-        const res = error.getResponse() as { errorCode: string; details: { field: string; issue: string }[] };
+        const res = error.getResponse() as {
+          errorCode: string;
+          details: { field: string; issue: string }[];
+        };
         expect(res.errorCode).toBe('VAL_INVALID_INPUT');
         expect(res.details).toBeDefined();
         expect(res.details.length).toBeGreaterThan(0);
 
         // Check if details capture the row validation problems
-        expect(res.details).toContainEqual({ field: 'Row 2: date', issue: 'Invalid calendar date' });
-        expect(res.details).toContainEqual({ field: 'Row 2: amount', issue: 'Amount must be a positive decimal number greater than 0' });
-        expect(res.details).toContainEqual({ field: 'Row 2: currency', issue: 'Currency must be exactly 3 uppercase letters (ISO 4217)' });
-        expect(res.details).toContainEqual({ field: 'Row 2: payer_email', issue: "User 'unknown@ex.com' is not a member of the group." });
-        expect(res.details).toContainEqual({ field: 'Row 2: split_type', issue: 'Invalid split type. Must be equal, fixed, percent, or share' });
-        expect(res.details).toContainEqual({ field: 'Row 3: shares_data', issue: 'Percentage split values must sum up to exactly 100.00 (got 50.00)' });
+        expect(res.details).toContainEqual({
+          field: 'Row 2: date',
+          issue: 'Invalid calendar date',
+        });
+        expect(res.details).toContainEqual({
+          field: 'Row 2: amount',
+          issue: 'Amount must be a positive decimal number greater than 0',
+        });
+        expect(res.details).toContainEqual({
+          field: 'Row 2: currency',
+          issue: 'Currency must be exactly 3 uppercase letters (ISO 4217)',
+        });
+        expect(res.details).toContainEqual({
+          field: 'Row 2: payer_email',
+          issue: "User 'unknown@ex.com' is not a member of the group.",
+        });
+        expect(res.details).toContainEqual({
+          field: 'Row 2: split_type',
+          issue: 'Invalid split type. Must be equal, fixed, percent, or share',
+        });
+        expect(res.details).toContainEqual({
+          field: 'Row 3: shares_data',
+          issue:
+            'Percentage split values must sum up to exactly 100.00 (got 50.00)',
+        });
       }
     });
 
     it('should successfully import expenses with equal splits and handle rounding remainder', async () => {
       // 10.00 split equally among A, B, C (3.33, 3.33, 3.33 -> remainder 0.01)
-      const csvContent = 
+      const csvContent =
         'date,title,amount,currency,category,payer_email,split_type,shares_data,description\n' +
         '2026-06-10,Dinner,10.00,USD,Food,a@ex.com,equal,,Goa dinner\n';
-      
+
       const file = createMockFile(csvContent, 'test.csv', 'text/csv');
 
       const userA = { id: 'aaaa', email: 'a@ex.com' }; // lexicographically first by id
@@ -194,8 +305,14 @@ describe('ImportService', () => {
         { user: userC, joinStatus: 'active' },
       ];
 
-      mockManager.findOne.mockResolvedValueOnce({ id: 'group-1', isArchived: false }); // group
-      mockManager.findOne.mockResolvedValueOnce({ id: 'member-1', role: 'member' }); // callerMember
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: false,
+      }); // group
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'member-1',
+        role: 'member',
+      }); // callerMember
       mockManager.find.mockResolvedValueOnce(mockMembers); // active members
       mockManager.findOne.mockResolvedValueOnce(userA); // caller user details for ownerUser
 
@@ -209,7 +326,7 @@ describe('ImportService', () => {
         Expense,
         expect.objectContaining({
           title: 'Dinner',
-          amountTotal: 10.00,
+          amountTotal: 10.0,
           currency: 'USD',
           category: 'Food',
           description: 'Goa dinner',
@@ -240,10 +357,10 @@ describe('ImportService', () => {
 
     it('should allocate rounding remainder to lexicographically first user if payer is not in the split', async () => {
       // 10.00 split equally among B and C, paid by A (A is not in the split)
-      const csvContent = 
+      const csvContent =
         'date,title,amount,currency,category,payer_email,split_type,shares_data,description\n' +
         '2026-06-10,Lunch,10.00,USD,Food,a@ex.com,share,b@ex.com:1;c@ex.com:2,Goa lunch\n'; // total weight = 3
-      
+
       const file = createMockFile(csvContent, 'test.csv', 'text/csv');
 
       const userA = { id: 'aaaa', email: 'a@ex.com' };
@@ -256,8 +373,14 @@ describe('ImportService', () => {
         { user: userC, joinStatus: 'active' },
       ];
 
-      mockManager.findOne.mockResolvedValueOnce({ id: 'group-1', isArchived: false }); // group
-      mockManager.findOne.mockResolvedValueOnce({ id: 'member-1', role: 'member' }); // callerMember
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: false,
+      }); // group
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'member-1',
+        role: 'member',
+      }); // callerMember
       mockManager.find.mockResolvedValueOnce(mockMembers); // active members
       mockManager.findOne.mockResolvedValueOnce(userA); // caller user details
 
@@ -301,32 +424,51 @@ describe('ImportService', () => {
         getMany: jest.fn().mockResolvedValue([]),
       };
 
-      expenseRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder as any);
+      expenseRepository.createQueryBuilder.mockReturnValue(
+        mockQueryBuilder as any,
+      );
     });
 
     it('should throw BadRequestException if startDate format is invalid', async () => {
-      await expect(service.exportExpenses('user-1', 'csv', 'group-1', '2026/06/10')).rejects.toThrow(BadRequestException);
+      await expect(
+        service.exportExpenses('user-1', 'csv', 'group-1', '2026/06/10'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw BadRequestException if endDate format is invalid', async () => {
-      await expect(service.exportExpenses('user-1', 'csv', 'group-1', undefined, '2026-06-100')).rejects.toThrow(BadRequestException);
+      await expect(
+        service.exportExpenses(
+          'user-1',
+          'csv',
+          'group-1',
+          undefined,
+          '2026-06-100',
+        ),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw NotFoundException if groupId is provided but group does not exist', async () => {
       groupRepository.findOne.mockResolvedValueOnce(null);
-      await expect(service.exportExpenses('user-1', 'csv', 'group-1')).rejects.toThrow(NotFoundException);
+      await expect(
+        service.exportExpenses('user-1', 'csv', 'group-1'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException if caller is not an active group member', async () => {
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-1' } as Group);
       groupMemberRepository.findOne.mockResolvedValueOnce(null); // not found or inactive
-      await expect(service.exportExpenses('user-1', 'csv', 'group-1')).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.exportExpenses('user-1', 'csv', 'group-1'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should export all expenses for group if groupId is provided and caller is active member', async () => {
       const mockGroup = { id: 'group-1' } as Group;
-      const mockCallerMember = { id: 'member-1', role: 'member' } as GroupMember;
-      
+      const mockCallerMember = {
+        id: 'member-1',
+        role: 'member',
+      } as GroupMember;
+
       groupRepository.findOne.mockResolvedValueOnce(mockGroup);
       groupMemberRepository.findOne.mockResolvedValueOnce(mockCallerMember);
 
@@ -334,14 +476,14 @@ describe('ImportService', () => {
         {
           id: 'exp-1',
           title: 'Lunch',
-          amountTotal: 15.50,
+          amountTotal: 15.5,
           currency: 'USD',
           category: 'Food',
           paidByUser: { id: 'user-a', email: 'a@ex.com' } as User,
           ownerUser: { id: 'user-1', email: 'caller@ex.com' } as User,
           expenseDate: new Date('2026-06-10T00:00:00.000Z'),
           description: 'Team lunch',
-        }
+        },
       ] as unknown as Expense[];
 
       const mockSplits = [
@@ -360,11 +502,13 @@ describe('ImportService', () => {
           splitType: 'equal',
           shareValue: 1.0,
           amountOwed: 7.75,
-        }
+        },
       ] as unknown as ExpenseSplit[];
 
       mockQueryBuilder.getMany.mockResolvedValueOnce(mockExpenses);
-      (expenseSplitRepository.find as jest.Mock).mockResolvedValueOnce(mockSplits);
+      (expenseSplitRepository.find as jest.Mock).mockResolvedValueOnce(
+        mockSplits,
+      );
 
       const result = await service.exportExpenses('user-1', 'csv', 'group-1');
 
@@ -373,7 +517,9 @@ describe('ImportService', () => {
       expect(result.buffer).toBeDefined();
 
       const csvContent = result.buffer.toString('utf-8');
-      expect(csvContent).toContain('date,title,amount,currency,category,payer_email,split_type,shares_data,description');
+      expect(csvContent).toContain(
+        'date,title,amount,currency,category,payer_email,split_type,shares_data,description',
+      );
       expect(csvContent).toContain('2026-06-10');
       expect(csvContent).toContain('Lunch');
       expect(csvContent).toContain('15.50');
@@ -387,7 +533,7 @@ describe('ImportService', () => {
 
     it('should export all user expenses if no groupId is specified', async () => {
       const mockMemberships = [
-        { group: { id: 'group-1' } }
+        { group: { id: 'group-1' } },
       ] as unknown as GroupMember[];
       groupMemberRepository.find.mockResolvedValueOnce(mockMemberships);
 
@@ -395,26 +541,30 @@ describe('ImportService', () => {
         {
           id: 'exp-2',
           title: 'Individual expense',
-          amountTotal: 30.00,
+          amountTotal: 30.0,
           currency: 'EUR',
           category: 'Transport',
           paidByUser: { id: 'user-1', email: 'caller@ex.com' } as User,
           ownerUser: { id: 'user-1', email: 'caller@ex.com' } as User,
           expenseDate: '2026-06-11',
           description: '',
-        }
+        },
       ] as unknown as Expense[];
 
       const mockSplits = [] as unknown as ExpenseSplit[];
 
       mockQueryBuilder.getMany.mockResolvedValueOnce(mockExpenses);
-      (expenseSplitRepository.find as jest.Mock).mockResolvedValueOnce(mockSplits);
+      (expenseSplitRepository.find as jest.Mock).mockResolvedValueOnce(
+        mockSplits,
+      );
 
       const result = await service.exportExpenses('user-1', 'xlsx');
 
-      expect(result.mimeType).toBe('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      expect(result.mimeType).toBe(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
       expect(result.filename).toMatch(/^expenses_export_\d+\.xlsx$/);
-      
+
       const workbook = XLSX.read(result.buffer, { type: 'buffer' });
       expect(workbook.SheetNames).toContain('Expenses');
       const sheet = workbook.Sheets['Expenses'];

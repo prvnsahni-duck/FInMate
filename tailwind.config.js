@@ -1,9 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: 'class',
-  content: [
-    './frontend/src/**/*.{html,ts,scss}',
-  ],
+  content: ['./frontend/src/**/*.{html,ts,scss}'],
   theme: {
     extend: {
       colors: {
@@ -19,9 +17,9 @@ module.exports = {
 
         // Keeping backward compatibility fallback
         conflict: {
-          local:  '#f87171',   // red-400   — "mine"
-          server: '#34d399',   // emerald-400 — "theirs"
-          action: '#818cf8',   // indigo-400 — actions
+          local: '#f87171', // red-400   — "mine"
+          server: '#34d399', // emerald-400 — "theirs"
+          action: '#818cf8', // indigo-400 — actions
         },
       },
       fontFamily: {
@@ -34,19 +32,18 @@ module.exports = {
       keyframes: {
         'fade-in': {
           from: { opacity: '0' },
-          to:   { opacity: '1' },
+          to: { opacity: '1' },
         },
         'slide-in': {
           from: { opacity: '0', transform: 'translate(-50%, -46%)' },
-          to:   { opacity: '1', transform: 'translate(-50%, -50%)' },
+          to: { opacity: '1', transform: 'translate(-50%, -50%)' },
         },
       },
       animation: {
-        'fade-in':  'fade-in 150ms ease',
+        'fade-in': 'fade-in 150ms ease',
         'slide-in': 'slide-in 220ms cubic-bezier(0.22, 1, 0.36, 1)',
       },
     },
   },
   plugins: [],
 };
-

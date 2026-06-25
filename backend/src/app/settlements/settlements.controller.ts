@@ -1,9 +1,23 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, Req, UseGuards, ParseUUIDPipe } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+  ParseUUIDPipe,
+} from '@nestjs/common';
 import { SettlementsService } from './settlements.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
 import { GroupRoles } from '../auth/decorators/group-roles.decorator';
-import { ProposeSettlementDto, UpdateSettlementDto } from '@finmate/data-models';
+import {
+  ProposeSettlementDto,
+  UpdateSettlementDto,
+} from '@finmate/data-models';
 import { SuccessResponse } from '../common/response.util';
 
 @Controller('groups/:groupId/settlements')
@@ -13,9 +27,18 @@ export class SettlementsController {
 
   @Get('balances')
   @GroupRoles('owner', 'admin', 'member', 'viewer')
-  async getBalances(@Param('groupId', ParseUUIDPipe) groupId: string, @Req() req: any) {
-    const result = await this.settlementsService.calculateGroupBalances(req.user.id, groupId);
-    return new SuccessResponse('Group balances calculated successfully', result);
+  async getBalances(
+    @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Req() req: any,
+  ) {
+    const result = await this.settlementsService.calculateGroupBalances(
+      req.user.id,
+      groupId,
+    );
+    return new SuccessResponse(
+      'Group balances calculated successfully',
+      result,
+    );
   }
 
   @Post()
@@ -26,10 +49,18 @@ export class SettlementsController {
     @Req() req: any,
   ) {
     const context = {
-      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
       userAgent: req.headers['user-agent'] as string,
     };
-    const result = await this.settlementsService.proposeSettlement(req.user.id, groupId, proposeSettlementDto, context);
+    const result = await this.settlementsService.proposeSettlement(
+      req.user.id,
+      groupId,
+      proposeSettlementDto,
+      context,
+    );
     return new SuccessResponse('Settlement proposed successfully', result);
   }
 
@@ -45,7 +76,12 @@ export class SettlementsController {
     let limitNum = limit ? parseInt(limit, 10) : 20;
     if (isNaN(pageNum) || pageNum <= 0) pageNum = 1;
     if (isNaN(limitNum) || limitNum <= 0) limitNum = 20;
-    const result = await this.settlementsService.listSettlements(req.user.id, groupId, pageNum, limitNum);
+    const result = await this.settlementsService.listSettlements(
+      req.user.id,
+      groupId,
+      pageNum,
+      limitNum,
+    );
     return new SuccessResponse('Settlements retrieved successfully', result);
   }
 
@@ -58,10 +94,19 @@ export class SettlementsController {
     @Req() req: any,
   ) {
     const context = {
-      ip: req.ip || req.headers['x-forwarded-for'] as string || req.socket.remoteAddress,
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
       userAgent: req.headers['user-agent'] as string,
     };
-    const result = await this.settlementsService.updateSettlement(req.user.id, groupId, id, updateSettlementDto, context);
+    const result = await this.settlementsService.updateSettlement(
+      req.user.id,
+      groupId,
+      id,
+      updateSettlementDto,
+      context,
+    );
     return new SuccessResponse('Settlement updated successfully', result);
   }
 }

@@ -1,5 +1,8 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import {
+  HttpClientTestingModule,
+  HttpTestingController,
+} from '@angular/common/http/testing';
 import { FriendsService } from './friends.service';
 
 describe('FriendsService', () => {
@@ -9,7 +12,7 @@ describe('FriendsService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [FriendsService]
+      providers: [FriendsService],
     });
     service = TestBed.inject(FriendsService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -24,9 +27,12 @@ describe('FriendsService', () => {
   });
 
   it('should fetch friends balances via GET /api/friends', () => {
-    const dummyFriends = [{ id: '1', name: 'Alice' }, { id: '2', name: 'Bob' }];
+    const dummyFriends = [
+      { id: '1', name: 'Alice' },
+      { id: '2', name: 'Bob' },
+    ];
 
-    service.getFriends().subscribe(friends => {
+    service.getFriends().subscribe((friends) => {
       expect(friends).toEqual(dummyFriends);
     });
 
@@ -39,11 +45,13 @@ describe('FriendsService', () => {
     const dummyUsers = [{ id: '3', email: 'charlie@example.com' }];
     const query = 'charlie';
 
-    service.searchUsers(query).subscribe(users => {
+    service.searchUsers(query).subscribe((users) => {
       expect(users).toEqual(dummyUsers);
     });
 
-    const req = httpMock.expectOne(`/api/users/search?query=${encodeURIComponent(query)}`);
+    const req = httpMock.expectOne(
+      `/api/users/search?query=${encodeURIComponent(query)}`,
+    );
     expect(req.request.method).toBe('GET');
     req.flush(dummyUsers);
   });

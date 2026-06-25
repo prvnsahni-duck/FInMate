@@ -1,28 +1,33 @@
-<div class="fixed inset-0 z-[900] flex items-end justify-center md:items-center lg:items-center md:p-4 lg:p-4 bg-black/70 backdrop-blur-sm transition-all duration-300" (click)="cancel()">
+<div
+  class="fixed inset-0 z-[900] flex items-end justify-center md:items-center lg:items-center md:p-4 lg:p-4 bg-black/70 backdrop-blur-sm transition-all duration-300"
+  (click)="cancel()"
+>
   <div
     role="dialog"
     aria-modal="true"
     aria-labelledby="cdm-title"
     (click)="$event.stopPropagation()"
-    class="bg-[rgba(15,16,28,0.97)] border border-white/8 w-full h-[100dvh] md:h-auto md:max-h-[88vh] md:max-w-2xl lg:max-w-3xl rounded-none md:rounded-2xl shadow-2xl relative flex flex-col text-slate-100 font-sans transform scale-100 transition-all p-6 pb-safe md:p-8">
-
-
-
+    class="bg-[rgba(15,16,28,0.97)] border border-white/8 w-full h-[100dvh] md:h-auto md:max-h-[88vh] md:max-w-2xl lg:max-w-3xl rounded-none md:rounded-2xl shadow-2xl relative flex flex-col text-slate-100 font-sans transform scale-100 transition-all p-6 pb-safe md:p-8"
+  >
     <!-- Close Button -->
     <button
-      class="absolute top-6 right-6 bg-transparent border-none text-slate-400 text-lg
-             cursor-pointer px-1.5 py-0.5 rounded-md transition-colors
-             hover:text-slate-100 hover:bg-white/6 z-10"
+      class="absolute top-6 right-6 bg-transparent border-none text-slate-400 text-lg cursor-pointer px-1.5 py-0.5 rounded-md transition-colors hover:text-slate-100 hover:bg-white/6 z-10"
       (click)="cancel()"
-      aria-label="Cancel">
+      aria-label="Cancel"
+    >
       ✕
     </button>
 
     <!-- ─── Header ─────────────────────────────────────────────────── -->
-    <div class="flex items-start gap-3.5 pb-4 border-b border-white/8 flex-shrink-0 pr-8">
+    <div
+      class="flex items-start gap-3.5 pb-4 border-b border-white/8 flex-shrink-0 pr-8"
+    >
       <span class="text-3xl leading-none shrink-0">⚡</span>
       <div>
-        <h2 id="cdm-title" class="m-0 mb-1 text-[17px] font-bold tracking-tight">
+        <h2
+          id="cdm-title"
+          class="m-0 mb-1 text-[17px] font-bold tracking-tight"
+        >
           Edit Conflict Detected
         </h2>
         <p class="m-0 text-[13px] text-slate-400">
@@ -42,37 +47,40 @@
           </label>
           <textarea
             id="cdm-editor"
-            class="w-full box-border bg-black/35 border border-white/8 rounded-lg
-                   text-slate-100 font-mono text-[13px] leading-relaxed p-3.5
-                   resize-y outline-none transition-colors
-                   focus:border-indigo-400"
+            class="w-full box-border bg-black/35 border border-white/8 rounded-lg text-slate-100 font-mono text-[13px] leading-relaxed p-3.5 resize-y outline-none transition-colors focus:border-indigo-400"
             rows="8"
             spellcheck="false"
             [ngModel]="manualText()"
             (ngModelChange)="manualText.set($event)"
           ></textarea>
         </div>
-
       } @else {
         <!-- ─── Side-by-side Diff ──────────────────────────────────────── -->
-        <div class="grid grid-cols-[1fr_36px_1fr] h-[340px] overflow-hidden border border-white/8 rounded-lg bg-black/10">
-
+        <div
+          class="grid grid-cols-[1fr_36px_1fr] h-[340px] overflow-hidden border border-white/8 rounded-lg bg-black/10"
+        >
           <!-- Local panel -->
           <div class="flex flex-col overflow-hidden border-r border-white/8">
-            <div class="flex items-center justify-between px-3.5 py-2.5
-                        text-[11px] font-bold tracking-widest border-b border-white/8
-                        bg-white/[0.03]">
-              <span class="px-2 py-0.5 rounded-full text-[10px]
-                           bg-red-400/18 text-red-400">YOUR VERSION</span>
+            <div
+              class="flex items-center justify-between px-3.5 py-2.5 text-[11px] font-bold tracking-widest border-b border-white/8 bg-white/[0.03]"
+            >
+              <span
+                class="px-2 py-0.5 rounded-full text-[10px] bg-red-400/18 text-red-400"
+                >YOUR VERSION</span
+              >
               <span class="text-slate-400">v{{ context.localVersion }}</span>
             </div>
-            <div class="flex-1 overflow-y-auto font-mono text-[12.5px] leading-[1.65] py-2">
+            <div
+              class="flex-1 overflow-y-auto font-mono text-[12.5px] leading-[1.65] py-2"
+            >
               @for (line of localDiffLines(); track $index) {
-                <div class="flex px-3 min-h-6 break-words whitespace-pre-wrap"
-                     [ngClass]="{
-                       'bg-red-400/14 text-red-400':   line.type === 'removed',
-                       'text-slate-400/55':             line.type === 'same'
-                     }">
+                <div
+                  class="flex px-3 min-h-6 break-words whitespace-pre-wrap"
+                  [ngClass]="{
+                    'bg-red-400/14 text-red-400': line.type === 'removed',
+                    'text-slate-400/55': line.type === 'same',
+                  }"
+                >
                   <span class="w-5 shrink-0 text-slate-400 select-none">
                     {{ line.type === 'removed' ? '−' : ' ' }}
                   </span>
@@ -83,26 +91,37 @@
           </div>
 
           <!-- Divider -->
-          <div class="flex items-center justify-center text-base text-slate-400
-                      border-l border-r border-white/8 bg-white/[0.02]"
-               aria-hidden="true">⟷</div>
+          <div
+            class="flex items-center justify-center text-base text-slate-400 border-l border-r border-white/8 bg-white/[0.02]"
+            aria-hidden="true"
+          >
+            ⟷
+          </div>
 
           <!-- Server panel -->
           <div class="flex flex-col overflow-hidden">
-            <div class="flex items-center justify-between px-3.5 py-2.5
-                        text-[11px] font-bold tracking-widest border-b border-white/8
-                        bg-white/[0.03]">
-              <span class="px-2 py-0.5 rounded-full text-[10px]
-                           bg-emerald-400/18 text-emerald-400">SERVER VERSION</span>
-              <span class="text-slate-400">v{{ context.serverState['version'] }}</span>
+            <div
+              class="flex items-center justify-between px-3.5 py-2.5 text-[11px] font-bold tracking-widest border-b border-white/8 bg-white/[0.03]"
+            >
+              <span
+                class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-400/18 text-emerald-400"
+                >SERVER VERSION</span
+              >
+              <span class="text-slate-400"
+                >v{{ context.serverState['version'] }}</span
+              >
             </div>
-            <div class="flex-1 overflow-y-auto font-mono text-[12.5px] leading-[1.65] py-2">
+            <div
+              class="flex-1 overflow-y-auto font-mono text-[12.5px] leading-[1.65] py-2"
+            >
               @for (line of serverDiffLines(); track $index) {
-                <div class="flex px-3 min-h-6 break-words whitespace-pre-wrap"
-                     [ngClass]="{
-                       'bg-emerald-400/14 text-emerald-400': line.type === 'added',
-                       'text-slate-400/55':                  line.type === 'same'
-                     }">
+                <div
+                  class="flex px-3 min-h-6 break-words whitespace-pre-wrap"
+                  [ngClass]="{
+                    'bg-emerald-400/14 text-emerald-400': line.type === 'added',
+                    'text-slate-400/55': line.type === 'same',
+                  }"
+                >
                   <span class="w-5 shrink-0 text-slate-400 select-none">
                     {{ line.type === 'added' ? '+' : ' ' }}
                   </span>
@@ -119,68 +138,67 @@
     <div class="flex-shrink-0 border-t border-white/8 pt-4">
       @if (activeStrategy() === null) {
         <div class="grid grid-cols-3 gap-3">
-          <button id="cdm-btn-keep-mine"
-                  class="flex flex-col items-center gap-1.5 px-3 py-[12px]
-                         bg-white/[0.04] border border-white/8 rounded-xl
-                         text-slate-100 cursor-pointer transition-all duration-150
-                         hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-red-400"
-                  (click)="selectStrategy('keep-mine')">
+          <button
+            id="cdm-btn-keep-mine"
+            class="flex flex-col items-center gap-1.5 px-3 py-[12px] bg-white/[0.04] border border-white/8 rounded-xl text-slate-100 cursor-pointer transition-all duration-150 hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-red-400"
+            (click)="selectStrategy('keep-mine')"
+          >
             <span class="text-2xl">🙋</span>
             <span class="text-[13px] font-bold">Keep Mine</span>
-            <span class="text-[10px] text-slate-400 text-center leading-tight">Overwrite server with your edit</span>
+            <span class="text-[10px] text-slate-400 text-center leading-tight"
+              >Overwrite server with your edit</span
+            >
           </button>
 
-          <button id="cdm-btn-keep-theirs"
-                  class="flex flex-col items-center gap-1.5 px-3 py-[12px]
-                         bg-white/[0.04] border border-white/8 rounded-xl
-                         text-slate-100 cursor-pointer transition-all duration-150
-                         hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-emerald-400"
-                  (click)="selectStrategy('keep-theirs')">
+          <button
+            id="cdm-btn-keep-theirs"
+            class="flex flex-col items-center gap-1.5 px-3 py-[12px] bg-white/[0.04] border border-white/8 rounded-xl text-slate-100 cursor-pointer transition-all duration-150 hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-emerald-400"
+            (click)="selectStrategy('keep-theirs')"
+          >
             <span class="text-2xl">🌐</span>
             <span class="text-[13px] font-bold">Keep Theirs</span>
-            <span class="text-[10px] text-slate-400 text-center leading-tight">Accept server and discard yours</span>
+            <span class="text-[10px] text-slate-400 text-center leading-tight"
+              >Accept server and discard yours</span
+            >
           </button>
 
-          <button id="cdm-btn-manual-merge"
-                  class="flex flex-col items-center gap-1.5 px-3 py-[12px]
-                         bg-white/[0.04] border border-white/8 rounded-xl
-                         text-slate-100 cursor-pointer transition-all duration-150
-                         hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-indigo-400"
-                  (click)="selectStrategy('manual')">
+          <button
+            id="cdm-btn-manual-merge"
+            class="flex flex-col items-center gap-1.5 px-3 py-[12px] bg-white/[0.04] border border-white/8 rounded-xl text-slate-100 cursor-pointer transition-all duration-150 hover:bg-white/[0.09] hover:-translate-y-0.5 hover:border-indigo-400"
+            (click)="selectStrategy('manual')"
+          >
             <span class="text-2xl">✍️</span>
             <span class="text-[13px] font-bold">Manual Merge</span>
-            <span class="text-[10px] text-slate-400 text-center leading-tight">Combine both versions yourself</span>
+            <span class="text-[10px] text-slate-400 text-center leading-tight"
+              >Combine both versions yourself</span
+            >
           </button>
         </div>
-
       } @else {
         <div class="flex items-center justify-between">
           <button
-            class="bg-transparent border-none text-slate-400 text-[13px]
-                   cursor-pointer px-1 py-1.5 transition-colors hover:text-slate-100"
-            (click)="activeStrategy.set(null)">
+            class="bg-transparent border-none text-slate-400 text-[13px] cursor-pointer px-1 py-1.5 transition-colors hover:text-slate-100"
+            (click)="activeStrategy.set(null)"
+          >
             ← Back
           </button>
           <div class="flex gap-2.5">
             <button
-              class="px-5 py-2 bg-white/[0.05] border border-white/8 rounded-lg
-                     text-slate-400 text-[13px] cursor-pointer transition-colors
-                     hover:bg-white/10 hover:text-slate-100"
-              (click)="cancel()">
+              class="px-5 py-2 bg-white/[0.05] border border-white/8 rounded-lg text-slate-400 text-[13px] cursor-pointer transition-colors hover:bg-white/10 hover:text-slate-100"
+              (click)="cancel()"
+            >
               Cancel
             </button>
             <button
               id="cdm-btn-confirm"
-              class="px-5 py-2 bg-indigo-400 border-none rounded-lg
-                     text-white text-[13px] font-semibold cursor-pointer
-                     transition-all hover:opacity-90 hover:-translate-y-px active:translate-y-0"
-              (click)="confirm()">
+              class="px-5 py-2 bg-indigo-400 border-none rounded-lg text-white text-[13px] font-semibold cursor-pointer transition-all hover:opacity-90 hover:-translate-y-px active:translate-y-0"
+              (click)="confirm()"
+            >
               Apply Resolution
             </button>
           </div>
         </div>
       }
     </div>
-
   </div>
 </div>

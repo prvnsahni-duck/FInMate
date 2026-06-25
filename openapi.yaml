@@ -4,10 +4,10 @@ info:
   description: |
     API Contract for FinMate, a Personal Finance & Lifestyle Companion.
     Provides endpoints for Auth, Users, Groups, Expenses, Settlements, Notes, Goals, and Import/Export.
-    
+
     ### Versioning Strategy
     URL-based versioning is used. All paths start with `/api/v1`.
-    
+
     ### Pagination & Filtering
     Paginated GET endpoints support standard query parameters:
     * `page`: 1-based page index (default: `1`)
@@ -84,7 +84,7 @@ paths:
                   example: securePassword123!
                 deviceId:
                   type: string
-                  example: "web-client-chrome-1234"
+                  example: 'web-client-chrome-1234'
       responses:
         '200':
           description: Login successful
@@ -99,10 +99,10 @@ paths:
                 properties:
                   accessToken:
                     type: string
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
                   refreshToken:
                     type: string
-                    example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
                   user:
                     $ref: '#/components/schemas/UserResponse'
         '401':
@@ -124,7 +124,7 @@ paths:
               properties:
                 refreshToken:
                   type: string
-                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
       responses:
         '200':
           description: Tokens refreshed successfully
@@ -176,10 +176,10 @@ paths:
                 properties:
                   secret:
                     type: string
-                    example: "KVKFKRCSN5RHK33O"
+                    example: 'KVKFKRCSN5RHK33O'
                   qrCodeUrl:
                     type: string
-                    example: "otpauth://totp/FinMate:user@example.com?secret=KVKFKRCSN5RHK33O&issuer=FinMate"
+                    example: 'otpauth://totp/FinMate:user@example.com?secret=KVKFKRCSN5RHK33O&issuer=FinMate'
         '401':
           $ref: '#/components/responses/UnauthorizedError'
 
@@ -201,8 +201,8 @@ paths:
               properties:
                 code:
                   type: string
-                  pattern: "^[0-9]{6}$"
-                  example: "123456"
+                  pattern: '^[0-9]{6}$'
+                  example: '123456'
       responses:
         '200':
           description: 2FA enabled successfully
@@ -229,8 +229,8 @@ paths:
               properties:
                 code:
                   type: string
-                  pattern: "^[0-9]{6}$"
-                  example: "123456"
+                  pattern: '^[0-9]{6}$'
+                  example: '123456'
       responses:
         '204':
           description: 2FA disabled successfully
@@ -284,14 +284,14 @@ paths:
                   format: uri
                 locale:
                   type: string
-                  example: "en-IN"
+                  example: 'en-IN'
                 timezone:
                   type: string
-                  example: "Asia/Kolkata"
+                  example: 'Asia/Kolkata'
                 defaultCurrency:
                   type: string
                   maxLength: 3
-                  example: "INR"
+                  example: 'INR'
                 monthlyBudget:
                   type: number
                   minimum: 0
@@ -346,10 +346,10 @@ paths:
                 name:
                   type: string
                   maxLength: 120
-                  example: "Flatmates Goa Trip"
+                  example: 'Flatmates Goa Trip'
                 description:
                   type: string
-                  example: "Sharing expenses for our trip to Goa"
+                  example: 'Sharing expenses for our trip to Goa'
                 visibility:
                   type: string
                   enum: [private, invite_only, public_readonly]
@@ -656,10 +656,10 @@ paths:
                 title:
                   type: string
                   maxLength: 1000
-                  example: "Dinner at Taj"
+                  example: 'Dinner at Taj'
                 description:
                   type: string
-                  example: "Celebration dinner"
+                  example: 'Celebration dinner'
                 amountTotal:
                   type: number
                   format: float
@@ -667,10 +667,10 @@ paths:
                 currency:
                   type: string
                   maxLength: 3
-                  example: "INR"
+                  example: 'INR'
                 category:
                   type: string
-                  example: "Food"
+                  example: 'Food'
                 paidByUserId:
                   type: string
                   format: uuid
@@ -681,7 +681,7 @@ paths:
                 expenseDate:
                   type: string
                   format: date
-                  example: "2026-06-09"
+                  example: '2026-06-09'
                 status:
                   type: string
                   enum: [draft, posted, void]
@@ -694,7 +694,7 @@ paths:
                   type: array
                   items:
                     type: string
-                  example: ["receipts/20260609_taj.jpg"]
+                  example: ['receipts/20260609_taj.jpg']
       responses:
         '201':
           description: Expense created successfully
@@ -1118,17 +1118,17 @@ paths:
                 toUserId:
                   type: string
                   format: uuid
-                  example: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
+                  example: 'f81d4fae-7dec-11d0-a765-00a0c91e6bf6'
                 amount:
                   type: number
                   example: 1250.00
                 currency:
                   type: string
                   maxLength: 3
-                  example: "INR"
+                  example: 'INR'
                 note:
                   type: string
-                  example: "Settling taj dinner"
+                  example: 'Settling taj dinner'
       responses:
         '201':
           description: Settlement proposed successfully
@@ -1288,7 +1288,7 @@ paths:
                 settledOn:
                   type: string
                   format: date
-                  example: "2026-06-09"
+                  example: '2026-06-09'
                 version:
                   type: integer
                   example: 1
@@ -1329,14 +1329,14 @@ paths:
                 title:
                   type: string
                   maxLength: 1000
-                  example: "Trip Itinerary"
+                  example: 'Trip Itinerary'
                 body:
                   type: string
-                  example: "Day 1: Arrive, check-in. Day 2: Beach day."
+                  example: 'Day 1: Arrive, check-in. Day 2: Beach day.'
                 visibility:
                   type: string
                   enum: [private, group]
-                  example: "group"
+                  example: 'group'
                 groupId:
                   type: string
                   format: uuid
@@ -1516,7 +1516,7 @@ paths:
                 title:
                   type: string
                   maxLength: 1000
-                  example: "Trip to Goa"
+                  example: 'Trip to Goa'
                 targetAmount:
                   type: number
                   example: 30000.00
@@ -1527,12 +1527,12 @@ paths:
                 currency:
                   type: string
                   maxLength: 3
-                  example: "INR"
+                  example: 'INR'
                 targetDate:
                   type: string
                   format: date
                   nullable: true
-                  example: "2026-12-31"
+                  example: '2026-12-31'
       responses:
         '201':
           description: Goal created successfully
@@ -1736,7 +1736,7 @@ paths:
                           example: 5
                         message:
                           type: string
-                          example: "Missing required field: amount"
+                          example: 'Missing required field: amount'
         '400':
           $ref: '#/components/responses/ValidationError'
         '401':
@@ -1782,7 +1782,7 @@ paths:
             Content-Disposition:
               schema:
                 type: string
-                example: "attachment; filename=\"expenses_export_20260609.csv\""
+                example: 'attachment; filename="expenses_export_20260609.csv"'
           content:
             text/csv:
               schema:
@@ -1833,13 +1833,13 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             statusCode: 400
-            timestamp: "2026-06-09T17:15:00.000Z"
-            path: "/api/v1/auth/register"
-            errorCode: "VAL_INVALID_INPUT"
-            message: "Input validation failed"
+            timestamp: '2026-06-09T17:15:00.000Z'
+            path: '/api/v1/auth/register'
+            errorCode: 'VAL_INVALID_INPUT'
+            message: 'Input validation failed'
             details:
-              - field: "email"
-                issue: "must be a valid email address"
+              - field: 'email'
+                issue: 'must be a valid email address'
             retryable: false
 
     UnauthorizedError:
@@ -1850,10 +1850,10 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             statusCode: 401
-            timestamp: "2026-06-09T17:15:00.000Z"
-            path: "/api/v1/users/me"
-            errorCode: "AUTH_TOKEN_EXPIRED"
-            message: "JWT access token has expired"
+            timestamp: '2026-06-09T17:15:00.000Z'
+            path: '/api/v1/users/me'
+            errorCode: 'AUTH_TOKEN_EXPIRED'
+            message: 'JWT access token has expired'
             retryable: false
 
     ForbiddenError:
@@ -1864,10 +1864,10 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             statusCode: 403
-            timestamp: "2026-06-09T17:15:00.000Z"
-            path: "/api/v1/groups/d3b07384-d113-49c3-a558-f54248880bf6"
-            errorCode: "RES_FORBIDDEN"
-            message: "You do not have access to view this group."
+            timestamp: '2026-06-09T17:15:00.000Z'
+            path: '/api/v1/groups/d3b07384-d113-49c3-a558-f54248880bf6'
+            errorCode: 'RES_FORBIDDEN'
+            message: 'You do not have access to view this group.'
             retryable: false
 
     NotFoundError:
@@ -1878,10 +1878,10 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             statusCode: 404
-            timestamp: "2026-06-09T17:15:00.000Z"
-            path: "/api/v1/expenses/f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
-            errorCode: "RES_NOT_FOUND"
-            message: "Expense with ID f81d4fae-7dec-11d0-a765-00a0c91e6bf6 does not exist."
+            timestamp: '2026-06-09T17:15:00.000Z'
+            path: '/api/v1/expenses/f81d4fae-7dec-11d0-a765-00a0c91e6bf6'
+            errorCode: 'RES_NOT_FOUND'
+            message: 'Expense with ID f81d4fae-7dec-11d0-a765-00a0c91e6bf6 does not exist.'
             retryable: false
 
     ConflictError:
@@ -1892,10 +1892,10 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             statusCode: 409
-            timestamp: "2026-06-09T17:15:00.000Z"
-            path: "/api/v1/auth/register"
-            errorCode: "RES_ALREADY_EXISTS"
-            message: "A user with email user@example.com already exists."
+            timestamp: '2026-06-09T17:15:00.000Z'
+            path: '/api/v1/auth/register'
+            errorCode: 'RES_ALREADY_EXISTS'
+            message: 'A user with email user@example.com already exists.'
             retryable: false
 
     PreconditionFailedError:
@@ -1906,10 +1906,10 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
           example:
             statusCode: 412
-            timestamp: "2026-06-09T17:15:00.000Z"
-            path: "/api/v1/expenses/f81d4fae-7dec-11d0-a765-00a0c91e6bf6"
-            errorCode: "CON_VERSION_CONFLICT"
-            message: "The resource version has changed. Please fetch the latest state and retry."
+            timestamp: '2026-06-09T17:15:00.000Z'
+            path: '/api/v1/expenses/f81d4fae-7dec-11d0-a765-00a0c91e6bf6'
+            errorCode: 'CON_VERSION_CONFLICT'
+            message: 'The resource version has changed. Please fetch the latest state and retry.'
             retryable: true
 
   schemas:

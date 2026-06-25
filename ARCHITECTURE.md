@@ -29,12 +29,12 @@ graph TD
 
 ### Directory Structure & Packages
 
-| Package / Library | Path | Technology / Framework | Role |
-| :--- | :--- | :--- | :--- |
-| **`frontend`** | `frontend/` | Angular 21, Standalone Components, RxJS, NGXS, Tailwind CSS | The user-facing Single Page Application and progressive web app (PWA), including native compilation configuration via Capacitor. |
-| **`backend`** | `backend/` | NestJS, Express, TypeORM | The RESTful application server managing API requests, database queries, caching, and audit logging. |
-| **`data-models`** | `shared/data-models/` | TypeScript, class-validator, TypeORM entities | The shared code library containing base data models, DTOs (Data Transfer Objects), validation rules, and central type definitions. |
-| **`utils`** | `shared/utils/` | TypeScript | Shared mathematical and operational utility functions, such as the minimum transaction split-debt calculator. |
+| Package / Library | Path                  | Technology / Framework                                      | Role                                                                                                                               |
+| :---------------- | :-------------------- | :---------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------- |
+| **`frontend`**    | `frontend/`           | Angular 21, Standalone Components, RxJS, NGXS, Tailwind CSS | The user-facing Single Page Application and progressive web app (PWA), including native compilation configuration via Capacitor.   |
+| **`backend`**     | `backend/`            | NestJS, Express, TypeORM                                    | The RESTful application server managing API requests, database queries, caching, and audit logging.                                |
+| **`data-models`** | `shared/data-models/` | TypeScript, class-validator, TypeORM entities               | The shared code library containing base data models, DTOs (Data Transfer Objects), validation rules, and central type definitions. |
+| **`utils`**       | `shared/utils/`       | TypeScript                                                  | Shared mathematical and operational utility functions, such as the minimum transaction split-debt calculator.                      |
 
 ---
 
@@ -54,7 +54,7 @@ sequenceDiagram
     User->>Crypt: Encrypt Title / Notes with local key (never sent to server)
     Crypt-->>User: Returns ciphertext (base64)
     User->>API: POST /expenses (Ciphertext Title, Plaintext Amount)
-    
+
     Note over API,DB: Server-Side Processing
     API->>DB: INSERT into expenses (encrypted_title, plaintext_amount)
     DB-->>API: Persisted
@@ -83,9 +83,11 @@ sequenceDiagram
    - **Architecture**: To allow searching on client-side encrypted fields (like expense titles) without decrypting them on the server, we will implement blind index hashing (`title_search_hash` and `title_ciphertext` columns) enabling server-side exact-match indexing without exposure to the raw plaintext.
 
 ### 4. Authentication & Session Security:
-   - **JWT Tokens**: Dual token architecture consisting of short-lived `access_tokens` (15 mins) and HTTP-only, secure `refresh_tokens` (7 days) signed via HS256.
-   - **Redis Session Caching**: Active session refresh token IDs (`refreshId`) are stored in Redis. To mitigate database compromise or session hijacking, key identifiers in Redis are stored deterministically as `refresh_token:${userId}:${sha256(refreshId)}`, and the value stored is the Argon2 hash of the `refreshId`.
-   - **Two-Factor Authentication (MFA)**: TOTP verification via authenticator apps, with secrets encrypted in PostgreSQL using AES-256-GCM.
+
+- **JWT Tokens**: Dual token architecture consisting of short-lived `access_tokens` (15 mins) and HTTP-only, secure `refresh_tokens` (7 days) signed via HS256.
+- **Redis Session Caching**: Active session refresh token IDs (`refreshId`) are stored in Redis. To mitigate database compromise or session hijacking, key identifiers in Redis are stored deterministically as `refresh_token:${userId}:${sha256(refreshId)}`, and the value stored is the Argon2 hash of the `refreshId`.
+- **Two-Factor Authentication (MFA)**: TOTP verification via authenticator apps, with secrets encrypted in PostgreSQL using AES-256-GCM.
+
 4. **Rate Limiting**:
    - Enforced using Redis and `@nestjs/throttler`:
      - Global API paths: Max 100 requests / minute.
@@ -135,19 +137,19 @@ Incoming Request
 
 ### Key Entities
 
-| Entity | Description |
-|--------|-------------|
-| `User` | Account with email, username, phone number, password hash, status, and 2FA support |
-| `Profile` | Extended user profile data |
-| `Group` | Expense group (normal, household, trip types) with invite token and settings |
-| `GroupMember` | Membership link with role (owner/admin/member/viewer/spectator) and joinStatus |
-| `GroupMemberContribution` | Custom contribution percentages per ledger month |
-| `Expense` | Expense record with soft delete, ledgerMonth, and carry-forward flag |
-| `ExpenseSplit` | Individual split allocation (fixed, equal, percent, share splits) |
-| `RecurringExpense` | Recurring expense template template with frequency and occurrence tracking |
-| `RecurringExpenseSplit` | Individual split allocation for recurring templates |
-| `Settlement` | Payment settlement between users |
-| `AuditLog` | Action audit trail |
+| Entity                    | Description                                                                        |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| `User`                    | Account with email, username, phone number, password hash, status, and 2FA support |
+| `Profile`                 | Extended user profile data                                                         |
+| `Group`                   | Expense group (normal, household, trip types) with invite token and settings       |
+| `GroupMember`             | Membership link with role (owner/admin/member/viewer/spectator) and joinStatus     |
+| `GroupMemberContribution` | Custom contribution percentages per ledger month                                   |
+| `Expense`                 | Expense record with soft delete, ledgerMonth, and carry-forward flag               |
+| `ExpenseSplit`            | Individual split allocation (fixed, equal, percent, share splits)                  |
+| `RecurringExpense`        | Recurring expense template template with frequency and occurrence tracking         |
+| `RecurringExpenseSplit`   | Individual split allocation for recurring templates                                |
+| `Settlement`              | Payment settlement between users                                                   |
+| `AuditLog`                | Action audit trail                                                                 |
 
 ---
 
@@ -177,7 +179,7 @@ erDiagram
     groups ||--o{ settlements : "settles (1:N)"
     users ||--o{ settlements : "debtor (1:N)"
     users ||--o{ settlements : "creditor (1:N)"
- 
+
     users ||--o{ audit_logs : "logs (1:N)"
 ```
 
@@ -197,12 +199,16 @@ erDiagram
 ## 5. Multi-Currency Ledgers & Friends Balances
 
 ### Currency Consistency
+
 To prevent ledger balance corruption:
+
 - Group base currency changes are blocked if any expenses or settlements have already been posted in the group.
 - Proposed settlements within a group must match the group's active base currency.
 
 ### Friends Balance Representation
+
 Friends balances across all mutual groups are grouped by currency. To prevent frontend track-by collisions, the friend records are virtualized per currency:
+
 - `friendId` is mapped using a combined key format: `${friendId}_${currency}`.
 - `displayName` is output with the currency suffix: `Name (Currency)`.
 
@@ -212,6 +218,7 @@ Friends balances across all mutual groups are grouped by currency. To prevent fr
 
 An active, write-only audit trail logs high-priority actions for authentication, group configuration, settlements, and spreadsheet imports.
 To protect user privacy:
+
 - The actor's requesting IP address is hashed using SHA-256 (`ipHash`) before being written to the database.
 - Request User Agent details and other non-sensitive operational parameters are saved in the `metadataJson` field.
 
@@ -222,6 +229,7 @@ To protect user privacy:
 The frontend is a modern Angular SPA designed with standalone components, fine-grained reactivity, and offline-first functionality.
 
 ### Layout & Routing
+
 - **Lazy Loading**: Route configurations isolate feature bundles (`groups`, `friends`) and load them dynamically to keep initial package sizes optimized.
 - **Organization**:
   - `core/`: Singleton services, auth guards, interceptors, and cryptographic engines.
@@ -229,15 +237,17 @@ The frontend is a modern Angular SPA designed with standalone components, fine-g
   - `shared/`: Reusable components (e.g., custom Submit Buttons, Confirm Modals), custom pipes, and utility classes.
 
 ### State & Reactivity
+
 FinMate uses a three-tier hybrid reactivity structure:
 
-| Layer | Technology | Use Case |
-|-------|-----------|----------|
-| **Local UI** | Angular Signals | Toggles, form state, local filters, and derived values |
-| **Async Streams** | RxJS | HTTP requests, debounced inputs, event composition |
-| **Global State** | NGXS | Auth state, cached entities, user preferences |
+| Layer             | Technology      | Use Case                                               |
+| ----------------- | --------------- | ------------------------------------------------------ |
+| **Local UI**      | Angular Signals | Toggles, form state, local filters, and derived values |
+| **Async Streams** | RxJS            | HTTP requests, debounced inputs, event composition     |
+| **Global State**  | NGXS            | Auth state, cached entities, user preferences          |
 
 ### Styling
+
 - **Primary**: Tailwind CSS v3 with custom `finmate` color palette.
 - **Fallback**: SCSS for complex keyframes or cases Tailwind can't cover.
 - **Dark Mode**: Class-based (`dark` class on `<html>`).
@@ -249,16 +259,16 @@ FinMate uses a three-tier hybrid reactivity structure:
 
 All backend environment variables are documented in `.env.example`. Key variables:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string |
-| `REDIS_URL` | ✅ | Redis connection string |
-| `JWT_SECRET` | ✅ | JWT signing secret |
-| `JWT_REFRESH_SECRET` | ✅ | Refresh token secret |
-| `ENCRYPTION_KEY` | ✅ | AES-256 server-side encryption key |
-| `FRONTEND_URL` | ✅ | Frontend origin (CORS + invite links) |
-| `CORS_ORIGINS` | ❌ | Comma-separated additional CORS origins |
-| `PORT` | ❌ | Server port (default: 3000) |
+| Variable             | Required | Description                             |
+| -------------------- | -------- | --------------------------------------- |
+| `DATABASE_URL`       | ✅       | PostgreSQL connection string            |
+| `REDIS_URL`          | ✅       | Redis connection string                 |
+| `JWT_SECRET`         | ✅       | JWT signing secret                      |
+| `JWT_REFRESH_SECRET` | ✅       | Refresh token secret                    |
+| `ENCRYPTION_KEY`     | ✅       | AES-256 server-side encryption key      |
+| `FRONTEND_URL`       | ✅       | Frontend origin (CORS + invite links)   |
+| `CORS_ORIGINS`       | ❌       | Comma-separated additional CORS origins |
+| `PORT`               | ❌       | Server port (default: 3000)             |
 
 ---
 

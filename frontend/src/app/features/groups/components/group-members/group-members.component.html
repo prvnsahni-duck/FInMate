@@ -1,9 +1,26 @@
-<div class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5">
+<div
+  class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5"
+>
   <div class="flex justify-between items-center mb-4">
     <h2 class="text-xl font-bold">Group Members</h2>
     @if (isOwnerOrAdmin() && inviteToken()) {
-      <button (click)="openQrModal()" class="text-xs font-semibold text-finmate-neon2 hover:text-finmate-neon transition-all flex items-center space-x-1">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+      <button
+        (click)="openQrModal()"
+        class="text-xs font-semibold text-finmate-neon2 hover:text-finmate-neon transition-all flex items-center space-x-1"
+      >
+        <svg
+          class="w-4 h-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+          ></path>
+        </svg>
         <span>Join Link & QR</span>
       </button>
     }
@@ -14,34 +31,106 @@
     @for (member of members(); track member.id) {
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-3">
-          <div class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center font-bold text-xs">
-            {{ (member.user.displayName || member.user.email).substring(0, 2).toUpperCase() }}
+          <div
+            class="w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center font-bold text-xs"
+          >
+            {{
+              (member.user.displayName || member.user.email)
+                .substring(0, 2)
+                .toUpperCase()
+            }}
           </div>
           <div>
-            <h4 class="font-semibold text-sm truncate max-w-[130px]">{{ member.user.displayName || member.user.email }}</h4>
-            <p class="text-[10px] text-slate-500 dark:text-slate-400 capitalize">{{ member.role }}</p>
+            <h4 class="font-semibold text-sm truncate max-w-[130px]">
+              {{ member.user.displayName || member.user.email }}
+            </h4>
+            <p
+              class="text-[10px] text-slate-500 dark:text-slate-400 capitalize"
+            >
+              {{ member.role }}
+            </p>
           </div>
         </div>
         <div class="flex items-center space-x-2">
-          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full" 
-                [ngClass]="{'bg-green-500/10 text-green-500': member.joinStatus === 'active', 
-                            'bg-yellow-500/10 text-yellow-500': member.joinStatus === 'invited'}">
+          <span
+            class="text-[10px] font-semibold px-2 py-0.5 rounded-full"
+            [ngClass]="{
+              'bg-green-500/10 text-green-500': member.joinStatus === 'active',
+              'bg-yellow-500/10 text-yellow-500':
+                member.joinStatus === 'invited',
+            }"
+          >
             {{ member.joinStatus }}
           </span>
 
           @if (member.joinStatus === 'invited' && getPhoneNumber(member)) {
-            <a [href]="getWhatsAppShareUrl(getPhoneNumber(member)!, member.user.displayName || member.user.email)" target="_blank" class="p-1 text-slate-400 hover:text-green-500 rounded-lg transition-colors flex items-center justify-center" title="Send WhatsApp Invite">
-              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.588 2.01 14.116.985 11.48.985c-5.439 0-9.864 4.37-9.868 9.8-.001 1.768.463 3.493 1.346 5.025l-.985 3.596 3.674-.952zm12.352-7.11c-.329-.165-1.95-.963-2.253-1.074-.303-.11-.524-.165-.745.165-.22.33-.852 1.074-1.044 1.293-.191.22-.383.247-.712.082-1.393-.699-2.42-1.222-3.39-2.88-.258-.44.258-.41.74-.138.435.247.493.412.74.825.247.412.124.77-.062.935-.186.165-.825.825-.825.825s-.19.247-.412.165c-.247-.11-1.023-.377-1.947-1.201-.718-.641-1.203-1.433-1.344-1.68-.142-.247-.015-.38.11-.504.11-.11.247-.29.37-.435.124-.143.165-.247.248-.412.082-.165.041-.314-.02-.44-.062-.124-.524-1.265-.718-1.733-.19-.459-.383-.396-.524-.403-.134-.007-.29-.007-.446-.007-.156 0-.413.06-.628.29-.215.23-.822.805-.822 1.964s.842 2.279.96 2.438c.12.16 1.658 2.53 4.015 3.542.56.24 1 .383 1.34.492.563.18 1.075.154 1.48.094.453-.067 1.95-.798 2.227-1.57.276-.77.276-1.43.193-1.57-.083-.14-.303-.222-.63-.387z"/></svg>
+            <a
+              [href]="
+                getWhatsAppShareUrl(
+                  getPhoneNumber(member)!,
+                  member.user.displayName || member.user.email
+                )
+              "
+              target="_blank"
+              class="p-1 text-slate-400 hover:text-green-500 rounded-lg transition-colors flex items-center justify-center"
+              title="Send WhatsApp Invite"
+            >
+              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                <path
+                  d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.588 2.01 14.116.985 11.48.985c-5.439 0-9.864 4.37-9.868 9.8-.001 1.768.463 3.493 1.346 5.025l-.985 3.596 3.674-.952zm12.352-7.11c-.329-.165-1.95-.963-2.253-1.074-.303-.11-.524-.165-.745.165-.22.33-.852 1.074-1.044 1.293-.191.22-.383.247-.712.082-1.393-.699-2.42-1.222-3.39-2.88-.258-.44.258-.41.74-.138.435.247.493.412.74.825.247.412.124.77-.062.935-.186.165-.825.825-.825.825s-.19.247-.412.165c-.247-.11-1.023-.377-1.947-1.201-.718-.641-1.203-1.433-1.344-1.68-.142-.247-.015-.38.11-.504.11-.11.247-.29.37-.435.124-.143.165-.247.248-.412.082-.165.041-.314-.02-.44-.062-.124-.524-1.265-.718-1.733-.19-.459-.383-.396-.524-.403-.134-.007-.29-.007-.446-.007-.156 0-.413.06-.628.29-.215.23-.822.805-.822 1.964s.842 2.279.96 2.438c.12.16 1.658 2.53 4.015 3.542.56.24 1 .383 1.34.492.563.18 1.075.154 1.48.094.453-.067 1.95-.798 2.227-1.57.276-.77.276-1.43.193-1.57-.083-.14-.303-.222-.63-.387z"
+                />
+              </svg>
             </a>
-            <a [href]="getSmsShareUrl(getPhoneNumber(member)!, member.user.displayName || member.user.email)" class="p-1 text-slate-400 hover:text-blue-500 rounded-lg transition-colors flex items-center justify-center" title="Send SMS Invite">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+            <a
+              [href]="
+                getSmsShareUrl(
+                  getPhoneNumber(member)!,
+                  member.user.displayName || member.user.email
+                )
+              "
+              class="p-1 text-slate-400 hover:text-blue-500 rounded-lg transition-colors flex items-center justify-center"
+              title="Send SMS Invite"
+            >
+              <svg
+                class="w-3.5 h-3.5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                ></path>
+              </svg>
             </a>
           }
 
           <!-- Kick / Revoke Actions (Owners/Admins only) -->
           @if (isOwnerOrAdmin() && member.role !== 'owner') {
-            <button (click)="removeOrRevokeMember(member)" class="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors" [title]="member.joinStatus === 'invited' ? 'Revoke Invite' : 'Remove Member'">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            <button
+              (click)="removeOrRevokeMember(member)"
+              class="p-1 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+              [title]="
+                member.joinStatus === 'invited'
+                  ? 'Revoke Invite'
+                  : 'Remove Member'
+              "
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                ></path>
+              </svg>
             </button>
           }
         </div>
@@ -52,50 +141,103 @@
   <!-- Inline Invite Form (Owners/Admins only) -->
   @if (isOwnerOrAdmin()) {
     <div class="border-t border-slate-100 dark:border-white/5 pt-4">
-      <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Invite Member</h3>
-      
+      <h3
+        class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3"
+      >
+        Invite Member
+      </h3>
+
       @if (inviteError) {
-        <p class="text-[11px] text-red-500 font-semibold mb-2">{{ inviteError }}</p>
+        <p class="text-[11px] text-red-500 font-semibold mb-2">
+          {{ inviteError }}
+        </p>
       }
       @if (inviteSuccess) {
-        <p class="text-[11px] text-green-500 font-semibold mb-2">{{ inviteSuccess }}</p>
+        <p class="text-[11px] text-green-500 font-semibold mb-2">
+          {{ inviteSuccess }}
+        </p>
       }
 
       <div class="space-y-2 relative">
         <div class="relative">
-          <input 
-            type="text" 
+          <input
+            type="text"
             [(ngModel)]="searchQuery"
             (ngModelChange)="onSearchChange($event)"
-            placeholder="Email, username, or phone" 
+            placeholder="Email, username, or phone"
             class="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-finmate-neon text-slate-900 dark:text-white"
-          >
+          />
           @if (isSearching) {
-            <div class="absolute right-2 top-2.5 w-4 h-4 border-2 border-finmate-neon border-t-transparent rounded-full animate-spin"></div>
+            <div
+              class="absolute right-2 top-2.5 w-4 h-4 border-2 border-finmate-neon border-t-transparent rounded-full animate-spin"
+            ></div>
           }
         </div>
 
         <!-- Suggestions Dropdown -->
         @if (searchQuery.trim().length >= 2) {
-          <div class="absolute z-50 w-full bg-white dark:bg-finmate-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto">
+          <div
+            class="absolute z-50 w-full bg-white dark:bg-finmate-card border border-slate-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden max-h-56 overflow-y-auto"
+          >
             @for (user of searchResults; track user.id) {
-              <button (click)="selectUserForInvite(user)" type="button" class="w-full text-left p-2.5 hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/5 flex flex-col transition-colors">
-                <span class="font-bold text-slate-800 dark:text-white text-xs">{{ user.displayName || user.email.split('@')[0] }}</span>
+              <button
+                (click)="selectUserForInvite(user)"
+                type="button"
+                class="w-full text-left p-2.5 hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/5 flex flex-col transition-colors"
+              >
+                <span
+                  class="font-bold text-slate-800 dark:text-white text-xs"
+                  >{{ user.displayName || user.email.split('@')[0] }}</span
+                >
                 <span class="text-[10px] text-slate-500">{{ user.email }}</span>
               </button>
             }
-            
+
             @if (searchResults.length > 0) {
               <div class="border-t border-slate-100 dark:border-white/5"></div>
             }
 
-            <button (click)="selectCustomInvite()" type="button" class="w-full text-left p-2.5 hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/5 flex items-center space-x-2 transition-colors text-slate-800 dark:text-white text-xs font-bold">
-              <svg class="w-4 h-4 text-finmate-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
-              <span class="truncate">Add "{{ searchQuery }}" to {{ appName }}</span>
+            <button
+              (click)="selectCustomInvite()"
+              type="button"
+              class="w-full text-left p-2.5 hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/5 flex items-center space-x-2 transition-colors text-slate-800 dark:text-white text-xs font-bold"
+            >
+              <svg
+                class="w-4 h-4 text-finmate-neon"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                ></path>
+              </svg>
+              <span class="truncate"
+                >Add "{{ searchQuery }}" to {{ appName }}</span
+              >
             </button>
 
-            <button (click)="openNewContactModal()" type="button" class="w-full text-left p-2.5 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center space-x-2 transition-colors text-slate-500 dark:text-slate-400 text-xs font-semibold">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+            <button
+              (click)="openNewContactModal()"
+              type="button"
+              class="w-full text-left p-2.5 hover:bg-slate-50 dark:hover:bg-white/5 flex items-center space-x-2 transition-colors text-slate-500 dark:text-slate-400 text-xs font-semibold"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 4v16m8-8H4"
+                ></path>
+              </svg>
               <span>Add new contact to {{ appName }}</span>
             </button>
           </div>
@@ -109,8 +251,24 @@
             styleClass="w-32"
           ></app-dropdown>
 
-          <button (click)="selectCustomInvite()" [disabled]="!searchQuery.trim()" class="flex-1 py-2 bg-gradient-neon text-white rounded-xl text-xs font-semibold shadow-md shadow-finmate-neon/10 hover:shadow-finmate-neon/30 transition-all disabled:opacity-40 flex items-center justify-center space-x-1">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          <button
+            (click)="selectCustomInvite()"
+            [disabled]="!searchQuery.trim()"
+            class="flex-1 py-2 bg-gradient-neon text-white rounded-xl text-xs font-semibold shadow-md shadow-finmate-neon/10 hover:shadow-finmate-neon/30 transition-all disabled:opacity-40 flex items-center justify-center space-x-1"
+          >
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"
+              ></path>
+            </svg>
             <span>Add</span>
           </button>
         </div>
@@ -118,39 +276,87 @@
 
       <!-- Staged Queue -->
       @if (stagedInvites().length > 0) {
-        <div class="space-y-2 mt-4 pt-4 border-t border-slate-100 dark:border-white/5">
-          <h4 class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Invitations to Send</h4>
+        <div
+          class="space-y-2 mt-4 pt-4 border-t border-slate-100 dark:border-white/5"
+        >
+          <h4
+            class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500"
+          >
+            Invitations to Send
+          </h4>
           <div class="grid grid-cols-1 gap-2 max-h-40 overflow-y-auto pr-1">
             @for (invite of stagedInvites(); track invite.id) {
-              <div class="flex items-center justify-between p-2 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl relative pr-8 transition-colors">
+              <div
+                class="flex items-center justify-between p-2 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl relative pr-8 transition-colors"
+              >
                 <div class="flex items-center space-x-2 min-w-0">
-                  <div class="w-6 h-6 rounded-full bg-gradient-neon text-white flex items-center justify-center font-bold text-[9px] uppercase flex-shrink-0">
+                  <div
+                    class="w-6 h-6 rounded-full bg-gradient-neon text-white flex items-center justify-center font-bold text-[9px] uppercase flex-shrink-0"
+                  >
                     {{ invite.name.substring(0, 2) }}
                   </div>
                   <div class="min-w-0">
-                    <h5 class="font-bold text-xs text-slate-800 dark:text-white truncate max-w-[120px]" [title]="invite.name">{{ invite.name }}</h5>
-                    <p class="text-[9px] text-slate-500 dark:text-slate-400 truncate max-w-[120px]" [title]="invite.identifier">{{ invite.identifier }}</p>
+                    <h5
+                      class="font-bold text-xs text-slate-800 dark:text-white truncate max-w-[120px]"
+                      [title]="invite.name"
+                    >
+                      {{ invite.name }}
+                    </h5>
+                    <p
+                      class="text-[9px] text-slate-500 dark:text-slate-400 truncate max-w-[120px]"
+                      [title]="invite.identifier"
+                    >
+                      {{ invite.identifier }}
+                    </p>
                   </div>
                 </div>
                 <div class="flex items-center space-x-1">
-                  <span class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 capitalize">
+                  <span
+                    class="text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 capitalize"
+                  >
                     {{ invite.role }}
                   </span>
                 </div>
-                <button (click)="removeStagedInvite(invite.id)" class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-red-500 transition-colors" title="Remove">
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <button
+                  (click)="removeStagedInvite(invite.id)"
+                  class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-red-500 transition-colors"
+                  title="Remove"
+                >
+                  <svg
+                    class="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    ></path>
+                  </svg>
                 </button>
               </div>
             }
           </div>
 
           <!-- Send Invites Action -->
-          <button (click)="sendBulkInvites()" [disabled]="isInviting" class="w-full py-2 bg-gradient-neon text-white rounded-xl text-xs font-semibold shadow-md shadow-finmate-neon/10 hover:shadow-finmate-neon/30 transition-all disabled:opacity-40 flex items-center justify-center space-x-1.5">
+          <button
+            (click)="sendBulkInvites()"
+            [disabled]="isInviting"
+            class="w-full py-2 bg-gradient-neon text-white rounded-xl text-xs font-semibold shadow-md shadow-finmate-neon/10 hover:shadow-finmate-neon/30 transition-all disabled:opacity-40 flex items-center justify-center space-x-1.5"
+          >
             @if (isInviting) {
-              <div class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <div
+                class="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"
+              ></div>
               <span>Inviting...</span>
             } @else {
-              <span>Send {{ stagedInvites().length }} Invite{{ stagedInvites().length > 1 ? 's' : '' }}</span>
+              <span
+                >Send {{ stagedInvites().length }} Invite{{
+                  stagedInvites().length > 1 ? 's' : ''
+                }}</span
+              >
             }
           </button>
         </div>
@@ -161,16 +367,41 @@
 
 <!-- QR Link Modal -->
 @if (isQrModalOpen) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-    <div class="bg-white dark:bg-finmate-card rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-white/5 text-center relative">
-      <button (click)="closeQrModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
+  >
+    <div
+      class="bg-white dark:bg-finmate-card rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-white/5 text-center relative"
+    >
+      <button
+        (click)="closeQrModal()"
+        class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          ></path>
+        </svg>
       </button>
 
       <h3 class="text-lg font-bold mb-4">Share Invite Link & QR Code</h3>
 
-      <div class="w-48 h-48 bg-white p-2 rounded-2xl mx-auto mb-4 border border-slate-200/50 flex items-center justify-center shadow-inner">
-        <img [src]="qrCodeUrl" alt="QR Code" class="w-full h-full object-contain" />
+      <div
+        class="w-48 h-48 bg-white p-2 rounded-2xl mx-auto mb-4 border border-slate-200/50 flex items-center justify-center shadow-inner"
+      >
+        <img
+          [src]="qrCodeUrl"
+          alt="QR Code"
+          class="w-full h-full object-contain"
+        />
       </div>
 
       <p class="text-xs text-slate-500 dark:text-slate-400 mb-6 px-4">
@@ -178,10 +409,16 @@
       </p>
 
       <div class="flex space-x-2">
-        <button (click)="copyJoinUrl()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white rounded-xl text-xs font-semibold transition-all">
+        <button
+          (click)="copyJoinUrl()"
+          class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white rounded-xl text-xs font-semibold transition-all"
+        >
           Copy Link
         </button>
-        <button (click)="closeQrModal()" class="flex-1 py-2.5 bg-gradient-neon text-white rounded-xl text-xs font-semibold transition-all">
+        <button
+          (click)="closeQrModal()"
+          class="flex-1 py-2.5 bg-gradient-neon text-white rounded-xl text-xs font-semibold transition-all"
+        >
           Done
         </button>
       </div>
@@ -191,41 +428,71 @@
 
 <!-- Add New Contact Modal -->
 @if (isNewContactModalOpen) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-    <div class="bg-white dark:bg-finmate-card rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-white/5 relative text-left">
-      <button (click)="closeNewContactModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
+  >
+    <div
+      class="bg-white dark:bg-finmate-card rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-white/5 relative text-left"
+    >
+      <button
+        (click)="closeNewContactModal()"
+        class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          ></path>
+        </svg>
       </button>
 
       <h3 class="text-lg font-bold mb-4">Add New Contact</h3>
 
       @if (newContactError) {
-        <p class="text-[11px] text-red-500 font-semibold mb-3">{{ newContactError }}</p>
+        <p class="text-[11px] text-red-500 font-semibold mb-3">
+          {{ newContactError }}
+        </p>
       }
 
       <div class="space-y-4">
         <div>
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Name</label>
-          <input 
-            type="text" 
+          <label
+            class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1"
+            >Name</label
+          >
+          <input
+            type="text"
             [(ngModel)]="newContactName"
-            placeholder="Contact Name" 
+            placeholder="Contact Name"
             class="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-finmate-neon text-slate-900 dark:text-white"
-          >
+          />
         </div>
 
         <div>
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Email or Phone Number</label>
-          <input 
-            type="text" 
+          <label
+            class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1"
+            >Email or Phone Number</label
+          >
+          <input
+            type="text"
             [(ngModel)]="newContactIdentifier"
-            placeholder="email@example.com or +1234567890" 
+            placeholder="email@example.com or +1234567890"
             class="w-full text-xs px-3 py-2 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl outline-none focus:border-finmate-neon text-slate-900 dark:text-white"
-          >
+          />
         </div>
 
         <div>
-          <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Group Role</label>
+          <label
+            class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1"
+            >Group Role</label
+          >
           <app-dropdown
             [(ngModel)]="newContactRole"
             [options]="roleOptions"
@@ -234,10 +501,16 @@
         </div>
 
         <div class="flex space-x-2 pt-2">
-          <button (click)="closeNewContactModal()" class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white rounded-xl text-xs font-semibold transition-all">
+          <button
+            (click)="closeNewContactModal()"
+            class="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 text-slate-800 dark:text-white rounded-xl text-xs font-semibold transition-all"
+          >
             Cancel
           </button>
-          <button (click)="confirmAddStagedContact()" class="flex-1 py-2.5 bg-gradient-neon text-white rounded-xl text-xs font-semibold transition-all">
+          <button
+            (click)="confirmAddStagedContact()"
+            class="flex-1 py-2.5 bg-gradient-neon text-white rounded-xl text-xs font-semibold transition-all"
+          >
             Add to List
           </button>
         </div>
@@ -248,35 +521,99 @@
 
 <!-- Mobile Share Messenger Modal -->
 @if (isMobileShareModalOpen) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn">
-    <div class="bg-white dark:bg-finmate-card rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-white/5 text-center relative">
-      <button (click)="closeMobileShareModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-fadeIn"
+  >
+    <div
+      class="bg-white dark:bg-finmate-card rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-white/5 text-center relative"
+    >
+      <button
+        (click)="closeMobileShareModal()"
+        class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M6 18L18 6M6 6l12 12"
+          ></path>
+        </svg>
       </button>
 
-      <div class="w-12 h-12 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+      <div
+        class="w-12 h-12 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+          ></path>
+        </svg>
       </div>
 
       <h3 class="text-lg font-bold mb-2">Invitations Staged!</h3>
       <p class="text-xs text-slate-500 dark:text-slate-400 mb-6">
-        Share the join links with your mobile contacts using a messenger app below:
+        Share the join links with your mobile contacts using a messenger app
+        below:
       </p>
 
       <div class="space-y-4 max-h-60 overflow-y-auto mb-6 pr-1 text-left">
         @for (contact of justInvitedPhoneContacts; track contact.id) {
-          <div class="p-3 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl flex flex-col space-y-2">
+          <div
+            class="p-3 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl flex flex-col space-y-2"
+          >
             <div class="flex justify-between items-center">
-              <span class="text-xs font-bold text-slate-800 dark:text-white truncate max-w-[120px]">{{ contact.name }}</span>
-              <span class="text-[10px] text-slate-400">{{ contact.identifier }}</span>
+              <span
+                class="text-xs font-bold text-slate-800 dark:text-white truncate max-w-[120px]"
+                >{{ contact.name }}</span
+              >
+              <span class="text-[10px] text-slate-400">{{
+                contact.identifier
+              }}</span>
             </div>
             <div class="flex space-x-2">
-              <a [href]="getWhatsAppShareUrl(contact.identifier, contact.name)" target="_blank" class="flex-1 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-[11px] font-semibold transition-all flex items-center justify-center space-x-1.5">
-                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.588 2.01 14.116.985 11.48.985c-5.439 0-9.864 4.37-9.868 9.8-.001 1.768.463 3.493 1.346 5.025l-.985 3.596 3.674-.952zm12.352-7.11c-.329-.165-1.95-.963-2.253-1.074-.303-.11-.524-.165-.745.165-.22.33-.852 1.074-1.044 1.293-.191.22-.383.247-.712.082-1.393-.699-2.42-1.222-3.39-2.88-.258-.44.258-.41.74-.138.435.247.493.412.74.825.247.412.124.77-.062.935-.186.165-.825.825-.825.825s-.19.247-.412.165c-.247-.11-1.023-.377-1.947-1.201-.718-.641-1.203-1.433-1.344-1.68-.142-.247-.015-.38.11-.504.11-.11.247-.29.37-.435.124-.143.165-.247.248-.412.082-.165.041-.314-.02-.44-.062-.124-.524-1.265-.718-1.733-.19-.459-.383-.396-.524-.403-.134-.007-.29-.007-.446-.007-.156 0-.413.06-.628.29-.215.23-.822.805-.822 1.964s.842 2.279.96 2.438c.12.16 1.658 2.53 4.015 3.542.56.24 1 .383 1.34.492.563.18 1.075.154 1.48.094.453-.067 1.95-.798 2.227-1.57.276-.77.276-1.43.193-1.57-.083-.14-.303-.222-.63-.387z"/></svg>
+              <a
+                [href]="getWhatsAppShareUrl(contact.identifier, contact.name)"
+                target="_blank"
+                class="flex-1 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-xl text-[11px] font-semibold transition-all flex items-center justify-center space-x-1.5"
+              >
+                <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                  <path
+                    d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.262 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.37 9.864-9.799.002-2.63-1.023-5.101-2.885-6.963C16.588 2.01 14.116.985 11.48.985c-5.439 0-9.864 4.37-9.868 9.8-.001 1.768.463 3.493 1.346 5.025l-.985 3.596 3.674-.952zm12.352-7.11c-.329-.165-1.95-.963-2.253-1.074-.303-.11-.524-.165-.745.165-.22.33-.852 1.074-1.044 1.293-.191.22-.383.247-.712.082-1.393-.699-2.42-1.222-3.39-2.88-.258-.44.258-.41.74-.138.435.247.493.412.74.825.247.412.124.77-.062.935-.186.165-.825.825-.825.825s-.19.247-.412.165c-.247-.11-1.023-.377-1.947-1.201-.718-.641-1.203-1.433-1.344-1.68-.142-.247-.015-.38.11-.504.11-.11.247-.29.37-.435.124-.143.165-.247.248-.412.082-.165.041-.314-.02-.44-.062-.124-.524-1.265-.718-1.733-.19-.459-.383-.396-.524-.403-.134-.007-.29-.007-.446-.007-.156 0-.413.06-.628.29-.215.23-.822.805-.822 1.964s.842 2.279.96 2.438c.12.16 1.658 2.53 4.015 3.542.56.24 1 .383 1.34.492.563.18 1.075.154 1.48.094.453-.067 1.95-.798 2.227-1.57.276-.77.276-1.43.193-1.57-.083-.14-.303-.222-.63-.387z"
+                  />
+                </svg>
                 <span>WhatsApp</span>
               </a>
-              <a [href]="getSmsShareUrl(contact.identifier, contact.name)" class="flex-1 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-[11px] font-semibold transition-all flex items-center justify-center space-x-1.5">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
+              <a
+                [href]="getSmsShareUrl(contact.identifier, contact.name)"
+                class="flex-1 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-[11px] font-semibold transition-all flex items-center justify-center space-x-1.5"
+              >
+                <svg
+                  class="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                  ></path>
+                </svg>
                 <span>SMS</span>
               </a>
             </div>
@@ -284,10 +621,12 @@
         }
       </div>
 
-      <button (click)="closeMobileShareModal()" class="w-full py-2.5 bg-gradient-neon text-white rounded-xl text-xs font-semibold transition-all">
+      <button
+        (click)="closeMobileShareModal()"
+        class="w-full py-2.5 bg-gradient-neon text-white rounded-xl text-xs font-semibold transition-all"
+      >
         Close
       </button>
     </div>
   </div>
 }
-

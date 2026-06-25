@@ -1,4 +1,11 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { QueryFailedError, EntityNotFoundError } from 'typeorm';
 import { randomUUID } from 'crypto';
 
@@ -32,7 +39,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
         }
 
         // Extract class-validator array formatting
-        if (statusCode === HttpStatus.BAD_REQUEST && Array.isArray(resBody.message)) {
+        if (
+          statusCode === HttpStatus.BAD_REQUEST &&
+          Array.isArray(resBody.message)
+        ) {
           errorCode = 'VAL_INVALID_INPUT';
           message = 'Input validation failed: ' + resBody.message.join(', ');
           details = [];
@@ -56,33 +66,55 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = exception.message || 'The requested resource was not found';
     } else if (exception instanceof QueryFailedError) {
       const driverError = exception.driverError;
-      this.logger.error(`Database Exception: ${exception.message}`, exception.stack);
+      this.logger.error(
+        `Database Exception: ${exception.message}`,
+        exception.stack,
+      );
 
       if (driverError && driverError.code === '23505') {
         statusCode = HttpStatus.CONFLICT;
         errorCode = 'RES_ALREADY_EXISTS';
-        message = driverError.detail || 'Database unique constraint violation: resource already exists';
+        message =
+          driverError.detail ||
+          'Database unique constraint violation: resource already exists';
       } else if (driverError && driverError.code === '23503') {
         statusCode = HttpStatus.BAD_REQUEST;
         errorCode = 'VAL_INVALID_INPUT';
-        message = driverError.detail || 'Database foreign key constraint violation: referenced resource does not exist';
-      } else if (driverError && ['22P02', '22007', '22001', '22003', '23502', '23514'].includes(driverError.code)) {
+        message =
+          driverError.detail ||
+          'Database foreign key constraint violation: referenced resource does not exist';
+      } else if (
+        driverError &&
+        ['22P02', '22007', '22001', '22003', '23502', '23514'].includes(
+          driverError.code,
+        )
+      ) {
         statusCode = HttpStatus.BAD_REQUEST;
         errorCode = 'VAL_INVALID_INPUT';
-        message = driverError.code === '23502'
-          ? 'Invalid input: a required field was missing or empty'
-          : driverError.code === '23514'
-            ? 'Invalid input: constraint violation'
-            : 'Invalid input format: ' + (driverError.message || exception.message);
-      } else if (driverError && (
-        String(driverError.code).startsWith('08') ||
-        ['ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EPIPE', 'ECONNRESET'].includes(driverError.code) ||
-        String(driverError.message).toLowerCase().includes('connect') ||
-        String(exception.message).toLowerCase().includes('connection')
-      )) {
+        message =
+          driverError.code === '23502'
+            ? 'Invalid input: a required field was missing or empty'
+            : driverError.code === '23514'
+              ? 'Invalid input: constraint violation'
+              : 'Invalid input format: ' +
+                (driverError.message || exception.message);
+      } else if (
+        driverError &&
+        (String(driverError.code).startsWith('08') ||
+          [
+            'ECONNREFUSED',
+            'ETIMEDOUT',
+            'ENOTFOUND',
+            'EPIPE',
+            'ECONNRESET',
+          ].includes(driverError.code) ||
+          String(driverError.message).toLowerCase().includes('connect') ||
+          String(exception.message).toLowerCase().includes('connection'))
+      ) {
         statusCode = HttpStatus.SERVICE_UNAVAILABLE;
         errorCode = 'SYS_SERVICE_UNAVAILABLE';
-        message = 'Database service is temporarily unavailable. Please try again later.';
+        message =
+          'Database service is temporarily unavailable. Please try again later.';
       } else {
         statusCode = HttpStatus.INTERNAL_SERVER_ERROR;
         errorCode = 'SYS_INTERNAL_ERROR';
@@ -91,7 +123,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
     } else {
       // Unhandled generic errors
       const err = exception as Error;
-      this.logger.error(`Unhandled Exception: ${err?.message || exception}`, err?.stack);
+      this.logger.error(
+        `Unhandled Exception: ${err?.message || exception}`,
+        err?.stack,
+      );
 
       const errMsg = String(err?.message || exception).toLowerCase();
       const errCode = (err as any)?.code;
@@ -108,12 +143,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
       ) {
         statusCode = HttpStatus.SERVICE_UNAVAILABLE;
         errorCode = 'SYS_SERVICE_UNAVAILABLE';
-        message = 'Database service is temporarily unavailable. Please try again later.';
+        message =
+          'Database service is temporarily unavailable. Please try again later.';
       }
     }
 
     // Map status codes to custom error codes if they weren't explicitly set above
-    if (errorCode === 'SYS_INTERNAL_ERROR' && statusCode !== HttpStatus.INTERNAL_SERVER_ERROR) {
+    if (
+      errorCode === 'SYS_INTERNAL_ERROR' &&
+      statusCode !== HttpStatus.INTERNAL_SERVER_ERROR
+    ) {
       switch (statusCode) {
         case HttpStatus.BAD_REQUEST:
           errorCode = 'VAL_INVALID_INPUT';
@@ -122,7 +161,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
           const msgStr = String(message).toLowerCase();
           if (msgStr.includes('expired')) {
             errorCode = 'AUTH_TOKEN_EXPIRED';
-          } else if (msgStr.includes('missing') || msgStr.includes('authorization')) {
+          } else if (
+            msgStr.includes('missing') ||
+            msgStr.includes('authorization')
+          ) {
             errorCode = 'AUTH_MISSING_TOKEN';
           } else {
             errorCode = 'AUTH_INVALID_TOKEN';
@@ -157,7 +199,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       'CON_VERSION_CONFLICT',
       'CON_LIMIT_RATE',
       'SYS_SERVICE_UNAVAILABLE',
-      'SYS_TIMEOUT'
+      'SYS_TIMEOUT',
     ].includes(errorCode);
 
     const errorPayload: Record<string, any> = {
@@ -168,7 +210,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (statusCode === HttpStatus.INTERNAL_SERVER_ERROR) {
       const errorId = randomUUID();
-      const correlationId = request.headers['x-correlation-id'] || request.headers['x-request-id'] || randomUUID();
+      const correlationId =
+        request.headers['x-correlation-id'] ||
+        request.headers['x-request-id'] ||
+        randomUUID();
       const err = exception as Error;
 
       this.logger.error(
@@ -181,10 +226,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
           serviceName: 'HttpExceptionFilter',
           timestamp: new Date().toISOString(),
           stack: err?.stack || null,
-        })
+        }),
       );
 
-      errorPayload.message = 'An unexpected error occurred. Please try again later.';
+      errorPayload.message =
+        'An unexpected error occurred. Please try again later.';
       errorPayload.errorId = errorId;
     } else {
       errorPayload.data = null;

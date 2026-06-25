@@ -6,10 +6,7 @@ import { UsersController } from './users.controller';
 import { EncryptionModule } from '../encryption/encryption.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([User, Profile]),
-    EncryptionModule,
-  ],
+  imports: [TypeOrmModule.forFeature([User, Profile]), EncryptionModule],
   controllers: [UsersController],
   providers: [UsersService],
   exports: [UsersService],

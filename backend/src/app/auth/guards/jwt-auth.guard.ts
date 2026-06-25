@@ -9,12 +9,20 @@ interface AuthFailureInfo {
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  override handleRequest<TUser = User>(err: unknown, user: unknown, info?: AuthFailureInfo): TUser {
+  override handleRequest<TUser = User>(
+    err: unknown,
+    user: unknown,
+    info?: AuthFailureInfo,
+  ): TUser {
     if (err || !user) {
       if (info && info.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Token expired');
       }
-      if (!info || info.message === 'No auth token' || String(info.message).toLowerCase().includes('missing')) {
+      if (
+        !info ||
+        info.message === 'No auth token' ||
+        String(info.message).toLowerCase().includes('missing')
+      ) {
         throw new UnauthorizedException('Missing token');
       }
       throw new UnauthorizedException(info?.message || 'Invalid token');

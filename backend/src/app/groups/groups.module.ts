@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuditLog, Group, GroupMember, GroupMemberContribution } from '@finmate/data-models';
+import {
+  AuditLog,
+  Group,
+  GroupMember,
+  GroupMemberContribution,
+} from '@finmate/data-models';
 import { GroupsService } from './groups.service';
 import { GroupsController } from './groups.controller';
 import { MembersController } from './members.controller';
@@ -17,7 +22,12 @@ import {
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Group, GroupMember, GroupMemberContribution, AuditLog]),
+    TypeOrmModule.forFeature([
+      Group,
+      GroupMember,
+      GroupMemberContribution,
+      AuditLog,
+    ]),
     ExpensesModule,
     EmailModule,
   ],

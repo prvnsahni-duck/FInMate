@@ -7,7 +7,7 @@ describe('DashboardGoalsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DashboardGoalsComponent]
+      imports: [DashboardGoalsComponent],
     }).compileComponents();
 
     fixture = TestBed.createComponent(DashboardGoalsComponent);
@@ -23,6 +23,8 @@ describe('DashboardGoalsComponent', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelectorAll('.card-glass').length).toBe(3);
-    expect(compiled.querySelector('h1')?.textContent).toContain('Personal Savings Goals');
+    expect(compiled.querySelector('h1')?.textContent).toContain(
+      'Personal Savings Goals',
+    );
   });
 });

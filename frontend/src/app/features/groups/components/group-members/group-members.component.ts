@@ -7,7 +7,10 @@ import { GroupMember, UserSearchResult } from '@finmate/data-models';
 import { GroupsService } from '../../services/groups.service';
 import { FriendsService } from '../../../friends/services/friends.service';
 import { APP_NAME } from '../../../../core/constants/app.constants';
-import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
+import {
+  DropdownComponent,
+  DropdownOption,
+} from '../../../../shared/components/dropdown/dropdown.component';
 
 export interface StagedInvite {
   id: string;
@@ -24,7 +27,9 @@ interface FailedInviteResult {
   message: string;
 }
 
-function isFailedInviteResult(result: GroupMember | FailedInviteResult): result is FailedInviteResult {
+function isFailedInviteResult(
+  result: GroupMember | FailedInviteResult,
+): result is FailedInviteResult {
   return 'error' in result && result.error;
 }
 
@@ -32,7 +37,7 @@ function isFailedInviteResult(result: GroupMember | FailedInviteResult): result 
   selector: 'app-group-members',
   standalone: true,
   imports: [NgClass, FormsModule, DropdownComponent],
-  templateUrl: './group-members.component.html'
+  templateUrl: './group-members.component.html',
 })
 export class GroupMembersComponent {
   private groupsService = inject(GroupsService);
@@ -57,7 +62,7 @@ export class GroupMembersComponent {
     { value: 'member', label: 'Member' },
     { value: 'admin', label: 'Admin' },
     { value: 'viewer', label: 'Viewer' },
-    { value: 'spectator', label: 'Spectator' }
+    { value: 'spectator', label: 'Spectator' },
   ];
 
   stagedInvites = signal<StagedInvite[]>([]);
@@ -97,25 +102,31 @@ export class GroupMembersComponent {
     this.isSearching = true;
     this.friendsService.searchUsers(query).subscribe({
       next: (users) => {
-        this.searchResults = users.filter(user => 
-          !this.members().some(m => m.user?.id === user.id) &&
-          !this.stagedInvites().some(s => s.userId === user.id || s.identifier === (user.email || user.username || user.phoneNumber))
+        this.searchResults = users.filter(
+          (user) =>
+            !this.members().some((m) => m.user?.id === user.id) &&
+            !this.stagedInvites().some(
+              (s) =>
+                s.userId === user.id ||
+                s.identifier ===
+                  (user.email || user.username || user.phoneNumber),
+            ),
         );
         this.isSearching = false;
       },
       error: () => {
         this.isSearching = false;
-      }
+      },
     });
   }
 
   stageUser(invite: Omit<StagedInvite, 'id'>) {
     const id = Math.random().toString(36).substring(2, 9);
-    this.stagedInvites.update(list => [...list, { ...invite, id }]);
+    this.stagedInvites.update((list) => [...list, { ...invite, id }]);
   }
 
   removeStagedInvite(id: string) {
-    this.stagedInvites.update(list => list.filter(item => item.id !== id));
+    this.stagedInvites.update((list) => list.filter((item) => item.id !== id));
   }
 
   selectUserForInvite(user: UserSearchResult) {
@@ -124,7 +135,7 @@ export class GroupMembersComponent {
       identifier: user.email || user.username || user.phoneNumber || user.id,
       role: this.inviteRole,
       isRegisteredUser: true,
-      userId: user.id
+      userId: user.id,
     });
     this.searchQuery = '';
     this.searchResults = [];
@@ -139,7 +150,7 @@ export class GroupMembersComponent {
         name: query,
         identifier: query,
         role: this.inviteRole,
-        isRegisteredUser: false
+        isRegisteredUser: false,
       });
       this.searchQuery = '';
       this.searchResults = [];
@@ -175,16 +186,18 @@ export class GroupMembersComponent {
     }
 
     if (!this.isValidEmail(identifier) && !this.isValidPhone(identifier)) {
-      this.newContactError = 'Please enter a valid email address or phone number (7-15 digits).';
+      this.newContactError =
+        'Please enter a valid email address or phone number (7-15 digits).';
       return;
     }
 
     const isAlreadyStaged = this.stagedInvites().some(
-      s => s.identifier.toLowerCase() === identifier.toLowerCase()
+      (s) => s.identifier.toLowerCase() === identifier.toLowerCase(),
     );
     const isAlreadyMember = this.members().some(
-      m => m.user?.email?.toLowerCase() === identifier.toLowerCase() ||
-           m.user?.phoneNumber === identifier
+      (m) =>
+        m.user?.email?.toLowerCase() === identifier.toLowerCase() ||
+        m.user?.phoneNumber === identifier,
     );
 
     if (isAlreadyStaged || isAlreadyMember) {
@@ -196,7 +209,7 @@ export class GroupMembersComponent {
       name,
       identifier,
       role: this.newContactRole,
-      isRegisteredUser: false
+      isRegisteredUser: false,
     });
 
     this.closeNewContactModal();
@@ -212,14 +225,22 @@ export class GroupMembersComponent {
     this.inviteError = '';
     this.inviteSuccess = '';
 
-    const requests = list.map(invite => 
-      this.groupsService.inviteMember(this.groupId(), {
-        identifier: invite.identifier,
-        role: invite.role,
-        displayName: invite.isRegisteredUser ? undefined : invite.name
-      }).pipe(
-        catchError(err => of({ error: true, invite, message: err.error?.message || 'Failed to send invite.' } satisfies FailedInviteResult))
-      )
+    const requests = list.map((invite) =>
+      this.groupsService
+        .inviteMember(this.groupId(), {
+          identifier: invite.identifier,
+          role: invite.role,
+          displayName: invite.isRegisteredUser ? undefined : invite.name,
+        })
+        .pipe(
+          catchError((err) =>
+            of({
+              error: true,
+              invite,
+              message: err.error?.message || 'Failed to send invite.',
+            } satisfies FailedInviteResult),
+          ),
+        ),
     );
 
     forkJoin(requests).subscribe({
@@ -228,40 +249,48 @@ export class GroupMembersComponent {
         const failed = results.filter(isFailedInviteResult);
 
         if (failed.length === 0) {
-          const phoneInvites = list.filter(invite => this.isValidPhone(invite.identifier));
+          const phoneInvites = list.filter((invite) =>
+            this.isValidPhone(invite.identifier),
+          );
           this.stagedInvites.set([]);
           this.inviteSuccess = 'All invitations sent successfully!';
           this.memberChanged.emit();
-          
+
           if (phoneInvites.length > 0) {
             this.justInvitedPhoneContacts = phoneInvites;
             this.isMobileShareModalOpen = true;
           } else {
-            setTimeout(() => this.inviteSuccess = '', 3000);
+            setTimeout(() => (this.inviteSuccess = ''), 3000);
           }
         } else {
-          const failedIds = new Set(failed.map(f => f.invite.id));
-          this.stagedInvites.update(staged => staged.filter(item => failedIds.has(item.id)));
-          this.inviteError = `Failed to invite: ${failed.map(f => f.invite.name).join(', ')}`;
+          const failedIds = new Set(failed.map((f) => f.invite.id));
+          this.stagedInvites.update((staged) =>
+            staged.filter((item) => failedIds.has(item.id)),
+          );
+          this.inviteError = `Failed to invite: ${failed.map((f) => f.invite.name).join(', ')}`;
           this.memberChanged.emit();
         }
       },
       error: () => {
         this.isInviting = false;
         this.inviteError = 'An unexpected error occurred.';
-      }
+      },
     });
   }
 
   removeOrRevokeMember(member: GroupMember) {
-    if (confirm(`Are you sure you want to remove ${member.user?.displayName || member.user?.email}?`)) {
+    if (
+      confirm(
+        `Are you sure you want to remove ${member.user?.displayName || member.user?.email}?`,
+      )
+    ) {
       this.groupsService.removeMember(this.groupId(), member.id).subscribe({
         next: () => {
           this.memberChanged.emit();
         },
         error: (err) => {
           alert(err.error?.message || 'Failed to remove member.');
-        }
+        },
       });
     }
   }
@@ -269,7 +298,7 @@ export class GroupMembersComponent {
   openQrModal() {
     const token = this.inviteToken();
     if (!token) return;
-    
+
     const host = window.location.origin;
     this.joinUrl = `${host}/groups/join/${token}`;
     this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(this.joinUrl)}`;
@@ -290,7 +319,10 @@ export class GroupMembersComponent {
     if (member.user?.phoneNumber) {
       return member.user.phoneNumber;
     }
-    if (member.user?.email && member.user.email.endsWith('@placeholder.finmate')) {
+    if (
+      member.user?.email &&
+      member.user.email.endsWith('@placeholder.finmate')
+    ) {
       return member.user.email.split('@')[0];
     }
     return null;
@@ -301,7 +333,7 @@ export class GroupMembersComponent {
     const host = window.location.origin;
     const joinUrl = `${host}/groups/join/${this.inviteToken()}`;
     const text = `Hey ${displayName}! I've invited you to join our group "${this.groupName()}" on FinMate. Use this link to join and track split expenses: ${joinUrl}`;
-    
+
     if (cleanPhone) {
       return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
     }

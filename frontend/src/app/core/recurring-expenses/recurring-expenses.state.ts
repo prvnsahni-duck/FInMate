@@ -15,7 +15,10 @@ export class CreateRecurringExpense {
 
 export class UpdateRecurringExpense {
   static readonly type = '[RecurringExpenses] Update';
-  constructor(public id: string, public payload: any) {}
+  constructor(
+    public id: string,
+    public payload: any,
+  ) {}
 }
 
 export class DeleteRecurringExpense {
@@ -32,8 +35,8 @@ export interface RecurringExpensesStateModel {
   name: 'recurringExpenses',
   defaults: {
     templates: [],
-    loading: false
-  }
+    loading: false,
+  },
 })
 @Injectable()
 export class RecurringExpensesState {
@@ -50,48 +53,60 @@ export class RecurringExpensesState {
   }
 
   @Action(LoadRecurringExpenses)
-  load(ctx: StateContext<RecurringExpensesStateModel>, action: LoadRecurringExpenses) {
+  load(
+    ctx: StateContext<RecurringExpensesStateModel>,
+    action: LoadRecurringExpenses,
+  ) {
     ctx.patchState({ loading: true });
     return this.service.getRecurringExpenses(action.groupId).pipe(
       tap((templates) => {
         ctx.patchState({ templates, loading: false });
-      })
+      }),
     );
   }
 
   @Action(CreateRecurringExpense)
-  create(ctx: StateContext<RecurringExpensesStateModel>, action: CreateRecurringExpense) {
+  create(
+    ctx: StateContext<RecurringExpensesStateModel>,
+    action: CreateRecurringExpense,
+  ) {
     return this.service.createRecurringExpense(action.payload).pipe(
       tap((newTemplate) => {
         const state = ctx.getState();
         ctx.patchState({
-          templates: [...state.templates, newTemplate]
+          templates: [...state.templates, newTemplate],
         });
-      })
+      }),
     );
   }
 
   @Action(UpdateRecurringExpense)
-  update(ctx: StateContext<RecurringExpensesStateModel>, action: UpdateRecurringExpense) {
+  update(
+    ctx: StateContext<RecurringExpensesStateModel>,
+    action: UpdateRecurringExpense,
+  ) {
     return this.service.updateRecurringExpense(action.id, action.payload).pipe(
       tap((updatedTemplate) => {
         const state = ctx.getState();
         const updatedTemplates = state.templates.map((t) =>
-          t.id === action.id ? updatedTemplate : t
+          t.id === action.id ? updatedTemplate : t,
         );
         ctx.patchState({ templates: updatedTemplates });
-      })
+      }),
     );
   }
 
   @Action(DeleteRecurringExpense)
-  delete(ctx: StateContext<RecurringExpensesStateModel>, action: DeleteRecurringExpense) {
+  delete(
+    ctx: StateContext<RecurringExpensesStateModel>,
+    action: DeleteRecurringExpense,
+  ) {
     return this.service.deleteRecurringExpense(action.id).pipe(
       tap(() => {
         const state = ctx.getState();
         const filtered = state.templates.filter((t) => t.id !== action.id);
         ctx.patchState({ templates: filtered });
-      })
+      }),
     );
   }
 }

@@ -1,4 +1,11 @@
-import { Component, inject, OnInit, OnDestroy, signal, computed } from '@angular/core';
+import {
+  Component,
+  inject,
+  OnInit,
+  OnDestroy,
+  signal,
+  computed,
+} from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CreateExpenseModalComponent } from '../../components/create-expense-modal/create-expense-modal.component';
@@ -11,7 +18,10 @@ import { ConfirmModalComponent } from '../../../../shared/components/confirm-mod
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
 import { Subscription } from 'rxjs';
-import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
+import {
+  DropdownComponent,
+  DropdownOption,
+} from '../../../../shared/components/dropdown/dropdown.component';
 
 import {
   BalanceEntry,
@@ -24,24 +34,32 @@ import {
   JwtPayload,
 } from '@finmate/data-models';
 
-import { GroupHistoryLogComponent, GroupAuditLog } from '../../components/group-history-log/group-history-log.component';
+import {
+  GroupHistoryLogComponent,
+  GroupAuditLog,
+} from '../../components/group-history-log/group-history-log.component';
 import { GroupTrashComponent } from '../../components/group-trash/group-trash.component';
-import { GroupBalancesComponent, SuggestedSettlement } from '../../components/group-balances/group-balances.component';
+import {
+  GroupBalancesComponent,
+  SuggestedSettlement,
+} from '../../components/group-balances/group-balances.component';
 import { GroupMembersComponent } from '../../components/group-members/group-members.component';
 
 export interface GroupExpense extends Expense {
   paidByUserId: string;
   ownerUserId: string;
-  splits?: Array<ExpenseSplitInputDto & {
-    participantUser?: {
-      id: string;
-      email: string;
-      displayName?: string;
-    };
-    participantUserDisplayName?: string;
-    participantUserEmail?: string;
-    shareAmount?: number;
-  }>;
+  splits?: Array<
+    ExpenseSplitInputDto & {
+      participantUser?: {
+        id: string;
+        email: string;
+        displayName?: string;
+      };
+      participantUserDisplayName?: string;
+      participantUserEmail?: string;
+      shareAmount?: number;
+    }
+  >;
   attachments?: Array<{
     storageKey: string;
     originalName: string;
@@ -66,10 +84,10 @@ export interface GroupExpense extends Expense {
     GroupTrashComponent,
     GroupBalancesComponent,
     GroupMembersComponent,
-    DropdownComponent
+    DropdownComponent,
   ],
   templateUrl: './group-detail.component.html',
-  styleUrls: ['./group-detail.component.scss']
+  styleUrls: ['./group-detail.component.scss'],
 })
 export class GroupDetailComponent implements OnInit, OnDestroy {
   private groupsService = inject(GroupsService);
@@ -87,13 +105,13 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     { value: 'Entertainment', label: 'Entertainment' },
     { value: 'Shopping', label: 'Shopping' },
     { value: 'Housing', label: 'Housing' },
-    { value: 'Others', label: 'Others' }
+    { value: 'Others', label: 'Others' },
   ];
 
   visibilityOptions: DropdownOption[] = [
     { value: 'private', label: 'Private' },
     { value: 'invite_only', label: 'Invite Only' },
-    { value: 'public_readonly', label: 'Public Read-Only' }
+    { value: 'public_readonly', label: 'Public Read-Only' },
   ];
 
   currencyOptions: DropdownOption[] = [
@@ -103,7 +121,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     { value: 'INR', label: 'INR (₹)' },
     { value: 'CAD', label: 'CAD ($)' },
     { value: 'AUD', label: 'AUD ($)' },
-    { value: 'JPY', label: 'JPY (¥)' }
+    { value: 'JPY', label: 'JPY (¥)' },
   ];
 
   memberRoleOptions: DropdownOption[] = [
@@ -111,7 +129,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     { value: 'admin', label: 'Admin' },
     { value: 'spectator', label: 'Spectator' },
     { value: 'viewer', label: 'Viewer' },
-    { value: 'owner', label: 'Transfer Owner' }
+    { value: 'owner', label: 'Transfer Owner' },
   ];
 
   // Signals for Group State
@@ -135,7 +153,9 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
   // Signals for UI state
   isLoading = signal<boolean>(true);
-  activeTab = signal<'ledger' | 'analytics' | 'history' | 'trash' | 'settings' | 'recurring'>('ledger');
+  activeTab = signal<
+    'ledger' | 'analytics' | 'history' | 'trash' | 'settings' | 'recurring'
+  >('ledger');
   isRecurringExpenseFormOpen = signal<boolean>(false);
   selectedRecurringExpenseForEdit = signal<any | null>(null);
   isExpenseModalOpen = signal<boolean>(false);
@@ -153,7 +173,15 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   isViewer = signal<boolean>(false);
 
   // Categories list
-  categories = ['Food & Drinks', 'Travel', 'Utilities', 'Entertainment', 'Shopping', 'Housing', 'Others'];
+  categories = [
+    'Food & Drinks',
+    'Travel',
+    'Utilities',
+    'Entertainment',
+    'Shopping',
+    'Housing',
+    'Others',
+  ];
   selectedExpenseForEdit = signal<GroupExpense | null>(null);
 
   // Error Banner & Cooldown State
@@ -162,18 +190,18 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   expandedExpenseIds = signal<Record<string, boolean>>({});
 
   toggleExpenseExpand(expenseId: string) {
-    this.expandedExpenseIds.update(ids => ({
+    this.expandedExpenseIds.update((ids) => ({
       ...ids,
-      [expenseId]: !ids[expenseId]
+      [expenseId]: !ids[expenseId],
     }));
   }
 
   retryLoadLedger() {
     if (this.retryCooldown() > 0) return;
-    
+
     this.retryCooldown.set(5);
     const interval = setInterval(() => {
-      this.retryCooldown.update(c => c - 1);
+      this.retryCooldown.update((c) => c - 1);
       if (this.retryCooldown() <= 0) {
         clearInterval(interval);
       }
@@ -188,7 +216,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   isOwnerOrAdmin = computed(() => {
     const userId = this.currentUserId();
     if (!userId) return false;
-    const member = this.members().find(m => m.user?.id === userId);
+    const member = this.members().find((m) => m.user?.id === userId);
     return member?.role === 'owner' || member?.role === 'admin';
   });
 
@@ -199,7 +227,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.currentUserId.set(this.getCurrentUserId());
     this.closeMonthSelected.set(this.getCurrentMonthString());
-    this.routeSub = this.route.paramMap.subscribe(params => {
+    this.routeSub = this.route.paramMap.subscribe((params) => {
       const groupId = params.get('id');
       if (groupId) {
         this.isLoading.set(true);
@@ -221,7 +249,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
               this.fetchCarryForward(groupId);
             }
           },
-          error: () => this.isLoading.set(false)
+          error: () => this.isLoading.set(false),
         });
       }
     });
@@ -239,7 +267,10 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   }
 
   getMonthDisplayName(): string {
-    return this.currentTimelineMonth().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    return this.currentTimelineMonth().toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+    });
   }
 
   changeMonth(delta: number) {
@@ -251,7 +282,8 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     this.currentTimelineMonth.set(nextDate);
 
     const todayMonth = new Date();
-    const isPast = (nextDate.getFullYear() < todayMonth.getFullYear()) ||
+    const isPast =
+      nextDate.getFullYear() < todayMonth.getFullYear() ||
       (nextDate.getFullYear() === todayMonth.getFullYear() &&
         nextDate.getMonth() < todayMonth.getMonth());
     this.isMonthLocked.set(isPast);
@@ -272,62 +304,68 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
       end = `${activeMonth}-31`;
     }
 
-    this.expensesService.getExpenses(groupId, {
-      page: this.currentPage(),
-      limit: this.pageSize(),
-      category: this.filterCategory(),
-      startDate: start,
-      endDate: end
-    }).subscribe({
-      next: (res) => {
-        const mappedExpenses = (res.data as any[]).map(expense => {
-          const mappedSplits = (expense.splits || []).map((split: any) => {
-            let email = split.participantUserEmail;
-            let displayName = split.participantUserDisplayName;
-            let participantUser = split.participantUser;
+    this.expensesService
+      .getExpenses(groupId, {
+        page: this.currentPage(),
+        limit: this.pageSize(),
+        category: this.filterCategory(),
+        startDate: start,
+        endDate: end,
+      })
+      .subscribe({
+        next: (res) => {
+          const mappedExpenses = (res.data as any[]).map((expense) => {
+            const mappedSplits = (expense.splits || []).map((split: any) => {
+              let email = split.participantUserEmail;
+              let displayName = split.participantUserDisplayName;
+              let participantUser = split.participantUser;
 
-            if (!email || !displayName || !participantUser) {
-              if (split.participantUserId) {
-                const member = this.members().find(m => m.user?.id === split.participantUserId);
-                if (member) {
-                  email = member.user.email;
-                  displayName = member.user.displayName;
-                  participantUser = member.user;
-                }
-              } else if (split.participantGroupMemberId) {
-                const member = this.members().find(m => m.id === split.participantGroupMemberId);
-                if (member) {
-                  email = member.user?.email;
-                  displayName = member.user?.displayName;
-                  participantUser = member.user;
+              if (!email || !displayName || !participantUser) {
+                if (split.participantUserId) {
+                  const member = this.members().find(
+                    (m) => m.user?.id === split.participantUserId,
+                  );
+                  if (member) {
+                    email = member.user.email;
+                    displayName = member.user.displayName;
+                    participantUser = member.user;
+                  }
+                } else if (split.participantGroupMemberId) {
+                  const member = this.members().find(
+                    (m) => m.id === split.participantGroupMemberId,
+                  );
+                  if (member) {
+                    email = member.user?.email;
+                    displayName = member.user?.displayName;
+                    participantUser = member.user;
+                  }
                 }
               }
-            }
+
+              return {
+                ...split,
+                shareAmount: split.amountOwed,
+                participantUserEmail: email,
+                participantUserDisplayName: displayName,
+                participantUser,
+              };
+            });
 
             return {
-              ...split,
-              shareAmount: split.amountOwed,
-              participantUserEmail: email,
-              participantUserDisplayName: displayName,
-              participantUser
-            };
+              ...expense,
+              splits: mappedSplits,
+            } as GroupExpense;
           });
-
-          return {
-            ...expense,
-            splits: mappedSplits
-          } as GroupExpense;
-        });
-        this.expenses.set(mappedExpenses);
-        this.totalExpenses.set(res.meta?.totalItems || 0);
-        this.isLoading.set(false);
-        this.ledgerError.set(false);
-      },
-      error: () => {
-        this.isLoading.set(false);
-        this.ledgerError.set(true);
-      }
-    });
+          this.expenses.set(mappedExpenses);
+          this.totalExpenses.set(res.meta?.totalItems || 0);
+          this.isLoading.set(false);
+          this.ledgerError.set(false);
+        },
+        error: () => {
+          this.isLoading.set(false);
+          this.ledgerError.set(true);
+        },
+      });
   }
 
   fetchMembers(groupId: string) {
@@ -336,10 +374,10 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         this.members.set(res);
 
         const currentUserId = this.currentUserId();
-        const myMember = res.find(m => m.user?.id === currentUserId);
+        const myMember = res.find((m) => m.user?.id === currentUserId);
         this.isViewer.set(myMember?.role === 'viewer');
       },
-      error: () => { }
+      error: () => {},
     });
   }
 
@@ -352,10 +390,12 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         this.suggestedSettlements.set(res.suggestedSettlements);
 
         const currentUserId = this.currentUserId();
-        const myBalanceEntry = res.balances.find((b) => b.userId === currentUserId && b.currency === g.currency);
+        const myBalanceEntry = res.balances.find(
+          (b) => b.userId === currentUserId && b.currency === g.currency,
+        );
         this.userBalance.set(myBalanceEntry ? myBalanceEntry.netBalance : 0);
       },
-      error: () => { }
+      error: () => {},
     });
   }
 
@@ -364,7 +404,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.historyLogs.set(res.data || []);
       },
-      error: () => { }
+      error: () => {},
     });
   }
 
@@ -373,23 +413,27 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.deletedExpenses.set(res.data || []);
       },
-      error: () => { }
+      error: () => {},
     });
   }
 
   fetchCarryForward(groupId: string) {
-    this.groupsService.getCarryForward(groupId, this.getCurrentMonthString()).subscribe({
-      next: (res) => {
-        this.carryForwardBalances.set(res || []);
-      },
-      error: () => { }
-    });
+    this.groupsService
+      .getCarryForward(groupId, this.getCurrentMonthString())
+      .subscribe({
+        next: (res) => {
+          this.carryForwardBalances.set(res || []);
+        },
+        error: () => {},
+      });
   }
 
   getMaxCarryForwardValue(): number {
     const balances = this.carryForwardBalances();
     if (balances.length === 0) return 1;
-    return Math.max(...balances.map(b => Math.max(b.paid || 0, b.expected || 0, 1)));
+    return Math.max(
+      ...balances.map((b) => Math.max(b.paid || 0, b.expected || 0, 1)),
+    );
   }
 
   getCurrentUserId(): string | null {
@@ -404,8 +448,10 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   }
 
   getUserName(userId: string): string {
-    const member = this.members().find(m => m.user?.id === userId);
-    return member ? (member.user.displayName || member.user.email) : 'Unknown User';
+    const member = this.members().find((m) => m.user?.id === userId);
+    return member
+      ? member.user.displayName || member.user.email
+      : 'Unknown User';
   }
 
   openExpenseModal(expense?: GroupExpense) {
@@ -449,7 +495,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
           this.isDeleteConfirmOpen.set(false);
           this.deleteExpenseId.set(null);
           alert(err.error?.message || 'Failed to delete expense');
-        }
+        },
       });
     }
   }
@@ -465,7 +511,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         alert('Expense restored successfully!');
         this.onExpenseCreated();
       },
-      error: (err) => alert(err.error?.message || 'Failed to restore expense')
+      error: (err) => alert(err.error?.message || 'Failed to restore expense'),
     });
   }
 
@@ -483,7 +529,10 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
       },
-      error: (err) => alert('Failed to export ledger: ' + (err.error?.message || err.message))
+      error: (err) =>
+        alert(
+          'Failed to export ledger: ' + (err.error?.message || err.message),
+        ),
     });
   }
 
@@ -502,7 +551,8 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
           alert('Expenses imported successfully!');
           this.onExpenseCreated();
         },
-        error: (err) => alert(err.error?.message || 'Import failed. Check file format.')
+        error: (err) =>
+          alert(err.error?.message || 'Import failed. Check file format.'),
       });
     }
   }
@@ -527,7 +577,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   }
 
   changePage(delta: number) {
-    this.currentPage.update(val => val + delta);
+    this.currentPage.update((val) => val + delta);
     const g = this.group();
     if (g?.id) {
       this.fetchExpenses(g.id);
@@ -535,8 +585,13 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   }
 
   downloadAttachment(file: NonNullable<GroupExpense['attachments']>[number]) {
-    alert(`Downloading attachment: ${file.originalName}\nDecrypted successfully!`);
-    const blob = new Blob([`Decrypted content of: ${file.originalName} (${file.storageKey})`], { type: 'text/plain' });
+    alert(
+      `Downloading attachment: ${file.originalName}\nDecrypted successfully!`,
+    );
+    const blob = new Blob(
+      [`Decrypted content of: ${file.originalName} (${file.storageKey})`],
+      { type: 'text/plain' },
+    );
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -550,7 +605,8 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   // Group Settings Form State
   editGroupName = '';
   editGroupDescription = '';
-  editGroupVisibility: 'private' | 'invite_only' | 'public_readonly' = 'private';
+  editGroupVisibility: 'private' | 'invite_only' | 'public_readonly' =
+    'private';
   editGroupCurrency = 'USD';
   editGroupCarryForward = false;
 
@@ -571,7 +627,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.recurringExpenses.set(res || []);
       },
-      error: (err) => console.error('Failed to fetch recurring expenses', err)
+      error: (err) => console.error('Failed to fetch recurring expenses', err),
     });
   }
 
@@ -594,7 +650,11 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   }
 
   deleteRecurringExpense(id: string) {
-    if (confirm('Are you sure you want to delete this recurring expense schedule?')) {
+    if (
+      confirm(
+        'Are you sure you want to delete this recurring expense schedule?',
+      )
+    ) {
       this.recurringExpensesService.deleteRecurringExpense(id).subscribe({
         next: () => {
           const g = this.group();
@@ -602,28 +662,39 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
             this.fetchRecurringExpenses(g.id);
           }
         },
-        error: (err) => alert(err.error?.message || 'Failed to delete recurring expense')
+        error: (err) =>
+          alert(err.error?.message || 'Failed to delete recurring expense'),
       });
     }
   }
 
   toggleRecurringExpenseStatus(template: any) {
     const nextStatus = template.status === 'active' ? 'paused' : 'active';
-    this.recurringExpensesService.updateRecurringExpense(template.id, {
-      status: nextStatus,
-      version: template.version
-    }).subscribe({
-      next: () => {
-        const g = this.group();
-        if (g?.id) {
-          this.fetchRecurringExpenses(g.id);
-        }
-      },
-      error: (err) => alert(err.error?.message || 'Failed to update status')
-    });
+    this.recurringExpensesService
+      .updateRecurringExpense(template.id, {
+        status: nextStatus,
+        version: template.version,
+      })
+      .subscribe({
+        next: () => {
+          const g = this.group();
+          if (g?.id) {
+            this.fetchRecurringExpenses(g.id);
+          }
+        },
+        error: (err) => alert(err.error?.message || 'Failed to update status'),
+      });
   }
 
-  setTab(tab: 'ledger' | 'analytics' | 'history' | 'trash' | 'settings' | 'recurring') {
+  setTab(
+    tab:
+      | 'ledger'
+      | 'analytics'
+      | 'history'
+      | 'trash'
+      | 'settings'
+      | 'recurring',
+  ) {
     this.activeTab.set(tab);
     if (tab === 'settings') {
       const g = this.group();
@@ -650,25 +721,28 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     this.settingsError = '';
     this.settingsSuccess = '';
 
-    this.groupsService.updateGroup(g.id, {
-      name: this.editGroupName,
-      description: this.editGroupDescription,
-      visibility: this.editGroupVisibility,
-      currency: this.editGroupCurrency,
-      carryForwardEnabled: this.editGroupCarryForward,
-      version: g.version
-    }).subscribe({
-      next: (res) => {
-        this.group.set(res);
-        this.isSavingSettings = false;
-        this.settingsSuccess = 'Group settings updated successfully!';
-        setTimeout(() => this.settingsSuccess = '', 3000);
-      },
-      error: (err) => {
-        this.isSavingSettings = false;
-        this.settingsError = err.error?.message || 'Failed to update group settings.';
-      }
-    });
+    this.groupsService
+      .updateGroup(g.id, {
+        name: this.editGroupName,
+        description: this.editGroupDescription,
+        visibility: this.editGroupVisibility,
+        currency: this.editGroupCurrency,
+        carryForwardEnabled: this.editGroupCarryForward,
+        version: g.version,
+      })
+      .subscribe({
+        next: (res) => {
+          this.group.set(res);
+          this.isSavingSettings = false;
+          this.settingsSuccess = 'Group settings updated successfully!';
+          setTimeout(() => (this.settingsSuccess = ''), 3000);
+        },
+        error: (err) => {
+          this.isSavingSettings = false;
+          this.settingsError =
+            err.error?.message || 'Failed to update group settings.';
+        },
+      });
   }
 
   loadContributionsForMonth() {
@@ -678,19 +752,22 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     this.contributionError = '';
     this.contributionSuccess = '';
 
-    this.groupsService.getContributions(g.id, this.contributionMonth).subscribe({
-      next: (res) => {
-        this.contributionsList = res.map((c) => ({
-          ...c,
-          amount: Number(c.percentage || 0) // Initialize amount to percentage
-        }));
-        this.isLoadingContributions = false;
-      },
-      error: (err) => {
-        this.contributionError = err.error?.message || 'Failed to load contributions.';
-        this.isLoadingContributions = false;
-      }
-    });
+    this.groupsService
+      .getContributions(g.id, this.contributionMonth)
+      .subscribe({
+        next: (res) => {
+          this.contributionsList = res.map((c) => ({
+            ...c,
+            amount: Number(c.percentage || 0), // Initialize amount to percentage
+          }));
+          this.isLoadingContributions = false;
+        },
+        error: (err) => {
+          this.contributionError =
+            err.error?.message || 'Failed to load contributions.';
+          this.isLoadingContributions = false;
+        },
+      });
   }
 
   contributionMode: 'amount' | 'percentage' = 'amount';
@@ -700,14 +777,17 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   }
 
   getContributionsSum(): number {
-    const sum = this.contributionsList.reduce((acc, c) => acc + Number(c.percentage || 0), 0);
+    const sum = this.contributionsList.reduce(
+      (acc, c) => acc + Number(c.percentage || 0),
+      0,
+    );
     return Math.round(sum * 100) / 100;
   }
 
   getCallerRole(): string {
     const userId = this.currentUserId();
     if (!userId) return 'viewer';
-    const member = this.members().find(m => m.user?.id === userId);
+    const member = this.members().find((m) => m.user?.id === userId);
     return member ? member.role : 'viewer';
   }
 
@@ -718,19 +798,19 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   canRemoveMember(member: GroupMember): boolean {
     const currentUserId = this.currentUserId();
     if (!currentUserId) return false;
-    
+
     // Cannot remove self
     if (member.user?.id === currentUserId) return false;
-    
+
     const callerRole = this.getCallerRole();
     if (callerRole === 'owner') return true;
-    
+
     // Admin can remove members that are not owner or admin
     if (callerRole === 'admin') {
       const targetRole = member.role as string;
       return targetRole !== 'owner' && targetRole !== 'admin';
     }
-    
+
     return false;
   }
 
@@ -745,31 +825,42 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     const g = this.group();
     if (!g) return;
 
-    this.groupsService.updateMember(g.id, member.id, { role: newRole }).subscribe({
-      next: () => {
-        alert(`Successfully updated role for ${member.user?.displayName || member.user?.email}`);
-        this.fetchMembers(g.id);
-      },
-      error: (err) => {
-        alert(err.error?.message || 'Failed to update member role');
-      }
-    });
+    this.groupsService
+      .updateMember(g.id, member.id, { role: newRole })
+      .subscribe({
+        next: () => {
+          alert(
+            `Successfully updated role for ${member.user?.displayName || member.user?.email}`,
+          );
+          this.fetchMembers(g.id);
+        },
+        error: (err) => {
+          alert(err.error?.message || 'Failed to update member role');
+        },
+      });
   }
 
   removeOrRevokeMember(member: GroupMember) {
-    const actionText = member.joinStatus === 'invited' ? 'revoke invitation for' : 'remove';
-    if (confirm(`Are you sure you want to ${actionText} ${member.user?.displayName || member.user?.email}?`)) {
+    const actionText =
+      member.joinStatus === 'invited' ? 'revoke invitation for' : 'remove';
+    if (
+      confirm(
+        `Are you sure you want to ${actionText} ${member.user?.displayName || member.user?.email}?`,
+      )
+    ) {
       const g = this.group();
       if (!g) return;
 
       this.groupsService.removeMember(g.id, member.id).subscribe({
         next: () => {
-          alert(`Successfully removed ${member.user?.displayName || member.user?.email}`);
+          alert(
+            `Successfully removed ${member.user?.displayName || member.user?.email}`,
+          );
           this.fetchMembers(g.id);
         },
         error: (err) => {
           alert(err.error?.message || 'Failed to remove member');
-        }
+        },
       });
     }
   }
@@ -779,14 +870,17 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   }
 
   calculatePercentagesFromAmounts() {
-    const totalAmount = this.contributionsList.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+    const totalAmount = this.contributionsList.reduce(
+      (sum, c) => sum + (Number(c.amount) || 0),
+      0,
+    );
     if (totalAmount <= 0) {
-      this.contributionsList.forEach(c => c.percentage = 0);
+      this.contributionsList.forEach((c) => (c.percentage = 0));
       return;
     }
 
     let sum = 0;
-    this.contributionsList.forEach(c => {
+    this.contributionsList.forEach((c) => {
       const rawPct = ((Number(c.amount) || 0) / totalAmount) * 100;
       c.percentage = Math.round(rawPct * 100) / 100;
       sum += c.percentage;
@@ -806,13 +900,17 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         }
       }
       if (targetMember) {
-        targetMember.percentage = Math.round((targetMember.percentage + diff) * 100) / 100;
+        targetMember.percentage =
+          Math.round((targetMember.percentage + diff) * 100) / 100;
       }
     }
   }
 
   getContributionsAmountSum(): number {
-    const sum = this.contributionsList.reduce((acc, c) => acc + Number(c.amount || 0), 0);
+    const sum = this.contributionsList.reduce(
+      (acc, c) => acc + Number(c.amount || 0),
+      0,
+    );
     return Math.round(sum * 100) / 100;
   }
 
@@ -825,13 +923,23 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
       this.calculatePercentagesFromAmounts();
     }
 
-    const sum = this.contributionsList.reduce((acc, c) => acc + Number(c.percentage || 0), 0);
+    const sum = this.contributionsList.reduce(
+      (acc, c) => acc + Number(c.percentage || 0),
+      0,
+    );
     const roundedSum = Math.round(sum * 100) / 100;
     if (roundedSum !== 100) {
-      if (this.contributionMode === 'amount' && this.getContributionsAmountSum() > 0) {
-        this.contributionError = 'Internal calculation failed to distribute exactly 100%';
+      if (
+        this.contributionMode === 'amount' &&
+        this.getContributionsAmountSum() > 0
+      ) {
+        this.contributionError =
+          'Internal calculation failed to distribute exactly 100%';
       } else {
-        this.contributionError = 'Total contribution percentages must equal exactly 100% (currently ' + roundedSum + '%).';
+        this.contributionError =
+          'Total contribution percentages must equal exactly 100% (currently ' +
+          roundedSum +
+          '%).';
       }
       return;
     }
@@ -842,25 +950,27 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
 
     const payload = {
       ledgerMonth: this.contributionMonth,
-      contributions: this.contributionsList.map(c => ({
+      contributions: this.contributionsList.map((c) => ({
         memberId: c.memberId,
-        percentage: Number(c.percentage)
-      }))
+        percentage: Number(c.percentage),
+      })),
     };
 
     this.groupsService.updateContributions(g.id, payload).subscribe({
       next: () => {
         this.isSavingContributions = false;
-        this.contributionSuccess = this.contributionMode === 'amount' 
-          ? 'Contribution amounts saved successfully!' 
-          : 'Contribution percentages saved successfully!';
+        this.contributionSuccess =
+          this.contributionMode === 'amount'
+            ? 'Contribution amounts saved successfully!'
+            : 'Contribution percentages saved successfully!';
         this.fetchCarryForward(g.id);
-        setTimeout(() => this.contributionSuccess = '', 3000);
+        setTimeout(() => (this.contributionSuccess = ''), 3000);
       },
       error: (err) => {
         this.isSavingContributions = false;
-        this.contributionError = err.error?.message || 'Failed to save contributions.';
-      }
+        this.contributionError =
+          err.error?.message || 'Failed to save contributions.';
+      },
     });
   }
 
@@ -882,7 +992,9 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
     this.groupsService.closeMonth(g.id, this.closeMonthSelected()).subscribe({
       next: (res) => {
         this.isClosingMonth.set(false);
-        this.closeMonthSuccess.set(`Month ${this.closeMonthSelected()} closed successfully! ${res.carryForwardExpenseCount} rollover expense(s) created.`);
+        this.closeMonthSuccess.set(
+          `Month ${this.closeMonthSelected()} closed successfully! ${res.carryForwardExpenseCount} rollover expense(s) created.`,
+        );
         this.fetchExpenses(g.id);
         this.fetchBalances(g.id);
         this.fetchHistoryLogs(g.id);
@@ -891,8 +1003,10 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.isClosingMonth.set(false);
-        this.closeMonthError.set(err.error?.message || 'Failed to close the billing month.');
-      }
+        this.closeMonthError.set(
+          err.error?.message || 'Failed to close the billing month.',
+        );
+      },
     });
   }
 

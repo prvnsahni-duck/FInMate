@@ -15,9 +15,7 @@ describe('AiController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AiController],
-      providers: [
-        { provide: AiService, useValue: mockAiService },
-      ],
+      providers: [{ provide: AiService, useValue: mockAiService }],
     })
       .overrideGuard(JwtAuthGuard)
       .useValue({ canActivate: () => true })
@@ -41,7 +39,15 @@ describe('AiController', () => {
     service.callOpenAiProxy.mockResolvedValueOnce({ text: 'Response' });
 
     const result = await controller.callOpenAiProxy(dto);
-    expect(result).toEqual(new SuccessResponse('AI response generated successfully', { text: 'Response' }));
-    expect(service.callOpenAiProxy).toHaveBeenCalledWith('Hello AI', 'Be nice', 'gpt-4');
+    expect(result).toEqual(
+      new SuccessResponse('AI response generated successfully', {
+        text: 'Response',
+      }),
+    );
+    expect(service.callOpenAiProxy).toHaveBeenCalledWith(
+      'Hello AI',
+      'Be nice',
+      'gpt-4',
+    );
   });
 });

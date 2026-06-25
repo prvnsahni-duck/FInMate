@@ -15,8 +15,8 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   if (token) {
     authReq = req.clone({
       setHeaders: {
-        Authorization: `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     });
   }
 
@@ -32,24 +32,26 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
         if (refreshToken) {
           return authService.refresh(refreshToken).pipe(
             switchMap((res: RefreshTokenResponse) => {
-              store.dispatch(new RefreshTokenSuccess(res.accessToken, res.refreshToken));
+              store.dispatch(
+                new RefreshTokenSuccess(res.accessToken, res.refreshToken),
+              );
               const retryReq = req.clone({
                 setHeaders: {
-                  Authorization: `Bearer ${res.accessToken}`
-                }
+                  Authorization: `Bearer ${res.accessToken}`,
+                },
               });
               return next(retryReq);
             }),
             catchError((refreshErr) => {
               store.dispatch(new Logout());
               return throwError(() => refreshErr);
-            })
+            }),
           );
         } else {
           store.dispatch(new Logout());
         }
       }
       return throwError(() => error);
-    })
+    }),
   );
 };

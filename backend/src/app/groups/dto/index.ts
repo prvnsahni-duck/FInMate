@@ -7,4 +7,3 @@ export {
   UpdateGroupDto,
   UpdateMemberDto,
 } from '@finmate/data-models';
-

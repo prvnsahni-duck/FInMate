@@ -1,4 +1,12 @@
-import { Component, Input, ElementRef, HostListener, forwardRef, signal, computed } from '@angular/core';
+import {
+  Component,
+  Input,
+  ElementRef,
+  HostListener,
+  forwardRef,
+  signal,
+  computed,
+} from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 export interface DropdownOption {
@@ -15,10 +23,10 @@ export interface DropdownOption {
     {
       provide: NG_VALUE_ACCESSOR,
       useExisting: forwardRef(() => DropdownComponent),
-      multi: true
-    }
+      multi: true,
+    },
   ],
-  templateUrl: './dropdown.component.html'
+  templateUrl: './dropdown.component.html',
 })
 export class DropdownComponent implements ControlValueAccessor {
   @Input() options: DropdownOption[] = [];
@@ -40,14 +48,16 @@ export class DropdownComponent implements ControlValueAccessor {
   constructor(private elementRef: ElementRef) {}
 
   selectedOption = computed(() => {
-    return this.options.find(opt => opt.value === this.value()) || null;
+    return this.options.find((opt) => opt.value === this.value()) || null;
   });
 
   toggle() {
     if (this.disabled) return;
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
-      this.focusedIndex = this.options.findIndex(opt => opt.value === this.value());
+      this.focusedIndex = this.options.findIndex(
+        (opt) => opt.value === this.value(),
+      );
       if (this.focusedIndex === -1 && this.options.length > 0) {
         this.focusedIndex = 0;
       }
@@ -93,7 +103,12 @@ export class DropdownComponent implements ControlValueAccessor {
     if (this.disabled) return;
 
     if (!this.isOpen) {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === ' ') {
+      if (
+        event.key === 'ArrowDown' ||
+        event.key === 'ArrowUp' ||
+        event.key === 'Enter' ||
+        event.key === ' '
+      ) {
         event.preventDefault();
         this.toggle();
       }
@@ -107,7 +122,8 @@ export class DropdownComponent implements ControlValueAccessor {
         break;
       case 'ArrowUp':
         event.preventDefault();
-        this.focusedIndex = (this.focusedIndex - 1 + this.options.length) % this.options.length;
+        this.focusedIndex =
+          (this.focusedIndex - 1 + this.options.length) % this.options.length;
         break;
       case 'Enter':
       case ' ':

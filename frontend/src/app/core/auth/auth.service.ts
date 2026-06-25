@@ -13,7 +13,7 @@ import {
 } from '@finmate/data-models';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthService {
   private http = inject(HttpClient);
@@ -32,14 +32,23 @@ export class AuthService {
   }
 
   refresh(refreshToken: string): Observable<RefreshTokenResponse> {
-    return this.http.post<RefreshTokenResponse>(`${this.baseUrl}/refresh`, { refreshToken });
+    return this.http.post<RefreshTokenResponse>(`${this.baseUrl}/refresh`, {
+      refreshToken,
+    });
   }
 
   getMe(): Observable<CurrentUserResponse> {
-    return this.http.get<CurrentUserResponse>(`${environment.apiBaseUrl}/users/me`);
+    return this.http.get<CurrentUserResponse>(
+      `${environment.apiBaseUrl}/users/me`,
+    );
   }
 
-  updateProfile(profileData: UpdateProfileDto): Observable<CurrentUserResponse> {
-    return this.http.patch<CurrentUserResponse>(`${environment.apiBaseUrl}/users/me`, profileData);
+  updateProfile(
+    profileData: UpdateProfileDto,
+  ): Observable<CurrentUserResponse> {
+    return this.http.patch<CurrentUserResponse>(
+      `${environment.apiBaseUrl}/users/me`,
+      profileData,
+    );
   }
 }

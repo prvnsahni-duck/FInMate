@@ -5,7 +5,7 @@ import { environment } from '../../../../environments/environment';
 import { FriendBalanceResponse, UserSearchResult } from '@finmate/data-models';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class FriendsService {
   private http = inject(HttpClient);
@@ -22,6 +22,8 @@ export class FriendsService {
    * Search for users by email, username, or phone number.
    */
   searchUsers(query: string): Observable<UserSearchResult[]> {
-    return this.http.get<UserSearchResult[]>(`${this.baseUrl}/users/search?query=${encodeURIComponent(query)}`);
+    return this.http.get<UserSearchResult[]>(
+      `${this.baseUrl}/users/search?query=${encodeURIComponent(query)}`,
+    );
   }
 }

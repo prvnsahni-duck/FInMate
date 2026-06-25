@@ -1,4 +1,12 @@
-import { IsEmail, IsString, IsNotEmpty, MinLength, MaxLength, IsOptional, Matches } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsNotEmpty,
+  MinLength,
+  MaxLength,
+  IsOptional,
+  Matches,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsEmail({}, { message: 'Must be a valid email address' })
@@ -39,6 +47,8 @@ export class RefreshTokenDto {
 export class Verify2FaDto {
   @IsString()
   @IsNotEmpty({ message: '2FA verification code is required' })
-  @Matches(/^[0-9]{6}$/, { message: 'Verification code must be exactly 6 digits' })
+  @Matches(/^[0-9]{6}$/, {
+    message: 'Verification code must be exactly 6 digits',
+  })
   code!: string;
 }

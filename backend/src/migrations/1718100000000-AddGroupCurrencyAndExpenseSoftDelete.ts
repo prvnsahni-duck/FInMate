@@ -1,6 +1,8 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddGroupCurrencyAndExpenseSoftDelete1718100000000 implements MigrationInterface {
+export class AddGroupCurrencyAndExpenseSoftDelete1718100000000
+  implements MigrationInterface
+{
   name = 'AddGroupCurrencyAndExpenseSoftDelete1718100000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {

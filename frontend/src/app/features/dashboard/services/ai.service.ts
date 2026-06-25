@@ -7,15 +7,18 @@ export interface AiResponse {
 }
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AiService {
   private http = inject(HttpClient);
 
-  sendMessage(prompt: string, systemInstruction?: string): Observable<AiResponse> {
+  sendMessage(
+    prompt: string,
+    systemInstruction?: string,
+  ): Observable<AiResponse> {
     return this.http.post<AiResponse>('/api/ai/proxy', {
       prompt,
-      systemInstruction
+      systemInstruction,
     });
   }
 }

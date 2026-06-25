@@ -308,14 +308,14 @@ cp .env.example .env
 
 Then fill in your local values. Key variables:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string |
-| `REDIS_URL` | ✅ | Redis connection string |
-| `JWT_SECRET` | ✅ | JWT signing secret |
-| `JWT_REFRESH_SECRET` | ✅ | Refresh token secret |
-| `ENCRYPTION_KEY` | ✅ | AES-256 encryption key |
-| `FRONTEND_URL` | ✅ | Frontend origin for CORS + invite links |
+| Variable             | Required | Description                             |
+| -------------------- | -------- | --------------------------------------- |
+| `DATABASE_URL`       | ✅       | PostgreSQL connection string            |
+| `REDIS_URL`          | ✅       | Redis connection string                 |
+| `JWT_SECRET`         | ✅       | JWT signing secret                      |
+| `JWT_REFRESH_SECRET` | ✅       | Refresh token secret                    |
+| `ENCRYPTION_KEY`     | ✅       | AES-256 encryption key                  |
+| `FRONTEND_URL`       | ✅       | Frontend origin for CORS + invite links |
 
 ## Mobile & PWA
 

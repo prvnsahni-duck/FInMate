@@ -1,4 +1,10 @@
-import { Injectable, CanActivate, ExecutionContext, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { verifyTotp } from '../utils/totp.util';
 
 @Injectable()
