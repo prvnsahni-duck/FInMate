@@ -6,25 +6,29 @@
       {{ appName }}
     </div>
     <!-- Quick Theme Toggle on Mobile/Tablet Top Bar -->
-    <div class="flex items-center p-1 bg-secondary/5 dark:bg-black/20 rounded-xl border border-secondary/15">
-      <button (click)="setTheme('light')" 
-        [class.bg-white]="themeState() === 'light'" 
-        [class.dark:bg-transparent]="themeState() === 'light'"
-        [class.shadow-sm]="themeState() === 'light'"
-        [class.text-primary]="themeState() === 'light'"
-        [class.text-secondary/70]="themeState() !== 'light'"
-        class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer">
-        <app-icon [path]="sunIconPath" className="w-4 h-4"></app-icon>
-      </button>
-      <button (click)="setTheme('dark')" 
-        [class.bg-finmate-card]="themeState() === 'dark'" 
-        [class.shadow-sm]="themeState() === 'dark'"
-        [class.text-white]="themeState() === 'dark'"
-        [class.text-secondary/70]="themeState() !== 'dark'"
-        class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer">
-        <app-icon [path]="moonIconPath" className="w-4 h-4"></app-icon>
-      </button>
-    </div>
+<div class="flex items-center p-1 bg-secondary/5 dark:bg-black/20 rounded-xl border border-secondary/15">
+  <button
+    (click)="setTheme('light')"
+    [ngClass]="{
+      'bg-white shadow-sm text-primary': themeState() === 'light',
+      'text-secondary/70': themeState() !== 'light'
+    }"
+    class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+  >
+    <app-icon [path]="sunIconPath" className="w-4 h-4"></app-icon>
+  </button>
+
+  <button
+    (click)="setTheme('dark')"
+    [ngClass]="{
+      'bg-finmate-card shadow-sm text-white': themeState() === 'dark',
+      'text-secondary/70': themeState() !== 'dark'
+    }"
+    class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+  >
+    <app-icon [path]="moonIconPath" className="w-4 h-4"></app-icon>
+  </button>
+</div>
   </header>
 
   <!-- Desktop Sidebar (Hidden on Mobile & Tablet) -->
@@ -57,16 +61,16 @@
 
         <!-- Sidebar Theme Switcher -->
         <div class="flex items-center justify-between p-1 bg-secondary/5 dark:bg-black/20 rounded-2xl border border-secondary/15">
-          <button (click)="setTheme('light')" 
-            [class.bg-finmate-card]="themeState() === 'light'" 
+          <button (click)="setTheme('light')"
+            [class.bg-finmate-card]="themeState() === 'light'"
             [class.shadow-sm]="themeState() === 'light'"
             [class.text-primary]="themeState() === 'light'"
             [class.text-secondary/70]="themeState() !== 'light'"
             class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer">
             <app-icon [path]="sunIconPath" className="w-4 h-4 mr-1"></app-icon> <span>Light</span>
           </button>
-          <button (click)="setTheme('dark')" 
-            [class.bg-finmate-card]="themeState() === 'dark'" 
+          <button (click)="setTheme('dark')"
+            [class.bg-finmate-card]="themeState() === 'dark'"
             [class.shadow-sm]="themeState() === 'dark'"
             [class.text-white]="themeState() === 'dark'"
             [class.text-secondary/70]="themeState() !== 'dark'"

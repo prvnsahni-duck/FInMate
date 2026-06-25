@@ -4,6 +4,7 @@ import { filter } from 'rxjs/operators';
 import { APP_NAME } from '../../core/constants/app.constants';
 import { ExpensesService } from '../../features/groups/services/expenses.service';
 import { IconComponent } from '../components/icon/icon.component';
+import { NgClass } from '@angular/common';
 
 const THEME_STORAGE_KEY = 'finmate_theme';
 
@@ -26,7 +27,9 @@ export const NAV_ITEMS: NavItem[] = [
 @Component({
   selector: 'app-main-layout',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, IconComponent],
+  imports: [RouterOutlet, RouterLink, IconComponent, NgClass
+    
+  ],
   templateUrl: './main-layout.component.html'
 })
 export class MainLayoutComponent {
