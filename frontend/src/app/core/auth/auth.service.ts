@@ -11,6 +11,7 @@ import {
   RegisterResponse,
   UpdateProfileDto,
 } from '@finmate/data-models';
+import { ClientEncryptionService } from '../services/encryption.service';
 
 @Injectable({
   providedIn: 'root',
@@ -18,6 +19,7 @@ import {
 export class AuthService {
   private http = inject(HttpClient);
   private baseUrl = `${environment.apiBaseUrl}/auth`;
+  private encryptionService = inject(ClientEncryptionService);
 
   login(credentials: LoginDto): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.baseUrl}/login`, credentials);
@@ -28,6 +30,8 @@ export class AuthService {
   }
 
   logout(refreshToken: string): Observable<void> {
+    sessionStorage.removeItem('finmate_zk_key');
+    this.encryptionService.clearKey();
     return this.http.post<void>(`${this.baseUrl}/logout`, { refreshToken });
   }
 

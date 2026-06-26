@@ -87,7 +87,8 @@ export class ClientEncryptionService {
         name: 'AES-GCM',
         length: 256,
       },
-      false, // Key must be non-extractable for maximum security (prevent XSS extraction)
+      // false, // Key must be non-extractable for maximum security (prevent XSS extraction)
+      true, //TODO temp
       ['encrypt', 'decrypt'],
     );
   }
@@ -97,25 +98,54 @@ export class ClientEncryptionService {
    */
   async deriveAndStoreKey(password: string, email: string): Promise<CryptoKey> {
     const derivedKey = await this.deriveMasterKey(password, email);
+    const subtle = this.getSubtleCrypto();
+    const rawKey = await subtle.exportKey('raw', derivedKey); // TODO: Remove this line if you want to keep the key non-extractable for maximum security
+
+    sessionStorage.setItem('finmate_zk_key', arrayBufferToBase64(rawKey));
     this.key = derivedKey;
-    console.log(`dddddddddddDerived and stored master key for ${email} in memory.`, derivedKey);
     return derivedKey;
   }
 
   /**
    * Loads key from memory if it exists.
+   * TODO: Consider loading from sessionStorage if not in memory, but be cautious about security implications.
+   * TODO(ZK-001):
+Temporary sessionStorage key persistence.
+Key marked extractable=true until
+encrypted IndexedDB vault is implemented.
    */
-  async loadKeyFromSession(email: string): Promise<CryptoKey | null> {
+  async loadKeyFromSession(): Promise<CryptoKey | null> {
     if (this.key) {
       return this.key;
     }
-    return null;
+
+    const stored = sessionStorage.getItem('finmate_zk_key');
+
+    if (!stored) {
+      return null;
+    }
+
+    const subtle = this.getSubtleCrypto();
+
+    const importedKey = await subtle.importKey(
+      'raw',
+      base64ToArrayBuffer(stored),
+      {
+        name: 'AES-GCM',
+      },
+      false,
+      ['encrypt', 'decrypt'],
+    );
+
+    this.key = importedKey;
+
+    return importedKey;
   }
 
   /**
    * Clears the cached key from memory.
    */
-  clearKey(email: string): void {
+  clearKey(): void {
     this.key = null;
   }
 
