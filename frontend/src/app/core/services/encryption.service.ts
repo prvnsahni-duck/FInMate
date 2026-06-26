@@ -98,6 +98,7 @@ export class ClientEncryptionService {
   async deriveAndStoreKey(password: string, email: string): Promise<CryptoKey> {
     const derivedKey = await this.deriveMasterKey(password, email);
     this.key = derivedKey;
+    console.log(`dddddddddddDerived and stored master key for ${email} in memory.`, derivedKey);
     return derivedKey;
   }
 

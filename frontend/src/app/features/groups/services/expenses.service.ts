@@ -39,22 +39,29 @@ export class ExpensesService {
     const email = user?.email;
     if (email) {
       const key = await this.encryptionService.loadKeyFromSession(email);
-      if (key) {
-        const encrypted = { ...payload };
-        if (payload.title) {
-          encrypted.title = await this.encryptionService.encrypt(
-            payload.title,
-            key,
-          );
-        }
-        if (payload.description) {
-          encrypted.description = await this.encryptionService.encrypt(
-            payload.description,
-            key,
-          );
-        }
-        return encrypted;
+      if (!key) {
+        throw new Error(
+          'Encryption key unavailable. Cannot create or update encrypted expense.',
+        );
       }
+
+      const encrypted = { ...payload };
+
+      if (payload.title) {
+        encrypted.title = await this.encryptionService.encrypt(
+          payload.title,
+          key,
+        );
+      }
+
+      if (payload.description) {
+        encrypted.description = await this.encryptionService.encrypt(
+          payload.description,
+          key,
+        );
+      }
+
+      return encrypted;
     }
     return payload;
   }

@@ -248,7 +248,7 @@
       <div class="space-y-1.5">
         <div class="flex justify-between items-center text-xs">
           <span class="font-bold text-secondary flex items-center space-x-1.5">
-            <app-icon [path]="getCategoryIconPath(cat.category)" className="w-4 h-4"></app-icon>
+            <app-icon [path]="categoryOptions.find(option => option.value === cat.category)?.icon || ''" className="w-4 h-4"></app-icon>
             <span>{{ cat.category }}</span>
           </span>
           <span class="font-extrabold text-secondary/80">

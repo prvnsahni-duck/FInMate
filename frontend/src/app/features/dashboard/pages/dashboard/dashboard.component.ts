@@ -24,6 +24,7 @@ import { DashboardAnalyticsComponent } from '../../components/dashboard-analytic
 import { DashboardGoalsComponent } from '../../components/dashboard-goals/dashboard-goals.component';
 import { DashboardSettingsComponent } from '../../components/dashboard-settings/dashboard-settings.component';
 import { DashboardProfileComponent } from '../../components/dashboard-profile/dashboard-profile.component';
+import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
 
 @Component({
   selector: 'app-dashboard',
@@ -66,7 +67,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     amount: number;
     percentage: number;
   }[] = [];
-  quickLogCategory = 'Food & Drinks';
+  quickLogCategory = CATEGORY_OPTIONS[0].value; // Default to first category
   private store = inject(Store);
   private groupsService = inject(GroupsService);
   private expensesService = inject(ExpensesService);
@@ -173,7 +174,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.monthlyExpenses = currentMonthData ? currentMonthData.total : 0;
         this.recalculatePercentages();
       },
-      error: () => {},
+      error: () => {
+        console.error('Failed to fetch monthly analytics');
+      },
     });
 
     // 3. Fetch active groups to count them
@@ -181,7 +184,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.activeGroupsCount = res.meta?.totalItems || res.data?.length || 0;
       },
-      error: () => {},
+      error: () => {
+        console.error('Failed to fetch active groups');
+      },
     });
 
     // 4. Fetch profile
@@ -193,7 +198,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.newCurrency = res.profile.defaultCurrency || 'USD';
         this.recalculatePercentages();
       },
-      error: () => {},
+      error: () => {
+        console.error('Failed to fetch profile');
+      },
     });
 
     // 5. Fetch pending invitations
@@ -201,7 +208,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.pendingInvitations = res;
       },
-      error: () => {},
+      error: () => {
+        console.error('Failed to fetch pending invitations');
+      },
     });
 
     // 6. Fetch category analytics
@@ -217,7 +226,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
           }))
           .sort((a, b) => b.amount - a.amount);
       },
-      error: () => {},
+      error: () => {
+        console.error('Failed to fetch category analytics');
+      },
     });
   }
 
@@ -306,7 +317,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.quickLogCategory = category;
       this.selectedExpenseForEdit = null;
     } else {
-      this.quickLogCategory = expense ? expense.category : 'Food & Drinks';
+      this.quickLogCategory = expense
+        ? expense.category
+        : CATEGORY_OPTIONS[0].value;
       this.selectedExpenseForEdit = expense || null;
     }
     this.isExpenseModalOpen = true;
@@ -418,43 +431,5 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.isAiLoading = false;
       },
     });
-  }
-
-  getCategoryBadgeClass(category: string): string {
-    switch (category) {
-      case 'Food & Drinks':
-        return 'bg-success/10 text-success border border-success/20';
-      case 'Travel':
-        return 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20';
-      case 'Utilities':
-        return 'bg-accent/10 text-accent border border-accent/20';
-      case 'Entertainment':
-        return 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20';
-      case 'Shopping':
-        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20';
-      case 'Housing':
-        return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20';
-      default:
-        return 'bg-secondary/10 text-secondary/75 border border-secondary/20';
-    }
-  }
-
-  getCategoryIconPath(category: string): string {
-    switch (category) {
-      case 'Food & Drinks':
-        return 'M17 2v7h2V2h2v7a4 4 0 01-4 4v9h-2v-9a4 4 0 01-4-4V2h2v7h2V2h2z M6 2v8h2v12H6v-12H4V2h2z';
-      case 'Travel':
-        return 'M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z';
-      case 'Utilities':
-        return 'M13 10V3L4 14h7v7l9-11h-7z';
-      case 'Entertainment':
-        return 'M21 12a9 9 0 11-18 0 9 9 0 0118 0z M10 8l7 4-7 4V8z';
-      case 'Shopping':
-        return 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z';
-      case 'Housing':
-        return 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6';
-      default:
-        return 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2';
-    }
   }
 }

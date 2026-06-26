@@ -1,26 +1,12 @@
 <div
-  class="fixed inset-0 z-[60] flex items-end justify-center md:items-center md:p-4 bg-slate-900/60 backdrop-blur-md transition-all duration-300"
->
+  class="fixed inset-0 z-[60] flex items-end justify-center md:items-center md:p-4 bg-slate-900/60 backdrop-blur-md transition-all duration-300">
   <div
-    class="bg-white dark:bg-finmate-card w-full md:max-w-lg h-[100dvh] md:h-auto md:max-h-[80vh] rounded-none md:rounded-3xl p-6 pb-safe md:p-8 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 relative flex flex-col transform scale-100 transition-all"
-  >
+    class="bg-white dark:bg-finmate-card w-full md:max-w-lg h-[100dvh] md:h-auto md:max-h-[80vh] rounded-none md:rounded-3xl p-6 pb-safe md:p-8 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 relative flex flex-col transform scale-100 transition-all">
     <!-- Close Button -->
-    <button
-      (click)="closeModal()"
-      class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors z-10"
-    >
-      <svg
-        class="w-6 h-6"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M6 18L18 6M6 6l12 12"
-        ></path>
+    <button (click)="closeModal()"
+      class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors z-10">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
       </svg>
     </button>
 
@@ -31,409 +17,275 @@
       </h2>
       <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
         {{
-          groupId
-            ? 'Create or edit a shared expense for the group.'
-            : 'Create or edit a personal expense.'
+        groupId
+        ? 'Create or edit a shared expense for the group.'
+        : 'Create or edit a personal expense.'
         }}
       </p>
     </div>
 
     <!-- Error Alert -->
     @if (errorMessage) {
-      <div
-        class="mb-4 p-4 bg-red-500/10 border border-red-500/25 text-red-500 rounded-2xl text-sm font-semibold flex items-center space-x-2 animate-shake flex-shrink-0"
-      >
-        <svg
-          class="w-5 h-5 flex-shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-          ></path>
-        </svg>
-        <span>{{ errorMessage }}</span>
-      </div>
+    <div
+      class="mb-4 p-4 bg-red-500/10 border border-red-500/25 text-red-500 rounded-2xl text-sm font-semibold flex items-center space-x-2 animate-shake flex-shrink-0">
+      <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+        </path>
+      </svg>
+      <span>{{ errorMessage }}</span>
+    </div>
     }
 
     <!-- Form Layout (Flex Column) -->
-    <form
-      [formGroup]="expenseForm"
-      (ngSubmit)="onSubmit()"
-      class="flex flex-col flex-1 min-h-0"
-    >
+    <form [formGroup]="expenseForm" (ngSubmit)="onSubmit()" class="flex flex-col flex-1 min-h-0">
       <!-- Scrollable Form Body -->
       <div class="flex-1 overflow-y-auto pr-1 -mr-1 space-y-4">
         <!-- Title / Name -->
         <div>
-          <label
-            for="expense-title-input"
-            class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-            >Title / Name *</label
-          >
-          <input
-            id="expense-title-input"
-            type="text"
-            formControlName="title"
-            placeholder="e.g., Dinner, Groceries"
+          <label for="expense-title-input"
+            class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Title / Name *</label>
+          <input id="expense-title-input" type="text" formControlName="title" placeholder="e.g., Dinner, Groceries"
             class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
             [class.border-red-500]="
               expenseForm.get('title')?.touched &&
               expenseForm.get('title')?.errors
-            "
-          />
+            " />
           @if (
-            expenseForm.get('title')?.touched &&
-            expenseForm.get('title')?.hasError('required')
+          expenseForm.get('title')?.touched &&
+          expenseForm.get('title')?.hasError('required')
           ) {
-            <span class="text-xs text-red-500 mt-1 block">
-              Title is required.
-            </span>
+          <span class="text-xs text-red-500 mt-1 block">
+            Title is required.
+          </span>
           }
           @if (
-            expenseForm.get('title')?.touched &&
-            expenseForm.get('title')?.hasError('maxlength')
+          expenseForm.get('title')?.touched &&
+          expenseForm.get('title')?.hasError('maxlength')
           ) {
-            <span class="text-xs text-red-500 mt-1 block">
-              Title cannot exceed 160 characters.
-            </span>
+          <span class="text-xs text-red-500 mt-1 block">
+            Title cannot exceed 160 characters.
+          </span>
           }
-        </div>
-
-        <!-- Description (Optional) -->
-        <div>
-          <label
-            for="expense-desc-input"
-            class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-            >Description (Optional)</label
-          >
-          <textarea
-            id="expense-desc-input"
-            formControlName="description"
-            placeholder="Add more details, notes, or comments..."
-            rows="2"
-            class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all resize-none"
-          ></textarea>
         </div>
 
         <!-- Amount & Currency -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label
-              for="expense-amount-input"
-              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-              >Amount *</label
-            >
+            <label for="expense-amount-input"
+              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Amount *</label>
             <div class="relative flex items-center">
-              <span
-                class="absolute left-4 text-slate-400 font-semibold select-none"
-                >{{ currencySymbol }}</span
-              >
-              <input
-                id="expense-amount-input"
-                type="number"
-                step="0.01"
-                formControlName="amountTotal"
+              <span class="absolute left-4 text-slate-400 font-semibold select-none">{{ currencySymbol }}</span>
+              <input id="expense-amount-input" type="number" step="0.01" formControlName="amountTotal"
                 placeholder="0.00"
                 class="w-full pl-9 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
                 [class.border-red-500]="
                   expenseForm.get('amountTotal')?.touched &&
                   expenseForm.get('amountTotal')?.errors
-                "
-              />
+                " />
             </div>
             @if (
-              expenseForm.get('amountTotal')?.touched &&
-              expenseForm.get('amountTotal')?.hasError('required')
+            expenseForm.get('amountTotal')?.touched &&
+            expenseForm.get('amountTotal')?.hasError('required')
             ) {
-              <span class="text-xs text-red-500 mt-1 block">
-                Amount is required.
-              </span>
+            <span class="text-xs text-red-500 mt-1 block">
+              Amount is required.
+            </span>
             }
             @if (
-              expenseForm.get('amountTotal')?.touched &&
-              expenseForm.get('amountTotal')?.hasError('min')
+            expenseForm.get('amountTotal')?.touched &&
+            expenseForm.get('amountTotal')?.hasError('min')
             ) {
-              <span class="text-xs text-red-500 mt-1 block">
-                Amount must be greater than zero.
-              </span>
+            <span class="text-xs text-red-500 mt-1 block">
+              Amount must be greater than zero.
+            </span>
             }
           </div>
           <div>
-            <label
-              for="expense-currency-select"
-              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-              >Currency *</label
-            >
-            <app-dropdown
-              id="expense-currency-select"
-              formControlName="currency"
-              [options]="currencyOptions"
-              placeholder="Select currency..."
-            ></app-dropdown>
+            <label for="expense-currency-select"
+              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Currency *</label>
+            <app-dropdown id="expense-currency-select" formControlName="currency" [options]="currencyOptions"
+              placeholder="Select currency..."></app-dropdown>
           </div>
         </div>
 
         <!-- Category & Date -->
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label
-              for="expense-category-select"
-              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-              >Category *</label
-            >
-            <app-dropdown
-              id="expense-category-select"
-              formControlName="category"
-              [options]="categoryOptions"
-              placeholder="Select category..."
-            ></app-dropdown>
+            <label for="expense-category-select"
+              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Category *</label>
+            <app-dropdown id="expense-category-select" formControlName="category" [options]="categoryOptions"
+              placeholder="Select category..."></app-dropdown>
           </div>
           <div>
-            <label
-              for="expense-date-input"
-              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-              >Date *</label
-            >
-            <input
-              id="expense-date-input"
-              type="date"
-              formControlName="expenseDate"
+            <label for="expense-date-input"
+              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Date *</label>
+            <input id="expense-date-input" type="date" formControlName="expenseDate"
               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
               [class.border-red-500]="
                 expenseForm.get('expenseDate')?.touched &&
                 expenseForm.get('expenseDate')?.errors
-              "
-            />
+              " />
           </div>
         </div>
 
         <!-- Toggle: Split with Friend (visible only in personal mode, i.e., no groupId) -->
         @if (!groupId) {
-          <div
-            class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5"
-          >
-            <div>
-              <span
-                class="text-sm font-semibold text-slate-800 dark:text-slate-200"
-                >Split with Friends</span
-              >
-              <p class="text-xs text-slate-500">
-                Share this expense directly with friends
-              </p>
-            </div>
-            <label class="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                [(ngModel)]="splitWithFriend"
-                [ngModelOptions]="{ standalone: true }"
-                (change)="onSplitToggleChange()"
-                class="sr-only peer"
-              />
-              <div
-                class="w-11 h-6 bg-slate-200 dark:bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-finmate-neon"
-              ></div>
-            </label>
+        <div
+          class="flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5">
+          <div>
+            <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">Split with Friends</span>
+            <p class="text-xs text-slate-500">
+              Share this expense directly with friends
+            </p>
           </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" [(ngModel)]="splitWithFriend" [ngModelOptions]="{ standalone: true }"
+              (change)="onSplitToggleChange()" class="sr-only peer" />
+            <div
+              class="w-11 h-6 bg-slate-200 dark:bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-finmate-neon">
+            </div>
+          </label>
+        </div>
         }
 
         <!-- Search & Manage Friends (visible if personal mode AND splitWithFriend is active) -->
         @if (!groupId && splitWithFriend) {
-          <div class="space-y-2 relative">
-            <label
-              for="friend-search-input"
-              class="block text-sm font-semibold text-slate-700 dark:text-slate-300"
-              >Add Friends to Split</label
-            >
-            <div class="relative">
-              <input
-                id="friend-search-input"
-                type="text"
-                [(ngModel)]="searchQuery"
-                [ngModelOptions]="{ standalone: true }"
-                (ngModelChange)="onSearchChange($event)"
-                placeholder="Search by email, username, or phone number"
-                class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
-              />
-              @if (isSearching) {
-                <div
-                  class="absolute right-4 top-3.5 w-5 h-5 border-2 border-finmate-neon border-t-transparent rounded-full animate-spin"
-                ></div>
-              }
+        <div class="space-y-2 relative">
+          <label for="friend-search-input" class="block text-sm font-semibold text-slate-700 dark:text-slate-300">Add
+            Friends to Split</label>
+          <div class="relative">
+            <input id="friend-search-input" type="text" [(ngModel)]="searchQuery"
+              [ngModelOptions]="{ standalone: true }" (ngModelChange)="onSearchChange($event)"
+              placeholder="Search by email, username, or phone number"
+              class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all" />
+            @if (isSearching) {
+            <div
+              class="absolute right-4 top-3.5 w-5 h-5 border-2 border-finmate-neon border-t-transparent rounded-full animate-spin">
             </div>
-
-            <!-- Search Results Dropdown -->
-            @if (searchResults.length > 0) {
-              <div
-                class="absolute z-50 w-full mt-1 bg-white dark:bg-finmate-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto"
-              >
-                @for (user of searchResults; track user.id) {
-                  <button
-                    type="button"
-                    (click)="addFriendToSplit(user)"
-                    class="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/5 flex flex-col transition-colors"
-                  >
-                    <span
-                      class="font-bold text-slate-800 dark:text-white text-sm"
-                      >{{ user.displayName || user.email.split('@')[0] }}</span
-                    >
-                    <span class="text-xs text-slate-500"
-                      >{{ user.email }} •
-                      {{ user.username || 'No username' }}</span
-                    >
-                  </button>
-                }
-              </div>
             }
           </div>
+
+          <!-- Search Results Dropdown -->
+          @if (searchResults.length > 0) {
+          <div
+            class="absolute z-50 w-full mt-1 bg-white dark:bg-finmate-card border border-slate-200 dark:border-white/10 rounded-2xl shadow-xl overflow-hidden max-h-60 overflow-y-auto">
+            @for (user of searchResults; track user.id) {
+            <button type="button" (click)="addFriendToSplit(user)"
+              class="w-full text-left p-3 hover:bg-slate-50 dark:hover:bg-white/5 border-b border-slate-100 dark:border-white/5 flex flex-col transition-colors">
+              <span class="font-bold text-slate-800 dark:text-white text-sm">{{ user.displayName ||
+                user.email.split('@')[0] }}</span>
+              <span class="text-xs text-slate-500">{{ user.email }} •
+                {{ user.username || 'No username' }}</span>
+            </button>
+            }
+          </div>
+          }
+        </div>
         }
 
         <!-- Paid By Select (visible if group mode OR direct split mode) -->
         @if (groupId || splitWithFriend) {
-          <div>
-            <label
-              for="expense-payer-select"
-              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-              >Paid By *</label
-            >
-            <app-dropdown
-              id="expense-payer-select"
-              formControlName="paidByUserId"
-              [options]="payerOptions"
-              placeholder="Select payer..."
-            ></app-dropdown>
-          </div>
+        <div>
+          <label for="expense-payer-select"
+            class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Paid By *</label>
+          <app-dropdown id="expense-payer-select" formControlName="paidByUserId" [options]="payerOptions"
+            placeholder="Select payer..."></app-dropdown>
+        </div>
 
-          <div>
-            <div
-              class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-            >
-              Split Equally Among
-            </div>
-            <div
-              class="space-y-2 max-h-40 overflow-y-auto p-3 bg-slate-50 dark:bg-black/10 rounded-2xl border border-slate-200/50 dark:border-white/5"
-            >
-              @for (
-                participant of availableParticipants;
-                track participant.id
-              ) {
-                <label
-                  class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
-                >
-                  <span class="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      [checked]="selectedUserIds.has(participant.id)"
-                      (change)="toggleParticipant(participant.id)"
-                      class="w-5 h-5 rounded-lg border-slate-300 text-finmate-neon focus:ring-finmate-neon cursor-pointer"
-                    />
-                    <span
-                      class="text-sm font-medium text-slate-800 dark:text-slate-200"
-                    >
-                      {{ participant.name }}
-                    </span>
-                  </span>
-                  @if (!groupId && participant.id !== getCurrentUserId()) {
-                    <button
-                      type="button"
-                      (click)="removeFriendFromSplit(participant.id)"
-                      class="text-slate-400 hover:text-red-500 text-sm"
-                    >
-                      Remove
-                    </button>
-                  }
-                </label>
-              }
-            </div>
-            @if (selectedUserIds.size === 0) {
-              <span class="text-xs text-red-500 mt-1 block">
-                At least one participant must be selected.
+        <div>
+          <div class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+            Split Equally Among
+          </div>
+          <div
+            class="space-y-2 max-h-40 overflow-y-auto p-3 bg-slate-50 dark:bg-black/10 rounded-2xl border border-slate-200/50 dark:border-white/5">
+            @for (
+            participant of availableParticipants;
+            track participant.id
+            ) {
+            <label
+              class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+              <span class="flex items-center space-x-3 cursor-pointer">
+                <input type="checkbox" [checked]="selectedUserIds.has(participant.id)"
+                  (change)="toggleParticipant(participant.id)"
+                  class="w-5 h-5 rounded-lg border-slate-300 text-finmate-neon focus:ring-finmate-neon cursor-pointer" />
+                <span class="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  {{ participant.name }}
+                </span>
               </span>
+              @if (!groupId && participant.id !== getCurrentUserId()) {
+              <button type="button" (click)="removeFriendFromSplit(participant.id)"
+                class="text-slate-400 hover:text-red-500 text-sm">
+                Remove
+              </button>
+              }
+            </label>
             }
           </div>
+          @if (selectedUserIds.size === 0) {
+          <span class="text-xs text-red-500 mt-1 block">
+            At least one participant must be selected.
+          </span>
+          }
+        </div>
         }
+
+        <!-- Description (Optional) -->
+        <div>
+          <label for="expense-desc-input"
+            class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Description (Optional)</label>
+          <textarea id="expense-desc-input" formControlName="description"
+            placeholder="Add more details, notes, or comments..." rows="2"
+            class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all resize-none"></textarea>
+        </div>
 
         <!-- Attachments Section (Zero-Knowledge file uploader simulation) -->
         <div>
-          <div
-            class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-          >
+          <div class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
             Attachments (Optional)
           </div>
           <div class="flex items-center space-x-2">
             <label
-              class="cursor-pointer py-2 px-4 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl font-semibold border border-slate-200 dark:border-white/10 transition-all flex items-center space-x-2 text-xs"
-            >
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                ></path>
+              class="cursor-pointer py-2 px-4 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-300 rounded-xl font-semibold border border-slate-200 dark:border-white/10 transition-all flex items-center space-x-2 text-xs">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13">
+                </path>
               </svg>
               <span>Attach Receipt</span>
-              <input
-                type="file"
-                (change)="onFileSelected($event)"
-                multiple
-                class="hidden"
-              />
+              <input type="file" (change)="onFileSelected($event)" multiple class="hidden" />
             </label>
           </div>
           <!-- List attached files -->
           @if (attachedFiles.length > 0) {
-            <div class="mt-2 flex flex-wrap gap-2">
-              @for (file of attachedFiles; track file.name; let idx = $index) {
-                <div
-                  class="flex items-center space-x-1.5 py-1 px-3 bg-slate-100 dark:bg-white/5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-white/5"
-                >
-                  <span class="truncate max-w-[150px]" [title]="file.name">{{
-                    file.name
-                  }}</span>
-                  <button
-                    type="button"
-                    (click)="removeAttachment(idx)"
-                    class="text-slate-400 hover:text-red-500 font-bold ml-1 focus:outline-none"
-                  >
-                    &times;
-                  </button>
-                </div>
-              }
+          <div class="mt-2 flex flex-wrap gap-2">
+            @for (file of attachedFiles; track file.name; let idx = $index) {
+            <div
+              class="flex items-center space-x-1.5 py-1 px-3 bg-slate-100 dark:bg-white/5 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-300 border border-slate-200/50 dark:border-white/5">
+              <span class="truncate max-w-[150px]" [title]="file.name">{{
+                file.name
+                }}</span>
+              <button type="button" (click)="removeAttachment(idx)"
+                class="text-slate-400 hover:text-red-500 font-bold ml-1 focus:outline-none">
+                &times;
+              </button>
             </div>
+            }
+          </div>
           }
         </div>
       </div>
 
       <!-- Sticky Footer -->
-      <div
-        class="flex-shrink-0 flex space-x-4 pt-4 border-t border-slate-200 dark:border-white/5 mt-4"
-      >
-        <button
-          type="button"
-          (click)="closeModal()"
-          class="flex-1 py-3 px-4 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded-2xl font-semibold transition-all"
-        >
+      <div class="flex-shrink-0 flex space-x-4 pt-4 border-t border-slate-200 dark:border-white/5 mt-4">
+        <button type="button" (click)="closeModal()"
+          class="flex-1 py-3 px-4 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded-2xl font-semibold transition-all">
           Cancel
         </button>
-        <app-submit-button
-          [label]="'Save Expense'"
-          [loadingLabel]="'Saving...'"
-          [isLoading]="isSubmitting"
-          [disabled]="expenseForm.invalid || selectedUserIds.size === 0"
-          [styleClass]="
+        <app-submit-button [label]="'Save Expense'" [loadingLabel]="'Saving...'" [isLoading]="isSubmitting"
+          [disabled]="expenseForm.invalid || selectedUserIds.size === 0" [styleClass]="
             'flex-1 py-3 px-4 bg-primary text-white font-semibold transition-all duration-200 hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 rounded-2xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
-          "
-        ></app-submit-button>
+          "></app-submit-button>
       </div>
     </form>
   </div>
