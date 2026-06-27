@@ -64,7 +64,8 @@ describe('DashboardHomeComponent', () => {
     fixture.detectChanges();
     const emitSpy = jest.spyOn(component.openExpenseModalEvent, 'emit');
 
-    const logExpenseBtn = fixture.nativeElement.querySelector('button');
+    const logExpenseBtn = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find(btn => (btn as HTMLButtonElement).textContent?.includes('Log Expense')) as HTMLButtonElement;
     logExpenseBtn.click();
 
     expect(emitSpy).toHaveBeenCalledWith({});
@@ -74,11 +75,10 @@ describe('DashboardHomeComponent', () => {
     fixture.detectChanges();
     const emitSpy = jest.spyOn(component.acceptInvitationEvent, 'emit');
 
-    // Find the accept button inside the invitation block
-    // Decline button is index 0 inside invitations, Accept is index 1
-    const buttons = fixture.nativeElement.querySelectorAll('button');
-    // Button 0: Log Expense, Button 1: Configure limits, Button 2: Decline, Button 3: Accept
-    const acceptBtn = buttons[3] as HTMLButtonElement;
+    // Find the accept button specifically by text
+    const acceptBtn = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find(btn => (btn as HTMLButtonElement).textContent?.trim() === 'Accept') as HTMLButtonElement;
+    expect(acceptBtn).toBeTruthy();
     expect(acceptBtn.textContent?.trim()).toBe('Accept');
 
     acceptBtn.click();

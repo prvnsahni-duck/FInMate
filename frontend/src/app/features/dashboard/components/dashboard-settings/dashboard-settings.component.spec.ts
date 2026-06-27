@@ -28,8 +28,9 @@ describe('DashboardSettingsComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should display setting inputs correctly', () => {
+  it('should display setting inputs correctly', async () => {
     fixture.detectChanges();
+    await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
     const inputs = compiled.querySelectorAll('input[type="number"]');
 
@@ -43,7 +44,8 @@ describe('DashboardSettingsComponent', () => {
     fixture.detectChanges();
     const emitSpy = jest.spyOn(component.saveIncomeEvent, 'emit');
 
-    const saveBtn = fixture.nativeElement.querySelector('button');
+    const saveBtn = Array.from(fixture.nativeElement.querySelectorAll('button'))
+      .find(btn => (btn as HTMLButtonElement).textContent?.includes('Save Configuration')) as HTMLButtonElement;
     saveBtn.click();
 
     expect(emitSpy).toHaveBeenCalled();
