@@ -114,7 +114,7 @@ Temporary sessionStorage key persistence.
 Key marked extractable=true until
 encrypted IndexedDB vault is implemented.
    */
-  async loadKeyFromSession(): Promise<CryptoKey | null> {
+  async loadKeyFromSession(email?: string): Promise<CryptoKey | null> {
     if (this.key) {
       return this.key;
     }
@@ -145,7 +145,7 @@ encrypted IndexedDB vault is implemented.
   /**
    * Clears the cached key from memory.
    */
-  clearKey(): void {
+  clearKey(email?: string): void {
     this.key = null;
   }
 
