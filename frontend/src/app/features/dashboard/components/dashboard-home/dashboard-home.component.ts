@@ -1,4 +1,5 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { DecryptPipe } from '../../../../shared/pipes/decrypt/decrypt.pipe';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StatsCardComponent } from '../../../../shared/components/stats-card/stats-card.component';
@@ -11,7 +12,7 @@ import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
   imports: [
     FormsModule,
     CurrencyPipe,
-    DatePipe,
+    DatePipe, DecryptPipe,
     StatsCardComponent,
     IconComponent,
   ],

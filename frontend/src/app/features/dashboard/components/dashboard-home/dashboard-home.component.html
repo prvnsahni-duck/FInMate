@@ -195,7 +195,7 @@
           </div>
           <div>
             <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2">
-              <span>{{ expense.title }}</span>
+              <span>{{ expense.title | decrypt }}</span>
               <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider"
                 [class]="categoryOptions.find(option => option.value === expense.category)?.class || categoryOptions[0].class">
                 {{ expense.category }}

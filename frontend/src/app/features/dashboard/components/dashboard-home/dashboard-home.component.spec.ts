@@ -1,3 +1,5 @@
+import { NGXS_OPTIONS, Store } from '@ngxs/store';
+
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DashboardHomeComponent } from './dashboard-home.component';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
@@ -28,7 +30,10 @@ describe('DashboardHomeComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DashboardHomeComponent],
+      providers: [
+        { provide: Store, useValue: { selectSnapshot: jest.fn().mockReturnValue({ email: 'test@example.com' }) } },
+        { provide: NGXS_OPTIONS, useValue: {} },
+      ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
 
