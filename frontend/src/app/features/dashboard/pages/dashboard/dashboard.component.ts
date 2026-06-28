@@ -12,6 +12,7 @@ import { StatsCardComponent } from '../../../../shared/components/stats-card/sta
 import { IconComponent } from '../../../../shared/components/icon/icon.component';
 import { GroupsService } from '../../../groups/services/groups.service';
 import { ExpensesService } from '../../../groups/services/expenses.service';
+import { ExpensesUiStore } from '../../../groups/services/expenses-ui.store';
 import { PendingInvitationResponse, Profile } from '@finmate/data-models';
 import { GroupExpense } from '../../../groups/pages/group-detail/group-detail.component';
 import { AiService } from '../../services/ai.service';
@@ -71,11 +72,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private store = inject(Store);
   private groupsService = inject(GroupsService);
   private expensesService = inject(ExpensesService);
+  private expensesUiStore = inject(ExpensesUiStore);
   private authService = inject(AuthService);
   private aiService = inject(AiService);
 
   get activeTab(): string {
-    return this.expensesService.activeTab();
+    return this.expensesUiStore.activeTab();
   }
 
   protected readonly Math = Math;
@@ -87,10 +89,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   activeGroupsCount = 0;
   personalExpenses: GroupExpense[] = [];
   get isExpenseModalOpen(): boolean {
-    return this.expensesService.showCreateExpenseModal();
+    return this.expensesUiStore.showCreateExpenseModal();
   }
   set isExpenseModalOpen(val: boolean) {
-    this.expensesService.showCreateExpenseModal.set(val);
+    this.expensesUiStore.showCreateExpenseModal.set(val);
   }
   isLoading = true;
 
@@ -139,7 +141,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.aiOptIn = localStorage.getItem('finmate_ai_opt_in') === 'true';
     this.fetchData();
 
-    const sub = this.expensesService.expenseCreated$.subscribe(() => {
+    const sub = this.expensesUiStore.expenseCreated$.subscribe(() => {
       this.fetchData();
     });
     this.destroy$.add(sub);

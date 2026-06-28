@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { ZkKeyVaultService } from './zk-key-vault.service';
 
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -23,6 +24,7 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
   providedIn: 'root',
 })
 export class ClientEncryptionService {
+  private zkVault = inject(ZkKeyVaultService);
   private key: CryptoKey | null = null;
 
   /** Returns the current in-memory master key, or null if not yet derived. */
@@ -87,66 +89,61 @@ export class ClientEncryptionService {
         name: 'AES-GCM',
         length: 256,
       },
-      // false, // Key must be non-extractable for maximum security (prevent XSS extraction)
-      true, //TODO temp
+      false, // Non-extractable: prevents XSS from reading raw key material
       ['encrypt', 'decrypt'],
     );
   }
 
   /**
-   * Derives a key and caches it in memory only.
+   * Derives a key and persists it in the secure IndexedDB vault.
+   * The key is non-extractable — the browser allows encrypt/decrypt
+   * operations but prevents JavaScript from reading the raw key bytes.
    */
   async deriveAndStoreKey(password: string, email: string): Promise<CryptoKey> {
     const derivedKey = await this.deriveMasterKey(password, email);
-    const subtle = this.getSubtleCrypto();
-    const rawKey = await subtle.exportKey('raw', derivedKey); // TODO: Remove this line if you want to keep the key non-extractable for maximum security
-
-    sessionStorage.setItem('finmate_zk_key', arrayBufferToBase64(rawKey));
+    await this.zkVault.storeKey(email, derivedKey);
     this.key = derivedKey;
     return derivedKey;
   }
 
   /**
-   * Loads key from memory if it exists.
-   * TODO: Consider loading from sessionStorage if not in memory, but be cautious about security implications.
-   * TODO(ZK-001):
-Temporary sessionStorage key persistence.
-Key marked extractable=true until
-encrypted IndexedDB vault is implemented.
+   * Loads key from in-memory cache first, then falls back to IndexedDB vault.
+   * This allows the key to survive page refreshes without re-authentication.
    */
   async loadKeyFromSession(email?: string): Promise<CryptoKey | null> {
     if (this.key) {
       return this.key;
     }
 
-    const stored = sessionStorage.getItem('finmate_zk_key');
-
-    if (!stored) {
+    if (!email) {
       return null;
     }
 
-    const subtle = this.getSubtleCrypto();
+    try {
+      const vaultKey = await this.zkVault.loadKey(email);
+      if (vaultKey) {
+        this.key = vaultKey;
+        return vaultKey;
+      }
+    } catch (e) {
+      console.error('Failed to load key from vault', e);
+    }
 
-    const importedKey = await subtle.importKey(
-      'raw',
-      base64ToArrayBuffer(stored),
-      {
-        name: 'AES-GCM',
-      },
-      false,
-      ['encrypt', 'decrypt'],
-    );
-
-    this.key = importedKey;
-
-    return importedKey;
+    return null;
   }
 
   /**
-   * Clears the cached key from memory.
+   * Clears the key from both in-memory cache and the IndexedDB vault.
    */
-  clearKey(email?: string): void {
+  async clearKey(email?: string): Promise<void> {
     this.key = null;
+    if (email) {
+      try {
+        await this.zkVault.deleteKey(email);
+      } catch (e) {
+        console.error('Failed to delete key from vault', e);
+      }
+    }
   }
 
   /**

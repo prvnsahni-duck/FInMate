@@ -4,12 +4,15 @@ import { from, Observable } from 'rxjs';
 import { mergeMap, map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { Store } from '@ngxs/store';
-import { AuthState } from '../../../core/auth/auth.state';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import {
   CreateRecurringExpenseDto,
   UpdateRecurringExpenseDto,
 } from '@finmate/data-models';
+import {
+  mapDecryptExpense,
+  mapDecryptExpenses,
+} from '../../../core/utils/crypto-operators';
 
 @Injectable({
   providedIn: 'root',
@@ -23,7 +26,9 @@ export class RecurringExpensesService {
   private async encryptPayload(
     payload: CreateRecurringExpenseDto | UpdateRecurringExpenseDto,
   ): Promise<any> {
-    const user = this.store.selectSnapshot(AuthState.getUser);
+    const user = this.store.selectSnapshot(
+      (state: any) => state.auth?.user,
+    );
     const email = user?.email;
     if (email) {
       const key = await this.encryptionService.loadKeyFromSession(email);
@@ -57,28 +62,7 @@ export class RecurringExpensesService {
       .get<any>(`${this.baseUrl}/recurring-expenses`, { params })
       .pipe(
         map((res) => res.data || []),
-        mergeMap(async (templates: any[]) => {
-          const user = this.store.selectSnapshot(AuthState.getUser);
-          const email = user?.email;
-          if (email && templates.length > 0) {
-            const key = await this.encryptionService.loadKeyFromSession(email);
-            if (key) {
-              return Promise.all(
-                templates.map(async (template) => {
-                  try {
-                    return await this.encryptionService.decryptExpense(
-                      template,
-                      key,
-                    );
-                  } catch (e) {
-                    return template;
-                  }
-                }),
-              );
-            }
-          }
-          return templates;
-        }),
+        mapDecryptExpenses(this.store, this.encryptionService),
       );
   }
 
@@ -91,19 +75,7 @@ export class RecurringExpensesService {
         ),
       ),
       map((res) => res.data),
-      mergeMap(async (template) => {
-        const user = this.store.selectSnapshot(AuthState.getUser);
-        const email = user?.email;
-        if (email) {
-          const key = await this.encryptionService.loadKeyFromSession(email);
-          if (key) {
-            try {
-              return await this.encryptionService.decryptExpense(template, key);
-            } catch (e) {}
-          }
-        }
-        return template;
-      }),
+      mapDecryptExpense(this.store, this.encryptionService),
     );
   }
 
@@ -119,19 +91,7 @@ export class RecurringExpensesService {
         ),
       ),
       map((res) => res.data),
-      mergeMap(async (template) => {
-        const user = this.store.selectSnapshot(AuthState.getUser);
-        const email = user?.email;
-        if (email) {
-          const key = await this.encryptionService.loadKeyFromSession(email);
-          if (key) {
-            try {
-              return await this.encryptionService.decryptExpense(template, key);
-            } catch (e) {}
-          }
-        }
-        return template;
-      }),
+      mapDecryptExpense(this.store, this.encryptionService),
     );
   }
 

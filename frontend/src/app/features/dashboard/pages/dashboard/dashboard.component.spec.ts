@@ -4,6 +4,7 @@ import { DashboardComponent } from './dashboard.component';
 import { Store } from '@ngxs/store';
 import { GroupsService } from '../../../groups/services/groups.service';
 import { ExpensesService } from '../../../groups/services/expenses.service';
+import { ExpensesUiStore } from '../../../groups/services/expenses-ui.store';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { of, throwError } from 'rxjs';
 import { FormsModule } from '@angular/forms';
@@ -17,6 +18,7 @@ describe('DashboardComponent', () => {
   let mockStore: jest.Mocked<Store>;
   let mockGroupsService: jest.Mocked<GroupsService>;
   let mockExpensesService: any;
+  let mockExpensesUiStore: any;
   let mockAuthService: jest.Mocked<AuthService>;
 
   const mockUser = {
@@ -64,6 +66,9 @@ describe('DashboardComponent', () => {
       getMonthlyAnalytics: jest.fn().mockReturnValue(of(mockAnalytics)),
       getCategoryAnalytics: jest.fn().mockReturnValue(of([])),
       deleteExpense: jest.fn().mockReturnValue(of({})),
+    };
+
+    mockExpensesUiStore = {
       expenseCreated$: of(),
       activeTab: signal('Home'),
       showCreateExpenseModal: signal(false),
@@ -80,6 +85,7 @@ describe('DashboardComponent', () => {
         { provide: Store, useValue: mockStore },
         { provide: GroupsService, useValue: mockGroupsService },
         { provide: ExpensesService, useValue: mockExpensesService },
+        { provide: ExpensesUiStore, useValue: mockExpensesUiStore },
         { provide: AuthService, useValue: mockAuthService },
         provideRouter([]),
       ],

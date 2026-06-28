@@ -30,7 +30,6 @@ export class AuthService {
   }
 
   logout(refreshToken: string): Observable<void> {
-    sessionStorage.removeItem('finmate_zk_key');
     this.encryptionService.clearKey();
     return this.http.post<void>(`${this.baseUrl}/logout`, { refreshToken });
   }

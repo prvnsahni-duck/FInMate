@@ -1,6 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { ClientEncryptionService } from './encryption.service';
 import { webcrypto } from 'node:crypto';
+import 'fake-indexeddb/auto';
+
+if (typeof globalThis.structuredClone === 'undefined') {
+  (globalThis as any).structuredClone = (val: any) => JSON.parse(JSON.stringify(val));
+}
 
 // Polyfill Web Cryptography API for Jest/Node.js testing environment
 if (typeof globalThis !== 'undefined' && !globalThis.crypto) {
@@ -19,12 +24,17 @@ if (typeof globalThis !== 'undefined' && !globalThis.crypto) {
   });
 }
 
+import { ZK_DB_NAME } from './zk-key-vault.service';
+
 describe('ClientEncryptionService', () => {
   let service: ClientEncryptionService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [ClientEncryptionService],
+      providers: [
+        ClientEncryptionService,
+        { provide: ZK_DB_NAME, useValue: 'finmate_zk_vault_enc_spec_' + Math.random() }
+      ],
     });
     service = TestBed.inject(ClientEncryptionService);
   });
@@ -187,31 +197,37 @@ describe('ClientEncryptionService', () => {
     expect(decryptedSettlement.note).toBe(settlement.note);
   });
 
-  it('should derive, store, load, and clear master key in memory only', async () => {
+  it('should derive, store, load, and clear master key using the secure vault', async () => {
     const password = 'testPassword!';
     const email = 'user-spec@example.com';
 
-    // 1. Derive and store key
+    // 1. Derive and store key (persists to vault)
     const key = await service.deriveAndStoreKey(password, email);
     expect(key).toBeDefined();
     expect(service.getKey()).toBe(key);
 
     // Verify it is NOT in sessionStorage
-    const stored = sessionStorage.getItem(
-      `finmate_crypto_key_${email.toLowerCase()}`,
-    );
+    const stored = sessionStorage.getItem('finmate_zk_key');
     expect(stored).toBeNull();
 
-    // 2. Clear key from memory
-    service.clearKey(email);
+    // 2. Clear key from memory and vault
+    await service.clearKey(email);
     expect(service.getKey()).toBeNull();
 
-    // 3. Re-store and test loadKeyFromSession
+    // 3. Verify it is removed from vault
+    const loadedNull = await service.loadKeyFromSession(email);
+    expect(loadedNull).toBeNull();
+
+    // 4. Re-derive, clear only memory cache (by setting service['key'] to null or similar)
     const key2 = await service.deriveAndStoreKey(password, email);
+    // Artificially clear in-memory reference to force loading from vault
+    (service as any).key = null;
+    
     const loadedKey = await service.loadKeyFromSession(email);
-    expect(loadedKey).toBe(key2);
+    expect(loadedKey).toBeDefined();
+    expect(loadedKey).not.toBeNull();
 
     // Cleanup
-    service.clearKey(email);
+    await service.clearKey(email);
   });
 });

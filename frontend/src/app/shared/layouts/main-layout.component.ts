@@ -7,7 +7,7 @@ import {
 } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { APP_NAME } from '../../core/constants/app.constants';
-import { ExpensesService } from '../../features/groups/services/expenses.service';
+import { ExpensesUiStore } from '../../features/groups/services/expenses-ui.store';
 import { IconComponent } from '../components/icon/icon.component';
 import { NgClass } from '@angular/common';
 
@@ -70,7 +70,7 @@ export class MainLayoutComponent {
   themeState = signal<'light' | 'dark'>('light');
   navItems = NAV_ITEMS;
   activeTab = signal<string>('Home');
-  expensesService = inject(ExpensesService);
+  private expensesUiStore = inject(ExpensesUiStore);
   private router = inject(Router);
 
   sunIconPath =
@@ -93,11 +93,11 @@ export class MainLayoutComponent {
         const url = event.urlAfterRedirects || event.url;
         if (url.includes('/groups')) {
           this.activeTab.set('Groups');
-          this.expensesService.activeTab.set('Groups');
+          this.expensesUiStore.activeTab.set('Groups');
         } else if (url.includes('/dashboard')) {
           if (this.activeTab() === 'Groups') {
             this.activeTab.set('Home');
-            this.expensesService.activeTab.set('Home');
+            this.expensesUiStore.activeTab.set('Home');
           }
         }
       });
@@ -105,25 +105,25 @@ export class MainLayoutComponent {
 
   selectTab(item: NavItem) {
     this.activeTab.set(item.label);
-    this.expensesService.activeTab.set(item.label);
+    this.expensesUiStore.activeTab.set(item.label);
   }
 
   openExpenseModal() {
     if (this.router.url !== '/dashboard') {
       this.router.navigate(['/dashboard']).then(() => {
-        this.expensesService.showCreateExpenseModal.set(true);
+        this.expensesUiStore.showCreateExpenseModal.set(true);
       });
     } else {
-      this.expensesService.showCreateExpenseModal.set(true);
+      this.expensesUiStore.showCreateExpenseModal.set(true);
     }
   }
 
   closeExpenseModal() {
-    this.expensesService.showCreateExpenseModal.set(false);
+    this.expensesUiStore.showCreateExpenseModal.set(false);
   }
 
   onExpenseCreated() {
-    this.expensesService.expenseCreated$.next();
+    this.expensesUiStore.expenseCreated$.next();
   }
 
   setTheme(theme: 'light' | 'dark') {
