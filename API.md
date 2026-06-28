@@ -243,7 +243,16 @@ graph TD
   {
     "name": "Goa Trip 2026",
     "description": "Sharing travel and lodging costs for our Goa summer getaway",
-    "visibility": "private"
+    "visibility": "private",
+    "currency": "INR",
+    "groupType": "normal",
+    "carryForwardEnabled": false,
+    "members": [
+      {
+        "identifier": "bob.friend@example.com",
+        "role": "member"
+      }
+    ]
   }
   ```
 - **Response Example (`201 Created`)**:
@@ -253,7 +262,11 @@ graph TD
     "name": "Goa Trip 2026",
     "description": "Sharing travel and lodging costs for our Goa summer getaway",
     "visibility": "private",
+    "currency": "INR",
+    "groupType": "normal",
+    "carryForwardEnabled": false,
     "ownerUserId": "e44d3202-b2a6-42d4-bb06-b33df1fb3e61",
+    "inviteToken": "4bb4cd6d-495c-4b53-847e-128bf7f3e8f8",
     "isArchived": false,
     "createdAt": "2026-06-09T22:46:00.000Z",
     "updatedAt": "2026-06-09T22:46:00.000Z"
@@ -266,10 +279,24 @@ graph TD
 - **Description**: Lists all active/archived groups user belongs to.
 - **Response Example (`200 OK`)**: Paginated response wrapper around `Group` list data.
 
+#### Update Group
+
+- **Endpoint**: `PATCH /api/v1/groups/{id}`
+- **Description**: Updates settings or details of a group.
+- **Request Example**:
+  ```json
+  {
+    "name": "Goa Trip 2026 Updated",
+    "carryForwardEnabled": true,
+    "version": 1
+  }
+  ```
+- **Response Example (`200 OK`)**: Updated group schema payload.
+
 #### Invite Member
 
 - **Endpoint**: `POST /api/v1/groups/{id}/members`
-- **Description**: Invite a user to a group via their email.
+- **Description**: Invite a user to a group via their email, username, or phone number.
 - **Request Example**:
   ```json
   {
@@ -291,6 +318,81 @@ graph TD
     "updatedAt": "2026-06-09T22:47:00.000Z"
   }
   ```
+
+#### Update Member Role / Accept Invitation
+
+- **Endpoint**: `PATCH /api/v1/groups/{id}/members/{memberId}`
+- **Description**: Accept/decline invitation, leave group, or promote/demote members.
+- **Request Example**:
+  ```json
+  {
+    "joinStatus": "active"
+  }
+  ```
+- **Response Example (`200 OK`)**: Updated member schema payload.
+
+#### Remove Member
+
+- **Endpoint**: `DELETE /api/v1/groups/{id}/members/{memberId}`
+- **Description**: Kick a member or revoke a pending invitation.
+- **Response Example (`200 OK`)**: Empty success response.
+
+#### Join Group by Token
+
+- **Endpoint**: `POST /api/v1/groups/join/{inviteToken}`
+- **Description**: Join a group using a shared invitation token UUID.
+- **Response Example (`200 OK`)**: Created member membership payload.
+
+#### List Pending Invitations
+
+- **Endpoint**: `GET /api/v1/groups/invitations/pending`
+- **Description**: Retrieve list of all pending group invitations for the authenticated user.
+- **Response Example (`200 OK`)**: List of pending invitations with group context details.
+
+#### Public Invite Link Details
+
+- **Endpoint**: `GET /api/v1/invite-links/{inviteToken}`
+- **Description**: Get descriptive details of a group for invitation landing pages before joining.
+- **Response Example (`200 OK`)**:
+  ```json
+  {
+    "id": "2ab72e81-b20f-488f-a9cb-b2f5cf111818",
+    "name": "Goa Trip 2026",
+    "description": "Sharing travel and lodging costs for our Goa summer getaway",
+    "ownerName": "Jane Doe",
+    "groupType": "normal",
+    "currency": "INR",
+    "members": []
+  }
+  ```
+
+#### Get Household Monthly Contributions
+
+- **Endpoint**: `GET /api/v1/groups/{id}/contributions?month=YYYY-MM`
+- **Description**: Retrieve custom monthly contribution target percentages and amounts for a household group ledger month.
+- **Response Example (`200 OK`)**: List of group member targets.
+
+#### Update Household Monthly Contributions
+
+- **Endpoint**: `POST /api/v1/groups/{id}/contributions`
+- **Description**: Set custom monthly contribution percentages for members. Sum must equal exactly 100%.
+- **Request Example**:
+  ```json
+  {
+    "ledgerMonth": "2026-06",
+    "contributions": [
+      {
+        "memberId": "b3e0c0fe-3f04-411a-86c2-48fb8a221f1e",
+        "percentage": 50.0
+      },
+      {
+        "memberId": "c44d3202-b2a6-42d4-bb06-b33df1fb3e62",
+        "percentage": 50.0
+      }
+    ]
+  }
+  ```
+- **Response Example (`201 Created`)**: List of updated member target percentages.
 
 ---
 
@@ -380,6 +482,124 @@ graph TD
     "createdAt": "2026-06-09T22:48:00.000Z",
     "updatedAt": "2026-06-09T22:48:00.000Z"
   }
+  ```
+
+#### List Expenses
+
+- **Endpoint**: `GET /api/v1/expenses`
+- **Description**: List expenses with optional pagination (cursor or offset), date range, and group filtering.
+- **Query Parameters**:
+  - `page`: Page index (default: 1)
+  - `limit`: Number of items per page (default: 20)
+  - `cursor`: Opaque base64 cursor string for cursor-based pagination
+  - `groupId`: Filter by group UUID
+  - `category`: Filter by category string
+  - `status`: Filter by status (`draft` | `posted` | `void`)
+  - `startDate`: ISO start date string (`YYYY-MM-DD`)
+  - `endDate`: ISO end date string (`YYYY-MM-DD`)
+- **Response Example (`200 OK`)**: Paginated array of expenses.
+
+#### Get Single Expense
+
+- **Endpoint**: `GET /api/v1/expenses/{id}`
+- **Description**: Retrieve detailed single expense by UUID.
+- **Response Example (`200 OK`)**: Single expense schema details.
+
+#### Update Expense
+
+- **Endpoint**: `PATCH /api/v1/expenses/{id}`
+- **Description**: Update fields of an existing expense. Validates versions for optimistic locking concurrency control.
+- **Request Example**:
+  ```json
+  {
+    "title": "Villa Booking Advance (Adjusted)",
+    "amountTotal": 16000.0,
+    "version": 1
+  }
+  ```
+- **Response Example (`200 OK`)**: Updated expense details.
+
+#### Delete Expense (Soft Delete)
+
+- **Endpoint**: `DELETE /api/v1/expenses/{id}`
+- **Description**: Soft delete an expense by changing its status to `void`.
+- **Response Example (`200 OK`)**: Empty success response.
+
+#### Restore Deleted Expense
+
+- **Endpoint**: `POST /api/v1/expenses/{id}/restore`
+- **Description**: Restore a soft-deleted expense if within the 7-day grace period.
+- **Response Example (`200 OK`)**: Restored expense details.
+
+#### Monthly Expense Analytics Summary
+
+- **Endpoint**: `GET /api/v1/expenses/analytics/monthly`
+- **Description**: Fetch monthly expense totals for a given year, optionally filtered by group.
+- **Query Parameters**:
+  - `year`: Selected calendar year (default: current year)
+  - `groupId`: Filter by group UUID
+- **Response Example (`200 OK`)**:
+  ```json
+  [
+    {
+      "month": "2026-06",
+      "total": 15000.0,
+      "currency": "INR"
+    }
+  ]
+  ```
+
+#### Yearly Expense Analytics Summary
+
+- **Endpoint**: `GET /api/v1/expenses/analytics/yearly`
+- **Description**: Fetch yearly expense totals across all years, optionally filtered by group.
+- **Query Parameters**:
+  - `groupId`: Filter by group UUID
+- **Response Example (`200 OK`)**:
+  ```json
+  [
+    {
+      "year": 2026,
+      "total": 125000.0,
+      "currency": "INR"
+    }
+  ]
+  ```
+
+#### Category Distribution Analytics
+
+- **Endpoint**: `GET /api/v1/expenses/analytics/categories`
+- **Description**: Fetch category distribution totals, optionally filtered by date range and group.
+- **Query Parameters**:
+  - `groupId`: Filter by group UUID
+  - `startDate`: Start date filter
+  - `endDate`: End date filter
+- **Response Example (`200 OK`)**:
+  ```json
+  [
+    {
+      "category": "Accommodation",
+      "total": 15000.0,
+      "currency": "INR"
+    }
+  ]
+  ```
+
+#### Combined Category Monthly Analytics
+
+- **Endpoint**: `GET /api/v1/expenses/analytics/all-monthly`
+- **Description**: Combined category-level monthly expenditures (personal + group splits) for the user.
+- **Query Parameters**:
+  - `month`: Billing ledger month in format `YYYY-MM`
+- **Response Example (`200 OK`)**:
+  ```json
+  [
+    {
+      "category": "Accommodation",
+      "total": 7500.0,
+      "currency": "INR"
+    }
+  ]
   ```
 
 ---
@@ -632,3 +852,31 @@ graph TD
 - **Endpoint**: `GET /api/v1/recurring-expenses`
 - **Description**: Retrieve all recurring templates. Optional query filter `groupId`.
 - **Response Example (`200 OK`)**: List of Recurring Expense Templates.
+
+#### Get Single Recurring Expense Template
+
+- **Endpoint**: `GET /api/v1/recurring-expenses/{id}`
+- **Description**: Retrieve a single recurring template by UUID.
+- **Response Example (`200 OK`)**: Single template details payload.
+
+#### Update Recurring Expense Template
+
+- **Endpoint**: `PATCH /api/v1/recurring-expenses/{id}`
+- **Description**: Update fields of a recurring template.
+- **Request Example**:
+  ```json
+  {
+    "title": "Gym Membership (Revised)",
+    "amountTotal": 1300.0,
+    "status": "paused",
+    "version": 1
+  }
+  ```
+- **Response Example (`200 OK`)**: Updated recurring template payload.
+
+#### Delete Recurring Expense Template
+
+- **Endpoint**: `DELETE /api/v1/recurring-expenses/{id}`
+- **Description**: Permanently delete a recurring template.
+- **Response Example (`200 OK`)**: Empty success response.
+

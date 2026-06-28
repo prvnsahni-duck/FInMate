@@ -65,7 +65,7 @@ sequenceDiagram
 
 1. **Client-Side (Zero-Knowledge) Encryption**:
    - **Fields**: Expense `title`, Expense `description`, Note `title`, Note `body`, and Settlement `note`.
-   - **Mechanism**: Encrypted using **AES-256-GCM** on the client device. The derived master keys for client-side encryption are retained exclusively in-memory as non-extractable `CryptoKey` objects. No `sessionStorage` or local storage cache is maintained, preventing XSS-based key exfiltration.
+   - **Mechanism**: Encrypted using **AES-256-GCM** on the client device. The derived master keys for client-side encryption are retained securely as non-extractable `CryptoKey` objects in a local **IndexedDB** cache via `ZkKeyVaultService`. This ensures keys survive page refreshes, while `extractable: false` prevents malicious scripts from exporting the raw key material. `sessionStorage` and `localStorage` are strictly avoided due to XSS vulnerability risks. Decryption failures are handled gracefully using generic placeholders (`DECRYPTION_FAILED_PLACEHOLDER`) to ensure ciphertexts and technical details never bleed into the UI.
 2. **Server-Side (At-Rest) Encryption**:
    - **Fields**: Sensitive user Profile details and 2FA secrets.
    - **Mechanism**: Encrypted before writing to the database using TypeORM value transformers (AES-256-CBC/GCM) leveraging the server's `ENCRYPTION_KEY`.
@@ -149,6 +149,9 @@ Incoming Request
 | `RecurringExpense`        | Recurring expense template template with frequency and occurrence tracking         |
 | `RecurringExpenseSplit`   | Individual split allocation for recurring templates                                |
 | `Settlement`              | Payment settlement between users                                                   |
+| `Note`                    | Shared group or personal rich notes with attachments                               |
+| `Goal`                    | Savings goals with target values, progress tracks, and attachments                 |
+| `Attachment`              | Metadata records for uploaded files and receipts attached to entities              |
 | `AuditLog`                | Action audit trail                                                                 |
 
 ---
@@ -180,7 +183,19 @@ erDiagram
     users ||--o{ settlements : "debtor (1:N)"
     users ||--o{ settlements : "creditor (1:N)"
 
-    users ||--o{ audit_logs : "logs (1:N)"
+    users ||--o{ notes : "authors (1:N)"
+    groups o|--o{ notes : "shares (0:N)"
+
+    users ||--o{ goals : "owns (1:N)"
+
+    users ||--o{ attachments : "uploads (1:N)"
+    expenses o|--o{ attachments : "attached_to (0:N)"
+    notes o|--o{ attachments : "attached_to (0:N)"
+    goals o|--o{ attachments : "attached_to (0:N)"
+    groups o|--o{ attachments : "attached_to (0:N)"
+
+    users o|--o{ audit_logs : "acts (0:N)"
+    groups o|--o{ audit_logs : "scoped_to (0:N)"
 ```
 
 ### Critical Ledger Mechanics
@@ -224,7 +239,7 @@ To protect user privacy:
 
 ---
 
-## 7. Frontend Architecture (Angular 21)
+## 7. Frontend Architecture (Angular 19)
 
 The frontend is a modern Angular SPA designed with standalone components, fine-grained reactivity, and offline-first functionality.
 

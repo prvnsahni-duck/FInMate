@@ -93,6 +93,11 @@ erDiagram
 | `invite_token`          | `uuid`         |   Yes    | `NULL`               | Unique                                              |
 | `is_archived`           | `boolean`      |    No    | `false`              |                                                     |
 | `carry_forward_enabled` | `boolean`      |    No    | `false`              | Household rollover toggle                           |
+| `currency`              | `char(3)`      |    No    | `'USD'`              |                                                     |
+| `group_type`            | `varchar(20)`  |    No    | `'normal'`           | Values: `normal`, `household`                       |
+| `version`               | `integer`      |    No    | `1`                  | For Optimistic Concurrency Control                  |
+| `created_at`            | `timestamptz`  |    No    | `NOW()`              |                                                     |
+| `updated_at`            | `timestamptz`  |    No    | `NOW()`              |                                                     |
 
 ### 4. `group_members`
 
@@ -131,9 +136,9 @@ erDiagram
 | Column Name        | Type           | Nullable | Default              | Constraints                                     |
 | :----------------- | :------------- | :------: | :------------------- | :---------------------------------------------- |
 | `id`               | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                                     |
-| `title`            | `varchar(160)` |    No    |                      | Client-Side Encrypted (base64 string)           |
+| `title`            | `text`         |    No    |                      | Client-Side Encrypted (base64 string)           |
 | `description`      | `text`         |   Yes    | `NULL`               | Client-Side Encrypted                           |
-| `amount_total`     | `varchar(255)` |    No    |                      | Server-Side Encrypted (base64 string)           |
+| `amount_total`     | `decimal(12,2)`|    No    |                      |                                                 |
 | `currency`         | `char(3)`      |    No    |                      |                                                 |
 | `category`         | `varchar(64)`  |    No    |                      |                                                 |
 | `paid_by_user_id`  | `uuid`         |    No    |                      | Foreign Key -> `users(id)`                      |
@@ -144,6 +149,8 @@ erDiagram
 | `ledger_month`     | `char(7)`      |   Yes    | `NULL`               | Format: `YYYY-MM` (Household groups only)       |
 | `is_carry_forward` | `boolean`      |    No    | `false`              | System rollover record flag                     |
 | `version`          | `integer`      |    No    | `1`                  | For Optimistic Concurrency Control              |
+| `created_at`       | `timestamptz`  |    No    | `NOW()`              |                                                 |
+| `updated_at`       | `timestamptz`  |    No    | `NOW()`              |                                                 |
 | `deleted_at`       | `timestamptz`  |   Yes    | `NULL`               | Soft delete support                             |
 
 ### 7. `expense_splits`
@@ -159,9 +166,11 @@ erDiagram
 | `participant_group_member_id` | `uuid`          |   Yes    | `NULL`               | Foreign Key -> `group_members(id)`                 |
 | `split_type`                  | `varchar(16)`   |    No    |                      | Values: `equal`, `fixed`, `percent`, `share`       |
 | `share_value`                 | `decimal(12,4)` |    No    |                      |                                                    |
-| `amount_owed`                 | `varchar(255)`  |    No    |                      | Server-Side Encrypted (base64 string)              |
+| `amount_owed`                 | `decimal(12,2)` |    No    |                      |                                                    |
 | `is_settled`                  | `boolean`       |    No    | `false`              |                                                    |
 | `settled_at`                  | `timestamptz`   |   Yes    | `NULL`               |                                                    |
+| `created_at`                  | `timestamptz`   |    No    | `NOW()`              |                                                    |
+| `updated_at`                  | `timestamptz`   |    No    | `NOW()`              |                                                    |
 | **Check Constraint**          |                 |          |                      | Exactly one participant reference must be non-null |
 
 ### 8. `settlements`
@@ -180,6 +189,9 @@ erDiagram
 | `status`       | `enum`          |    No    | `'proposed'`         | Values: `proposed`, `confirmed`, `cancelled` |
 | `settled_on`   | `date`          |   Yes    | `NULL`               |                                              |
 | `note`         | `text`          |   Yes    | `NULL`               | Client-Side Encrypted                        |
+| `version`      | `integer`       |    No    | `1`                  | For Optimistic Concurrency Control           |
+| `created_at`   | `timestamptz`   |    No    | `NOW()`              |                                              |
+| `updated_at`   | `timestamptz`   |    No    | `NOW()`              |                                              |
 
 ### 9. `recurring_expenses`
 
@@ -189,7 +201,7 @@ erDiagram
 | Column Name            | Type            | Nullable | Default              | Constraints                                    |
 | :--------------------- | :-------------- | :------: | :------------------- | :--------------------------------------------- |
 | `id`                   | `uuid`          |    No    | `uuid_generate_v4()` | Primary Key                                    |
-| `title`                | `varchar(160)`  |    No    |                      | Client-Side Encrypted                          |
+| `title`                | `text`          |    No    |                      | Client-Side Encrypted                          |
 | `description`          | `text`          |   Yes    | `NULL`               | Client-Side Encrypted                          |
 | `amount_total`         | `decimal(12,2)` |    No    |                      | Plaintext                                      |
 | `currency`             | `char(3)`       |    No    |                      |                                                |
@@ -203,6 +215,8 @@ erDiagram
 | `next_occurrence_date` | `date`          |    No    |                      |                                                |
 | `status`               | `varchar(20)`   |    No    | `'active'`           | Values: `active`, `paused`, `completed`        |
 | `version`              | `integer`       |    No    | `1`                  |                                                |
+| `created_at`           | `timestamptz`   |    No    | `NOW()`              |                                                |
+| `updated_at`           | `timestamptz`   |    No    | `NOW()`              |                                                |
 
 ### 10. `recurring_expense_splits`
 
@@ -218,6 +232,8 @@ erDiagram
 | `split_type`                  | `varchar(16)`   |    No    |                      | Values: `equal`, `fixed`, `percent`, `share`       |
 | `share_value`                 | `decimal(12,4)` |    No    |                      |                                                    |
 | `amount_owed`                 | `decimal(12,2)` |    No    |                      | Plaintext                                          |
+| `created_at`                  | `timestamptz`   |    No    | `NOW()`              |                                                    |
+| `updated_at`                  | `timestamptz`   |    No    | `NOW()`              |                                                    |
 | **Check Constraint**          |                 |          |                      | Exactly one participant reference must be non-null |
 
 ---

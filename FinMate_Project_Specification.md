@@ -1729,8 +1729,8 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 
 - **Summary:** Integrated zero-knowledge client-side encryption into the Expenses Module. Transaction titles and descriptions are now encrypted locally before transmission and decrypted locally on retrieval, keeping them private from the backend.
 - **Changes Made:**
-  - Added key caching (`deriveAndStoreKey`, `loadKeyFromSession`, `clearKey`, `getKey`) with `sessionStorage` persistence in JWK format to [encryption.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.ts).
-  - Set derived key `extractable: true` for JWK export/import across page refreshes.
+  - Added key caching (`deriveAndStoreKey`, `loadKey`, `clearKey`, `getKey`) via `ZkKeyVaultService` with `IndexedDB` persistence as non-extractable `CryptoKey` to [encryption.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/services/encryption.service.ts).
+  - Set derived key `extractable: false` for secure caching across page refreshes.
   - Integrated master key derivation on login and clearance on logout in [auth.state.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/core/auth/auth.state.ts).
   - Added `encryptPayload` helper and transparent encrypt/decrypt in `createExpense`, `updateExpense`, `getExpenses`, and `restoreExpense` in [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts).
   - Fixed relative import paths in `expenses.service.ts` (4-level → 3-level for `core/` imports).
@@ -1742,8 +1742,8 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   - [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts)
   - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
 - **Decisions:**
-  - Store derived key in `sessionStorage` (JWK format) scoped per user email to survive page refreshes within a tab session without re-prompting for password.
-  - Encryption failures in `getExpenses` silently return the original (encrypted) expense to avoid breaking the UI when decryption keys are unavailable.
+  - Store derived key in `IndexedDB` as a non-extractable `CryptoKey` (via `ZkKeyVaultService`) to survive page refreshes within a tab session securely.
+  - Encryption failures in `getExpenses` gracefully substitute a generic placeholder (`DECRYPTION_FAILED_PLACEHOLDER`) to avoid exposing technical details or ciphertexts in the UI.
 - **Next Actions:**
   - Manual verification: login, create expense, confirm encrypted payloads in Network tab, and verify decrypted display in UI.
 

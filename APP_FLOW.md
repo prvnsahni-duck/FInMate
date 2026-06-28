@@ -77,6 +77,7 @@
   3. **Household Contributions**: Set monthly target contribution budgets and view expected vs actual progress charts.
   4. **Notes**: Collaborative group-shared notes.
   5. **Members**: Invite new contacts (via multi-identifier staging queue) and manage roles.
+  6. **Recurring Expenses**: Create, edit, and schedule recurring expense templates; view upcoming occurrences.
 - **Components Used**: `GroupDetailComponent`, `CreateExpenseModalComponent`, `AnalyticsChartsComponent`, `ConflictDiffModalComponent`, `GroupMembersComponent`.
 
 ### 5. Friends Screen
