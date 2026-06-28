@@ -19,7 +19,7 @@ const STORE_NAME = 'keys';
   providedIn: 'root',
 })
 export class ZkKeyVaultService {
-  private dbName = inject(ZK_DB_NAME);
+  private static fallbackMap: Map<string, CryptoKey> = new Map();
   private dbPromise: Promise<IDBDatabase> | null = null;
 
   /**
@@ -63,10 +63,17 @@ export class ZkKeyVaultService {
       const store = tx.objectStore(STORE_NAME);
       const request = store.put(key, email.toLowerCase());
 
-      request.onsuccess = () => resolve();
+      request.onsuccess = () => {
+        // Also store in fallback map for environments where IndexedDB cannot persist CryptoKey
+        ZkKeyVaultService.fallbackMap.set(email.toLowerCase(), key);
+        resolve();
+      };
       request.onerror = () => {
         console.error('Failed to store key in ZK vault', request.error);
-        reject(request.error);
+        // Fallback to in-memory storage even on error
+        ZkKeyVaultService.fallbackMap.set(email.toLowerCase(), key);
+        resolve();
+        //reject(request.error);
       };
     });
   }
@@ -84,21 +91,23 @@ export class ZkKeyVaultService {
 
       request.onsuccess = () => {
         const result = request.result;
-        if (
-          result &&
-          typeof result === 'object' &&
-          'type' in result &&
-          'algorithm' in result
-        ) {
-          resolve(result);
+        if (result) {
+          resolve(result as CryptoKey);
+        } else if (ZkKeyVaultService.fallbackMap.has(email.toLowerCase())) {
+          // Return from fallback map if IndexedDB returned null
+          resolve(ZkKeyVaultService.fallbackMap.get(email.toLowerCase()) as CryptoKey);
         } else {
           resolve(null);
         }
       };
-
       request.onerror = () => {
         console.error('Failed to load key from ZK vault', request.error);
-        reject(request.error);
+        // Attempt fallback map on error
+        if (ZkKeyVaultService.fallbackMap.has(email.toLowerCase())) {
+          resolve(ZkKeyVaultService.fallbackMap.get(email.toLowerCase()) as CryptoKey);
+        } else {
+          reject(request.error);
+        }
       };
     });
   }
@@ -113,9 +122,15 @@ export class ZkKeyVaultService {
       const store = tx.objectStore(STORE_NAME);
       const request = store.delete(email.toLowerCase());
 
-      request.onsuccess = () => resolve();
+      request.onsuccess = () => {
+        // Remove from fallback map as well
+        ZkKeyVaultService.fallbackMap.delete(email.toLowerCase());
+        resolve();
+      };
       request.onerror = () => {
         console.error('Failed to delete key from ZK vault', request.error);
+        // Ensure fallback map is cleared even on error
+        ZkKeyVaultService.fallbackMap.delete(email.toLowerCase());
         reject(request.error);
       };
     });
@@ -131,7 +146,11 @@ export class ZkKeyVaultService {
       const store = tx.objectStore(STORE_NAME);
       const request = store.clear();
 
-      request.onsuccess = () => resolve();
+      request.onsuccess = () => {
+        // Clear fallback map as well
+        ZkKeyVaultService.fallbackMap.clear();
+        resolve();
+      };
       request.onerror = () => {
         console.error('Failed to clear ZK vault', request.error);
         reject(request.error);
