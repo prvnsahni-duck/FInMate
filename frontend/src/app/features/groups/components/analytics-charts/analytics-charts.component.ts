@@ -6,7 +6,7 @@ import {
   SimpleChanges,
   inject,
 } from '@angular/core';
-import { CurrencyPipe, NgFor, NgIf, PercentPipe } from '@angular/common';
+import { CurrencyPipe, PercentPipe } from '@angular/common';
 import { ExpensesService } from '../../services/expenses.service';
 import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
 
@@ -43,7 +43,7 @@ interface ProcessedMonth {
 @Component({
   selector: 'app-analytics-charts',
   standalone: true,
-  imports: [CurrencyPipe, NgFor, NgIf, PercentPipe],
+  imports: [CurrencyPipe, PercentPipe],
   templateUrl: './analytics-charts.component.html',
   styles: [
     `

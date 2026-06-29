@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { ClientEncryptionService } from './encryption.service';
+import { ZkKeyVaultService } from './zk-key-vault.service';
 import { webcrypto } from 'node:crypto';
 import 'fake-indexeddb/auto';
 
@@ -33,6 +34,7 @@ describe('ClientEncryptionService', () => {
     TestBed.configureTestingModule({
       providers: [
         ClientEncryptionService,
+        ZkKeyVaultService,
         { provide: ZK_DB_NAME, useValue: 'finmate_zk_vault_enc_spec_' + Math.random() }
       ],
     });

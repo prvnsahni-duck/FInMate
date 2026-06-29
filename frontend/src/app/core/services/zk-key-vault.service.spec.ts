@@ -62,6 +62,20 @@ describe('ZkKeyVaultService', () => {
       const result = await service.loadKey('nonexistent@example.com');
       expect(result).toBeNull();
     });
+
+    it('should fall back to in-memory key if IndexedDB cannot open', async () => {
+      const mockKey = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
+      await service.storeKey('fallback@example.com', mockKey);
+
+      const openVaultSpy = jest
+        .spyOn(service as any, 'openVault')
+        .mockRejectedValueOnce(new Error('IndexedDB unavailable'));
+
+      const loaded = await service.loadKey('fallback@example.com');
+
+      expect(loaded).toBe(mockKey);
+      openVaultSpy.mockRestore();
+    });
   });
 
   describe('deleteKey', () => {
@@ -97,6 +111,23 @@ describe('ZkKeyVaultService', () => {
 
       expect(loaded1).toBeNull();
       expect(loaded2).toBeNull();
+    });
+
+    it('should clear fallback keys even if IndexedDB clear fails', async () => {
+      const mockKey = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
+
+      const openVaultSpy = jest
+        .spyOn(service as any, 'openVault')
+        .mockRejectedValue(new Error('IndexedDB unavailable'));
+
+      await expect(service.storeKey('clear-fallback@example.com', mockKey)).rejects.toThrow(
+        'IndexedDB unavailable',
+      );
+      await expect(service.clearAll()).rejects.toThrow('IndexedDB unavailable');
+      const loaded = await service.loadKey('clear-fallback@example.com');
+
+      expect(loaded).toBeNull();
+      openVaultSpy.mockRestore();
     });
   });
 });

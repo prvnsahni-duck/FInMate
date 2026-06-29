@@ -172,6 +172,9 @@ describe('RecurringExpenses Service & Scheduler', () => {
 
   describe('RecurringExpensesScheduler Cron Engine', () => {
     it('should process due active recurring expenses', async () => {
+      // Freeze the clock so only one occurrence (2026-06-20) is due
+      jest.useFakeTimers({ now: new Date('2026-06-20T12:00:00Z') });
+
       const template = {
         id: 'template-1',
         title: 'Weekly Rent',
@@ -211,6 +214,8 @@ describe('RecurringExpenses Service & Scheduler', () => {
       // Verify template dates are advanced (weekly rent from 2026-06-20 advances to 2026-06-27)
       expect(template.nextOccurrenceDate).toBe('2026-06-27');
       expect(template.status).toBe('active');
+
+      jest.useRealTimers();
     });
 
     it('should acquire lock and run if lock is available', async () => {

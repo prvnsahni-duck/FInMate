@@ -8,8 +8,7 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { CreateExpenseModalComponent } from '../../../groups/components/create-expense-modal/create-expense-modal.component';
 import { AnalyticsChartsComponent } from '../../../groups/components/analytics-charts/analytics-charts.component';
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
-import { StatsCardComponent } from '../../../../shared/components/stats-card/stats-card.component';
-import { IconComponent } from '../../../../shared/components/icon/icon.component';
+
 import { GroupsService } from '../../../groups/services/groups.service';
 import { ExpensesService } from '../../../groups/services/expenses.service';
 import { ExpensesUiStore } from '../../../groups/services/expenses-ui.store';
@@ -17,7 +16,6 @@ import { PendingInvitationResponse, Profile } from '@finmate/data-models';
 import { GroupExpense } from '../../../groups/pages/group-detail/group-detail.component';
 import { AiService } from '../../services/ai.service';
 import {
-  DropdownComponent,
   DropdownOption,
 } from '../../../../shared/components/dropdown/dropdown.component';
 import { DashboardHomeComponent } from '../../components/dashboard-home/dashboard-home.component';
@@ -37,9 +35,6 @@ import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
     CreateExpenseModalComponent,
     AnalyticsChartsComponent,
     ConfirmModalComponent,
-    StatsCardComponent,
-    IconComponent,
-    DropdownComponent,
     DashboardHomeComponent,
     DashboardAnalyticsComponent,
     DashboardGoalsComponent,

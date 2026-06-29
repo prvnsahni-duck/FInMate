@@ -1,4 +1,6 @@
 import { NGXS_OPTIONS, Store } from '@ngxs/store';
+import { ZK_DB_NAME } from '../../../../core/services/zk-key-vault.service';
+import { ZkKeyVaultService } from '../../../../core/services/zk-key-vault.service';
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DashboardHomeComponent } from './dashboard-home.component';
@@ -28,11 +30,13 @@ describe('DashboardHomeComponent', () => {
     { membershipId: 'invite-1', name: 'Household Group', ownerName: 'Alice' },
   ];
 
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
+  beforeEach(() => {
+    TestBed.configureTestingModule({
       providers: [
         { provide: Store, useValue: { selectSnapshot: jest.fn().mockReturnValue({ email: 'test@example.com' }) } },
         { provide: NGXS_OPTIONS, useValue: {} },
+        { provide: ZK_DB_NAME, useValue: 'finmate_zk_vault_test_' + Math.random() },
+        ZkKeyVaultService,
       ],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
