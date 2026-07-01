@@ -1819,3 +1819,46 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   - Keep the production debounce behavior and align the test with the existing async timing.
 - **Next Actions:**
   - Run the full frontend test suite to confirm no additional failures.
+
+---
+
+### 2026-07-01 (Part 4)
+
+- **Summary:** Made expense descriptions truly optional in backend expense DTO validation.
+- **Changes Made:**
+  - Updated [create-expense.dto.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/dto/create-expense.dto.ts) to transform empty or whitespace-only descriptions to `undefined` before optional ciphertext validation.
+  - Updated [update-expense.dto.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/dto/update-expense.dto.ts) with the same optional description handling.
+  - Added DTO tests covering omitted and empty descriptions in [expenses.dto.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/dto/expenses.dto.spec.ts).
+- **Artifacts Updated:**
+  - [create-expense.dto.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/dto/create-expense.dto.ts)
+  - [update-expense.dto.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/dto/update-expense.dto.ts)
+  - [expenses.dto.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/dto/expenses.dto.spec.ts)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+  - Preserve ciphertext validation for non-empty descriptions while treating blank user input as skipped optional data.
+- **Next Actions:**
+  - Verify create and update expense flows from the UI with description left blank.
+
+---
+
+### 2026-07-01 (Part 5)
+
+- **Summary:** Replaced technical encrypted-field validation messages with user-friendly wording.
+- **Changes Made:**
+  - Updated backend ciphertext validator default messages to avoid exposing encryption format details.
+  - Updated expense DTO title/description validation messages to say the field could not be processed securely.
+  - Updated shared note and recurring expense encrypted-field validation messages with the same friendly wording.
+  - Updated backend validator tests for the new message.
+- **Artifacts Updated:**
+  - [is-ciphertext.decorator.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/common/decorators/is-ciphertext.decorator.ts)
+  - [is-ciphertext.decorator.spec.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/common/decorators/is-ciphertext.decorator.spec.ts)
+  - [create-expense.dto.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/dto/create-expense.dto.ts)
+  - [update-expense.dto.ts](file:///d:/prvn/Projects/FinMate/backend/src/app/expenses/dto/update-expense.dto.ts)
+  - [is-ciphertext.decorator.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/is-ciphertext.decorator.ts)
+  - [note.dto.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/note.dto.ts)
+  - [recurring-expense.dto.ts](file:///d:/prvn/Projects/FinMate/shared/data-models/src/lib/dto/recurring-expense.dto.ts)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+  - Keep validation strict, but present failures as friendly secure-processing errors instead of mentioning ciphertext or internal encryption formats.
+- **Next Actions:**
+  - Verify frontend error display shows the friendly secure-processing message if encrypted payload validation fails.

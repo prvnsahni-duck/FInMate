@@ -44,12 +44,17 @@ export class CreateRecurringExpenseDto {
   @IsString()
   @IsNotEmpty({ message: 'Expense title is required' })
   @MaxLength(1000, { message: 'Expense title cannot exceed 1000 characters' })
-  @IsCiphertext({ message: 'Expense title must be a valid ciphertext' })
+  @IsCiphertext({
+    message: 'Expense title could not be processed securely. Please try again.',
+  })
   title!: string;
 
   @IsString()
   @IsOptional()
-  @IsCiphertext({ message: 'Expense description must be a valid ciphertext' })
+  @IsCiphertext({
+    message:
+      'Expense description could not be processed securely. Please try again.',
+  })
   description?: string;
 
   @IsNumber(
@@ -107,12 +112,17 @@ export class UpdateRecurringExpenseDto {
   @IsString()
   @IsOptional()
   @MaxLength(1000, { message: 'Expense title cannot exceed 1000 characters' })
-  @IsCiphertext({ message: 'Expense title must be a valid ciphertext' })
+  @IsCiphertext({
+    message: 'Expense title could not be processed securely. Please try again.',
+  })
   title?: string;
 
   @IsString()
   @IsOptional()
-  @IsCiphertext({ message: 'Expense description must be a valid ciphertext' })
+  @IsCiphertext({
+    message:
+      'Expense description could not be processed securely. Please try again.',
+  })
   description?: string;
 
   @IsNumber(

@@ -32,6 +32,37 @@ describe('Expenses DTO validation', () => {
     expect(errors).toHaveLength(0);
   });
 
+  it('accepts create payload without description', () => {
+    const { description, ...payload } = validCreatePayload;
+    const dto = plainToInstance(CreateExpenseDto, payload);
+
+    const errors = validateSync(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.description).toBeUndefined();
+  });
+
+  it('accepts create payload with empty description as omitted', () => {
+    const dto = plainToInstance(CreateExpenseDto, {
+      ...validCreatePayload,
+      description: '   ',
+    });
+
+    const errors = validateSync(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.description).toBeUndefined();
+  });
+
+  it('accepts update payload with empty description as omitted', () => {
+    const dto = plainToInstance(UpdateExpenseDto, {
+      version: 1,
+      description: '',
+    });
+
+    const errors = validateSync(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.description).toBeUndefined();
+  });
+
   it('rejects invalid amount precision', () => {
     const dto = plainToInstance(CreateExpenseDto, {
       ...validCreatePayload,

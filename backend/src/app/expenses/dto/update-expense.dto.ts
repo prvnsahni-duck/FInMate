@@ -23,12 +23,20 @@ export class UpdateExpenseDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsOptional()
   @MaxLength(1000, { message: 'title cannot exceed 1000 characters' })
-  @IsCiphertext({ message: 'title must be a valid ciphertext' })
+  @IsCiphertext({
+    message: 'Expense title could not be processed securely. Please try again.',
+  })
   title?: string;
 
   @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' && value.trim().length === 0 ? undefined : value,
+  )
   @IsOptional()
-  @IsCiphertext({ message: 'description must be a valid ciphertext' })
+  @IsCiphertext({
+    message:
+      'Expense description could not be processed securely. Please try again.',
+  })
   description?: string;
 
   @IsNumber(

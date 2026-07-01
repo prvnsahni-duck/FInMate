@@ -13,12 +13,16 @@ export class CreateNoteDto {
   @IsString()
   @IsNotEmpty({ message: 'Note title is required' })
   @MaxLength(1000, { message: 'Note title cannot exceed 1000 characters' })
-  @IsCiphertext({ message: 'Note title must be a valid ciphertext' })
+  @IsCiphertext({
+    message: 'Note title could not be processed securely. Please try again.',
+  })
   title!: string;
 
   @IsString()
   @IsNotEmpty({ message: 'Note body is required' })
-  @IsCiphertext({ message: 'Note body must be a valid ciphertext' })
+  @IsCiphertext({
+    message: 'Note body could not be processed securely. Please try again.',
+  })
   body!: string;
 
   @IsEnum(['private', 'group'], { message: 'Invalid note visibility option' })
@@ -34,12 +38,16 @@ export class UpdateNoteDto {
   @IsString()
   @IsOptional()
   @MaxLength(1000, { message: 'Note title cannot exceed 1000 characters' })
-  @IsCiphertext({ message: 'Note title must be a valid ciphertext' })
+  @IsCiphertext({
+    message: 'Note title could not be processed securely. Please try again.',
+  })
   title?: string;
 
   @IsString()
   @IsOptional()
-  @IsCiphertext({ message: 'Note body must be a valid ciphertext' })
+  @IsCiphertext({
+    message: 'Note body could not be processed securely. Please try again.',
+  })
   body?: string;
 
   @IsEnum(['private', 'group'], { message: 'Invalid note visibility option' })

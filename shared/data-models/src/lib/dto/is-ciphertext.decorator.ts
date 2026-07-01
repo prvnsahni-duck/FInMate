@@ -25,7 +25,7 @@ export function IsCiphertext(validationOptions?: ValidationOptions) {
           return base64Regex.test(parts[0]) && base64Regex.test(parts[1]);
         },
         defaultMessage(args: ValidationArguments) {
-          return `${args.property} must be a valid zero-knowledge ciphertext in the format iv_base64:ciphertext_base64`;
+          return `${args.property} could not be processed securely. Please try again.`;
         },
       },
     });

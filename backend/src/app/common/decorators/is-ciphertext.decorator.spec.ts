@@ -25,7 +25,7 @@ describe('IsCiphertext Decorator', () => {
     const errors = validateSync(dto);
     expect(errors).toHaveLength(1);
     expect(errors[0].constraints?.isCiphertext).toContain(
-      'must be a valid zero-knowledge ciphertext',
+      'could not be processed securely. Please try again.',
     );
   });
 
