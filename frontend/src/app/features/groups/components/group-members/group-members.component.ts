@@ -1,7 +1,7 @@
-import { Component, input, output, inject, signal } from '@angular/core';
+import { Component, input, output, inject, signal, DestroyRef } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin, of, Subscription } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { GroupMember, UserSearchResult } from '@finmate/data-models';
 import { GroupsService } from '../../services/groups.service';
@@ -42,6 +42,7 @@ function isFailedInviteResult(
 export class GroupMembersComponent {
   private groupsService = inject(GroupsService);
   private friendsService = inject(FriendsService);
+  private destroyRef = inject(DestroyRef);
 
   members = input.required<GroupMember[]>();
   groupId = input.required<string>();
@@ -85,6 +86,17 @@ export class GroupMembersComponent {
   searchQuery = '';
   searchResults: UserSearchResult[] = [];
   isSearching = false;
+  private searchTimeoutId?: ReturnType<typeof setTimeout>;
+  private searchSub?: Subscription;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.searchTimeoutId) {
+        clearTimeout(this.searchTimeoutId);
+      }
+      this.searchSub?.unsubscribe();
+    });
+  }
 
   isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -95,29 +107,39 @@ export class GroupMembersComponent {
   }
 
   onSearchChange(query: string) {
+    if (this.searchTimeoutId) {
+      clearTimeout(this.searchTimeoutId);
+      this.searchTimeoutId = undefined;
+    }
+    this.searchSub?.unsubscribe();
+
     if (query.trim().length < 2) {
       this.searchResults = [];
+      this.isSearching = false;
       return;
     }
+
     this.isSearching = true;
-    this.friendsService.searchUsers(query).subscribe({
-      next: (users) => {
-        this.searchResults = users.filter(
-          (user) =>
-            !this.members().some((m) => m.user?.id === user.id) &&
-            !this.stagedInvites().some(
-              (s) =>
-                s.userId === user.id ||
-                s.identifier ===
-                  (user.email || user.username || user.phoneNumber),
-            ),
-        );
-        this.isSearching = false;
-      },
-      error: () => {
-        this.isSearching = false;
-      },
-    });
+    this.searchTimeoutId = setTimeout(() => {
+      this.searchSub = this.friendsService.searchUsers(query).subscribe({
+        next: (users) => {
+          this.searchResults = users.filter(
+            (user) =>
+              !this.members().some((m) => m.user?.id === user.id) &&
+              !this.stagedInvites().some(
+                (s) =>
+                  s.userId === user.id ||
+                  s.identifier ===
+                    (user.email || user.username || user.phoneNumber),
+              ),
+          );
+          this.isSearching = false;
+        },
+        error: () => {
+          this.isSearching = false;
+        },
+      });
+    }, 250);
   }
 
   stageUser(invite: Omit<StagedInvite, 'id'>) {
@@ -159,7 +181,7 @@ export class GroupMembersComponent {
     }
   }
 
-  openNewContactModal(initialName: string = '') {
+  openNewContactModal(initialName = '') {
     this.newContactName = initialName;
     this.newContactIdentifier = '';
     this.newContactRole = this.inviteRole;

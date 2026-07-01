@@ -2,7 +2,7 @@ import {
   Component,
   inject,
   OnInit,
-  OnDestroy,
+  DestroyRef,
   signal,
   computed,
 } from '@angular/core';
@@ -17,7 +17,7 @@ import { AnalyticsChartsComponent } from '../../components/analytics-charts/anal
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
-import { Subscription } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   DropdownComponent,
   DropdownOption,
@@ -89,13 +89,22 @@ export interface GroupExpense extends Expense {
   templateUrl: './group-detail.component.html',
   styleUrls: ['./group-detail.component.scss'],
 })
-export class GroupDetailComponent implements OnInit, OnDestroy {
+export class GroupDetailComponent implements OnInit {
   private groupsService = inject(GroupsService);
   private expensesService = inject(ExpensesService);
   private recurringExpensesService = inject(RecurringExpensesService);
   private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
+  private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
-  private routeSub?: Subscription;
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.retryCooldownIntervalId) {
+        clearInterval(this.retryCooldownIntervalId);
+        this.retryCooldownIntervalId = undefined;
+      }
+    });
+  }
 
   filterCategoryOptions: DropdownOption[] = [
     { value: '', label: 'All Categories' },
@@ -199,11 +208,19 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   retryLoadLedger() {
     if (this.retryCooldown() > 0) return;
 
+    if (this.retryCooldownIntervalId) {
+      clearInterval(this.retryCooldownIntervalId);
+      this.retryCooldownIntervalId = undefined;
+    }
+
     this.retryCooldown.set(5);
-    const interval = setInterval(() => {
+    this.retryCooldownIntervalId = setInterval(() => {
       this.retryCooldown.update((c) => c - 1);
       if (this.retryCooldown() <= 0) {
-        clearInterval(interval);
+        if (this.retryCooldownIntervalId) {
+          clearInterval(this.retryCooldownIntervalId);
+          this.retryCooldownIntervalId = undefined;
+        }
       }
     }, 1000);
 
@@ -227,7 +244,7 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.currentUserId.set(this.getCurrentUserId());
     this.closeMonthSelected.set(this.getCurrentMonthString());
-    this.routeSub = this.route.paramMap.subscribe((params) => {
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const groupId = params.get('id');
       if (groupId) {
         this.isLoading.set(true);
@@ -253,10 +270,6 @@ export class GroupDetailComponent implements OnInit, OnDestroy {
         });
       }
     });
-  }
-
-  ngOnDestroy() {
-    this.routeSub?.unsubscribe();
   }
 
   getCurrentMonthString(): string {

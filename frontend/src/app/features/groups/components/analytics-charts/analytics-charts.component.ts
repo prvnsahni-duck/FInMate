@@ -5,7 +5,10 @@ import {
   OnChanges,
   SimpleChanges,
   inject,
+  DestroyRef,
 } from '@angular/core';
+import { Subscription, forkJoin } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CurrencyPipe, PercentPipe } from '@angular/common';
 import { ExpensesService } from '../../services/expenses.service';
 import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
@@ -58,6 +61,8 @@ interface ProcessedMonth {
 })
 export class AnalyticsChartsComponent implements OnInit, OnChanges {
   private expensesService = inject(ExpensesService);
+  private destroyRef = inject(DestroyRef);
+  private analyticsSub?: Subscription;
 
   @Input() groupId: string | null = null;
   @Input() currency = 'USD';
@@ -87,21 +92,19 @@ export class AnalyticsChartsComponent implements OnInit, OnChanges {
   private loadAnalytics() {
     this.isLoading = true;
     const gId = this.groupId ? this.groupId : 'personal';
+    this.analyticsSub?.unsubscribe();
 
     // Load category distribution and monthly trends
-    this.expensesService.getCategoryAnalytics(gId).subscribe({
-      next: (categories) => {
+    this.analyticsSub = forkJoin({
+      categories: this.expensesService.getCategoryAnalytics(gId),
+      monthly: this.expensesService.getMonthlyAnalytics(gId),
+    })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+      next: ({ categories, monthly }) => {
         this.processCategoriesData(categories);
-
-        this.expensesService.getMonthlyAnalytics(gId).subscribe({
-          next: (monthly) => {
-            this.processMonthlyData(monthly);
-            this.isLoading = false;
-          },
-          error: () => {
-            this.isLoading = false;
-          },
-        });
+        this.processMonthlyData(monthly);
+        this.isLoading = false;
       },
       error: () => {
         this.isLoading = false;

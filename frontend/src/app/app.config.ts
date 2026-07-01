@@ -15,6 +15,7 @@ import { withNgxsReduxDevtoolsPlugin } from '@ngxs/devtools-plugin';
 import { withNgxsLoggerPlugin } from '@ngxs/logger-plugin';
 import { AuthState } from './core/auth/auth.state';
 import { RecurringExpensesState } from './core/recurring-expenses/recurring-expenses.state';
+import { environment } from '../environments/environment';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -31,8 +32,9 @@ export const appConfig: ApplicationConfig = {
     ),
     provideStore(
       [AuthState, RecurringExpensesState], // Register AuthState and RecurringExpensesState
-      withNgxsReduxDevtoolsPlugin(),
-      withNgxsLoggerPlugin(),
+      ...(environment.production
+        ? []
+        : [withNgxsReduxDevtoolsPlugin(), withNgxsLoggerPlugin()]),
     ),
   ],
 };

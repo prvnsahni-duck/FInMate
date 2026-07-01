@@ -6,7 +6,9 @@ import {
   OnChanges,
   SimpleChanges,
   inject,
+  DestroyRef,
 } from '@angular/core';
+import { Subscription } from 'rxjs';
 import {
   ReactiveFormsModule,
   FormsModule,
@@ -50,6 +52,7 @@ export class CreateExpenseModalComponent implements OnChanges {
   private expensesService = inject(ExpensesService);
   private friendsService = inject(FriendsService);
   private fb = inject(FormBuilder);
+  private destroyRef = inject(DestroyRef);
 
   currencyOptions: DropdownOption[] = CURRENCY_OPTIONS;
 
@@ -82,6 +85,17 @@ export class CreateExpenseModalComponent implements OnChanges {
   searchResults: UserSearchResult[] = [];
   resolvedFriends: Map<string, UserSearchResult> = new Map();
   isSearching = false;
+  private searchTimeoutId?: ReturnType<typeof setTimeout>;
+  private searchSub?: Subscription;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      if (this.searchTimeoutId) {
+        clearTimeout(this.searchTimeoutId);
+      }
+      this.searchSub?.unsubscribe();
+    });
+  }
 
   expenseForm = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(160)]],
@@ -295,20 +309,30 @@ export class CreateExpenseModalComponent implements OnChanges {
   }
 
   onSearchChange(query: string) {
+    if (this.searchTimeoutId) {
+      clearTimeout(this.searchTimeoutId);
+      this.searchTimeoutId = undefined;
+    }
+    this.searchSub?.unsubscribe();
+
     if (query.trim().length < 2) {
       this.searchResults = [];
+      this.isSearching = false;
       return;
     }
+
     this.isSearching = true;
-    this.friendsService.searchUsers(query).subscribe({
-      next: (users) => {
-        this.searchResults = users;
-        this.isSearching = false;
-      },
-      error: () => {
-        this.isSearching = false;
-      },
-    });
+    this.searchTimeoutId = setTimeout(() => {
+      this.searchSub = this.friendsService.searchUsers(query).subscribe({
+        next: (users) => {
+          this.searchResults = users;
+          this.isSearching = false;
+        },
+        error: () => {
+          this.isSearching = false;
+        },
+      });
+    }, 250);
   }
 
   addFriendToSplit(user: UserSearchResult) {

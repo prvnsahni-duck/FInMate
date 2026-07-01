@@ -1,10 +1,11 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, signal, inject, DestroyRef } from '@angular/core';
 import {
   RouterOutlet,
   RouterLink,
   Router,
   NavigationEnd,
 } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs/operators';
 import { APP_NAME } from '../../core/constants/app.constants';
 import { ExpensesUiStore } from '../../features/groups/services/expenses-ui.store';
@@ -72,6 +73,7 @@ export class MainLayoutComponent {
   activeTab = signal<string>('Home');
   private expensesUiStore = inject(ExpensesUiStore);
   private router = inject(Router);
+  private destroyRef = inject(DestroyRef);
 
   sunIconPath =
     'M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0 M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41';
@@ -88,8 +90,11 @@ export class MainLayoutComponent {
 
     // Track active navigation tab based on route changes
     this.router.events
-      .pipe(filter((event) => event instanceof NavigationEnd))
-      .subscribe((event: any) => {
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((event: NavigationEnd) => {
         const url = event.urlAfterRedirects || event.url;
         if (url.includes('/groups')) {
           this.activeTab.set('Groups');
