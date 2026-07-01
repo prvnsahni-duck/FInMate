@@ -1764,3 +1764,22 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   - Customize Helmet's global Content Security Policy directives to support Swagger UI's inline styles and scripts rather than disabling CSP completely, preserving API security.
 - **Next Actions:**
   - Run the backend service and test the `/docs` UI.
+
+---
+
+### 2026-07-01
+
+- **Summary:** Fixed authenticated dashboard freeze after login or refresh with a valid token.
+- **Changes Made:**
+  - Removed the impure async `decrypt` pipe from the dashboard expense title binding because expense titles are already decrypted by `ExpensesService`.
+  - Reworked personal expense list decryption in `ExpensesService.getExpenses()` to await decryption directly instead of wrapping an Observable subscription inside a Promise.
+  - Batched expense decryption and limited the dashboard recent-expenses query to 25 rows to prevent authenticated dashboard startup from blocking the UI thread.
+- **Artifacts Updated:**
+  - [dashboard-home.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/components/dashboard-home/dashboard-home.component.ts)
+  - [dashboard-home.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/components/dashboard-home/dashboard-home.component.html)
+  - [expenses.service.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/services/expenses.service.ts)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+  - Keep decryption centralized in `ExpensesService` for fetched expenses and avoid async work in impure template pipes.
+- **Next Actions:**
+  - Verify login, direct dashboard refresh with a valid token, and personal expense list rendering.

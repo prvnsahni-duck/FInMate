@@ -150,7 +150,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.isLoading = true;
 
     // 1. Fetch personal expenses
-    this.expensesService.getExpenses('personal').subscribe({
+    this.expensesService
+      .getExpenses('personal', { page: 1, limit: 25 })
+      .subscribe({
       next: (res) => {
         this.personalExpenses = (res.data as GroupExpense[]) || [];
         // Personal balance is simply the sum of all personal expenses logged

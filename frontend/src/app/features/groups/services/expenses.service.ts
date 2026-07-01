@@ -14,11 +14,23 @@ import {
   MonthlyAnalyticsPoint,
   UpdateExpenseDto,
 } from '@finmate/data-models';
-import { SESSION_EXPIRED_MESSAGE } from '../../../core/constants/crypto.constants';
 import {
-  mapDecryptExpense,
-  mapDecryptExpenses,
-} from '../../../core/utils/crypto-operators';
+  DECRYPTION_FAILED_PLACEHOLDER,
+  SESSION_EXPIRED_MESSAGE,
+} from '../../../core/constants/crypto.constants';
+import { mapDecryptExpense } from '../../../core/utils/crypto-operators';
+
+type EncryptedExpensePayload = Expense & {
+  title: string;
+  description?: string;
+  [key: string]: unknown;
+};
+
+const EXPENSE_DECRYPTION_BATCH_SIZE = 25;
+
+function yieldToBrowser(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 @Injectable({
   providedIn: 'root',
@@ -99,14 +111,63 @@ export class ExpensesService {
       .get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params })
       .pipe(
         mergeMap(async (res) => {
-          if (res.data) {
-            const decryptedData = await new Promise<Expense[]>((resolve) => {
-              mapDecryptExpenses<Expense>(this.store, this.encryptionService)(
-                from([res.data as Expense[]]),
-              ).subscribe((data) => resolve(data));
-            });
-            res.data = decryptedData;
+          const expenses = res.data as Expense[] | undefined;
+          if (!expenses || expenses.length === 0) {
+            return res;
           }
+
+          const user = this.store.selectSnapshot(AuthState.getUser);
+          const email = user?.email;
+          if (!email) {
+            return res;
+          }
+
+          const key = await this.encryptionService.loadKeyFromSession(email);
+          if (!key) {
+            return res;
+          }
+
+          const decryptedExpenses: Expense[] = [];
+
+          for (
+            let index = 0;
+            index < expenses.length;
+            index += EXPENSE_DECRYPTION_BATCH_SIZE
+          ) {
+            const batch = expenses.slice(
+              index,
+              index + EXPENSE_DECRYPTION_BATCH_SIZE,
+            );
+            const decryptedBatch = await Promise.all(
+              batch.map(async (expense) => {
+                try {
+                  const decrypted = await this.encryptionService.decryptExpense(
+                    expense as EncryptedExpensePayload,
+                    key,
+                  );
+                  return {
+                    ...expense,
+                    title: decrypted.title,
+                    description: decrypted.description,
+                  };
+                } catch (e) {
+                  console.error('Decryption failed for expense', expense.id, e);
+                  return {
+                    ...expense,
+                    title: DECRYPTION_FAILED_PLACEHOLDER,
+                    description: '',
+                  };
+                }
+              }),
+            );
+            decryptedExpenses.push(...decryptedBatch);
+
+            if (index + EXPENSE_DECRYPTION_BATCH_SIZE < expenses.length) {
+              await yieldToBrowser();
+            }
+          }
+
+          res.data = decryptedExpenses;
           return res;
         }),
       );
