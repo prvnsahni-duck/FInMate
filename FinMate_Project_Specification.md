@@ -1783,3 +1783,39 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   - Keep decryption centralized in `ExpensesService` for fetched expenses and avoid async work in impure template pipes.
 - **Next Actions:**
   - Verify login, direct dashboard refresh with a valid token, and personal expense list rendering.
+
+---
+
+### 2026-07-01 (Part 2)
+
+- **Summary:** Added a logout button to the Profile tab.
+- **Changes Made:**
+  - Added a disabled signing-out state and logout event to [DashboardProfileComponent](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/components/dashboard-profile/dashboard-profile.component.ts).
+  - Added the Profile logout button in [dashboard-profile.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/components/dashboard-profile/dashboard-profile.component.html).
+  - Wired Dashboard to dispatch the existing NGXS `Logout` action and route to `/auth/login` after logout cleanup in [dashboard.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts).
+  - Bound Profile logout inputs/events in [dashboard.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html).
+- **Artifacts Updated:**
+  - [dashboard-profile.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/components/dashboard-profile/dashboard-profile.component.ts)
+  - [dashboard-profile.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/components/dashboard-profile/dashboard-profile.component.html)
+  - [dashboard.component.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.ts)
+  - [dashboard.component.html](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/dashboard/pages/dashboard/dashboard.component.html)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+  - Reuse the existing centralized auth logout action so API logout, token cleanup, auth state reset, and encryption-key cleanup stay in one flow.
+- **Next Actions:**
+  - Verify that clicking Logout from Profile clears auth data, calls `/auth/logout`, and redirects to `/auth/login`.
+
+---
+
+### 2026-07-01 (Part 3)
+
+- **Summary:** Fixed the Create Expense Modal friend-search unit test.
+- **Changes Made:**
+  - Updated the friend search spec to advance Jest fake timers through the component's 250ms debounce before asserting `FriendsService.searchUsers`.
+- **Artifacts Updated:**
+  - [create-expense-modal.component.spec.ts](file:///d:/prvn/Projects/FinMate/frontend/src/app/features/groups/components/create-expense-modal/create-expense-modal.component.spec.ts)
+  - [FinMate_Project_Specification.md](file:///d:/prvn/Projects/FinMate/FinMate_Project_Specification.md)
+- **Decisions:**
+  - Keep the production debounce behavior and align the test with the existing async timing.
+- **Next Actions:**
+  - Run the full frontend test suite to confirm no additional failures.

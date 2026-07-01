@@ -337,13 +337,19 @@ describe('CreateExpenseModalComponent', () => {
   // --- Friend search ---
   describe('friend search', () => {
     it('should search users when query is >= 2 characters', () => {
-      mockFriendsService.searchUsers.mockReturnValue(
-        of([{ id: 'u2', displayName: 'Jane', email: 'jane@example.com' }]),
-      );
+      jest.useFakeTimers();
+      try {
+        mockFriendsService.searchUsers.mockReturnValue(
+          of([{ id: 'u2', displayName: 'Jane', email: 'jane@example.com' }]),
+        );
 
-      component.onSearchChange('ja');
+        component.onSearchChange('ja');
+        jest.advanceTimersByTime(250);
 
-      expect(mockFriendsService.searchUsers).toHaveBeenCalledWith('ja');
+        expect(mockFriendsService.searchUsers).toHaveBeenCalledWith('ja');
+      } finally {
+        jest.useRealTimers();
+      }
     });
 
     it('should not search when query is < 2 characters', () => {

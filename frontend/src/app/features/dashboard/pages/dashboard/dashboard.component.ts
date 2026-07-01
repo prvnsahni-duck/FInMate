@@ -2,8 +2,9 @@ import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { Store } from '@ngxs/store';
-import { AuthState } from '../../../../core/auth/auth.state';
+import { AuthState, Logout } from '../../../../core/auth/auth.state';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CreateExpenseModalComponent } from '../../../groups/components/create-expense-modal/create-expense-modal.component';
 import { AnalyticsChartsComponent } from '../../../groups/components/analytics-charts/analytics-charts.component';
@@ -70,6 +71,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private expensesUiStore = inject(ExpensesUiStore);
   private authService = inject(AuthService);
   private aiService = inject(AiService);
+  private router = inject(Router);
 
   get activeTab(): string {
     return this.expensesUiStore.activeTab();
@@ -90,6 +92,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.expensesUiStore.showCreateExpenseModal.set(val);
   }
   isLoading = true;
+  isLoggingOut = false;
 
   // AI Chat Bot State
   isAiChatOpen = false;
@@ -358,6 +361,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
   onDeleteCancelled() {
     this.isDeleteConfirmOpen = false;
     this.deleteExpenseId = null;
+  }
+
+  logout() {
+    if (this.isLoggingOut) {
+      return;
+    }
+
+    this.isLoggingOut = true;
+    this.store.dispatch(new Logout()).subscribe({
+      next: () => {
+        this.router.navigate(['/auth/login']);
+      },
+      error: () => {
+        this.router.navigate(['/auth/login']);
+      },
+    });
   }
 
   // AI Chat Bot Methods

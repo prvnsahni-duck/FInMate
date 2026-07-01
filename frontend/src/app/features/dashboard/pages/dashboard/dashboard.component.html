@@ -63,6 +63,8 @@
       [userProfile]="userProfile"
       [personalExpensesCount]="personalExpenses.length"
       [incomePercentage]="incomePercentage"
+      [isLoggingOut]="isLoggingOut"
+      (logoutEvent)="logout()"
     ></app-dashboard-profile>
   }
 </div>
