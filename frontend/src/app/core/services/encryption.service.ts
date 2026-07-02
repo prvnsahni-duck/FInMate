@@ -90,7 +90,7 @@ export class ClientEncryptionService {
         length: 256,
       },
       false, // Non-extractable: prevents XSS from reading raw key material
-      ['encrypt', 'decrypt'],
+      ['encrypt', 'decrypt', 'wrapKey', 'unwrapKey'],
     );
   }
 
@@ -358,5 +358,192 @@ export class ClientEncryptionService {
       ...settlement,
       note: decryptedNote,
     };
+  }
+
+  /**
+   * Generates a random symmetric key (AES-GCM 256-bit) to be used as a content
+   * or group key. Must be extractable so it can be wrapped.
+   */
+  async generateDataKey(): Promise<CryptoKey> {
+    const subtle = this.getSubtleCrypto();
+    return await subtle.generateKey(
+      {
+        name: 'AES-GCM',
+        length: 256,
+      },
+      true, // extractable
+      ['encrypt', 'decrypt'],
+    );
+  }
+
+  /**
+   * Wraps (encrypts) a data key with a wrapping key (such as the master key or a public key).
+   * Returns a combined string in format `iv_base64:ciphertext_base64` for symmetric key, or base64 ciphertext for asymmetric key.
+   */
+  async wrapKey(dataKey: CryptoKey, wrappingKey: CryptoKey): Promise<string> {
+    const subtle = this.getSubtleCrypto();
+    if (wrappingKey.type === 'public') {
+      const wrappedBuffer = await subtle.wrapKey(
+        'raw',
+        dataKey,
+        wrappingKey,
+        {
+          name: 'RSA-OAEP',
+        },
+      );
+      return arrayBufferToBase64(wrappedBuffer);
+    }
+
+    let iv: Uint8Array;
+    if (typeof window !== 'undefined' && window.crypto) {
+      iv = window.crypto.getRandomValues(new Uint8Array(12));
+    } else if (typeof globalThis !== 'undefined' && globalThis.crypto) {
+      iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+    } else {
+      throw new Error('Web Cryptography API (SubtleCrypto) is not available');
+    }
+    const ivBuffer = iv.buffer.slice(
+      iv.byteOffset,
+      iv.byteOffset + iv.byteLength,
+    ) as ArrayBuffer;
+
+    const wrappedBuffer = await subtle.wrapKey(
+      'raw',
+      dataKey,
+      wrappingKey,
+      {
+        name: 'AES-GCM',
+        iv: ivBuffer,
+      },
+    );
+
+    const ivBase64 = arrayBufferToBase64(ivBuffer);
+    const wrappedBase64 = arrayBufferToBase64(wrappedBuffer);
+
+    return `${ivBase64}:${wrappedBase64}`;
+  }
+
+  /**
+   * Unwraps (decrypts) a wrapped key using an unwrapping key (such as the master key or a private key).
+   * Returns a non-extractable CryptoKey.
+   */
+  async unwrapKey(wrappedStr: string, unwrappingKey: CryptoKey): Promise<CryptoKey> {
+    if (!wrappedStr) {
+      throw new Error('Wrapped key string cannot be empty');
+    }
+    const subtle = this.getSubtleCrypto();
+    if (unwrappingKey.type === 'private') {
+      const wrappedBuffer = base64ToArrayBuffer(wrappedStr);
+      return await subtle.unwrapKey(
+        'raw',
+        wrappedBuffer,
+        unwrappingKey,
+        {
+          name: 'RSA-OAEP',
+        },
+        {
+          name: 'AES-GCM',
+          length: 256,
+        },
+        false, // non-extractable for security
+        ['encrypt', 'decrypt'],
+      );
+    }
+
+    const parts = wrappedStr.split(':');
+    if (parts.length !== 2) {
+      throw new Error(
+        'Invalid wrapped key format. Expected iv_base64:ciphertext_base64',
+      );
+    }
+
+    const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
+    const ivBuffer = iv.buffer.slice(
+      iv.byteOffset,
+      iv.byteOffset + iv.byteLength,
+    ) as ArrayBuffer;
+    const wrappedBuffer = base64ToArrayBuffer(parts[1]);
+
+    return await subtle.unwrapKey(
+      'raw',
+      wrappedBuffer,
+      unwrappingKey,
+      {
+        name: 'AES-GCM',
+        iv: ivBuffer,
+      },
+      {
+        name: 'AES-GCM',
+        length: 256,
+      },
+      false, // non-extractable for security
+      ['encrypt', 'decrypt'],
+    );
+  }
+
+  /**
+   * Encrypts raw bytes (ArrayBuffer) using a CryptoKey with AES-256-GCM.
+   * Returns a combined string in format `iv_base64:ciphertext_base64`.
+   */
+  async encryptBytes(data: ArrayBuffer, key: CryptoKey): Promise<string> {
+    const subtle = this.getSubtleCrypto();
+    let iv: Uint8Array;
+    if (typeof window !== 'undefined' && window.crypto) {
+      iv = window.crypto.getRandomValues(new Uint8Array(12));
+    } else if (typeof globalThis !== 'undefined' && globalThis.crypto) {
+      iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+    } else {
+      throw new Error('Web Cryptography API (SubtleCrypto) is not available');
+    }
+    const ivBuffer = iv.buffer.slice(
+      iv.byteOffset,
+      iv.byteOffset + iv.byteLength,
+    ) as ArrayBuffer;
+
+    const ciphertextBuffer = await subtle.encrypt(
+      {
+        name: 'AES-GCM',
+        iv: ivBuffer,
+      },
+      key,
+      data,
+    );
+
+    const ivBase64 = arrayBufferToBase64(ivBuffer);
+    const ciphertextBase64 = arrayBufferToBase64(ciphertextBuffer);
+
+    return `${ivBase64}:${ciphertextBase64}`;
+  }
+
+  /**
+   * Decrypts encrypted bytes in format `iv_base64:ciphertext_base64` using a CryptoKey.
+   */
+  async decryptBytes(encryptedStr: string, key: CryptoKey): Promise<ArrayBuffer> {
+    if (!encryptedStr) {
+      return new ArrayBuffer(0);
+    }
+    const parts = encryptedStr.split(':');
+    if (parts.length !== 2) {
+      throw new Error(
+        'Invalid ciphertext format. Expected iv_base64:ciphertext_base64',
+      );
+    }
+
+    const subtle = this.getSubtleCrypto();
+    const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
+    const ivBuffer = iv.buffer.slice(
+      iv.byteOffset,
+      iv.byteOffset + iv.byteLength,
+    ) as ArrayBuffer;
+    const ciphertextBuffer = base64ToArrayBuffer(parts[1]);
+
+    return await subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: ivBuffer,
+      },
+      key,
+      ciphertextBuffer,
+    );
   }
 }

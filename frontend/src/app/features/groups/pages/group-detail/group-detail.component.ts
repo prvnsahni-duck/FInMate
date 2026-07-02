@@ -18,10 +18,11 @@ import { ConfirmModalComponent } from '../../../../shared/components/confirm-mod
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import {
-  DropdownComponent,
-  DropdownOption,
-} from '../../../../shared/components/dropdown/dropdown.component';
+import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
+import { Store } from '@ngxs/store';
+import { ClientEncryptionService } from '../../../../core/services/encryption.service';
+import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { base64ToArrayBuffer } from '../../../../core/services/encryption.service';
 
 import {
   BalanceEntry,
@@ -95,6 +96,9 @@ export class GroupDetailComponent implements OnInit {
   private recurringExpensesService = inject(RecurringExpensesService);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
+  private encryptionService = inject(ClientEncryptionService);
+  private groupKeyService = inject(GroupKeyService);
+  private store = inject(Store);
   private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -180,6 +184,7 @@ export class GroupDetailComponent implements OnInit {
   currentTimelineMonth = signal<Date>(new Date());
   isMonthLocked = signal<boolean>(false);
   isViewer = signal<boolean>(false);
+  isGroupKeyLoaded = signal<boolean>(true);
 
   // Categories list
   categories = [
@@ -265,11 +270,33 @@ export class GroupDetailComponent implements OnInit {
             if (res.groupType === 'household') {
               this.fetchCarryForward(groupId);
             }
+            this.initializeGroupKeysAndSelfHeal(groupId);
           },
           error: () => this.isLoading.set(false),
         });
       }
     });
+  }
+
+  async initializeGroupKeysAndSelfHeal(groupId: string) {
+    try {
+      await this.groupKeyService.getMyAsymmetricKeys();
+      let key = await this.groupKeyService.getGroupDataKey(groupId);
+      if (!key) {
+        const role = this.getCallerRole();
+        if (role === 'owner' || role === 'admin') {
+          console.info('No group key found. Generating new group data key...');
+          key = await this.groupKeyService.createAndStoreGroupKey(groupId);
+        }
+      }
+      this.isGroupKeyLoaded.set(!!key);
+      if (key) {
+        await this.groupKeyService.checkAndProvisionMissingKeys(groupId);
+      }
+    } catch (e) {
+      console.warn('Failed to initialize group encryption keys / self-heal', e);
+      this.isGroupKeyLoaded.set(false);
+    }
   }
 
   getCurrentMonthString(): string {
@@ -597,22 +624,80 @@ export class GroupDetailComponent implements OnInit {
     }
   }
 
-  downloadAttachment(file: NonNullable<GroupExpense['attachments']>[number]) {
-    alert(
-      `Downloading attachment: ${file.originalName}\nDecrypted successfully!`,
-    );
-    const blob = new Blob(
-      [`Decrypted content of: ${file.originalName} (${file.storageKey})`],
-      { type: 'text/plain' },
-    );
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.originalName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+  async downloadAttachment(file: any) {
+    if (file.encryptedFileKey && file.encryptedOriginalName) {
+      try {
+        const user = this.currentUserId();
+        const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
+
+        const expense = this.expenses().find((e) => e.id === file.expenseId);
+        if (!expense) {
+          throw new Error('Expense context not found for attachment');
+        }
+
+        let scopeKey: CryptoKey | null = null;
+        const scope = (expense as any).encryptionScope || 'personal';
+        const gId = (expense as any).groupId;
+
+        if (scope === 'group' && gId) {
+          scopeKey = await this.groupKeyService.getGroupDataKey(gId);
+        } else if (scope === 'direct_shared') {
+          const wrappedContentKeys = (expense as any).wrappedContentKeys || [];
+          const myWrapped = wrappedContentKeys.find((wk: any) => wk.userId === user);
+          if (myWrapped) {
+            const masterKey = await this.encryptionService.loadKeyFromSession(email || undefined);
+            if (masterKey) {
+              scopeKey = await this.encryptionService.unwrapKey(myWrapped.wrappedKey, masterKey);
+            }
+          }
+        } else {
+          scopeKey = await this.encryptionService.loadKeyFromSession(email || undefined);
+        }
+
+        if (!scopeKey) {
+          throw new Error('Decryption key not available.');
+        }
+
+        const fileKey = await this.encryptionService.unwrapKey(file.encryptedFileKey, scopeKey);
+        const decryptedName = await this.encryptionService.decrypt(file.encryptedOriginalName, fileKey);
+
+        const encryptedBytes = localStorage.getItem(`sim_storage:${file.storageKey}`);
+        if (!encryptedBytes) {
+          throw new Error('Attachment file data not found in simulation storage');
+        }
+
+        const decryptedBytes = await this.encryptionService.decryptBytes(encryptedBytes, fileKey);
+
+        const blob = new Blob([decryptedBytes], { type: file.mimeType || 'application/octet-stream' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = decryptedName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      } catch (err: any) {
+        console.error(err);
+        alert('Failed to decrypt attachment: ' + (err.message || err));
+      }
+    } else {
+      alert(
+        `Downloading attachment (Legacy): ${file.originalName}`,
+      );
+      const blob = new Blob(
+        [`Decrypted content of: ${file.originalName} (${file.storageKey})`],
+        { type: 'text/plain' },
+      );
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.originalName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }
   }
 
   // Group Settings Form State

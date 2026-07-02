@@ -1,4 +1,3 @@
-import { Transform } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
@@ -12,7 +11,9 @@ import {
   MaxLength,
   Min,
   Validate,
+  ValidateNested,
 } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
 import { ExpenseSplitInputDto } from './expense-split.dto';
 import { SplitPayloadValidator } from './split-payload.validator';
 import { IsCiphertext } from '../../common/decorators/is-ciphertext.decorator';
@@ -88,4 +89,24 @@ export class CreateExpenseDto {
   @IsString({ each: true, message: 'each attachment key must be a string' })
   @IsOptional()
   attachmentKeys?: string[];
+
+  @IsIn(['personal', 'group', 'direct_shared'], {
+    message: 'encryptionScope must be personal, group, or direct_shared',
+  })
+  @IsOptional()
+  encryptionScope?: 'personal' | 'group' | 'direct_shared';
+
+  @IsArray()
+  @IsOptional()
+  wrappedContentKeys?: Array<{ userId: string; wrappedKey: string }>;
+
+  @IsArray()
+  @IsOptional()
+  encryptedAttachments?: Array<{
+    storageKey: string;
+    encryptedOriginalName: string;
+    encryptedFileKey: string;
+    mimeType: string;
+    sizeBytes: number;
+  }>;
 }

@@ -38,6 +38,14 @@ export class User {
   @Column({ type: 'boolean', default: false })
   isTwoFactorEnabled!: boolean;
 
+  /** The user's public RSA-OAEP wrapping key. */
+  @Column({ name: 'public_wrapping_key', type: 'text', nullable: true })
+  publicWrappingKey?: string;
+
+  /** The user's private RSA-OAEP wrapping key, encrypted with their master key. */
+  @Column({ name: 'encrypted_private_wrapping_key', type: 'text', nullable: true })
+  encryptedPrivateWrappingKey?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 

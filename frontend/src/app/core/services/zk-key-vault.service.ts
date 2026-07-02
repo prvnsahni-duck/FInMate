@@ -208,4 +208,19 @@ export class ZkKeyVaultService {
       };
     });
   }
+
+  /** Stores a group's data key in the vault under group:${groupId} */
+  async storeGroupKey(groupId: string, key: CryptoKey): Promise<void> {
+    return this.storeKey(`group:${groupId}`, key);
+  }
+
+  /** Loads a group's data key from the vault by groupId */
+  async loadGroupKey(groupId: string): Promise<CryptoKey | null> {
+    return this.loadKey(`group:${groupId}`);
+  }
+
+  /** Deletes a group's data key from the vault by groupId */
+  async deleteGroupKey(groupId: string): Promise<void> {
+    return this.deleteKey(`group:${groupId}`);
+  }
 }

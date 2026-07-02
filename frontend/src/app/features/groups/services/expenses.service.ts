@@ -19,6 +19,8 @@ import {
   SESSION_EXPIRED_MESSAGE,
 } from '../../../core/constants/crypto.constants';
 import { mapDecryptExpense } from '../../../core/utils/crypto-operators';
+import { GroupKeyService } from '../../../core/services/group-key.service';
+import { firstValueFrom } from 'rxjs';
 
 type EncryptedExpensePayload = Expense & {
   title: string;
@@ -39,7 +41,18 @@ export class ExpensesService {
   private http = inject(HttpClient);
   private store = inject(Store);
   private encryptionService = inject(ClientEncryptionService);
+  private groupKeyService = inject(GroupKeyService);
   private baseUrl = environment.apiBaseUrl;
+
+  private getSubtleCrypto(): SubtleCrypto {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+      return window.crypto.subtle;
+    }
+    if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
+      return globalThis.crypto.subtle;
+    }
+    throw new Error('Web Cryptography API is not available');
+  }
 
   /**
    * Encrypts CreateExpenseDto or UpdateExpenseDto outgoing payloads.
@@ -50,12 +63,90 @@ export class ExpensesService {
     const user = this.store.selectSnapshot(AuthState.getUser);
     const email = user?.email;
     if (email) {
-      const key = await this.encryptionService.loadKeyFromSession(email);
-      if (!key) {
+      const masterKey = await this.encryptionService.loadKeyFromSession(email);
+      if (!masterKey) {
         throw new Error(SESSION_EXPIRED_MESSAGE);
       }
 
-      const encrypted = { ...payload };
+      const encrypted = { ...payload } as any;
+
+      // 1. Determine encryption scope and pick corresponding key
+      let scope: 'personal' | 'group' | 'direct_shared' = 'personal';
+      let key: CryptoKey = masterKey;
+
+      if ((payload as any).groupId) {
+        scope = 'group';
+        let gKey = await this.groupKeyService.getGroupDataKey((payload as any).groupId);
+        if (!gKey) {
+          gKey = await this.groupKeyService.createAndStoreGroupKey((payload as any).groupId);
+        }
+        key = gKey;
+      } else {
+        const currentUserId = user?.userId;
+        const splits = payload.splits || [];
+        const otherParticipants = splits.filter(
+          (s) => s.participantUserId && s.participantUserId !== currentUserId
+        );
+
+        if (otherParticipants.length > 0) {
+          scope = 'direct_shared';
+          
+          if ((payload as any).wrappedContentKeys && (payload as any).wrappedContentKeys.length > 0) {
+            const myWrapped = (payload as any).wrappedContentKeys.find((wk: any) => wk.userId === currentUserId);
+            if (myWrapped) {
+              key = await this.encryptionService.unwrapKey(myWrapped.wrappedKey, masterKey);
+            } else {
+              key = await this.encryptionService.generateDataKey();
+            }
+            encrypted.wrappedContentKeys = (payload as any).wrappedContentKeys;
+          } else {
+            const contentKey = await this.encryptionService.generateDataKey();
+            key = contentKey;
+
+            const wrappedContentKeys = [];
+
+            // Wrap for self
+            const wrappedSelf = await this.encryptionService.wrapKey(contentKey, masterKey);
+            wrappedContentKeys.push({
+              userId: currentUserId,
+              wrappedKey: wrappedSelf,
+            });
+
+            // Wrap for each friend
+            for (const split of otherParticipants) {
+              const participantId = split.participantUserId!;
+              try {
+                const pubKeyRes = await firstValueFrom(
+                  this.http.get<{ data: { publicWrappingKey: string | null } }>(
+                    `${this.baseUrl}/users/${participantId}/public-key`,
+                  ),
+                );
+                const pubKeyStr = pubKeyRes?.data?.publicWrappingKey;
+                if (pubKeyStr) {
+                  const pubKey = await this.getSubtleCrypto().importKey(
+                    'jwk',
+                    JSON.parse(pubKeyStr),
+                    { name: 'RSA-OAEP', hash: 'SHA-256' },
+                    true,
+                    ['wrapKey'],
+                  );
+                  const wrappedFriendKey = await this.encryptionService.wrapKey(contentKey, pubKey);
+                  wrappedContentKeys.push({
+                    userId: participantId,
+                    wrappedKey: wrappedFriendKey,
+                  });
+                }
+              } catch (e) {
+                console.error(`Failed to wrap key for participant ${participantId}`, e);
+              }
+            }
+
+            encrypted.wrappedContentKeys = wrappedContentKeys;
+          }
+        }
+      }
+
+      encrypted.encryptionScope = scope;
 
       if (payload.title) {
         encrypted.title = await this.encryptionService.encrypt(
@@ -139,8 +230,31 @@ export class ExpensesService {
               index + EXPENSE_DECRYPTION_BATCH_SIZE,
             );
             const decryptedBatch = await Promise.all(
-              batch.map(async (expense) => {
+              batch.map(async (expense: any) => {
                 try {
+                  let key: CryptoKey | null = null;
+                  const scope = expense.encryptionScope || 'personal';
+                  const gId = expense.groupId;
+
+                  if (scope === 'group' && gId) {
+                    key = await this.groupKeyService.getGroupDataKey(gId);
+                  } else if (scope === 'direct_shared') {
+                    const wrappedContentKeys = expense.wrappedContentKeys || [];
+                    const myWrapped = wrappedContentKeys.find((wk: any) => wk.userId === user?.userId);
+                    if (myWrapped) {
+                      const masterKey = await this.encryptionService.loadKeyFromSession(email);
+                      if (masterKey) {
+                        key = await this.encryptionService.unwrapKey(myWrapped.wrappedKey, masterKey);
+                      }
+                    }
+                  } else {
+                    key = await this.encryptionService.loadKeyFromSession(email);
+                  }
+
+                  if (!key) {
+                    throw new Error('Key not available for scope ' + scope);
+                  }
+
                   const decrypted = await this.encryptionService.decryptExpense(
                     expense as EncryptedExpensePayload,
                     key,
@@ -181,7 +295,7 @@ export class ExpensesService {
       mergeMap((encryptedPayload) =>
         this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload),
       ),
-      mapDecryptExpense(this.store, this.encryptionService),
+      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
     );
   }
 
@@ -196,7 +310,7 @@ export class ExpensesService {
           encryptedPayload,
         ),
       ),
-      mapDecryptExpense(this.store, this.encryptionService),
+      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
     );
   }
 
@@ -213,7 +327,7 @@ export class ExpensesService {
   restoreExpense(id: string): Observable<Expense> {
     return this.http
       .post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {})
-      .pipe(mapDecryptExpense(this.store, this.encryptionService));
+      .pipe(mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService));
   }
 
   /**

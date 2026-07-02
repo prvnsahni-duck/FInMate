@@ -15,6 +15,8 @@ import {
   FormBuilder,
   Validators,
 } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
 import { jwtDecode } from 'jwt-decode';
 import { ExpensesService } from '../../services/expenses.service';
 import { FriendsService } from '../../../../features/friends/services/friends.service';
@@ -27,6 +29,10 @@ import {
   UpdateExpenseDto,
   UserSearchResult,
 } from '@finmate/data-models';
+import { Store } from '@ngxs/store';
+import { ClientEncryptionService } from '../../../../core/services/encryption.service';
+import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { environment } from '../../../../../environments/environment';
 import { GroupExpense } from '../../pages/group-detail/group-detail.component';
 import {
   DropdownComponent,
@@ -53,6 +59,11 @@ export class CreateExpenseModalComponent implements OnChanges {
   private friendsService = inject(FriendsService);
   private fb = inject(FormBuilder);
   private destroyRef = inject(DestroyRef);
+  private encryptionService = inject(ClientEncryptionService);
+  private groupKeyService = inject(GroupKeyService);
+  private store = inject(Store);
+  private http = inject(HttpClient);
+  private baseUrl = environment.apiBaseUrl;
 
   currencyOptions: DropdownOption[] = CURRENCY_OPTIONS;
 
@@ -357,7 +368,9 @@ export class CreateExpenseModalComponent implements OnChanges {
     this.closeModalEvent.emit();
   }
 
-  onSubmit() {
+  filesToEncrypt: Array<{ name: string; type: string; size: number; arrayBuffer: ArrayBuffer }> = [];
+
+  async onSubmit() {
     if (!this.groupId && !this.splitWithFriend) {
       const currentUserId = this.getCurrentUserId();
       if (currentUserId) {
@@ -396,41 +409,155 @@ export class CreateExpenseModalComponent implements OnChanges {
         !expenseDate ||
         !paidByUserId
       ) {
+        this.isSubmitting = false;
         return;
       }
 
-      const payload: CreateExpenseDto = {
-        title,
-        description: formValue.description ?? undefined,
-        amountTotal,
-        currency,
-        category,
-        expenseDate,
-        paidByUserId,
-        groupId: this.groupId ?? undefined,
-        splits,
-        attachmentKeys: this.attachedFiles.map((f) => f.key),
-      };
+      try {
+        const user = this.getCurrentUserId();
+        const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
+        let scopeKey: CryptoKey | null = null;
+        let scope: 'personal' | 'group' | 'direct_shared' = 'personal';
 
-      const request$ = this.expense
-        ? this.expensesService.updateExpense(this.expense.id, {
-            ...payload,
-            version: this.expense.version,
-          } satisfies UpdateExpenseDto)
-        : this.expensesService.createExpense(payload);
+        if (this.groupId) {
+          scope = 'group';
+          scopeKey = await this.groupKeyService.getGroupDataKey(this.groupId);
+          if (!scopeKey) {
+            scopeKey = await this.groupKeyService.createAndStoreGroupKey(this.groupId);
+          }
+        } else {
+          const otherParticipants = splits.filter(
+            (s) => s.participantUserId && s.participantUserId !== user
+          );
+          if (otherParticipants.length > 0) {
+            scope = 'direct_shared';
+          } else {
+            scope = 'personal';
+            scopeKey = await this.encryptionService.loadKeyFromSession(email);
+          }
+        }
 
-      request$.subscribe({
-        next: () => {
-          this.isSubmitting = false;
-          this.expenseCreated.emit();
-          this.closeModal();
-        },
-        error: (err) => {
-          this.isSubmitting = false;
-          this.errorMessage =
-            err.error?.message || 'Failed to save expense. Please try again.';
-        },
-      });
+        if (scope === 'direct_shared') {
+          scopeKey = await this.encryptionService.generateDataKey();
+        }
+
+        if (!scopeKey) {
+          throw new Error('Encryption key not loaded/derived. Please try again.');
+        }
+
+        // Encrypt new attachments
+        const encryptedAttachments = [];
+        const existingAttachments = this.attachedFiles
+          .filter((f) => !f.key.startsWith('pending:'))
+          .map((f) => ({
+            storageKey: f.key,
+            encryptedOriginalName: '',
+            encryptedFileKey: '',
+            mimeType: 'application/octet-stream',
+            sizeBytes: 0,
+          }));
+
+        for (const fileObj of this.filesToEncrypt) {
+          const fileKey = await this.encryptionService.generateDataKey();
+          const encryptedBytes = await this.encryptionService.encryptBytes(fileObj.arrayBuffer, fileKey);
+          const encryptedName = await this.encryptionService.encrypt(fileObj.name, fileKey);
+          const wrappedFileKey = await this.encryptionService.wrapKey(fileKey, scopeKey);
+
+          const randomUuid = Math.random().toString(36).substring(2, 15);
+          const storageKey = `receipts/${randomUuid}-${fileObj.name}.enc`;
+          localStorage.setItem(`sim_storage:${storageKey}`, encryptedBytes);
+
+          encryptedAttachments.push({
+            storageKey,
+            encryptedOriginalName: encryptedName,
+            encryptedFileKey: wrappedFileKey,
+            mimeType: fileObj.type,
+            sizeBytes: fileObj.size,
+          });
+        }
+
+        let wrappedContentKeys = [];
+        if (scope === 'direct_shared' && scopeKey) {
+          const masterKey = await this.encryptionService.loadKeyFromSession(email);
+          const currentUserId = user;
+
+          const wrappedSelf = await this.encryptionService.wrapKey(scopeKey, masterKey!);
+          wrappedContentKeys.push({
+            userId: currentUserId!,
+            wrappedKey: wrappedSelf,
+          });
+
+          const otherParticipants = splits.filter(
+            (s) => s.participantUserId && s.participantUserId !== user
+          );
+          for (const split of otherParticipants) {
+            const participantId = split.participantUserId!;
+            try {
+              const pubKeyRes = await firstValueFrom(
+                this.http.get<{ data: { publicWrappingKey: string | null } }>(
+                  `${this.baseUrl}/users/${participantId}/public-key`,
+                ),
+              );
+              const pubKeyStr = pubKeyRes?.data?.publicWrappingKey;
+              if (pubKeyStr) {
+                const subtle = typeof window !== 'undefined' ? window.crypto.subtle : (globalThis as any).crypto.subtle;
+                const pubKey = await subtle.importKey(
+                  'jwk',
+                  JSON.parse(pubKeyStr),
+                  { name: 'RSA-OAEP', hash: 'SHA-256' },
+                  true,
+                  ['wrapKey'],
+                );
+                const wrappedFriendKey = await this.encryptionService.wrapKey(scopeKey, pubKey);
+                wrappedContentKeys.push({
+                  userId: participantId,
+                  wrappedKey: wrappedFriendKey,
+                });
+              }
+            } catch (e) {
+              console.error(`Failed to wrap content key for participant ${participantId}`, e);
+            }
+          }
+        }
+
+        const payload: any = {
+          title,
+          description: formValue.description ?? undefined,
+          amountTotal,
+          currency,
+          category,
+          expenseDate,
+          paidByUserId,
+          groupId: this.groupId ?? undefined,
+          splits,
+          encryptionScope: scope,
+          wrappedContentKeys: wrappedContentKeys.length > 0 ? wrappedContentKeys : undefined,
+          encryptedAttachments: [...existingAttachments, ...encryptedAttachments],
+        };
+
+        const request$ = this.expense
+          ? this.expensesService.updateExpense(this.expense.id, {
+              ...payload,
+              version: this.expense.version,
+            } satisfies UpdateExpenseDto)
+          : this.expensesService.createExpense(payload);
+
+        request$.subscribe({
+          next: () => {
+            this.isSubmitting = false;
+            this.expenseCreated.emit();
+            this.closeModal();
+          },
+          error: (err) => {
+            this.isSubmitting = false;
+            this.errorMessage =
+              err.error?.message || 'Failed to save expense. Please try again.';
+          },
+        });
+      } catch (err: any) {
+        this.isSubmitting = false;
+        this.errorMessage = err?.message || 'Failed to encrypt and save expense.';
+      }
     }
   }
 
@@ -440,17 +567,34 @@ export class CreateExpenseModalComponent implements OnChanges {
     if (files && files.length > 0) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const randomUuid = Math.random().toString(36).substring(2, 15);
-        this.attachedFiles.push({
-          name: file.name,
-          size: (file.size / 1024).toFixed(1) + ' KB',
-          key: `receipts/${randomUuid}-${file.name}.enc`,
-        });
+        const reader = new FileReader();
+        reader.onload = () => {
+          const arrayBuffer = reader.result as ArrayBuffer;
+          this.filesToEncrypt.push({
+            name: file.name,
+            type: file.type || 'application/octet-stream',
+            size: file.size,
+            arrayBuffer,
+          });
+          this.attachedFiles.push({
+            name: file.name,
+            size: (file.size / 1024).toFixed(1) + ' KB',
+            key: `pending:${Math.random().toString(36).substring(2, 10)}`,
+          });
+        };
+        reader.readAsArrayBuffer(file);
       }
     }
   }
 
   removeAttachment(index: number) {
+    const fileItem = this.attachedFiles[index];
+    if (fileItem && fileItem.key.startsWith('pending:')) {
+      const encryptIndex = this.filesToEncrypt.findIndex((f) => f.name === fileItem.name);
+      if (encryptIndex !== -1) {
+        this.filesToEncrypt.splice(encryptIndex, 1);
+      }
+    }
     this.attachedFiles.splice(index, 1);
   }
 }

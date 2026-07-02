@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   AuditLog,
+  EncryptedGroupKey,
   Group,
   GroupMember,
   GroupMemberContribution,
@@ -27,6 +28,7 @@ import {
       GroupMember,
       GroupMemberContribution,
       AuditLog,
+      EncryptedGroupKey,
     ]),
     ExpensesModule,
     EmailModule,

@@ -11,8 +11,43 @@ import {
   ValidateNested,
   IsInt,
   IsDateString,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+/** Per-participant wrapped content key for direct_shared expenses. */
+export class WrappedContentKeyDto {
+  @IsUUID('4')
+  @IsNotEmpty()
+  userId!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  wrappedKey!: string;
+}
+
+/** Encrypted attachment metadata sent from the client. */
+export class EncryptedAttachmentDto {
+  @IsString()
+  @IsNotEmpty()
+  storageKey!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  encryptedOriginalName!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  encryptedFileKey!: string;
+
+  @IsString()
+  @IsNotEmpty()
+  mimeType!: string;
+
+  @IsNumber()
+  @Min(0)
+  sizeBytes!: number;
+}
 
 export class ExpenseSplitInputDto {
   @IsUUID('4', { message: 'Participant User ID must be a valid UUID v4' })
@@ -99,6 +134,24 @@ export class CreateExpenseDto {
   })
   @IsOptional()
   attachmentKeys?: string[];
+
+  @IsIn(['personal', 'group', 'direct_shared'], {
+    message: 'encryptionScope must be personal, group, or direct_shared',
+  })
+  @IsOptional()
+  encryptionScope?: 'personal' | 'group' | 'direct_shared';
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WrappedContentKeyDto)
+  @IsOptional()
+  wrappedContentKeys?: WrappedContentKeyDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EncryptedAttachmentDto)
+  @IsOptional()
+  encryptedAttachments?: EncryptedAttachmentDto[];
 }
 
 export class UpdateExpenseDto {
@@ -158,6 +211,24 @@ export class UpdateExpenseDto {
   })
   @IsOptional()
   attachmentKeys?: string[];
+
+  @IsIn(['personal', 'group', 'direct_shared'], {
+    message: 'encryptionScope must be personal, group, or direct_shared',
+  })
+  @IsOptional()
+  encryptionScope?: 'personal' | 'group' | 'direct_shared';
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => WrappedContentKeyDto)
+  @IsOptional()
+  wrappedContentKeys?: WrappedContentKeyDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EncryptedAttachmentDto)
+  @IsOptional()
+  encryptedAttachments?: EncryptedAttachmentDto[];
 
   @IsInt({ message: 'Version must be an integer' })
   @IsNotEmpty({ message: 'Version is required to resolve concurrent edits' })

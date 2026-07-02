@@ -1,10 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { from, Observable } from 'rxjs';
+import { from, Observable, firstValueFrom } from 'rxjs';
 import { mergeMap, map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
+import { GroupKeyService } from '../../../core/services/group-key.service';
 import {
   CreateRecurringExpenseDto,
   UpdateRecurringExpenseDto,
@@ -21,7 +22,18 @@ export class RecurringExpensesService {
   private http = inject(HttpClient);
   private store = inject(Store);
   private encryptionService = inject(ClientEncryptionService);
+  private groupKeyService = inject(GroupKeyService);
   private baseUrl = environment.apiBaseUrl;
+
+  private getSubtleCrypto(): SubtleCrypto {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+      return window.crypto.subtle;
+    }
+    if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
+      return globalThis.crypto.subtle;
+    }
+    throw new Error('Web Cryptography API is not available');
+  }
 
   private async encryptPayload(
     payload: CreateRecurringExpenseDto | UpdateRecurringExpenseDto,
@@ -31,9 +43,24 @@ export class RecurringExpensesService {
     );
     const email = user?.email;
     if (email) {
-      const key = await this.encryptionService.loadKeyFromSession(email);
-      if (key) {
-        const encrypted = { ...payload };
+      const masterKey = await this.encryptionService.loadKeyFromSession(email);
+      if (masterKey) {
+        const encrypted = { ...payload } as any;
+
+        let scope: 'personal' | 'group' | 'direct_shared' = 'personal';
+        let key: CryptoKey = masterKey;
+
+        if ((payload as any).groupId) {
+          scope = 'group';
+          let gKey = await this.groupKeyService.getGroupDataKey((payload as any).groupId);
+          if (!gKey) {
+            gKey = await this.groupKeyService.createAndStoreGroupKey((payload as any).groupId);
+          }
+          key = gKey;
+        }
+
+        encrypted.encryptionScope = scope;
+
         if (payload.title) {
           encrypted.title = await this.encryptionService.encrypt(
             payload.title,
@@ -62,7 +89,7 @@ export class RecurringExpensesService {
       .get<any>(`${this.baseUrl}/recurring-expenses`, { params })
       .pipe(
         map((res) => res.data || []),
-        mapDecryptExpenses(this.store, this.encryptionService),
+        mapDecryptExpenses(this.store, this.encryptionService, this.groupKeyService),
       );
   }
 
@@ -75,7 +102,7 @@ export class RecurringExpensesService {
         ),
       ),
       map((res) => res.data),
-      mapDecryptExpense(this.store, this.encryptionService),
+      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
     );
   }
 
@@ -91,7 +118,7 @@ export class RecurringExpensesService {
         ),
       ),
       map((res) => res.data),
-      mapDecryptExpense(this.store, this.encryptionService),
+      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
     );
   }
 

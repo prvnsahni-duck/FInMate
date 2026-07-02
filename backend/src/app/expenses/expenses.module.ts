@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   AuditLog,
   Attachment,
+  EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
   Group,
@@ -35,6 +36,7 @@ import {
       User,
       Attachment,
       AuditLog,
+      EncryptedExpenseKey,
     ]),
   ],
   controllers: [ExpensesController, RecurringExpensesController],

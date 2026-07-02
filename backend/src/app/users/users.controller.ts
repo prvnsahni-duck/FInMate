@@ -7,6 +7,9 @@ import {
   Req,
   NotFoundException,
   Query,
+  Post,
+  Param,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { UpdateProfileDto } from '@finmate/data-models';
 import { UsersService } from './users.service';
@@ -56,6 +59,37 @@ export class UsersController {
       profile: result.profile,
     };
     return new SuccessResponse('User profile updated successfully', data);
+  }
+
+  @Post('me/keys')
+  async saveKeys(
+    @Body() body: { publicWrappingKey: string; encryptedPrivateWrappingKey: string },
+    @Req() req: any,
+  ) {
+    const result = await this.usersService.saveKeys(
+      req.user.id,
+      body.publicWrappingKey,
+      body.encryptedPrivateWrappingKey,
+    );
+    return new SuccessResponse('Wrapping keys saved successfully', {
+      id: result.id,
+      publicWrappingKey: result.publicWrappingKey,
+    });
+  }
+
+  @Get('me/keys')
+  async getKeys(@Req() req: any) {
+    const keys = await this.usersService.getKeys(req.user.id);
+    return new SuccessResponse('Wrapping keys retrieved successfully', keys);
+  }
+
+  @Get(':id/public-key')
+  async getPublicKey(@Param('id', ParseUUIDPipe) id: string) {
+    const publicWrappingKey = await this.usersService.getPublicWrappingKey(id);
+    return new SuccessResponse('Public wrapping key retrieved successfully', {
+      userId: id,
+      publicWrappingKey,
+    });
   }
 
   private serializeUser(user: any) {

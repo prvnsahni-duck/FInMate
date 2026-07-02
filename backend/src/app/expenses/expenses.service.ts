@@ -9,6 +9,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
   Attachment,
   AuditLog,
+  EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
   Group,
@@ -53,6 +54,14 @@ interface CategoryTotal {
   currency: string;
 }
 
+type ExpenseEncryptionMetadataInput = {
+  groupId?: string;
+  splits?: CreateExpenseDto['splits'] | UpdateExpenseDto['splits'];
+  encryptionScope?: 'personal' | 'group' | 'direct_shared';
+  wrappedContentKeys?: CreateExpenseDto['wrappedContentKeys'];
+  encryptedAttachments?: CreateExpenseDto['encryptedAttachments'];
+};
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 @Injectable()
@@ -74,6 +83,8 @@ export class ExpensesService {
     private readonly attachmentRepository: Repository<Attachment>,
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
+    @InjectRepository(EncryptedExpenseKey)
+    private readonly encryptedExpenseKeyRepository: Repository<EncryptedExpenseKey>,
   ) {}
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -227,6 +238,111 @@ export class ExpensesService {
     }
   }
 
+  /** Retrieves wrapped content keys for a direct_shared expense. */
+  private async getWrappedContentKeys(
+    expenseId: string,
+  ): Promise<Array<{ userId: string; wrappedKey: string }>> {
+    const keys = await this.encryptedExpenseKeyRepository.find({
+      where: { expense: { id: expenseId } },
+      relations: ['user'],
+    });
+    return keys.map((k) => ({
+      userId: k.user.id,
+      wrappedKey: k.wrappedKey,
+    }));
+  }
+
+  private getDirectParticipantIds(
+    dto: ExpenseEncryptionMetadataInput,
+    ownerUserId: string,
+  ): string[] {
+    const ids = new Set<string>([ownerUserId]);
+    for (const split of dto.splits ?? []) {
+      if (split.participantUserId) {
+        ids.add(split.participantUserId);
+      }
+    }
+    return [...ids];
+  }
+
+  private validateAttachmentEnvelopeMetadata(
+    dto: ExpenseEncryptionMetadataInput,
+  ): void {
+    for (const attachment of dto.encryptedAttachments ?? []) {
+      if (
+        !attachment.storageKey ||
+        !attachment.encryptedFileKey ||
+        !attachment.encryptedOriginalName ||
+        !attachment.mimeType ||
+        !Number.isFinite(Number(attachment.sizeBytes)) ||
+        Number(attachment.sizeBytes) < 0
+      ) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'Encrypted attachment metadata is incomplete',
+        });
+      }
+    }
+  }
+
+  private validateExpenseEncryptionMetadata(
+    userId: string,
+    dto: ExpenseEncryptionMetadataInput,
+    groupId?: string,
+  ): void {
+    this.validateAttachmentEnvelopeMetadata(dto);
+
+    const scope =
+      dto.encryptionScope ??
+      (groupId
+        ? 'group'
+        : this.getDirectParticipantIds(dto, userId).length > 1
+          ? 'direct_shared'
+          : 'personal');
+
+    if (groupId && scope !== 'group') {
+      throw new BadRequestException({
+        errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
+        message: 'Group expenses must use group encryption scope',
+      });
+    }
+
+    if (!groupId && scope === 'group') {
+      throw new BadRequestException({
+        errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
+        message: 'Personal expenses cannot use group encryption scope',
+      });
+    }
+
+    if (scope === 'direct_shared') {
+      const participantIds = this.getDirectParticipantIds(dto, userId);
+      if (participantIds.length < 2) {
+        throw new BadRequestException({
+          errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
+          message: 'Direct-shared encryption requires at least two participants',
+        });
+      }
+
+      const wrappedUserIds = new Set(
+        (dto.wrappedContentKeys ?? []).map((key) => key.userId),
+      );
+      const missingKeyFor = participantIds.find((id) => !wrappedUserIds.has(id));
+      if (missingKeyFor) {
+        throw new BadRequestException({
+          errorCode: 'EXP_MISSING_WRAPPED_KEY',
+          message: 'Direct-shared expenses require wrapped keys for all participants',
+        });
+      }
+    }
+
+    if (scope === 'personal' && this.getDirectParticipantIds(dto, userId).length > 1) {
+      throw new BadRequestException({
+        errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
+        message: 'Shared personal expenses must use direct-shared encryption scope',
+      });
+    }
+  }
+
   private async mapExpenseResponse(
     expense: Expense,
   ): Promise<Record<string, unknown>> {
@@ -254,6 +370,7 @@ export class ExpensesService {
       groupId: expense.group?.id ?? null,
       expenseDate: expense.expenseDate,
       status: expense.status,
+      encryptionScope: expense.encryptionScope ?? 'personal',
       ledgerMonth: expense.ledgerMonth ?? null,
       isCarryForward: expense.isCarryForward,
       splits: splits.map((split) => ({
@@ -281,8 +398,11 @@ export class ExpensesService {
         mimeType: attachment.mimeType,
         sizeBytes: Number(attachment.sizeBytes),
         checksumSha256: attachment.checksumSha256 ?? null,
+        encryptedFileKey: attachment.encryptedFileKey ?? null,
+        encryptedOriginalName: attachment.encryptedOriginalName ?? null,
         createdAt: attachment.createdAt,
       })),
+      wrappedContentKeys: await this.getWrappedContentKeys(expense.id),
       version: expense.version,
       createdAt: expense.createdAt,
       updatedAt: expense.updatedAt,
@@ -493,6 +613,10 @@ export class ExpensesService {
       }
     }
 
+    this.validateExpenseEncryptionMetadata(userId, dto, group?.id);
+    const effectiveEncryptionScope =
+      dto.encryptionScope ?? (group ? 'group' : 'personal');
+
     const saved = await this.dataSource.transaction(async (manager) => {
       const expense = await manager.getRepository(Expense).save(
         manager.getRepository(Expense).create({
@@ -506,6 +630,7 @@ export class ExpensesService {
           group,
           expenseDate: dto.expenseDate,
           status: dto.status || 'posted',
+          encryptionScope: effectiveEncryptionScope,
           // Auto-assign ledgerMonth for household groups
           ledgerMonth:
             group?.groupType === 'household'
@@ -517,7 +642,40 @@ export class ExpensesService {
 
       await this.persistSplits(expense, dto, manager);
 
-      if (dto.attachmentKeys?.length) {
+      // Save wrapped content keys for direct_shared expenses
+      if (
+        effectiveEncryptionScope === 'direct_shared' &&
+        dto.wrappedContentKeys?.length
+      ) {
+        for (const wk of dto.wrappedContentKeys) {
+          await manager.getRepository(EncryptedExpenseKey).save(
+            manager.getRepository(EncryptedExpenseKey).create({
+              expense,
+              user: { id: wk.userId } as User,
+              wrappedKey: wk.wrappedKey,
+            }),
+          );
+        }
+      }
+
+      // Save encrypted attachments (new model)
+      if (dto.encryptedAttachments?.length) {
+        for (const att of dto.encryptedAttachments) {
+          await manager.getRepository(Attachment).save(
+            manager.getRepository(Attachment).create({
+              uploaderUser: ownerUser,
+              expense,
+              storageKey: att.storageKey,
+              originalName: 'encrypted',
+              mimeType: att.mimeType,
+              sizeBytes: String(att.sizeBytes),
+              encryptedFileKey: att.encryptedFileKey,
+              encryptedOriginalName: att.encryptedOriginalName,
+            }),
+          );
+        }
+      } else if (dto.attachmentKeys?.length) {
+        // Legacy attachment keys support
         for (const key of dto.attachmentKeys) {
           await manager.getRepository(Attachment).save(
             manager.getRepository(Attachment).create({
@@ -779,10 +937,34 @@ export class ExpensesService {
     if (dto.category !== undefined) expense.category = dto.category;
     if (dto.expenseDate !== undefined) expense.expenseDate = dto.expenseDate;
     if (dto.status !== undefined) expense.status = dto.status;
+    if (dto.encryptionScope !== undefined)
+      expense.encryptionScope = dto.encryptionScope;
 
     const actorUser = await this.userRepository.findOne({
       where: { id: userId },
     });
+
+    const validationSplits =
+      dto.splits ??
+      (
+        await this.expenseSplitRepository.find({
+          where: { expense: { id: expense.id } },
+          relations: ['participantUser'],
+        })
+      ).map((split) => ({
+        participantUserId: split.participantUser?.id,
+        splitType: split.splitType,
+        shareValue: Number(split.shareValue),
+      }));
+
+    this.validateExpenseEncryptionMetadata(
+      userId,
+      {
+        ...dto,
+        splits: validationSplits,
+      },
+      expense.group?.id,
+    );
 
     const saved = await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(Expense).save(expense);
@@ -814,7 +996,40 @@ export class ExpensesService {
         );
       }
 
-      if (dto.attachmentKeys) {
+      if (expense.encryptionScope === 'direct_shared' && dto.wrappedContentKeys) {
+        await manager
+          .getRepository(EncryptedExpenseKey)
+          .delete({ expense: { id: expense.id } as Partial<Expense> });
+        for (const wk of dto.wrappedContentKeys) {
+          await manager.getRepository(EncryptedExpenseKey).save(
+            manager.getRepository(EncryptedExpenseKey).create({
+              expense,
+              user: { id: wk.userId } as User,
+              wrappedKey: wk.wrappedKey,
+            }),
+          );
+        }
+      }
+
+      if (dto.encryptedAttachments) {
+        await manager
+          .getRepository(Attachment)
+          .delete({ expense: { id: expense.id } as Partial<Expense> });
+        for (const att of dto.encryptedAttachments) {
+          await manager.getRepository(Attachment).save(
+            manager.getRepository(Attachment).create({
+              uploaderUser: expense.ownerUser,
+              expense,
+              storageKey: att.storageKey,
+              originalName: 'encrypted',
+              mimeType: att.mimeType,
+              sizeBytes: String(att.sizeBytes),
+              encryptedFileKey: att.encryptedFileKey,
+              encryptedOriginalName: att.encryptedOriginalName,
+            }),
+          );
+        }
+      } else if (dto.attachmentKeys) {
         await manager
           .getRepository(Attachment)
           .delete({ expense: { id: expense.id } as Partial<Expense> });

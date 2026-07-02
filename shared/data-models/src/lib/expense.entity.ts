@@ -68,6 +68,15 @@ export class Expense {
   @Column({ type: 'boolean', default: false })
   isCarryForward!: boolean;
 
+  /**
+   * Encryption scope determines which key is used for client-side encryption:
+   * - `personal`: encrypted with the owner's PBKDF2-derived master key.
+   * - `group`: encrypted with the per-group symmetric data key.
+   * - `direct_shared`: encrypted with a per-expense content key shared among participants.
+   */
+  @Column({ type: 'varchar', length: 20, default: 'personal' })
+  encryptionScope!: 'personal' | 'group' | 'direct_shared';
+
   @VersionColumn()
   version!: number;
 

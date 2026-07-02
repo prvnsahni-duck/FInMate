@@ -50,6 +50,21 @@ export class Attachment {
   @Column({ type: 'char', length: 64, nullable: true })
   checksumSha256?: string;
 
+  /**
+   * The per-attachment file key, wrapped (encrypted) with the scope key
+   * (personal master key / groupDataKey / expense contentKey).
+   * Format: `iv_base64:ciphertext_base64`.
+   */
+  @Column({ type: 'text', nullable: true })
+  encryptedFileKey?: string;
+
+  /**
+   * The original filename, encrypted client-side with the file key.
+   * Format: `iv_base64:ciphertext_base64`.
+   */
+  @Column({ type: 'text', nullable: true })
+  encryptedOriginalName?: string;
+
   @CreateDateColumn()
   createdAt!: Date;
 }

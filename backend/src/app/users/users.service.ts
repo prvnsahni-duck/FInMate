@@ -150,4 +150,37 @@ export class UsersService {
       .limit(10)
       .getMany();
   }
+
+  async saveKeys(
+    userId: string,
+    publicWrappingKey: string,
+    encryptedPrivateWrappingKey: string,
+  ): Promise<User> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    user.publicWrappingKey = publicWrappingKey;
+    user.encryptedPrivateWrappingKey = encryptedPrivateWrappingKey;
+    return this.userRepository.save(user);
+  }
+
+  async getKeys(userId: string): Promise<{ publicWrappingKey: string | null; encryptedPrivateWrappingKey: string | null }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return {
+      publicWrappingKey: user.publicWrappingKey || null,
+      encryptedPrivateWrappingKey: user.encryptedPrivateWrappingKey || null,
+    };
+  }
+
+  async getPublicWrappingKey(userId: string): Promise<string | null> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return user.publicWrappingKey || null;
+  }
 }

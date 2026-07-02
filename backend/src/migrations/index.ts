@@ -7,3 +7,4 @@ export { AddUserPhoneAndGroupInviteToken1718400000000 } from './1718400000000-Ad
 export { AddRecurringExpenses1718500000000 } from './1718500000000-AddRecurringExpenses';
 export { RevertExpenseAmountsEncryption1718600000000 } from './1718600000000-RevertExpenseAmountsEncryption';
 export { ChangeTitlesToText1718700000000 } from './1718700000000-ChangeTitlesToText';
+export { AddEnvelopeEncryption1718800000000 } from './1718800000000-AddEnvelopeEncryption';
