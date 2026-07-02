@@ -38,6 +38,9 @@ erDiagram
 
     users o|--o{ audit_logs : "acts (0:N)"
     groups o|--o{ audit_logs : "scoped_to (0:N)"
+    groups ||--o{ group_key_versions : "has (1:N)"
+    group_key_versions ||--o{ member_wrapped_group_keys : "has (1:N)"
+    users ||--o{ member_wrapped_group_keys : "has (1:N)"
 ```
 
 ---
@@ -58,9 +61,11 @@ erDiagram
 | `password_hash` | `varchar(255)` |    No    |                      |                                         |
 | `display_name`  | `varchar(120)` |   Yes    | `NULL`               |                                         |
 | `status`        | `enum`         |    No    | `'active'`           | Values: `active`, `disabled`, `invited` |
-| `last_login_at` | `timestamptz`  |   Yes    | `NULL`               |                                         |
-| `created_at`    | `timestamptz`  |    No    | `NOW()`              |                                         |
-| `updated_at`    | `timestamptz`  |    No    | `NOW()`              |                                         |
+| `last_login_at`               | `timestamptz`  |   Yes    | `NULL`               |                                         |
+| `public_wrapping_key`         | `text`         |   Yes    | `NULL`               | User public wrapping key (RSA-OAEP)     |
+| `encrypted_private_wrapping_key`| `text`        |   Yes    | `NULL`               | User private wrapping key, master wrapped|
+| `created_at`                  | `timestamptz`  |    No    | `NOW()`              |                                         |
+| `updated_at`                  | `timestamptz`  |    No    | `NOW()`              |                                         |
 
 ### 2. `profiles`
 
@@ -77,6 +82,51 @@ erDiagram
 | `default_currency` | `char(3)`       |    No    | `'INR'`              |                                    |
 | `monthly_budget`   | `decimal(12,2)` |   Yes    | `NULL`               |                                    |
 | `monthly_income`   | `decimal(12,2)` |   Yes    | `NULL`               |                                    |
+
+### 2b. `group_key_versions`
+
+- **Purpose**: Immutable key-version history for each group key lifecycle.
+- **Columns**:
+
+| Column Name          | Type           | Nullable | Default              | Constraints                                               |
+| :------------------- | :------------- | :------: | :------------------- | :-------------------------------------------------------- |
+| `id`                 | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                                               |
+| `group_id`           | `uuid`         |    No    |                      | Foreign Key -> `groups(id)`, Cascade on Delete            |
+| `version`            | `integer`      |    No    |                      | Unique within group `(group_id, version)`                 |
+| `algorithm`          | `varchar(64)`  |    No    | `AES-256-GCM`        |                                                          |
+| `status`             | `varchar(20)`  |    No    | `ACTIVE`             | Values: `ACTIVE`, `SUPERSEDED`, `REVOKED`                 |
+| `created_at`         | `timestamptz`  |    No    | `NOW()`              |                                                          |
+| `rotated_at`         | `timestamptz`  |   Yes    | `NULL`               |                                                          |
+| `rotated_by_user_id` | `uuid`         |   Yes    | `NULL`               | Foreign Key -> `users(id)`, Set Null on Delete            |
+| `rotation_reason`    | `varchar(255)` |   Yes    | `NULL`               |                                                          |
+| **Partial Unique**   |                |          |                      | At most one ACTIVE row per group `(group_id where ACTIVE)` |
+
+### 2c. `member_wrapped_group_keys`
+
+- **Purpose**: Member wrapped-key records for a specific group key version.
+- **Columns**:
+
+| Column Name              | Type           | Nullable | Default              | Constraints                                                      |
+| :----------------------- | :------------- | :------: | :------------------- | :--------------------------------------------------------------- |
+| `id`                     | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                                                      |
+| `group_key_version_id`   | `uuid`         |    No    |                      | Foreign Key -> `group_key_versions(id)`, Cascade on Delete       |
+| `group_id`               | `uuid`         |    No    |                      | Foreign Key -> `groups(id)`, Cascade on Delete                   |
+| `user_id`                | `uuid`         |    No    |                      | Foreign Key -> `users(id)`, Cascade on Delete                    |
+| `wrapped_group_key`      | `text`         |    No    |                      | Wrapped Group Key ciphertext                                     |
+| `wrapping_algorithm`     | `varchar(64)`  |   Yes    | `NULL`               |                                                                  |
+| `public_key_fingerprint` | `varchar(255)` |   Yes    | `NULL`               |                                                                  |
+| `created_at`             | `timestamptz`  |    No    | `NOW()`              |                                                                  |
+| **Unique**               |                |          |                      | Unique combination `(group_key_version_id, user_id)`             |
+
+- **Compatibility Note**:
+  - `encrypted_group_keys` remains as a legacy compatibility table during transition, but active key provisioning now uses `group_key_versions` + `member_wrapped_group_keys`.
+
+### 2d. Key Version References on Encrypted Group Resources
+
+- `group_invites.group_key_version_id` -> `group_key_versions(id)`
+- `expenses.group_key_version_id` -> `group_key_versions(id)`
+- `notes.group_key_version_id` -> `group_key_versions(id)`
+- `attachments.group_key_version_id` -> `group_key_versions(id)`
 
 ### 3. `groups`
 
@@ -144,6 +194,7 @@ erDiagram
 | `paid_by_user_id`  | `uuid`         |    No    |                      | Foreign Key -> `users(id)`                      |
 | `owner_user_id`    | `uuid`         |    No    |                      | Foreign Key -> `users(id)`                      |
 | `group_id`         | `uuid`         |   Yes    | `NULL`               | Foreign Key -> `groups(id)` (Null for personal) |
+| `group_key_version_id` | `uuid`      |   Yes    | `NULL`               | Foreign Key -> `group_key_versions(id)`         |
 | `expense_date`     | `date`         |    No    |                      |                                                 |
 | `status`           | `varchar(20)`  |    No    | `'posted'`           | Values: `draft`, `posted`, `void`               |
 | `ledger_month`     | `char(7)`      |   Yes    | `NULL`               | Format: `YYYY-MM` (Household groups only)       |
@@ -249,6 +300,12 @@ erDiagram
 - **`group_members`**:
   - `idx_group_members_user`: ON `(user_id)`
   - `idx_group_members_group`: ON `(group_id)`
+- **`group_key_versions`**:
+  - `uq_group_key_versions_group_version`: UNIQUE ON `(group_id, version)`
+  - `uq_group_key_versions_one_active_per_group`: UNIQUE PARTIAL ON `(group_id)` WHERE `status='ACTIVE'`
+- **`member_wrapped_group_keys`**:
+  - `idx_member_wrapped_group_keys_group_id`: ON `(group_id)`
+  - `idx_member_wrapped_group_keys_user_id`: ON `(user_id)`
 
 ---
 

@@ -718,3 +718,55 @@ Do not continue with opportunistic improvements unless explicitly requested.
 - Never delete or rename files without approval.
 - Never make architecture changes without approval.
 - Never fix unrelated issues unless explicitly requested.
+# Architecture Governance Rules
+
+This project follows an Architecture-First approach.
+
+The approved architecture is the source of truth.
+
+Agents MUST NOT modify architecture unless explicitly approved by the user.
+
+If implementation requires a new architectural or business decision:
+
+1. STOP.
+2. Explain why the decision is required.
+3. Present 2-3 implementation options.
+4. List pros and cons.
+5. Recommend one option.
+6. Wait for user approval.
+
+Never assume architecture.
+Never invent business rules.
+Never silently simplify security.
+Never replace an approved design with an easier implementation.
+
+Architecture decisions are permanent unless explicitly superseded.
+
+If architecture changes:
+
+- Update all affected documentation.
+- Update ADR documents.
+- Update implementation plan.
+- Update progress log.
+- Verify no documentation drift remains.
+# Architecture Drift Prevention
+
+Before completing any task verify:
+
+✓ Code matches approved architecture
+
+✓ Documentation matches implementation
+
+✓ Database matches entities
+
+✓ APIs match DTOs
+
+✓ UI matches business rules
+
+✓ Tests cover new behaviour
+
+✓ Progress log updated
+
+✓ ADR updated (if architecture changed)
+
+Do not mark a task complete until all checks pass.

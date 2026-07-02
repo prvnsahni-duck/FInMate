@@ -41,6 +41,162 @@ For any error responses (HTTP status code >= 400), the backend returns:
 
 ## 📂 Endpoint Specifications
 
+### 🔐 0. E2EE Key & Invite Management
+
+#### A. Lookup User Public Wrapping Key
+
+- **Method**: `GET`
+- **Route**: `/users/lookup?identifier=<email|username>`
+- **Auth Required**: Yes
+- **Success Response (`200 OK`)**:
+
+```json
+{
+  "userId": "e44d3202-b2a6-42d4-bb06-b33df1fb3e61",
+  "publicWrappingKey": "{\"kty\":\"RSA\",...}",
+  "displayName": "Alex Miller",
+  "email": "user@example.com"
+}
+```
+
+#### B. Save My Wrapping Keys
+
+- **Method**: `POST`
+- **Route**: `/users/me/keys`
+- **Auth Required**: Yes
+- **Request Body**:
+
+```json
+{
+  "publicWrappingKey": "{\"kty\":\"RSA\",...}",
+  "encryptedPrivateWrappingKey": "iv_base64:ciphertext_base64"
+}
+```
+
+#### C. Get My Wrapping Keys
+
+- **Method**: `GET`
+- **Route**: `/users/me/keys`
+- **Auth Required**: Yes
+
+#### D. Get User Public Wrapping Key
+
+- **Method**: `GET`
+- **Route**: `/users/{id}/public-key`
+- **Auth Required**: Yes
+
+#### E. Create Secure Group Invite Link
+
+- **Method**: `POST`
+- **Route**: `/groups/{id}/invites`
+- **Auth Required**: Yes (owner/admin)
+- **Request Body**:
+
+```json
+{
+  "wrappedGroupKey": "iv_base64:ciphertext_base64"
+}
+```
+
+#### F. Resolve Invite Link Metadata
+
+- **Method**: `GET`
+- **Route**: `/invite-links/{inviteToken}`
+- **Auth Required**: Yes
+- **Notes**: Expired invite tokens return `404 Invalid or expired invitation link`.
+
+#### G. Join Group By Invite Token
+
+- **Method**: `POST`
+- **Route**: `/groups/join/{inviteToken}`
+- **Auth Required**: Yes
+- **Success Response (`200 OK`)**:
+
+```json
+{
+  "member": {
+    "id": "membership-uuid",
+    "role": "member",
+    "joinStatus": "active"
+  },
+  "groupId": "group-uuid",
+  "wrappedGroupKey": "iv_base64:ciphertext_base64",
+  "groupKeyVersionId": "group-key-version-uuid",
+  "groupKeyVersion": 1
+}
+```
+
+#### H. Provision Wrapped Group Keys
+
+- **Method**: `POST`
+- **Route**: `/groups/{id}/keys`
+- **Auth Required**: Yes
+- **Request Body**:
+
+```json
+{
+  "keys": [
+    { "userId": "user-uuid", "wrappedKey": "iv_base64:ciphertext_base64" }
+  ]
+}
+```
+
+#### I. Get My Wrapped Group Key
+
+- **Method**: `GET`
+- **Route**: `/groups/{id}/keys/me`
+- **Auth Required**: Yes
+- **Success Response (`200 OK`)**:
+
+```json
+{
+  "groupId": "group-uuid",
+  "userId": "user-uuid",
+  "groupKeyVersionId": "group-key-version-uuid",
+  "groupKeyVersion": 1,
+  "wrappedKey": "iv_base64:ciphertext_base64"
+}
+```
+
+#### J. Get Missing Group Key Members
+
+- **Method**: `GET`
+- **Route**: `/groups/{id}/keys/missing`
+- **Auth Required**: Yes (owner/admin)
+
+#### K. Rotate Group Key (Versioned)
+
+- **Method**: `POST`
+- **Route**: `/groups/{id}/keys/rotate`
+- **Auth Required**: Yes (owner/admin)
+- **Request Body**:
+
+```json
+{
+  "reason": "member-device-compromised",
+  "keys": [
+    { "userId": "user-uuid", "wrappedKey": "iv_base64:ciphertext_base64" }
+  ]
+}
+```
+
+- **Success Response (`200 OK`)**:
+
+```json
+{
+  "groupId": "group-uuid",
+  "groupKeyVersionId": "group-key-version-uuid",
+  "groupKeyVersion": 2,
+  "status": "ACTIVE"
+}
+```
+
+#### L. Invite Member Payload Additions
+
+- `POST /groups/{id}/members` now supports optional:
+  - `wrappedGroupKey`
+  - `inviteKeyHash`
+
 ### 🔐 1. Authentication Module
 
 #### A. Register User

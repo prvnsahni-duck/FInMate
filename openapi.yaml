@@ -326,6 +326,403 @@ paths:
           description: Account deactivated successfully
         '401':
           $ref: '#/components/responses/UnauthorizedError'
+  /users/lookup:
+    get:
+      summary: Lookup user by identifier and return wrapping key metadata
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: identifier
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User lookup result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId:
+                    type: string
+                    format: uuid
+                  publicWrappingKey:
+                    type: string
+                    nullable: true
+                  displayName:
+                    type: string
+                    nullable: true
+                  email:
+                    type: string
+                    format: email
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /users/me/keys:
+    get:
+      summary: Get current user's wrapping keys
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Wrapping keys retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  publicWrappingKey:
+                    type: string
+                    nullable: true
+                  encryptedPrivateWrappingKey:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+    post:
+      summary: Save current user's wrapping keys
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - publicWrappingKey
+                - encryptedPrivateWrappingKey
+              properties:
+                publicWrappingKey:
+                  type: string
+                encryptedPrivateWrappingKey:
+                  type: string
+      responses:
+        '200':
+          description: Wrapping keys saved
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /users/{id}/public-key:
+    get:
+      summary: Get a user's public wrapping key
+      tags:
+        - Users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Public wrapping key retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  userId:
+                    type: string
+                    format: uuid
+                  publicWrappingKey:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /invite-links/{inviteToken}:
+    get:
+      summary: Resolve invite link metadata
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inviteToken
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invite details retrieved
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /groups/join/{inviteToken}:
+    post:
+      summary: Join a group by invite token
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: inviteToken
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Group join accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  member:
+                    $ref: '#/components/schemas/GroupMember'
+                  wrappedGroupKey:
+                    type: string
+                    nullable: true
+                  groupKeyVersionId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  groupKeyVersion:
+                    type: integer
+                    nullable: true
+                  groupId:
+                    type: string
+                    format: uuid
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /groups/{id}/invites:
+    post:
+      summary: Create a secure invite token with optional wrapped group key
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                wrappedGroupKey:
+                  type: string
+      responses:
+        '200':
+          description: Invite created
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /groups/{id}/keys:
+    post:
+      summary: Provision wrapped group keys for members
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - keys
+              properties:
+                keys:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - userId
+                      - wrappedKey
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                      wrappedKey:
+                        type: string
+      responses:
+        '200':
+          description: Group keys provisioned
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /groups/{id}/keys/me:
+    get:
+      summary: Get caller wrapped group key
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Wrapped key retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groupId:
+                    type: string
+                    format: uuid
+                  userId:
+                    type: string
+                    format: uuid
+                  groupKeyVersionId:
+                    type: string
+                    format: uuid
+                    nullable: true
+                  groupKeyVersion:
+                    type: integer
+                    nullable: true
+                  wrappedKey:
+                    type: string
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /groups/{id}/keys/missing:
+    get:
+      summary: List members missing wrapped group keys
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Missing member IDs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: uuid
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /groups/{id}/keys/rotate:
+    post:
+      summary: Rotate group key and create new active key version
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - keys
+              properties:
+                reason:
+                  type: string
+                  maxLength: 255
+                keys:
+                  type: array
+                  items:
+                    type: object
+                    required:
+                      - userId
+                      - wrappedKey
+                    properties:
+                      userId:
+                        type: string
+                        format: uuid
+                      wrappedKey:
+                        type: string
+      responses:
+        '200':
+          description: Group key rotated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groupId:
+                    type: string
+                    format: uuid
+                  groupKeyVersionId:
+                    type: string
+                    format: uuid
+                  groupKeyVersion:
+                    type: integer
+                  status:
+                    type: string
+                    enum: [ACTIVE]
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
 
   /groups:
     post:
@@ -494,18 +891,24 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - email
-                - role
               properties:
                 email:
                   type: string
                   format: email
                   example: friend@example.com
+                identifier:
+                  type: string
+                  example: friend@example.com
                 role:
                   type: string
-                  enum: [admin, member, viewer]
+                  enum: [admin, member, viewer, spectator]
                   default: member
+                displayName:
+                  type: string
+                wrappedGroupKey:
+                  type: string
+                inviteKeyHash:
+                  type: string
       responses:
         '201':
           description: Member added/invited successfully
@@ -583,7 +986,7 @@ paths:
               properties:
                 role:
                   type: string
-                  enum: [owner, admin, member, viewer]
+                  enum: [owner, admin, member, viewer, spectator]
                 joinStatus:
                   type: string
                   enum: [invited, active, left, removed]

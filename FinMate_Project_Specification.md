@@ -476,19 +476,31 @@ Role-Based Access Control (RBAC) in FinMate is applied at the group level. A use
 
 To enforce a Zero-Knowledge Architecture, user data containing transactional details, personal notes, and goal titles is encrypted client-side before submission. The backend server acts as a blind sync engine for these fields. Other fields needed for database querying, sorting, or settlements are stored in plaintext or server-side encrypted.
 
-#### 🔐 Encryption Key Tiers
+#### 🔐 Client-Side Encryption Key Boundaries
+- **User Data Key (UDK)**: Used to encrypt personal-scope data (personal expenses, personal notes, goals, and user secrets). It is derived from the user's password using PBKDF2 (AES-256-GCM).
+- **Group Key**: Each group owns a dedicated AES-256-GCM symmetric key. All collaborative data (group expenses, group notes, group attachments) is encrypted using this Group Key. Shared data is never encrypted using a personal UDK.
+- **Key Cache & Refresh Behavior (Current Release)**:
+  - **Temporary Key Cache**: The wrapped/exported User Data Key (UDK) and wrapped Group Keys are stored in a local **IndexedDB** cache via `ZkKeyVaultService` and in memory to prevent password prompts on page refresh.
+  - **Cache Lifetime**: The cache is cleared on logout or session expiration.
+- **Future Key Vault Architecture (Roadmap)**:
+  - The temporary cache will be replaced in future releases with an **Encrypted IndexedDB Key Vault** protected by **WebAuthn** / Device Trust, **Biometric Unlock** (Fingerprint/FaceID via Capacitor native APIs), or **PIN Unlock**.
+- **Password Changes**:
+  - Changing the login password only requires re-wrapping the UDK with the new master key. It does **not** require re-encrypting existing expenses, notes, or attachments.
+- **Group Membership & Ownership Rules**:
+  - **Invitations**: When a new member joins, the existing Group Key is wrapped using the new member's public key (RSA-OAEP). No duplicate group keys are generated.
+  - **Leaving Groups**: Members who leave a group retain access only to historical data they were authorized to see.
+  - **Group Ownership**: A group owner is blocked from leaving the group until ownership is explicitly transferred to another member.
+- **Encrypted Attachments (Roadmap)**:
+  - File uploads are encrypted client-side using a random File Key (AES-256-GCM) prior to upload. The File Key is wrapped with the Group Key (or UDK for personal) and uploaded to Supabase Storage.
+- **Offline Key Restoration**:
+  - Offline mode restores wrapped keys from IndexedDB, allowing offline decryption.
 
-1.  **Client-Side Encrypted (Zero-Knowledge / ZK)**:
-    - **Mechanism**: Encrypted on the client device using AES-256-GCM.
-    - **Keys**: Keys are derived locally on the client device using PBKDF2/Argon2. The master key never leaves the client device.
-    - **Server Access**: The server only sees base64-encoded ciphertext and initialization vectors. The server cannot decrypt this data.
-2.  **Server-Side Encrypted (SSE)**:
-    - **Mechanism**: Encrypted in transit and at rest on the server using database-level or application-level encryption keys (PostgreSQL `pgcrypto` or KMS).
-    - **Keys**: Managed securely by the server environment.
-    - **Server Access**: Decrypted ephemerally in server memory when running authorized queries (e.g. rendering user profile values or computing budget margins).
-3.  **Plaintext**:
-    - **Mechanism**: Stored as plaintext in database tables.
-    - **Server Access**: Fully searchable, indexable, and sortable.
+#### 📊 Personal Dashboard Aggregation Rules
+To avoid duplicate encrypted records and prevent synchronization overhead, the personal dashboard is built as follows:
+- **Only One Record**: Every expense exists as a single record in the database.
+- **Backend Aggregation**: The backend joins `expense_splits` with `expenses` to fetch the user's relevant shares. It aggregates:
+  $$\text{Personal Expenses} + \text{User's Share from Group Expenses}$$
+- **Frontend Decryption**: The frontend resolves the corresponding Group Key for group expenses or the UDK for personal expenses, decrypting the details on the fly. No duplicate encrypted entries are stored or synced.
 
 #### 📊 Entity-Field Encryption & AI Access Matrix
 
@@ -1862,3 +1874,229 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   - Keep validation strict, but present failures as friendly secure-processing errors instead of mentioning ciphertext or internal encryption formats.
 - **Next Actions:**
   - Verify frontend error display shows the friendly secure-processing message if encrypted payload validation fails.
+
+## 2026-07-02 - P0 E2EE Key Lifecycle Stabilization (Planning-Approved)
+
+- **Summary:** Implemented P0 hardening for E2EE key/invite lifecycle without redesigning architecture. Enforced invite expiry checks, unified active key-sharing flows on JWK, fixed join self-key provisioning identity mapping, hardened logout key cleanup, and aligned shared-expense policy to GK-only for new writes.
+- **Changes Made:**
+  - Added invite-hash support (`inviteKeyHash`) to invite payload DTO for secure TIK fragment delivery.
+  - Enforced invite expiry in backend invite detail and join-token flows; expired pending invites are marked `expired` and rejected.
+  - Updated invite email link construction to append sanitized `#inviteKeyHash` when provided.
+  - Standardized invite flow public-key import path in frontend member invites to JWK.
+  - Fixed self key-provisioning user-id fallback (`user.userId ?? user.id`) in join and group key provisioning flows.
+  - Hardened logout by clearing in-memory key caches and IndexedDB vault contents.
+  - Enforced GK-only for new shared expense writes by rejecting `direct_shared` write path client and server side.
+  - Synchronized API docs and OpenAPI with E2EE key/invite endpoints and updated invite member payload schema.
+  - Added `implementation_plan.md` for approved non-trivial execution tracking.
+- **Artifacts Updated:**
+  - `implementation_plan.md`
+  - `shared/data-models/src/lib/dto/group.dto.ts`
+  - `backend/src/app/groups/groups.service.ts`
+  - `backend/src/app/expenses/expenses.service.ts`
+  - `frontend/src/app/features/groups/components/group-members/group-members.component.ts`
+  - `frontend/src/app/features/groups/services/groups.service.ts`
+  - `frontend/src/app/core/services/group-key.service.ts`
+  - `frontend/src/app/core/auth/auth.state.ts`
+  - `frontend/src/app/features/groups/pages/join-group/join-group.component.ts`
+  - `frontend/src/app/features/groups/services/expenses.service.ts`
+  - `API_SPECIFICATION.md`
+  - `openapi.yaml`
+  - `FinMate_Project_Specification.md`
+- **Decisions:**
+  - Shared data writes are GK-only; `direct_shared` remains backward-readable but blocked for new writes.
+  - Canonical key-sharing format in active flows is JWK.
+  - Invite emails may include URL hash fragment via `inviteKeyHash` for unregistered invite flow.
+  - User deletion lifecycle remains deferred to a dedicated task.
+- **Next Actions:**
+  - Add unit/integration tests for invite-expiry and GK-only rejection paths.
+  - Implement key versioning + rotation phase after this stabilization baseline.
+
+## 2026-07-02 - P0 Follow-up Test Coverage (Invite Expiry + GK-only)
+
+- **Summary:** Continued to the next approved plan step by adding focused backend unit coverage for P0 security hardening paths.
+- **Changes Made:**
+  - Added group-service tests to verify expired pending invites are marked `expired` and rejected in:
+    - invite link detail lookup
+    - join-by-invite flow
+  - Added expense-service tests to verify GK-only shared policy enforcement by rejecting:
+    - `direct_shared` encryption scope writes
+    - personal (non-group) shared writes with multiple participants
+- **Artifacts Updated:**
+  - `backend/src/app/groups/groups.service.spec.ts`
+  - `backend/src/app/expenses/expenses.service.spec.ts`
+  - `FinMate_Project_Specification.md`
+- **Decisions:**
+  - No architecture changes.
+  - No dependency changes.
+  - Kept edits limited to existing spec files.
+- **Next Actions:**
+  - Run targeted specs and share first failing block if any regression appears.
+  - Continue with key versioning and rotation phase after verification.
+
+## 2026-07-02 - Test Infrastructure Fix (ExpensesService DI)
+
+- **Summary:** Resolved backend test bootstrap failure caused by a missing repository provider in `ExpensesService` unit test module setup.
+- **Changes Made:**
+  - Added `EncryptedExpenseKey` test repository mock.
+  - Registered `getRepositoryToken(EncryptedExpenseKey)` in test module providers.
+  - Wired transaction/entity-manager repository resolution for `EncryptedExpenseKey` in spec setup.
+- **Artifacts Updated:**
+  - `backend/src/app/expenses/expenses.service.spec.ts`
+  - `FinMate_Project_Specification.md`
+- **Decisions:**
+  - No architecture change.
+  - Keep fix strictly limited to test dependency wiring.
+- **Next Actions:**
+  - Re-run targeted test command and confirm `ExpensesService` suite executes test logic (not DI bootstrap failures).
+
+## 2026-07-02 - Test Follow-up Fix (EncryptedExpenseKey find mock)
+
+- **Summary:** Fixed remaining ExpensesService spec failures after DI wiring by stabilizing the encrypted expense key repository mock behavior.
+- **Changes Made:**
+  - Updated `mockEncryptedExpenseKeyRepository.find` to return an empty array by default.
+  - Prevented `keys.map(...)` runtime failure in `ExpensesService.getWrappedContentKeys` unit tests.
+- **Artifacts Updated:**
+  - `backend/src/app/expenses/expenses.service.spec.ts`
+  - `FinMate_Project_Specification.md`
+- **Decisions:**
+  - No architecture changes.
+  - Keep this fix isolated to test mock behavior.
+- **Next Actions:**
+  - Re-run targeted backend test command and confirm full pass for `expenses.service.spec.ts`.
+
+## 2026-07-02 - Verification Pass (ExpensesService Targeted Suite)
+
+- **Summary:** Verified backend targeted suite after test harness fixes; all backend test suites passed in the run output and `expenses.service.spec.ts` is now green.
+- **Changes Made:**
+  - No additional code changes.
+  - Validation run confirmed previous DI/mock fixes are effective.
+- **Artifacts Updated:**
+  - `FinMate_Project_Specification.md`
+- **Decisions:**
+  - Keep current test setup as baseline for next phase.
+- **Next Actions:**
+  - Proceed to next planned phase: key versioning and rotation design/implementation.
+
+## 2026-07-02 - P1 Option 2 Group Key Versioning + Rotation
+
+- **Summary:** Implemented approved Option 2 architecture with immutable group key versions, per-version member wrapped keys, and version-aware key APIs while preserving backward compatibility for existing endpoints.
+- **Changes Made:**
+  - Added new entities:
+    - `group_key_versions`
+    - `member_wrapped_group_keys`
+  - Added version-reference relations on encrypted group resources (`expenses`, `notes`, `attachments`) and invite records.
+  - Added migration `1719000000000-AddGroupKeyVersioningModel.ts`:
+    - Creates Option 2 tables, constraints, indexes, and one-active-per-group partial unique index.
+    - Adds `group_key_version_id` foreign keys for `group_invites`, `expenses`, `notes`, and `attachments`.
+  - Refactored group key flows to service-managed version-aware logic:
+    - `POST /groups/:id/keys` now provisions against ACTIVE key version.
+    - `GET /groups/:id/keys/me` returns wrapped key with key-version metadata.
+    - `GET /groups/:id/keys/missing` computes missing users for ACTIVE key version.
+    - Added `POST /groups/:id/keys/rotate` to rotate and activate next key version.
+  - Kept compatibility by preserving existing endpoint paths and request shapes where possible.
+  - Updated expenses service to stamp group expenses with `groupKeyVersion` and include it in response payloads.
+  - Updated architecture, API, OpenAPI, DB schema, and project decision docs to reflect approved model.
+- **Artifacts Updated:**
+  - `implementation_plan.md`
+  - `shared/data-models/src/lib/group-key-version.entity.ts`
+  - `shared/data-models/src/lib/member-wrapped-group-key.entity.ts`
+  - `shared/data-models/src/lib/group-invite.entity.ts`
+  - `shared/data-models/src/lib/expense.entity.ts`
+  - `shared/data-models/src/lib/note.entity.ts`
+  - `shared/data-models/src/lib/attachment.entity.ts`
+  - `shared/data-models/src/lib/dto/group-key.dto.ts`
+  - `shared/data-models/src/index.ts`
+  - `backend/src/migrations/1719000000000-AddGroupKeyVersioningModel.ts`
+  - `backend/src/migrations/index.ts`
+  - `backend/src/app/groups/groups.module.ts`
+  - `backend/src/app/groups/groups.controller.ts`
+  - `backend/src/app/groups/groups.service.ts`
+  - `backend/src/app/groups/services/groups-membership.service.ts`
+  - `backend/src/app/groups/groups.service.spec.ts`
+  - `backend/src/app/expenses/expenses.service.ts`
+  - `ARCHITECTURE.md`
+  - `DATABASE_SCHEMA.md`
+  - `API_SPECIFICATION.md`
+  - `openapi.yaml`
+  - `docs/PROJECT_DECISIONS.md`
+  - `FinMate_Project_Specification.md`
+- **Decisions:**
+  - No new architecture decisions beyond already approved Option 2.
+  - Legacy `encrypted_group_keys` is retained for transition compatibility; active runtime writes now use versioned tables.
+- **Next Actions:**
+  - Run targeted backend tests for groups/expenses key flows.
+  - Validate migration execution in controlled environment before production rollout.
+
+## 2026-07-03 - P1 Final Verification + Remediation
+
+- **Summary:** Completed Phase 1 verification pass and fixed discovered gaps before sign-off.
+- **Verification Findings & Fixes:**
+  - Found migration safety gap for re-runs on existing databases (unguarded FK creation).
+    - Fixed by guarding FK creation with `DO $$ ... IF NOT EXISTS ... $$` checks.
+  - Found existing-user access migration gap from legacy wrapped keys.
+    - Fixed by backfilling:
+      - `group_key_versions` ACTIVE v1 rows from `encrypted_group_keys`
+      - `member_wrapped_group_keys` from legacy wrapped keys
+      - `group_key_version_id` on existing group-scoped encrypted resources where null.
+  - Found wrapped-key immutability gap (overwrite on provision path).
+    - Fixed by making provision/join-path insertion immutable per `(group_key_version_id, user_id)` row.
+  - Added new test coverage for:
+    - immutable wrapped-key provisioning behavior
+    - rotation lifecycle (supersede old active + create new active version)
+- **Artifacts Updated:**
+  - `backend/src/migrations/1719000000000-AddGroupKeyVersioningModel.ts`
+  - `backend/src/app/groups/groups.service.ts`
+  - `backend/src/app/groups/groups.service.spec.ts`
+  - `openapi.yaml`
+  - `DATABASE_SCHEMA.md`
+  - `PRD.md`
+  - `FinMate_Project_Specification.md`
+- **Verification Status:**
+  - Backend test run reported by user: `18 passed, 18 total`.
+  - Architecture drift check: PASS for approved Option 2 scope.
+- **Next Actions:**
+  - Execute migration against staging snapshot and validate key retrieval for pre-existing users.
+  - Add integration test for migration backfill correctness in CI pipeline.
+
+## 2026-07-03 - RC Verification Critical Security Fix
+
+- **Summary:** During final Release Candidate audit, a critical auth mismatch was found and fixed before sign-off.
+- **Issue Found:**
+  - `GET /invite-links/:inviteToken` controller path was missing JWT guard in implementation while API contract required authentication.
+  - This could allow unauthenticated retrieval of invite metadata and potential wrapped key exposure risk.
+- **Fix Applied:**
+  - Added `@UseGuards(JwtAuthGuard)` on invite metadata controller.
+- **Artifacts Updated:**
+  - `backend/src/app/groups/invite.controller.ts`
+  - `FinMate_Project_Specification.md`
+- **Verification Status:**
+  - Static diagnostics pass on updated files.
+- **Next Actions:**
+  - Add explicit controller test asserting unauthenticated access is rejected for invite metadata endpoint.
+
+## 2026-07-03 - Final Project Hardening Documentation Phase
+
+- **Summary:** Completed documentation hardening for release and operations readiness without architecture changes.
+- **Changes Made:**
+  - Added production readiness checklist.
+  - Added release runbook.
+  - Added disaster recovery and rollback runbook.
+  - Added operations runbook for rotation, emergency revocation, staging migration validation, and production deployment.
+  - Added security verification checklist.
+  - Added QA verification checklist.
+  - Added maintenance checklist for future developers.
+  - Ensured each document references approved architecture and decision artifacts.
+- **Artifacts Updated:**
+  - `docs/PRODUCTION_READINESS_CHECKLIST.md`
+  - `docs/RELEASE_RUNBOOK.md`
+  - `docs/DISASTER_RECOVERY_ROLLBACK_RUNBOOK.md`
+  - `docs/OPERATIONS_RUNBOOK.md`
+  - `docs/SECURITY_VERIFICATION_CHECKLIST.md`
+  - `docs/QA_VERIFICATION_CHECKLIST.md`
+  - `docs/MAINTENANCE_CHECKLIST.md`
+  - `FinMate_Project_Specification.md`
+- **Decisions:**
+  - No architecture changes.
+  - No new features introduced.
+- **Next Actions:**
+  - Execute staged operational rehearsal using the new runbooks before production release.

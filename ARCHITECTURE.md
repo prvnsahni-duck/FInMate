@@ -61,26 +61,123 @@ sequenceDiagram
     API-->>User: HTTP 201 Created
 ```
 
-### Encryption Breakdown
+### Client-Side (Zero-Knowledge) Encryption & Key Management
 
-1. **Client-Side (Zero-Knowledge) Encryption**:
-   - **Fields**: Expense `title`, Expense `description`, Note `title`, Note `body`, and Settlement `note`.
-   - **Mechanism**: Encrypted using **AES-256-GCM** on the client device. The derived master keys for client-side encryption are retained securely as non-extractable `CryptoKey` objects in a local **IndexedDB** cache via `ZkKeyVaultService`. This ensures keys survive page refreshes, while `extractable: false` prevents malicious scripts from exporting the raw key material. `sessionStorage` and `localStorage` are strictly avoided due to XSS vulnerability risks. Decryption failures are handled gracefully using generic placeholders (`DECRYPTION_FAILED_PLACEHOLDER`) to ensure ciphertexts and technical details never bleed into the UI.
-2. **Server-Side (At-Rest) Encryption**:
-   - **Fields**: Sensitive user Profile details and 2FA secrets.
-   - **Mechanism**: Encrypted before writing to the database using TypeORM value transformers (AES-256-CBC/GCM) leveraging the server's `ENCRYPTION_KEY`.
-3. **Plaintext Storage**:
-   - **Fields**: Expense `amount_total`, split `amount_owed`, `currency`, and `category`.
-   - **Mechanism**: Retained strictly as plaintext decimals (`DECIMAL(12, 2)`) to allow performant aggregations, analytics, reports, budgets, and settlement math on the server.
+1. **Encryption Key Boundaries**:
+   - **User Data Key (UDK)**: Used to encrypt personal-scope data (personal expenses, personal notes, goals, and user secrets). It is derived from the user's password using PBKDF2 (AES-256-GCM).
+   - **Group Key**: Each group owns a dedicated AES-256-GCM symmetric key. All collaborative data (group expenses, group notes, group attachments) is encrypted using this Group Key. Shared data is never encrypted using a personal UDK.
+2. **Key Cache & Refresh Behavior (Current Release)**:
+   - **Temporary Key Cache**: The wrapped/exported User Data Key (UDK) and wrapped Group Keys are stored in a local **IndexedDB** cache via `ZkKeyVaultService` and in memory. This ensures keys survive page refreshes without re-prompting the user for their password.
+   - **Cache Lifetime**: The cache is strictly cleared upon logout, session expiration, or explicit security revoking.
+3. **Future Key Vault Architecture (Roadmap)**:
+   - The temporary cache will be replaced with an **Encrypted IndexedDB Key Vault** protected by:
+     - **WebAuthn** / Device Trust
+     - **Biometric Unlock** (Fingerprint/FaceID via Capacitor native APIs)
+     - **PIN Unlock**
+4. **Password Changes**:
+   - Changing the login password only requires re-wrapping the UDK with the new master key. It does **not** require re-encrypting existing expenses, notes, or attachments.
+5. **Group Membership & Ownership Rules**:
+   - **Invitations**: When a new member joins, the existing Group Key is wrapped using the new member's public key (RSA-OAEP). No duplicate group keys are generated.
+   - **Leaving Groups**: Members who leave a group retain access only to historical data they were authorized to see.
+   - **Group Ownership**: A group owner is blocked from leaving the group until ownership is explicitly transferred to another member.
+6. **Decryption Failures**:
+   - Handled gracefully using the placeholder `DECRYPTION_FAILED_PLACEHOLDER` (`'Unable to display this item'`) to avoid leaking ciphertexts or raw technical details in the UI.
+
+### Automatic Group Key Provisioning Flow (Zero-Knowledge)
+
+To make key distribution seamless without requiring the group owner to be online or manually approve new keys, the system supports automatic provisioning:
+
+#### Flow A: Invite Links & QR Codes (TIK Symmetric Wrapping)
+A Temporary Invite Key (TIK) is generated on the creator's device and appended to the invite link hash fragment (never sent to the backend). The Group Key is encrypted with the TIK and uploaded as `wrappedGroupKey` in the invite table, associated with the currently ACTIVE `group_key_versions` row.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner as Group Owner (Browser)
+    participant API as NestJS Backend
+    participant DB as PostgreSQL
+    actor Joiner as Invitee / Joiner (Browser)
+
+    Note over Owner: Create Invite Link / QR
+    Owner->>Owner: Generate random Temporary Invite Key (TIK)
+    Owner->>Owner: Encrypt Group Key (GK) using TIK -> Wrapped_GK_TIK
+    Owner->>API: POST /groups/:id/invites (Wrapped_GK_TIK)
+    API->>DB: INSERT into group_invites
+    API-->>Owner: Return inviteToken (UUID)
+    Note over Owner: Generates Link: /groups/join/:inviteToken#TIK
+
+    Note over Joiner: Click Invite Link / Scan QR
+    Joiner->>Joiner: Extract TIK from URL hash fragment (#)
+    Joiner->>API: POST /groups/join/:inviteToken
+    API->>DB: Add user to group_members
+    API-->>Joiner: Return Wrapped_GK_TIK
+    Joiner->>Joiner: Decrypt Wrapped_GK_TIK using TIK -> GK
+    Joiner->>Joiner: Re-encrypt GK with own PWK/Master Key
+   Joiner->>API: POST /groups/:id/keys (Wrapped_GK_for_Self)
+   API->>DB: Save wrapped key in member_wrapped_group_keys for ACTIVE key version
+```
+
+#### Flow B: Lookup Direct Invites (Asymmetric PWK Wrapping)
+When User A invites User B directly via email/username lookup, User A's browser resolves User B's Public Wrapping Key (`public_wrapping_key`) immediately, encrypts the currently ACTIVE Group Key, and uploads it.
+
+#### Flow C: Group Key Rotation (Versioned)
+Group key rotation uses immutable version history. Rotating creates a new ACTIVE key version and marks the previous ACTIVE version as SUPERSEDED.
+
+```mermaid
+sequenceDiagram
+   autonumber
+   actor Admin as Owner/Admin
+   participant API as NestJS Backend
+   participant DB as PostgreSQL
+
+   Admin->>API: POST /groups/:id/keys/rotate (keys[], reason?)
+   API->>DB: Mark current ACTIVE group_key_versions row as SUPERSEDED
+   API->>DB: Insert new ACTIVE group_key_versions row with next version
+   API->>DB: Insert member_wrapped_group_keys rows for new version
+   API-->>Admin: Return groupKeyVersionId and groupKeyVersion
+```
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Inviter as User A (Inviter)
+    participant API as NestJS Backend
+    participant DB as PostgreSQL
+    actor Invitee as User B (Invitee)
+
+    Inviter->>API: GET /users/lookup?email=userB@example.com
+    API->>DB: SELECT id, public_wrapping_key
+    API-->>Inviter: Return User B ID & PWK_B
+    Inviter->>Inviter: Encrypt Group Key (GK) with PWK_B -> Wrapped_GK_B
+    Inviter->>API: POST /groups/:id/invites (userId=UserB, Wrapped_GK_B)
+    API->>DB: Save Wrapped_GK_B directly
+    
+    Note over Invitee: Log in / Open Dashboard
+    Invitee->>API: POST /groups/accept-invite/:inviteId
+    API->>DB: UPDATE group_members status to 'active'
+    API-->>Invitee: Accept Success
+    Invitee->>Invitee: Fetch Wrapped_GK_B
+    Invitee->>Invitee: Decrypt Wrapped_GK_B using own Private Wrapping Key (PrWK_B) -> GK
+```
+
+### Personal Dashboard Aggregation
+
+To avoid duplicate encrypted records and prevent synchronization overhead, the application handles personal dashboard aggregation as follows:
+- **Only One Record**: Every expense exists as a single record in the database.
+- **Backend Aggregation**: The backend joins `expense_splits` with `expenses` to fetch the user's relevant shares. It aggregates:
+  $$\text{Personal Expenses} + \text{User's Share from Group Expenses}$$
+- **Frontend Decryption**: The frontend resolves the corresponding Group Key for group expenses or the UDK for personal expenses, decrypting the details on the fly. No duplicate encrypted entries are stored or synced.
 
 ### Future Cryptography & Integration Roadmap
 
 1. **Zero-Knowledge Attachment Storage**:
-   - **Architecture**: Attachments (receipts/files) will be encrypted in the client browser using AES-256-GCM prior to upload. The encrypted payloads will be dispatched directly to **Supabase Storage**, while the storage reference keys and hash checksums are stored in the PostgreSQL database.
-2. **Receipt OCR Workflow**:
-   - **Architecture**: Receipt files uploaded by the user will trigger client-side temporary decryption or transmission to an isolated, transient AI engine for OCR text extraction. The extracted details will pre-fill the creation forms for user review before encryption and persistence, ensuring plaintext receipts are never saved directly to the database.
-3. **Blind Index Search**:
-   - **Architecture**: To allow searching on client-side encrypted fields (like expense titles) without decrypting them on the server, we will implement blind index hashing (`title_search_hash` and `title_ciphertext` columns) enabling server-side exact-match indexing without exposure to the raw plaintext.
+   - Attachments (receipts/files) will be encrypted in the client browser using a random File Key (AES-256-GCM) prior to upload. The File Key is wrapped with the Group Key (or UDK for personal) and uploaded to Supabase Storage.
+2. **Offline Key Restoration**:
+   - Future offline support will cache the decrypted keys in a secure in-memory context, allowing the user to create, view, and queue encrypted expenses while offline.
+3. **Receipt OCR Workflow**:
+   - Receipt files uploaded by the user will trigger client-side temporary decryption or transmission to an isolated, transient AI engine for OCR text extraction. The extracted details will pre-fill the creation forms for user review before encryption and persistence, ensuring plaintext receipts are never saved directly to the database.
+4. **Blind Index Search**:
+   - To allow searching on client-side encrypted fields (like expense titles) without decrypting them on the server, we will implement blind index hashing (`title_search_hash` and `title_ciphertext` columns) enabling server-side exact-match indexing without exposure to the raw plaintext.
 
 ### 4. Authentication & Session Security:
 
