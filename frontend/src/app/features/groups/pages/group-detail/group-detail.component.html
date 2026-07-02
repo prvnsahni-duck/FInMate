@@ -8,14 +8,33 @@
 
 @if (!isLoading() && group()) {
   <div>
-    @if (!isGroupKeyLoaded()) {
-      <div class="bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-3xl p-6 mb-6 flex items-center space-x-3 shadow-lg">
+    @if (rateLimitError()) {
+      <div class="bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 rounded-3xl p-6 mb-6 flex items-center space-x-3 shadow-lg">
         <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
         </svg>
         <div>
+          <h4 class="font-bold text-sm">Rate Limit Exceeded</h4>
+          <p class="text-xs opacity-90 font-medium">{{ rateLimitError() }}</p>
+        </div>
+      </div>
+    }
+
+    @if (!isGroupKeyLoaded()) {
+      <div class="bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-3xl p-6 mb-6 flex items-start space-x-3 shadow-lg">
+        <svg class="w-6 h-6 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+        <div class="w-full">
           <h4 class="font-bold text-sm">Encryption key missing for this group</h4>
           <p class="text-xs opacity-90 font-medium">Your group data key has not been provisioned yet. Ask the group creator or an admin to open this group page while you are online to provision your key.</p>
+
+          @if (!isMasterKeyLoaded()) {
+            <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 max-w-md">
+              <input #passInput type="password" placeholder="Enter password to unlock vault" (keyup.enter)="unlockVault(passInput.value)" class="bg-white/10 text-white rounded-xl px-3 py-1.5 text-xs outline-none border border-white/20 focus:border-white/40 placeholder-white/50 w-full" />
+              <button (click)="unlockVault(passInput.value)" class="bg-amber-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs hover:bg-amber-700 transition shrink-0">Unlock Vault</button>
+            </div>
+          }
         </div>
       </div>
     }
@@ -283,7 +302,7 @@
       <div class="lg:col-span-2 space-y-8">
         <!-- Tabs Navigation -->
         <div
-          class="flex space-x-1 bg-slate-100 dark:bg-black/20 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5"
+          class="flex space-x-1 bg-slate-100 dark:bg-black/20 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5 overflow-x-auto whitespace-nowrap md:overflow-x-visible [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
           <button
             (click)="setTab('ledger')"
@@ -292,7 +311,7 @@
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
             "
-            class="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
+            class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center"
           >
             Ledger
           </button>
@@ -303,7 +322,7 @@
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
             "
-            class="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
+            class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center"
           >
             Analytics
           </button>
@@ -314,7 +333,7 @@
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
             "
-            class="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
+            class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center"
           >
             History
           </button>
@@ -325,7 +344,7 @@
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
             "
-            class="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
+            class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center"
           >
             Trash
           </button>
@@ -336,7 +355,7 @@
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
             "
-            class="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
+            class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center"
           >
             Settings
           </button>
@@ -347,7 +366,7 @@
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
             "
-            class="flex-1 py-2 rounded-xl text-sm font-bold transition-all"
+            class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center"
           >
             Recurring
           </button>
@@ -423,10 +442,11 @@
                 class="sticky top-0 z-30 bg-finmate-card/95 backdrop-blur-md p-4 mb-6 rounded-2xl border border-secondary/15 grid grid-cols-1 sm:grid-cols-4 gap-4"
               >
                 <div>
-                  <label
+                  <div
                     class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1"
-                    >Category</label
                   >
+                    Category
+                  </div>
                   <app-dropdown
                     [ngModel]="filterCategory()"
                     (ngModelChange)="filterCategory.set($event); applyFilters()"
@@ -435,11 +455,12 @@
                   ></app-dropdown>
                 </div>
                 <div>
-                  <label
+                  <label for="filterStartDate"
                     class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1"
                     >Start Date</label
                   >
                   <input
+                    id="filterStartDate"
                     type="date"
                     [ngModel]="filterStartDate()"
                     (ngModelChange)="
@@ -449,11 +470,12 @@
                   />
                 </div>
                 <div>
-                  <label
+                  <label for="filterEndDate"
                     class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1"
                     >End Date</label
                   >
                   <input
+                    id="filterEndDate"
                     type="date"
                     [ngModel]="filterEndDate()"
                     (ngModelChange)="filterEndDate.set($event); applyFilters()"
@@ -759,7 +781,8 @@
                           file of expense.attachments;
                           track file.storageKey
                         ) {
-                          <div
+                          <button
+                            type="button"
                             (click)="downloadAttachment(file)"
                             class="flex items-center space-x-1.5 py-1 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-white/5 dark:hover:bg-white/10 rounded-full text-xs font-semibold text-slate-600 dark:text-slate-300 cursor-pointer border border-slate-200/50 dark:border-white/5"
                           >
@@ -779,7 +802,7 @@
                             <span class="truncate max-w-[120px]">{{
                               file.originalName
                             }}</span>
-                          </div>
+                          </button>
                         }
                       </div>
                     }
@@ -884,11 +907,12 @@
               >
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label
+                    <label for="editGroupName"
                       class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1"
                       >Group Name</label
                     >
                     <input
+                      id="editGroupName"
                       type="text"
                       [(ngModel)]="editGroupName"
                       name="editGroupName"
@@ -898,10 +922,11 @@
                   </div>
 
                   <div>
-                    <label
+                    <div
                       class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1"
-                      >Currency</label
                     >
+                      Currency
+                    </div>
                     <app-dropdown
                       [(ngModel)]="editGroupCurrency"
                       name="editGroupCurrency"
@@ -912,11 +937,12 @@
                 </div>
 
                 <div>
-                  <label
+                  <label for="editGroupDescription"
                     class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1"
                     >Description</label
                   >
                   <textarea
+                    id="editGroupDescription"
                     [(ngModel)]="editGroupDescription"
                     name="editGroupDescription"
                     rows="2"
@@ -926,10 +952,11 @@
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label
+                    <div
                       class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1"
-                      >Visibility</label
                     >
+                      Visibility
+                    </div>
                     <app-dropdown
                       [(ngModel)]="editGroupVisibility"
                       name="editGroupVisibility"
@@ -1026,11 +1053,12 @@
                   </div>
 
                   <div class="flex items-center space-x-2">
-                    <label
+                    <label for="contributionMonth"
                       class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500"
                       >Month</label
                     >
                     <input
+                      id="contributionMonth"
                       type="month"
                       [(ngModel)]="contributionMonth"
                       (ngModelChange)="loadContributionsForMonth()"
@@ -1312,11 +1340,12 @@
                     class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div class="flex items-center space-x-3">
-                      <label
+                      <label for="closeMonthInput"
                         class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500"
                         >Billing Month to Lock</label
                       >
                       <input
+                        id="closeMonthInput"
                         type="month"
                         [ngModel]="closeMonthSelected()"
                         (ngModelChange)="closeMonthSelected.set($event)"
@@ -1701,8 +1730,8 @@
     [message]="'Are you sure you want to delete or void this expense?'"
     [confirmText]="'Delete'"
     [type]="'danger'"
-    (confirm)="onDeleteConfirmed()"
-    (cancel)="onDeleteCancelled()"
+    (confirmed)="onDeleteConfirmed()"
+    (cancelled)="onDeleteCancelled()"
   ></app-confirm-modal>
 }
 
@@ -1716,8 +1745,8 @@
     "
     [confirmText]="'Finalize Month'"
     [type]="'danger'"
-    (confirm)="onCloseMonthConfirmed()"
-    (cancel)="onCloseMonthCancelled()"
+    (confirmed)="onCloseMonthConfirmed()"
+    (cancelled)="onCloseMonthCancelled()"
   ></app-confirm-modal>
 }
 
@@ -1734,7 +1763,7 @@
         [members]="members()"
         [template]="selectedRecurringExpenseForEdit()"
         (saveSuccess)="onRecurringExpenseSaved()"
-        (cancel)="closeRecurringExpenseForm()"
+        (cancelled)="closeRecurringExpenseForm()"
       ></app-recurring-expense-form>
     </div>
   </div>

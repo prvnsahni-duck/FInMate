@@ -6,9 +6,9 @@ import { GroupsService } from '../../../groups/services/groups.service';
 import { ExpensesService } from '../../../groups/services/expenses.service';
 import { ExpensesUiStore } from '../../../groups/services/expenses-ui.store';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { of, throwError } from 'rxjs';
+import { of } from 'rxjs';
 import { FormsModule } from '@angular/forms';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { CommonModule, CurrencyPipe, DatePipe } from '@angular/common';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 
@@ -159,9 +159,11 @@ describe('DashboardComponent', () => {
     expect(component.budgetPercentage).toBe(45); // 1350 / 3000 = 45
   });
 
-  it('should accept a group invitation', () => {
+  it('should accept a group invitation and redirect to group details', () => {
     fixture.detectChanges();
     const mockInvite = { id: 'group-1', membershipId: 'member-1' };
+    const router = TestBed.inject(Router);
+    const navigateSpy = jest.spyOn(router, 'navigate').mockResolvedValue(true);
 
     component.acceptInvitation(mockInvite);
 
@@ -170,6 +172,7 @@ describe('DashboardComponent', () => {
       'member-1',
       { joinStatus: 'active' },
     );
+    expect(navigateSpy).toHaveBeenCalledWith(['/groups', 'group-1']);
   });
 
   it('should decline a group invitation', () => {

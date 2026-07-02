@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   GroupMember,
   InviteMemberDto,
+  RotateGroupKeyDto,
   UpdateMemberDto,
 } from '@finmate/data-models';
 import { GroupsService } from '../groups.service';
@@ -15,7 +16,7 @@ export class GroupsMembershipService {
     groupId: string,
     dto: InviteMemberDto,
     context?: { ip?: string; userAgent?: string },
-  ): Promise<GroupMember> {
+  ): Promise<any> {
     return this.groupsService.inviteMember(userId, groupId, dto, context);
   }
 
@@ -62,5 +63,33 @@ export class GroupsMembershipService {
 
   async getPendingInvitations(userId: string) {
     return this.groupsService.getPendingInvitations(userId);
+  }
+
+  async createGroupInvite(
+    userId: string,
+    groupId: string,
+    dto: { wrappedGroupKey?: string },
+  ) {
+    return this.groupsService.createGroupInvite(userId, groupId, dto);
+  }
+
+  async provisionGroupKeys(
+    userId: string,
+    groupId: string,
+    keys: Array<{ userId: string; wrappedKey: string }>,
+  ): Promise<void> {
+    return this.groupsService.provisionGroupKeys(userId, groupId, keys);
+  }
+
+  async getMyGroupKey(userId: string, groupId: string) {
+    return this.groupsService.getMyGroupKey(userId, groupId);
+  }
+
+  async getMissingGroupKeys(userId: string, groupId: string): Promise<string[]> {
+    return this.groupsService.getMissingGroupKeys(userId, groupId);
+  }
+
+  async rotateGroupKey(userId: string, groupId: string, dto: RotateGroupKeyDto) {
+    return this.groupsService.rotateGroupKey(userId, groupId, dto);
   }
 }

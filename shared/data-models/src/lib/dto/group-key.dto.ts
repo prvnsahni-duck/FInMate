@@ -5,6 +5,7 @@ import {
   IsArray,
   ValidateNested,
   IsOptional,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -30,6 +31,27 @@ export class ProvisionGroupKeysDto {
 /** Response for a single user's wrapped group key. */
 export interface WrappedGroupKeyResponse {
   groupId: string;
+  groupKeyVersionId?: string | null;
+  groupKeyVersion?: number | null;
   userId: string;
   wrappedKey: string;
+}
+
+export class RotateGroupKeyDto {
+  @IsArray({ message: 'keys must be an array' })
+  @ValidateNested({ each: true })
+  @Type(() => WrappedKeyEntryDto)
+  keys!: WrappedKeyEntryDto[];
+
+  @IsString({ message: 'reason must be a string' })
+  @IsOptional()
+  @MaxLength(255, { message: 'reason cannot exceed 255 characters' })
+  reason?: string;
+}
+
+export interface RotateGroupKeyResponse {
+  groupId: string;
+  groupKeyVersionId: string;
+  groupKeyVersion: number;
+  status: 'ACTIVE';
 }

@@ -4,8 +4,11 @@ import {
   AuditLog,
   EncryptedGroupKey,
   Group,
+  GroupKeyVersion,
   GroupMember,
   GroupMemberContribution,
+  GroupInvite,
+  MemberWrappedGroupKey,
 } from '@finmate/data-models';
 import { GroupsService } from './groups.service';
 import { GroupsController } from './groups.controller';
@@ -29,6 +32,9 @@ import {
       GroupMemberContribution,
       AuditLog,
       EncryptedGroupKey,
+      GroupInvite,
+      GroupKeyVersion,
+      MemberWrappedGroupKey,
     ]),
     ExpensesModule,
     EmailModule,

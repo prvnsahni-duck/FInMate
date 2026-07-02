@@ -10,6 +10,8 @@ import {
   RegisterDto,
 } from '@finmate/data-models';
 import { ClientEncryptionService } from '../services/encryption.service';
+import { GroupKeyService } from '../services/group-key.service';
+import { ZkKeyVaultService } from '../services/zk-key-vault.service';
 
 export class Login {
   static readonly type = '[Auth] Login';
@@ -53,6 +55,8 @@ export interface AuthStateModel {
 export class AuthState {
   private authService = inject(AuthService);
   private encryptionService = inject(ClientEncryptionService);
+  private groupKeyService = inject(GroupKeyService);
+  private zkVault = inject(ZkKeyVaultService);
 
   @Selector()
   static isAuthenticated(state: AuthStateModel): boolean {
@@ -81,6 +85,13 @@ export class AuthState {
         // Derive and store key client-side asynchronously
         this.encryptionService
           .deriveAndStoreKey(action.payload.password, action.payload.email)
+          .then(async () => {
+            try {
+              await this.groupKeyService.getMyAsymmetricKeys();
+            } catch (err) {
+              console.error('Failed to auto-provision asymmetric keys on login', err);
+            }
+          })
           .catch((err) => {
             console.error('Failed to derive master key on login', err);
           });
@@ -101,8 +112,10 @@ export class AuthState {
       : null;
 
     if (state.user?.email) {
-      this.encryptionService.clearKey(state.user.email);
+      void this.encryptionService.clearKey(state.user.email);
     }
+    this.groupKeyService.clearLocalState();
+    void this.zkVault.clearAll();
 
     // Clear local storage and state regardless of API success to ensure client safety
     localStorage.removeItem('finmate_token');

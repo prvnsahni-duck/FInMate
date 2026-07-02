@@ -112,9 +112,10 @@ interface FriendBalance {
               class="border border-slate-100 dark:border-white/5 rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-white/5 hover:border-finmate-neon/30 transition-all"
             >
               <!-- Friend Card Row -->
-              <div
+              <button
+                type="button"
                 (click)="toggleExpand(friend)"
-                class="flex items-center justify-between p-4 cursor-pointer select-none"
+                class="w-full flex items-center justify-between p-4 cursor-pointer select-none"
               >
                 <div class="flex items-center space-x-4">
                   <div
@@ -177,7 +178,7 @@ interface FriendBalance {
                     ></path>
                   </svg>
                 </div>
-              </div>
+              </button>
 
               <!-- Collapsible Group Breakdown -->
               @if (friend.isExpanded) {

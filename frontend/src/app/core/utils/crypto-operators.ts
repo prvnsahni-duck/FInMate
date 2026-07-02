@@ -16,30 +16,35 @@ async function resolveExpenseKey(
   encryptionService: ClientEncryptionService,
   groupKeyService: GroupKeyService,
 ): Promise<CryptoKey | null> {
-  const scope = item.encryptionScope || 'personal';
-  const groupId = item.groupId;
+  try {
+    const scope = item.encryptionScope || 'personal';
+    const groupId = item.groupId;
 
-  if (scope === 'group' && groupId) {
-    return await groupKeyService.getGroupDataKey(groupId);
-  }
+    if (scope === 'group' && groupId) {
+      return await groupKeyService.getGroupDataKey(groupId);
+    }
 
-  if (scope === 'direct_shared') {
-    const wrappedContentKeys = item.wrappedContentKeys || [];
-    const myWrapped = wrappedContentKeys.find((wk: any) => wk.userId === user?.userId);
-    if (myWrapped) {
-      const masterKey = await encryptionService.loadKeyFromSession(email);
-      if (masterKey) {
-        try {
-          return await encryptionService.unwrapKey(myWrapped.wrappedKey, masterKey);
-        } catch (e) {
-          console.error('Failed to unwrap direct_shared content key', item.id, e);
+    if (scope === 'direct_shared') {
+      const wrappedContentKeys = item.wrappedContentKeys || [];
+      const myWrapped = wrappedContentKeys.find((wk: any) => wk.userId === user?.userId);
+      if (myWrapped) {
+        const masterKey = await encryptionService.loadKeyFromSession(email);
+        if (masterKey) {
+          try {
+            return await encryptionService.unwrapKey(myWrapped.wrappedKey, masterKey);
+          } catch (e) {
+            console.error('Failed to unwrap direct_shared content key', item.id, e);
+          }
         }
       }
     }
-  }
 
-  // Default: personal
-  return await encryptionService.loadKeyFromSession(email);
+    // Default: personal
+    return await encryptionService.loadKeyFromSession(email);
+  } catch (e) {
+    console.error('Error resolving expense key:', e);
+    return null;
+  }
 }
 
 /**

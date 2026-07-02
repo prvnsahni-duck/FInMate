@@ -266,7 +266,7 @@ describe('ExpensesService', () => {
   // --- restoreExpense ---
   describe('restoreExpense', () => {
     it('should restore and decrypt the expense', (done) => {
-      service.restoreExpense('exp-1').subscribe((expense) => {
+      service.restoreExpense('exp-1').subscribe(() => {
         expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalled();
         done();
       });

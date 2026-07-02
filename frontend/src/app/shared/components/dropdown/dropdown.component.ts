@@ -6,6 +6,7 @@ import {
   forwardRef,
   signal,
   computed,
+  inject,
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
@@ -42,10 +43,10 @@ export class DropdownComponent implements ControlValueAccessor {
   isOpen = false;
   focusedIndex = -1;
 
-  onChange: any = () => {};
-  onTouched: any = () => {};
+  onChange: (value: unknown) => void = () => undefined;
+  onTouched: () => void = () => undefined;
 
-  constructor(private elementRef: ElementRef) {}
+  private elementRef = inject(ElementRef<HTMLElement>);
 
   selectedOption = computed(() => {
     return this.options.find((opt) => opt.value === this.value()) || null;

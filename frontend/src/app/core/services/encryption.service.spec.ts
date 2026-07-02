@@ -221,15 +221,37 @@ describe('ClientEncryptionService', () => {
     expect(loadedNull).toBeNull();
 
     // 4. Re-derive, clear only memory cache (by setting service['key'] to null or similar)
-    const key2 = await service.deriveAndStoreKey(password, email);
+    await service.deriveAndStoreKey(password, email);
     // Artificially clear in-memory reference to force loading from vault
     (service as any).key = null;
-    
+
     const loadedKey = await service.loadKeyFromSession(email);
     expect(loadedKey).toBeDefined();
     expect(loadedKey).not.toBeNull();
 
     // Cleanup
     await service.clearKey(email);
+  });
+
+  it('should support wrapping and unwrapping a generated data key using another generated data key with round-trip correctness', async () => {
+    const wrappingKey = await service.generateDataKey();
+    const dataKey = await service.generateDataKey();
+
+    // Wrap the data key
+    const wrappedStr = await service.wrapKey(dataKey, wrappingKey);
+    expect(wrappedStr).toBeDefined();
+    expect(wrappedStr).toContain(':');
+
+    // Unwrap the data key
+    const unwrappedKey = await service.unwrapKey(wrappedStr, wrappingKey);
+    expect(unwrappedKey).toBeDefined();
+    expect(unwrappedKey.type).toBe('secret');
+    expect(unwrappedKey.algorithm.name).toBe('AES-GCM');
+
+    // Verify round-trip correctness (encrypt with original key, decrypt with unwrapped key)
+    const plaintext = 'Symmetric key wrapping round-trip test!';
+    const encrypted = await service.encrypt(plaintext, dataKey);
+    const decrypted = await service.decrypt(encrypted, unwrappedKey);
+    expect(decrypted).toBe(plaintext);
   });
 });

@@ -1,8 +1,8 @@
 import { Component, input, output, inject, signal, DestroyRef } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { forkJoin, of, Subscription } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { HttpClient } from '@angular/common/http';
+import { Subscription, firstValueFrom } from 'rxjs';
 import { GroupMember, UserSearchResult } from '@finmate/data-models';
 import { GroupsService } from '../../services/groups.service';
 import { FriendsService } from '../../../friends/services/friends.service';
@@ -11,6 +11,9 @@ import {
   DropdownComponent,
   DropdownOption,
 } from '../../../../shared/components/dropdown/dropdown.component';
+import { ClientEncryptionService, arrayBufferToBase64 } from '../../../../core/services/encryption.service';
+import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { environment } from '../../../../../environments/environment';
 
 export interface StagedInvite {
   id: string;
@@ -27,12 +30,6 @@ interface FailedInviteResult {
   message: string;
 }
 
-function isFailedInviteResult(
-  result: GroupMember | FailedInviteResult,
-): result is FailedInviteResult {
-  return 'error' in result && result.error;
-}
-
 @Component({
   selector: 'app-group-members',
   standalone: true,
@@ -43,6 +40,9 @@ export class GroupMembersComponent {
   private groupsService = inject(GroupsService);
   private friendsService = inject(FriendsService);
   private destroyRef = inject(DestroyRef);
+  private encryptionService = inject(ClientEncryptionService);
+  private groupKeyService = inject(GroupKeyService);
+  private http = inject(HttpClient);
 
   members = input.required<GroupMember[]>();
   groupId = input.required<string>();
@@ -239,7 +239,7 @@ export class GroupMembersComponent {
     this.searchResults = [];
   }
 
-  sendBulkInvites() {
+  async sendBulkInvites() {
     const list = this.stagedInvites();
     if (list.length === 0) return;
 
@@ -247,57 +247,116 @@ export class GroupMembersComponent {
     this.inviteError = '';
     this.inviteSuccess = '';
 
-    const requests = list.map((invite) =>
-      this.groupsService
-        .inviteMember(this.groupId(), {
-          identifier: invite.identifier,
-          role: invite.role,
-          displayName: invite.isRegisteredUser ? undefined : invite.name,
-        })
-        .pipe(
-          catchError((err) =>
-            of({
-              error: true,
-              invite,
-              message: err.error?.message || 'Failed to send invite.',
-            } satisfies FailedInviteResult),
-          ),
-        ),
-    );
+    try {
+      const groupKey = await this.groupKeyService.getGroupDataKey(this.groupId());
+      if (!groupKey) {
+        throw new Error('Group key not available. Please unlock your vault.');
+      }
 
-    forkJoin(requests).subscribe({
-      next: (results) => {
-        this.isInviting = false;
-        const failed = results.filter(isFailedInviteResult);
+      const subtle = window.crypto.subtle || (globalThis as any).crypto?.subtle;
+      if (!subtle) {
+        throw new Error('Web Cryptography API is not available');
+      }
+      const results: any[] = [];
+      const failed: FailedInviteResult[] = [];
 
-        if (failed.length === 0) {
-          const phoneInvites = list.filter((invite) =>
-            this.isValidPhone(invite.identifier),
-          );
-          this.stagedInvites.set([]);
-          this.inviteSuccess = 'All invitations sent successfully!';
-          this.memberChanged.emit();
+      for (const invite of list) {
+        try {
+          let wrappedGroupKey: string | undefined;
+          let tikUrlSafe: string | undefined;
 
-          if (phoneInvites.length > 0) {
-            this.justInvitedPhoneContacts = phoneInvites;
-            this.isMobileShareModalOpen = true;
-          } else {
-            setTimeout(() => (this.inviteSuccess = ''), 3000);
+          // 1. Try lookup user on the server
+          let lookupData: any = null;
+          try {
+            const lookupRes = await firstValueFrom(
+              this.http.get<{ data: { userId: string; publicWrappingKey: string | null } }>(
+                `${environment.apiBaseUrl}/users/lookup?identifier=${encodeURIComponent(invite.identifier)}`
+              )
+            );
+            lookupData = lookupRes.data;
+          } catch {
+            // User not registered or lookup failed
           }
-        } else {
-          const failedIds = new Set(failed.map((f) => f.invite.id));
-          this.stagedInvites.update((staged) =>
-            staged.filter((item) => failedIds.has(item.id)),
+
+          if (lookupData && lookupData.publicWrappingKey) {
+            // Flow B: User is registered and has public wrapping key
+            const publicKey = await subtle.importKey(
+              'jwk',
+              JSON.parse(lookupData.publicWrappingKey),
+              { name: 'RSA-OAEP', hash: 'SHA-256' },
+              true,
+              ['wrapKey'],
+            );
+            wrappedGroupKey = await this.encryptionService.wrapKey(groupKey, publicKey);
+          } else {
+            // Flow C: User is unregistered or doesn't have public wrapping key
+            // Generate TIK (AES-GCM 256-bit)
+            const tik = await this.encryptionService.generateDataKey();
+            wrappedGroupKey = await this.encryptionService.wrapKey(groupKey, tik);
+
+            const rawTik = await subtle.exportKey('raw', tik);
+            const tikBase64 = arrayBufferToBase64(rawTik);
+            tikUrlSafe = tikBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          }
+
+          // 2. Send invitation
+          const inviteRes = await firstValueFrom(
+            this.groupsService.inviteMember(this.groupId(), {
+              identifier: invite.identifier,
+              role: invite.role,
+              displayName: invite.isRegisteredUser ? undefined : invite.name,
+              wrappedGroupKey,
+              inviteKeyHash: tikUrlSafe,
+            })
           );
-          this.inviteError = `Failed to invite: ${failed.map((f) => f.invite.name).join(', ')}`;
-          this.memberChanged.emit();
+
+          // 3. If TIK was used, save invite URL with TIK hash
+          if (tikUrlSafe && inviteRes.inviteToken) {
+            const host = window.location.origin;
+            (invite as any).joinUrl = `${host}/groups/join/${inviteRes.inviteToken}#${tikUrlSafe}`;
+          } else if (inviteRes.inviteToken) {
+            const host = window.location.origin;
+            (invite as any).joinUrl = `${host}/groups/join/${inviteRes.inviteToken}`;
+          }
+
+          results.push(inviteRes);
+        } catch (err: any) {
+          failed.push({
+            error: true,
+            invite,
+            message: err.error?.message || err.message || 'Failed to send invite.',
+          });
         }
-      },
-      error: () => {
-        this.isInviting = false;
-        this.inviteError = 'An unexpected error occurred.';
-      },
-    });
+      }
+
+      this.isInviting = false;
+
+      if (failed.length === 0) {
+        const phoneInvites = list.filter((invite) =>
+          this.isValidPhone(invite.identifier),
+        );
+        this.stagedInvites.set([]);
+        this.inviteSuccess = 'All invitations sent successfully!';
+        this.memberChanged.emit();
+
+        if (phoneInvites.length > 0) {
+          this.justInvitedPhoneContacts = phoneInvites;
+          this.isMobileShareModalOpen = true;
+        } else {
+          setTimeout(() => (this.inviteSuccess = ''), 3000);
+        }
+      } else {
+        const failedIds = new Set(failed.map((f) => f.invite.id));
+        this.stagedInvites.update((staged) =>
+          staged.filter((item) => failedIds.has(item.id)),
+        );
+        this.inviteError = `Failed to invite: ${failed.map((f) => f.invite.name).join(', ')}`;
+        this.memberChanged.emit();
+      }
+    } catch (err: any) {
+      this.isInviting = false;
+      this.inviteError = err.message || 'An unexpected error occurred.';
+    }
   }
 
   removeOrRevokeMember(member: GroupMember) {
@@ -317,14 +376,59 @@ export class GroupMembersComponent {
     }
   }
 
-  openQrModal() {
-    const token = this.inviteToken();
-    if (!token) return;
+  isGeneratingLink = false;
 
-    const host = window.location.origin;
-    this.joinUrl = `${host}/groups/join/${token}`;
-    this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(this.joinUrl)}`;
-    this.isQrModalOpen = true;
+  async generateSecureInviteLink() {
+    this.isGeneratingLink = true;
+    try {
+      const subtle = window.crypto.subtle || (globalThis as any).crypto?.subtle;
+      if (!subtle) {
+        throw new Error('Web Cryptography API is not available');
+      }
+
+      // 1. Resolve Group Key
+      const groupKey = await this.groupKeyService.getGroupDataKey(this.groupId());
+      if (!groupKey) {
+        throw new Error('Group key not available. Please unlock your vault.');
+      }
+
+      // 2. Generate TIK (AES-GCM 256-bit)
+      const tik = await this.encryptionService.generateDataKey();
+
+      // 3. Wrap Group Key with TIK
+      const wrappedGk = await this.encryptionService.wrapKey(groupKey, tik);
+
+      // 4. Export TIK raw bytes to put in URL
+      const rawTik = await subtle.exportKey('raw', tik);
+      const tikBase64 = arrayBufferToBase64(rawTik);
+      const tikUrlSafe = tikBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+      // 5. Post to API to create invite and store wrapped key
+      const response = await firstValueFrom(
+        this.http.post<{ data: { inviteToken: string } }>(
+          `${environment.apiBaseUrl}/groups/${this.groupId()}/invites`,
+          { wrappedGroupKey: wrappedGk }
+        )
+      );
+
+      const inviteToken = response.data.inviteToken;
+      const host = window.location.origin;
+      this.joinUrl = `${host}/groups/join/${inviteToken}#${tikUrlSafe}`;
+      this.qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(this.joinUrl)}`;
+    } catch (err: any) {
+      alert(err.message || 'Failed to generate secure invite link');
+      this.joinUrl = '';
+      this.qrCodeUrl = '';
+    } finally {
+      this.isGeneratingLink = false;
+    }
+  }
+
+  async openQrModal() {
+    await this.generateSecureInviteLink();
+    if (this.joinUrl) {
+      this.isQrModalOpen = true;
+    }
   }
 
   closeQrModal() {
@@ -352,8 +456,8 @@ export class GroupMembersComponent {
 
   getWhatsAppShareUrl(phoneNumber: string, displayName: string): string {
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
-    const host = window.location.origin;
-    const joinUrl = `${host}/groups/join/${this.inviteToken()}`;
+    const staged = this.justInvitedPhoneContacts.find((c) => c.identifier === phoneNumber);
+    const joinUrl = (staged as any)?.joinUrl || this.joinUrl || `${window.location.origin}/groups/join/${this.inviteToken()}`;
     const text = `Hey ${displayName}! I've invited you to join our group "${this.groupName()}" on FinMate. Use this link to join and track split expenses: ${joinUrl}`;
 
     if (cleanPhone) {
@@ -363,8 +467,8 @@ export class GroupMembersComponent {
   }
 
   getSmsShareUrl(phoneNumber: string, displayName: string): string {
-    const host = window.location.origin;
-    const joinUrl = `${host}/groups/join/${this.inviteToken()}`;
+    const staged = this.justInvitedPhoneContacts.find((c) => c.identifier === phoneNumber);
+    const joinUrl = (staged as any)?.joinUrl || this.joinUrl || `${window.location.origin}/groups/join/${this.inviteToken()}`;
     const text = `Hey ${displayName}! I've invited you to join our group "${this.groupName()}" on FinMate. Join here: ${joinUrl}`;
     return `sms:${phoneNumber}?body=${encodeURIComponent(text)}`;
   }

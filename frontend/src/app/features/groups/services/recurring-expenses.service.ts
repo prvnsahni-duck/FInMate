@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { from, Observable, firstValueFrom } from 'rxjs';
+import { from, Observable } from 'rxjs';
 import { mergeMap, map } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { Store } from '@ngxs/store';

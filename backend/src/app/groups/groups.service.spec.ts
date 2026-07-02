@@ -3,8 +3,11 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { GroupsService } from './groups.service';
 import {
   Group,
+  GroupKeyVersion,
   GroupMember,
   GroupMemberContribution,
+  GroupInvite,
+  MemberWrappedGroupKey,
   User,
   AuditLog,
 } from '@finmate/data-models';
@@ -26,6 +29,9 @@ describe('GroupsService', () => {
   let service: GroupsService;
   let groupRepository: jest.Mocked<Repository<Group>>;
   let groupMemberRepository: jest.Mocked<Repository<GroupMember>>;
+  let groupInviteRepository: jest.Mocked<Repository<GroupInvite>>;
+  let groupKeyVersionRepository: jest.Mocked<Repository<GroupKeyVersion>>;
+  let memberWrappedGroupKeyRepository: jest.Mocked<Repository<MemberWrappedGroupKey>>;
   let userRepository: any;
   let dataSource: jest.Mocked<DataSource>;
 
@@ -73,6 +79,25 @@ describe('GroupsService', () => {
       })),
     };
 
+    const mockGroupInviteRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockGroupKeyVersionRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockMemberWrappedGroupKeyRepository = {
+      findOne: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
     const mockManager = {
       create: jest.fn((entity, data) => data),
       save: jest.fn(async (entity, data) => data),
@@ -102,6 +127,9 @@ describe('GroupsService', () => {
         if (entity === Group) return mockGroupRepository;
         if (entity === GroupMember) return mockGroupMemberRepository;
         if (entity === AuditLog) return mockAuditLogRepository;
+        if (entity === GroupKeyVersion) return mockGroupKeyVersionRepository;
+        if (entity === MemberWrappedGroupKey)
+          return mockMemberWrappedGroupKeyRepository;
         return null;
       }),
     };
@@ -132,6 +160,18 @@ describe('GroupsService', () => {
           provide: getRepositoryToken(AuditLog),
           useValue: mockAuditLogRepository,
         },
+        {
+          provide: getRepositoryToken(GroupInvite),
+          useValue: mockGroupInviteRepository,
+        },
+        {
+          provide: getRepositoryToken(GroupKeyVersion),
+          useValue: mockGroupKeyVersionRepository,
+        },
+        {
+          provide: getRepositoryToken(MemberWrappedGroupKey),
+          useValue: mockMemberWrappedGroupKeyRepository,
+        },
         { provide: DataSource, useValue: mockDataSource },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: EmailService, useValue: mockEmailService },
@@ -141,7 +181,19 @@ describe('GroupsService', () => {
     service = module.get<GroupsService>(GroupsService);
     groupRepository = module.get(getRepositoryToken(Group));
     groupMemberRepository = module.get(getRepositoryToken(GroupMember));
+    groupInviteRepository = module.get(getRepositoryToken(GroupInvite));
+    groupKeyVersionRepository = module.get(getRepositoryToken(GroupKeyVersion));
+    memberWrappedGroupKeyRepository = module.get(
+      getRepositoryToken(MemberWrappedGroupKey),
+    );
     dataSource = module.get(DataSource);
+
+    groupKeyVersionRepository.findOne.mockResolvedValue({
+      id: 'active-version-id',
+      version: 1,
+      status: 'ACTIVE',
+      group: { id: 'group-id' },
+    } as any);
   });
 
   it('should be defined', () => {
@@ -409,6 +461,49 @@ describe('GroupsService', () => {
     });
   });
 
+  describe('invite expiry handling', () => {
+    it('should mark pending invite expired and reject invite details', async () => {
+      const expiredInvite = {
+        id: 'invite-id',
+        inviteToken: 'invite-token',
+        status: 'pending',
+        expiresAt: new Date(Date.now() - 60_000),
+        group: {
+          id: 'group-id',
+          ownerUser: { email: 'owner@example.com' },
+        },
+      } as any;
+
+      groupInviteRepository.findOne.mockResolvedValue(expiredInvite);
+
+      await expect(service.getInviteDetails('invite-token')).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(groupInviteRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'expired' }),
+      );
+    });
+
+    it('should mark pending invite expired and reject join by token', async () => {
+      const expiredInvite = {
+        id: 'invite-id',
+        inviteToken: 'invite-token',
+        status: 'pending',
+        expiresAt: new Date(Date.now() - 60_000),
+        group: { id: 'group-id' },
+      } as any;
+
+      groupInviteRepository.findOne.mockResolvedValue(expiredInvite);
+
+      await expect(
+        service.joinGroupByToken('user-id', 'invite-token'),
+      ).rejects.toThrow(NotFoundException);
+      expect(groupInviteRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'expired' }),
+      );
+    });
+  });
+
   describe('updateMember', () => {
     it('should throw ForbiddenException if caller does not have access', async () => {
       groupMemberRepository.findOne.mockResolvedValueOnce(null);
@@ -630,6 +725,137 @@ describe('GroupsService', () => {
 
       expect(target.joinStatus).toBe('removed');
       expect(target.leftAt).toBeDefined();
+    });
+  });
+
+  describe('group key versioning', () => {
+    it('should not overwrite existing wrapped key for active version during provisioning', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member-id',
+        role: 'owner',
+        joinStatus: 'active',
+        user: { id: 'owner-id' },
+        group: { id: 'group-id' },
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
+
+      const existingWrappedKey = {
+        id: 'wrapped-key-id',
+        wrappedGroupKey: 'existing-ciphertext',
+      };
+
+      const managerGroupKeyVersionRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          id: 'active-version-id',
+          version: 1,
+          status: 'ACTIVE',
+          group: { id: 'group-id' },
+        }),
+        save: jest.fn(),
+        create: jest.fn((data) => data),
+      };
+
+      const managerMemberWrappedRepo = {
+        findOne: jest.fn().mockResolvedValue(existingWrappedKey),
+        save: jest.fn(),
+        create: jest.fn((data) => data),
+      };
+
+      const managerGroupMemberRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          id: 'target-member-id',
+          user: { id: 'target-user-id' },
+          group: { id: 'group-id' },
+          joinStatus: 'active',
+        }),
+      };
+
+      dataSource.transaction.mockImplementationOnce(async (cb: any) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GroupKeyVersion) return managerGroupKeyVersionRepo;
+            if (entity === MemberWrappedGroupKey) return managerMemberWrappedRepo;
+            if (entity === GroupMember) return managerGroupMemberRepo;
+            return null;
+          },
+        }),
+      );
+
+      await service.provisionGroupKeys('owner-id', 'group-id', [
+        { userId: 'target-user-id', wrappedKey: 'new-ciphertext' },
+      ]);
+
+      expect(managerMemberWrappedRepo.findOne).toHaveBeenCalled();
+      expect(managerMemberWrappedRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('should rotate group key by superseding current active and creating next active version', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member-id',
+        role: 'owner',
+        joinStatus: 'active',
+        user: { id: 'owner-id' },
+        group: { id: 'group-id' },
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
+
+      const activeVersion = {
+        id: 'version-1-id',
+        version: 1,
+        status: 'ACTIVE',
+      } as any;
+      const createdVersion = {
+        id: 'version-2-id',
+        version: 2,
+        status: 'ACTIVE',
+      } as any;
+
+      const managerGroupKeyVersionRepo = {
+        findOne: jest
+          .fn()
+          .mockResolvedValueOnce(activeVersion)
+          .mockResolvedValueOnce({ id: 'version-1-id', version: 1 }),
+        save: jest
+          .fn()
+          .mockResolvedValueOnce({ ...activeVersion, status: 'SUPERSEDED' })
+          .mockResolvedValueOnce(createdVersion),
+        create: jest.fn((data) => data),
+      };
+
+      const managerGroupMemberRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          id: 'target-member-id',
+          user: { id: 'target-user-id' },
+          group: { id: 'group-id' },
+          joinStatus: 'active',
+        }),
+      };
+
+      const managerMemberWrappedRepo = {
+        save: jest.fn(async (data) => data),
+        create: jest.fn((data) => data),
+      };
+
+      dataSource.transaction.mockImplementationOnce(async (cb: any) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GroupKeyVersion) return managerGroupKeyVersionRepo;
+            if (entity === GroupMember) return managerGroupMemberRepo;
+            if (entity === MemberWrappedGroupKey) return managerMemberWrappedRepo;
+            return null;
+          },
+        }),
+      );
+
+      const result = await service.rotateGroupKey('owner-id', 'group-id', {
+        reason: 'scheduled-rotation',
+        keys: [{ userId: 'target-user-id', wrappedKey: 'ciphertext-v2' }],
+      });
+
+      expect(result.groupKeyVersion).toBe(2);
+      expect(result.status).toBe('ACTIVE');
+      expect(managerGroupKeyVersionRepo.save).toHaveBeenCalledTimes(2);
+      expect(managerMemberWrappedRepo.save).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -22,7 +22,6 @@ import { ExpensesService } from '../../services/expenses.service';
 import { FriendsService } from '../../../../features/friends/services/friends.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 import {
-  CreateExpenseDto,
   ExpenseSplitInputDto,
   GroupMember,
   JwtPayload,
@@ -476,7 +475,7 @@ export class CreateExpenseModalComponent implements OnChanges {
           });
         }
 
-        let wrappedContentKeys = [];
+        const wrappedContentKeys = [];
         if (scope === 'direct_shared' && scopeKey) {
           const masterKey = await this.encryptionService.loadKeyFromSession(email);
           const currentUserId = user;

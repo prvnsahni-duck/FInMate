@@ -8,3 +8,6 @@ export { AddRecurringExpenses1718500000000 } from './1718500000000-AddRecurringE
 export { RevertExpenseAmountsEncryption1718600000000 } from './1718600000000-RevertExpenseAmountsEncryption';
 export { ChangeTitlesToText1718700000000 } from './1718700000000-ChangeTitlesToText';
 export { AddEnvelopeEncryption1718800000000 } from './1718800000000-AddEnvelopeEncryption';
+export { AddGroupInvites1718900000000 } from './1718900000000-AddGroupInvites';
+export { AddGroupKeyVersioningModel1719000000000 } from './1719000000000-AddGroupKeyVersioningModel';
+

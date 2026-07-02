@@ -183,4 +183,15 @@ export class UsersService {
     }
     return user.publicWrappingKey || null;
   }
+
+  async lookupUser(identifier: string): Promise<User | null> {
+    if (!identifier) return null;
+    const trimmed = identifier.trim();
+    return this.userRepository.findOne({
+      where: [
+        { email: trimmed },
+        { username: trimmed },
+      ],
+    });
+  }
 }

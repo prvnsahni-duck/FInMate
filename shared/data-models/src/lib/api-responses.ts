@@ -115,6 +115,7 @@ export interface InviteDetailsResponse {
   ownerName: string;
   groupType: Group['groupType'];
   currency: string;
+  wrappedGroupKey?: string | null;
   members?: Array<{
     email?: string;
     phoneNumber?: string;

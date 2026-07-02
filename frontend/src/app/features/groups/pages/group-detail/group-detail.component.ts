@@ -22,7 +22,6 @@ import { DropdownComponent, DropdownOption } from '../../../../shared/components
 import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
-import { base64ToArrayBuffer } from '../../../../core/services/encryption.service';
 
 import {
   BalanceEntry,
@@ -185,6 +184,8 @@ export class GroupDetailComponent implements OnInit {
   isMonthLocked = signal<boolean>(false);
   isViewer = signal<boolean>(false);
   isGroupKeyLoaded = signal<boolean>(true);
+  isMasterKeyLoaded = signal<boolean>(true);
+  rateLimitError = this.groupKeyService.rateLimitError;
 
   // Categories list
   categories = [
@@ -270,7 +271,6 @@ export class GroupDetailComponent implements OnInit {
             if (res.groupType === 'household') {
               this.fetchCarryForward(groupId);
             }
-            this.initializeGroupKeysAndSelfHeal(groupId);
           },
           error: () => this.isLoading.set(false),
         });
@@ -280,6 +280,10 @@ export class GroupDetailComponent implements OnInit {
 
   async initializeGroupKeysAndSelfHeal(groupId: string) {
     try {
+      const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
+      const masterKey = await this.encryptionService.loadKeyFromSession(email || undefined);
+      this.isMasterKeyLoaded.set(!!masterKey);
+
       await this.groupKeyService.getMyAsymmetricKeys();
       let key = await this.groupKeyService.getGroupDataKey(groupId);
       if (!key) {
@@ -296,6 +300,26 @@ export class GroupDetailComponent implements OnInit {
     } catch (e) {
       console.warn('Failed to initialize group encryption keys / self-heal', e);
       this.isGroupKeyLoaded.set(false);
+    }
+  }
+
+  async unlockVault(password: string) {
+    if (!password) return;
+    try {
+      const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
+      if (!email) throw new Error('User email not found');
+
+      await this.encryptionService.deriveAndStoreKey(password, email);
+      this.isMasterKeyLoaded.set(true);
+
+      const g = this.group();
+      if (g?.id) {
+        await this.initializeGroupKeysAndSelfHeal(g.id);
+        this.fetchExpenses(g.id);
+        this.fetchBalances(g.id);
+      }
+    } catch (e: any) {
+      alert('Failed to unlock vault: ' + (e.message || e));
     }
   }
 
@@ -416,8 +440,10 @@ export class GroupDetailComponent implements OnInit {
         const currentUserId = this.currentUserId();
         const myMember = res.find((m) => m.user?.id === currentUserId);
         this.isViewer.set(myMember?.role === 'viewer');
+
+        this.initializeGroupKeysAndSelfHeal(groupId);
       },
-      error: () => {},
+      error: (err) => console.error('Failed to fetch group members', err),
     });
   }
 
@@ -435,7 +461,7 @@ export class GroupDetailComponent implements OnInit {
         );
         this.userBalance.set(myBalanceEntry ? myBalanceEntry.netBalance : 0);
       },
-      error: () => {},
+      error: (err) => console.error('Failed to fetch balances', err),
     });
   }
 
@@ -444,7 +470,7 @@ export class GroupDetailComponent implements OnInit {
       next: (res) => {
         this.historyLogs.set(res.data || []);
       },
-      error: () => {},
+      error: (err) => console.error('Failed to fetch history logs', err),
     });
   }
 
@@ -453,7 +479,7 @@ export class GroupDetailComponent implements OnInit {
       next: (res) => {
         this.deletedExpenses.set(res.data || []);
       },
-      error: () => {},
+      error: (err) => console.error('Failed to fetch deleted expenses', err),
     });
   }
 
@@ -464,7 +490,7 @@ export class GroupDetailComponent implements OnInit {
         next: (res) => {
           this.carryForwardBalances.set(res || []);
         },
-        error: () => {},
+        error: (err) => console.error('Failed to fetch carry-forward data', err),
       });
   }
 
@@ -890,6 +916,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   canChangeRole(member: GroupMember): boolean {
+    void member;
     return true;
   }
 

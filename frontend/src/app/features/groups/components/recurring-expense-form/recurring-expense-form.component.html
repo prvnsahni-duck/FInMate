@@ -119,17 +119,21 @@
 
     <!-- Splits Participant Checklist -->
     <div class="form-field participants-checklist">
-      <label>Split Beneficiaries *</label>
+      <div class="form-label">Split Beneficiaries *</div>
       <div class="checklist-grid">
         @for (member of availableParticipants; track member.id) {
-          <div class="checklist-item" (click)="toggleParticipant(member.id)">
+          <button
+            type="button"
+            class="checklist-item"
+            (click)="toggleParticipant(member.id)"
+          >
             <input
               type="checkbox"
               [checked]="selectedUserIds.has(member.id)"
               readonly
             />
             <span>{{ member.name }}</span>
-          </div>
+          </button>
         }
       </div>
     </div>
@@ -138,7 +142,7 @@
     <div class="form-actions">
       <button
         type="button"
-        (click)="cancel.emit()"
+        (click)="cancelled.emit()"
         class="btn-secondary"
         [disabled]="isSubmitting"
       >

@@ -9,8 +9,11 @@ import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { provideRouter } from '@angular/router';
 import { GroupMember } from '@finmate/data-models';
+import { Store } from '@ngxs/store';
+import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 
 import { RecurringExpensesService } from '../../services/recurring-expenses.service';
+import { GroupKeyService } from '../../../../core/services/group-key.service';
 
 describe('GroupDetailComponent', () => {
   let component: GroupDetailComponent;
@@ -19,6 +22,9 @@ describe('GroupDetailComponent', () => {
   let mockExpensesService: jest.Mocked<ExpensesService>;
   let mockRecurringExpensesService: any;
   let mockActivatedRoute: any;
+  let mockGroupKeyService: any;
+  let mockEncryptionService: any;
+  let mockStore: { selectSnapshot: jest.Mock };
 
   const mockGroup = {
     id: 'group-1',
@@ -76,7 +82,7 @@ describe('GroupDetailComponent', () => {
 
   beforeEach(async () => {
     // Mock window.alert to prevent JSDOM errors
-    jest.spyOn(window, 'alert').mockImplementation(() => {});
+    jest.spyOn(window, 'alert').mockImplementation(() => undefined);
 
     mockGroupsService = {
       getGroup: jest.fn().mockReturnValue(of(mockGroup)),
@@ -123,6 +129,27 @@ describe('GroupDetailComponent', () => {
       paramMap: of(convertToParamMap({ id: 'group-1' })),
     };
 
+    mockGroupKeyService = {
+      getMyAsymmetricKeys: jest.fn().mockResolvedValue({}),
+      getGroupDataKey: jest.fn().mockResolvedValue({}),
+      checkAndProvisionMissingKeys: jest.fn().mockResolvedValue({}),
+      rateLimitError: jest.fn().mockReturnValue(null),
+    };
+
+    mockEncryptionService = {
+      loadKeyFromSession: jest.fn().mockResolvedValue(null),
+      deriveAndStoreKey: jest.fn().mockResolvedValue(undefined),
+      unwrapKey: jest.fn().mockResolvedValue({}),
+      decrypt: jest.fn().mockResolvedValue('file.txt'),
+      decryptBytes: jest.fn().mockResolvedValue(new ArrayBuffer(0)),
+    };
+
+    mockStore = {
+      selectSnapshot: jest.fn().mockImplementation(() => ({
+        email: 'owner@household.com',
+      })),
+    };
+
     await TestBed.configureTestingModule({
       imports: [GroupDetailComponent],
       providers: [
@@ -132,6 +159,9 @@ describe('GroupDetailComponent', () => {
           provide: RecurringExpensesService,
           useValue: mockRecurringExpensesService,
         },
+        { provide: GroupKeyService, useValue: mockGroupKeyService },
+        { provide: ClientEncryptionService, useValue: mockEncryptionService },
+        { provide: Store, useValue: mockStore },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }, // Listed LAST to override provideRouter
       ],
@@ -242,5 +272,11 @@ describe('GroupDetailComponent', () => {
       'group-1',
       contributor.id,
     );
+  });
+
+  it('should call initializeGroupKeysAndSelfHeal on members load', () => {
+    const selfHealSpy = jest.spyOn(component, 'initializeGroupKeysAndSelfHeal').mockResolvedValue();
+    fixture.detectChanges(); // ngOnInit -> fetchMembers
+    expect(selfHealSpy).toHaveBeenCalledWith('group-1');
   });
 });

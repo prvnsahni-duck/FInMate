@@ -223,4 +223,19 @@ export class ZkKeyVaultService {
   async deleteGroupKey(groupId: string): Promise<void> {
     return this.deleteKey(`group:${groupId}`);
   }
+
+  /** Stores a user's private wrapping key in the vault under private_wrapping_key:${email} */
+  async storePrivateWrappingKey(email: string, key: CryptoKey): Promise<void> {
+    return this.storeKey(`private_wrapping_key:${email}`, key);
+  }
+
+  /** Loads a user's private wrapping key from the vault by email */
+  async loadPrivateWrappingKey(email: string): Promise<CryptoKey | null> {
+    return this.loadKey(`private_wrapping_key:${email}`);
+  }
+
+  /** Deletes a user's private wrapping key from the vault by email */
+  async deletePrivateWrappingKey(email: string): Promise<void> {
+    return this.deleteKey(`private_wrapping_key:${email}`);
+  }
 }

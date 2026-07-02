@@ -80,7 +80,7 @@ export class RecurringExpenseFormComponent implements OnChanges {
   @Input() template: any | null = null; // For editing existing template
 
   @Output() saveSuccess = new EventEmitter<void>();
-  @Output() cancel = new EventEmitter<void>();
+  @Output() cancelled = new EventEmitter<void>();
 
   selectedUserIds = new Set<string>();
   isSubmitting = false;

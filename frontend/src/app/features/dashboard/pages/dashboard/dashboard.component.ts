@@ -296,6 +296,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: () => {
           this.fetchData();
+          this.router.navigate(['/groups', invite.id]);
         },
         error: (err) => {
           alert(err.error?.message || 'Failed to accept invitation');

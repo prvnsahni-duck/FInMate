@@ -2,16 +2,21 @@ import { TestBed, ComponentFixture } from '@angular/core/testing';
 import { CreateExpenseModalComponent } from './create-expense-modal.component';
 import { ExpensesService } from '../../services/expenses.service';
 import { FriendsService } from '../../../../features/friends/services/friends.service';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { of, throwError } from 'rxjs';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
+import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { Store } from '@ngxs/store';
+import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 
 describe('CreateExpenseModalComponent', () => {
   let component: CreateExpenseModalComponent;
   let fixture: ComponentFixture<CreateExpenseModalComponent>;
   let mockExpensesService: any;
   let mockFriendsService: any;
+  let mockGroupKeyService: any;
+  let mockStore: any;
+  let mockEncryptionService: any;
 
   beforeEach(async () => {
     // Mock localStorage for JWT token
@@ -33,11 +38,37 @@ describe('CreateExpenseModalComponent', () => {
       searchUsers: jest.fn().mockReturnValue(of([])),
     };
 
+    const mockCryptoKey = {} as CryptoKey;
+    mockGroupKeyService = {
+      getGroupDataKey: jest.fn().mockResolvedValue(mockCryptoKey),
+      createAndStoreGroupKey: jest.fn().mockResolvedValue(mockCryptoKey),
+      rateLimitError: jest.fn().mockReturnValue(null),
+    };
+
+    mockStore = {
+      selectSnapshot: jest
+        .fn()
+        .mockImplementation((selector: (state: any) => unknown) =>
+          selector({ auth: { user: { email: 'test@example.com' } } }),
+        ),
+    };
+
+    mockEncryptionService = {
+      loadKeyFromSession: jest.fn().mockResolvedValue(mockCryptoKey),
+      generateDataKey: jest.fn().mockResolvedValue(mockCryptoKey),
+      encryptBytes: jest.fn().mockResolvedValue('encrypted-bytes'),
+      encrypt: jest.fn().mockResolvedValue('encrypted-value'),
+      wrapKey: jest.fn().mockResolvedValue('wrapped-key'),
+    };
+
     await TestBed.configureTestingModule({
-      imports: [CreateExpenseModalComponent],
+      imports: [CreateExpenseModalComponent, HttpClientTestingModule],
       providers: [
         { provide: ExpensesService, useValue: mockExpensesService },
         { provide: FriendsService, useValue: mockFriendsService },
+        { provide: GroupKeyService, useValue: mockGroupKeyService },
+        { provide: Store, useValue: mockStore },
+        { provide: ClientEncryptionService, useValue: mockEncryptionService },
       ],
     })
       .compileComponents();
@@ -209,17 +240,29 @@ describe('CreateExpenseModalComponent', () => {
   // --- File attachment ---
   describe('file attachments', () => {
     it('should add files on selection', () => {
+      const readSpy = jest
+        .spyOn(FileReader.prototype, 'readAsArrayBuffer')
+        .mockImplementation(function (this: FileReader) {
+          Object.defineProperty(this, 'result', {
+            value: new ArrayBuffer(8),
+            configurable: true,
+          });
+          this.onload?.(new ProgressEvent('load'));
+        });
+
+      const file = new File(['receipt'], 'receipt.jpg', {
+        type: 'image/jpeg',
+      });
       const mockEvent = {
         target: {
-          files: [
-            { name: 'receipt.jpg', size: 2048 },
-          ],
+          files: [file],
         },
       } as any;
 
       component.onFileSelected(mockEvent);
       expect(component.attachedFiles).toHaveLength(1);
       expect(component.attachedFiles[0].name).toBe('receipt.jpg');
+      readSpy.mockRestore();
     });
 
     it('should remove attachment by index', () => {
@@ -249,8 +292,8 @@ describe('CreateExpenseModalComponent', () => {
       });
     });
 
-    it('should call createExpense when form is valid and no existing expense', () => {
-      component.onSubmit();
+    it('should call createExpense when form is valid and no existing expense', async () => {
+      await component.onSubmit();
 
       expect(mockExpensesService.createExpense).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -262,13 +305,13 @@ describe('CreateExpenseModalComponent', () => {
       );
     });
 
-    it('should call updateExpense when editing an existing expense', () => {
+    it('should call updateExpense when editing an existing expense', async () => {
       component.expense = {
         id: 'exp-1',
         version: 2,
       } as any;
 
-      component.onSubmit();
+      await component.onSubmit();
 
       expect(mockExpensesService.updateExpense).toHaveBeenCalledWith(
         'exp-1',
@@ -279,49 +322,40 @@ describe('CreateExpenseModalComponent', () => {
       );
     });
 
-    it('should not submit when form is invalid', () => {
+    it('should not submit when form is invalid', async () => {
       component.expenseForm.patchValue({ title: '' });
-      component.onSubmit();
+      await component.onSubmit();
 
       expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
       expect(mockExpensesService.updateExpense).not.toHaveBeenCalled();
     });
 
-    it('should not submit when no participants are selected', () => {
+    it('should not submit when no participants are selected', async () => {
       component.selectedUserIds.clear();
-      component.onSubmit();
+      await component.onSubmit();
 
       expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
     });
 
-    it('should set user-friendly error message on failure', (done) => {
+    it('should set user-friendly error message on failure', async () => {
       mockExpensesService.createExpense.mockReturnValue(
         throwError(() => ({ error: { message: 'Internal server error 500' } })),
       );
 
-      component.onSubmit();
+      await component.onSubmit();
 
-      // Wait for async subscriber
-      setTimeout(() => {
-        // The component uses err.error?.message which may be technical,
-        // but fallback is user-friendly
-        expect(component.errorMessage).toBeDefined();
-        expect(component.isSubmitting).toBe(false);
-        done();
-      }, 0);
+      expect(component.errorMessage).toBeDefined();
+      expect(component.isSubmitting).toBe(false);
     });
 
-    it('should emit expenseCreated and close modal on success', (done) => {
+    it('should emit expenseCreated and close modal on success', async () => {
       const closeSpy = jest.spyOn(component.closeModalEvent, 'emit');
       const createdSpy = jest.spyOn(component.expenseCreated, 'emit');
 
-      component.onSubmit();
+      await component.onSubmit();
 
-      setTimeout(() => {
-        expect(createdSpy).toHaveBeenCalled();
-        expect(closeSpy).toHaveBeenCalled();
-        done();
-      }, 0);
+      expect(createdSpy).toHaveBeenCalled();
+      expect(closeSpy).toHaveBeenCalled();
     });
   });
 

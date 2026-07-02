@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
+import { GroupKeyVersion } from './group-key-version.entity';
 
 @Entity('expenses')
 @Index(['group', 'status', 'expenseDate'])
@@ -47,6 +48,9 @@ export class Expense {
 
   @ManyToOne(() => Group, { nullable: true })
   group?: Group;
+
+  @ManyToOne(() => GroupKeyVersion, { nullable: true, onDelete: 'SET NULL' })
+  groupKeyVersion?: GroupKeyVersion;
 
   @Column({ type: 'date' })
   expenseDate!: string;

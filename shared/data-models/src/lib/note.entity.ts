@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
+import { GroupKeyVersion } from './group-key-version.entity';
 
 @Entity('notes')
 export class Note {
@@ -20,6 +21,9 @@ export class Note {
 
   @ManyToOne(() => Group, { nullable: true })
   group?: Group;
+
+  @ManyToOne(() => GroupKeyVersion, { nullable: true, onDelete: 'SET NULL' })
+  groupKeyVersion?: GroupKeyVersion;
 
   @Column({ type: 'text' })
   title!: string;

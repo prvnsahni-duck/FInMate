@@ -123,6 +123,14 @@ export class InviteMemberDto {
   @IsOptional()
   displayName?: string;
 
+  @IsString()
+  @IsOptional()
+  wrappedGroupKey?: string;
+
+  @IsString()
+  @IsOptional()
+  inviteKeyHash?: string;
+
   /**
    * Role for the invited member.
    * - `spectator`: can create/update expenses but is excluded from all splits.

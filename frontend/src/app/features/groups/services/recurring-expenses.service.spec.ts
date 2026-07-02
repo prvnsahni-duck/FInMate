@@ -6,7 +6,6 @@ import {
 import { RecurringExpensesService } from './recurring-expenses.service';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import { Store } from '@ngxs/store';
-import { of } from 'rxjs';
 
 describe('RecurringExpensesService', () => {
   let service: RecurringExpensesService;
@@ -57,7 +56,7 @@ describe('RecurringExpensesService', () => {
 
     service.getRecurringExpenses('group-1').subscribe((data) => {
       expect(data).toHaveLength(1);
-      expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalled;
+      expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalled();
       done();
     });
 

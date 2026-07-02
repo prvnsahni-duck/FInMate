@@ -1,5 +1,5 @@
 import { Component, inject, OnInit } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { GroupsService } from '../../services/groups.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
@@ -23,6 +23,7 @@ import {
 export class GroupsListComponent implements OnInit {
   private groupsService = inject(GroupsService);
   private fb = inject(FormBuilder);
+  private router = inject(Router);
 
   groups: Group[] = [];
   isLoading = true;
@@ -110,10 +111,10 @@ export class GroupsListComponent implements OnInit {
       };
 
       this.groupsService.createGroup(payload).subscribe({
-        next: () => {
+        next: (res) => {
           this.isSubmitting = false;
           this.isModalOpen = false;
-          this.fetchGroups();
+          this.router.navigate(['/groups', res.id]);
         },
         error: (err) => {
           this.isSubmitting = false;

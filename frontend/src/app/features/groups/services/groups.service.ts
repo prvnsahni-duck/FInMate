@@ -169,9 +169,11 @@ export class GroupsService {
       identifier?: string;
       role?: string;
       displayName?: string;
+      wrappedGroupKey?: string;
+      inviteKeyHash?: string;
     },
-  ): Observable<GroupMember> {
-    return this.http.post<GroupMember>(
+  ): Observable<{ member: GroupMember; inviteToken: string }> {
+    return this.http.post<{ member: GroupMember; inviteToken: string }>(
       `${this.baseUrl}/groups/${groupId}/members`,
       payload,
     );

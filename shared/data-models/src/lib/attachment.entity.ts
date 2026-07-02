@@ -11,6 +11,7 @@ import { Expense } from './expense.entity';
 import { Note } from './note.entity';
 import { Goal } from './goal.entity';
 import { Group } from './group.entity';
+import { GroupKeyVersion } from './group-key-version.entity';
 
 @Entity('attachments')
 @Check(
@@ -34,6 +35,9 @@ export class Attachment {
 
   @ManyToOne(() => Group, { nullable: true })
   group?: Group;
+
+  @ManyToOne(() => GroupKeyVersion, { nullable: true, onDelete: 'SET NULL' })
+  groupKeyVersion?: GroupKeyVersion;
 
   @Column({ type: 'text' })
   storageKey!: string;

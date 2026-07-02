@@ -1,4 +1,4 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { Store } from '@ngxs/store';
@@ -18,6 +18,7 @@ export class GroupKeyService {
 
   private groupKeysMemoryCache = new Map<string, CryptoKey>();
   private myAsymmetricKeys: { publicKey: CryptoKey; privateKey: CryptoKey } | null = null;
+  rateLimitError = signal<string | null>(null);
 
   private getSubtleCrypto(): SubtleCrypto {
     if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
@@ -123,16 +124,40 @@ export class GroupKeyService {
     return this.myAsymmetricKeys;
   }
 
+  private activeGroupKeyRequests = new Map<string, Promise<CryptoKey | null>>();
+
+  clearLocalState(): void {
+    this.groupKeysMemoryCache.clear();
+    this.activeGroupKeyRequests.clear();
+    this.myAsymmetricKeys = null;
+    this.rateLimitError.set(null);
+  }
+
   /**
    * Retrieves a group's symmetric data key.
-   * Checks in-memory cache -> IndexedDB vault -> API (and unwraps it).
+   * Checks in-memory cache -> Deduplicated active request -> IndexedDB vault -> API (and unwraps it).
    */
   async getGroupDataKey(groupId: string): Promise<CryptoKey | null> {
     if (this.groupKeysMemoryCache.has(groupId)) {
       return this.groupKeysMemoryCache.get(groupId)!;
     }
 
-    // Try IndexedDB
+    if (this.activeGroupKeyRequests.has(groupId)) {
+      return await this.activeGroupKeyRequests.get(groupId)!;
+    }
+
+    const promise = this.fetchAndCacheGroupKey(groupId);
+    this.activeGroupKeyRequests.set(groupId, promise);
+
+    try {
+      return await promise;
+    } finally {
+      this.activeGroupKeyRequests.delete(groupId);
+    }
+  }
+
+  private async fetchAndCacheGroupKey(groupId: string): Promise<CryptoKey | null> {
+    // Try IndexedDB first
     try {
       const cachedKey = await this.zkVault.loadGroupKey(groupId);
       if (cachedKey) {
@@ -179,10 +204,15 @@ export class GroupKeyService {
         } catch (e) {
           console.warn('Failed to store unwrapped group key in IndexedDB', e);
         }
+        this.rateLimitError.set(null);
         return unwrappedKey;
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to unwrap group data key', e);
+      if (e?.status === 429) {
+        this.rateLimitError.set('Too many requests. Please try again later.');
+      }
+      throw e;
     }
 
     return null;
@@ -214,7 +244,7 @@ export class GroupKeyService {
       this.http.post(`${this.baseUrl}/groups/${groupId}/keys`, {
         keys: [
           {
-            userId: user.userId,
+            userId: user.userId ?? user.id,
             wrappedKey: wrappedKeyForSelf,
           },
         ],

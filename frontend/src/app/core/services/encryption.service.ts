@@ -407,18 +407,19 @@ export class ClientEncryptionService {
       iv.byteOffset + iv.byteLength,
     ) as ArrayBuffer;
 
-    const wrappedBuffer = await subtle.wrapKey(
-      'raw',
-      dataKey,
-      wrappingKey,
+    // Export the data key and encrypt it symmetrically
+    const rawKeyBuffer = await subtle.exportKey('raw', dataKey);
+    const ciphertextBuffer = await subtle.encrypt(
       {
         name: 'AES-GCM',
         iv: ivBuffer,
       },
+      wrappingKey,
+      rawKeyBuffer,
     );
 
     const ivBase64 = arrayBufferToBase64(ivBuffer);
-    const wrappedBase64 = arrayBufferToBase64(wrappedBuffer);
+    const wrappedBase64 = arrayBufferToBase64(ciphertextBuffer);
 
     return `${ivBase64}:${wrappedBase64}`;
   }
@@ -464,17 +465,21 @@ export class ClientEncryptionService {
     ) as ArrayBuffer;
     const wrappedBuffer = base64ToArrayBuffer(parts[1]);
 
-    return await subtle.unwrapKey(
-      'raw',
-      wrappedBuffer,
-      unwrappingKey,
+    // Decrypt the wrapped key symmetrically and import it
+    const rawKeyBuffer = await subtle.decrypt(
       {
         name: 'AES-GCM',
         iv: ivBuffer,
       },
+      unwrappingKey,
+      wrappedBuffer,
+    );
+
+    return await subtle.importKey(
+      'raw',
+      rawKeyBuffer,
       {
         name: 'AES-GCM',
-        length: 256,
       },
       false, // non-extractable for security
       ['encrypt', 'decrypt'],
@@ -544,6 +549,77 @@ export class ClientEncryptionService {
       },
       key,
       ciphertextBuffer,
+    );
+  }
+
+  /**
+   * Generates a 2048-bit RSA-OAEP keypair for wrapping.
+   */
+  async generateWrappingKeyPair(): Promise<CryptoKeyPair> {
+    const subtle = this.getSubtleCrypto();
+    return await subtle.generateKey(
+      {
+        name: 'RSA-OAEP',
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]),
+        hash: 'SHA-256',
+      },
+      true, // extractable
+      ['wrapKey', 'unwrapKey'],
+    );
+  }
+
+  /**
+   * Exports an RSA-OAEP public key to base64 SPKI format.
+   */
+  async exportPublicKey(key: CryptoKey): Promise<string> {
+    const subtle = this.getSubtleCrypto();
+    const exported = await subtle.exportKey('spki', key);
+    return arrayBufferToBase64(exported);
+  }
+
+  /**
+   * Imports an RSA-OAEP public key from base64 SPKI format.
+   */
+  async importPublicKey(spkiBase64: string): Promise<CryptoKey> {
+    const subtle = this.getSubtleCrypto();
+    const buffer = base64ToArrayBuffer(spkiBase64);
+    return await subtle.importKey(
+      'spki',
+      buffer,
+      {
+        name: 'RSA-OAEP',
+        hash: 'SHA-256',
+      },
+      true,
+      ['wrapKey'],
+    );
+  }
+
+  /**
+   * Exports an RSA-OAEP private key to base64 PKCS8 format.
+   */
+  async exportPrivateKey(key: CryptoKey): Promise<string> {
+    const subtle = this.getSubtleCrypto();
+    const exported = await subtle.exportKey('pkcs8', key);
+    return arrayBufferToBase64(exported);
+  }
+
+  /**
+   * Imports an RSA-OAEP private key from base64 PKCS8 format.
+   */
+  async importPrivateKey(pkcs8Base64: string): Promise<CryptoKey> {
+    const subtle = this.getSubtleCrypto();
+    const buffer = base64ToArrayBuffer(pkcs8Base64);
+    return await subtle.importKey(
+      'pkcs8',
+      buffer,
+      {
+        name: 'RSA-OAEP',
+        hash: 'SHA-256',
+      },
+      true,
+      ['unwrapKey'],
     );
   }
 }

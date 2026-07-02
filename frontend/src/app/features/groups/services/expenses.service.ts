@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { from, Observable } from 'rxjs';
-import { map, mergeMap } from 'rxjs/operators';
+import { mergeMap } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { Store } from '@ngxs/store';
 import { AuthState } from '../../../core/auth/auth.state';
@@ -20,7 +20,6 @@ import {
 } from '../../../core/constants/crypto.constants';
 import { mapDecryptExpense } from '../../../core/utils/crypto-operators';
 import { GroupKeyService } from '../../../core/services/group-key.service';
-import { firstValueFrom } from 'rxjs';
 
 type EncryptedExpensePayload = Expense & {
   title: string;
@@ -44,16 +43,6 @@ export class ExpensesService {
   private groupKeyService = inject(GroupKeyService);
   private baseUrl = environment.apiBaseUrl;
 
-  private getSubtleCrypto(): SubtleCrypto {
-    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
-      return window.crypto.subtle;
-    }
-    if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
-      return globalThis.crypto.subtle;
-    }
-    throw new Error('Web Cryptography API is not available');
-  }
-
   /**
    * Encrypts CreateExpenseDto or UpdateExpenseDto outgoing payloads.
    */
@@ -71,7 +60,7 @@ export class ExpensesService {
       const encrypted = { ...payload } as any;
 
       // 1. Determine encryption scope and pick corresponding key
-      let scope: 'personal' | 'group' | 'direct_shared' = 'personal';
+      let scope: 'personal' | 'group' = 'personal';
       let key: CryptoKey = masterKey;
 
       if ((payload as any).groupId) {
@@ -89,60 +78,9 @@ export class ExpensesService {
         );
 
         if (otherParticipants.length > 0) {
-          scope = 'direct_shared';
-          
-          if ((payload as any).wrappedContentKeys && (payload as any).wrappedContentKeys.length > 0) {
-            const myWrapped = (payload as any).wrappedContentKeys.find((wk: any) => wk.userId === currentUserId);
-            if (myWrapped) {
-              key = await this.encryptionService.unwrapKey(myWrapped.wrappedKey, masterKey);
-            } else {
-              key = await this.encryptionService.generateDataKey();
-            }
-            encrypted.wrappedContentKeys = (payload as any).wrappedContentKeys;
-          } else {
-            const contentKey = await this.encryptionService.generateDataKey();
-            key = contentKey;
-
-            const wrappedContentKeys = [];
-
-            // Wrap for self
-            const wrappedSelf = await this.encryptionService.wrapKey(contentKey, masterKey);
-            wrappedContentKeys.push({
-              userId: currentUserId,
-              wrappedKey: wrappedSelf,
-            });
-
-            // Wrap for each friend
-            for (const split of otherParticipants) {
-              const participantId = split.participantUserId!;
-              try {
-                const pubKeyRes = await firstValueFrom(
-                  this.http.get<{ data: { publicWrappingKey: string | null } }>(
-                    `${this.baseUrl}/users/${participantId}/public-key`,
-                  ),
-                );
-                const pubKeyStr = pubKeyRes?.data?.publicWrappingKey;
-                if (pubKeyStr) {
-                  const pubKey = await this.getSubtleCrypto().importKey(
-                    'jwk',
-                    JSON.parse(pubKeyStr),
-                    { name: 'RSA-OAEP', hash: 'SHA-256' },
-                    true,
-                    ['wrapKey'],
-                  );
-                  const wrappedFriendKey = await this.encryptionService.wrapKey(contentKey, pubKey);
-                  wrappedContentKeys.push({
-                    userId: participantId,
-                    wrappedKey: wrappedFriendKey,
-                  });
-                }
-              } catch (e) {
-                console.error(`Failed to wrap key for participant ${participantId}`, e);
-              }
-            }
-
-            encrypted.wrappedContentKeys = wrappedContentKeys;
-          }
+          throw new Error(
+            'Shared expenses must belong to a group and use group encryption scope.',
+          );
         }
       }
 

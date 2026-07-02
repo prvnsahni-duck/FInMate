@@ -157,7 +157,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         case HttpStatus.BAD_REQUEST:
           errorCode = 'VAL_INVALID_INPUT';
           break;
-        case HttpStatus.UNAUTHORIZED:
+        case HttpStatus.UNAUTHORIZED: {
           const msgStr = String(message).toLowerCase();
           if (msgStr.includes('expired')) {
             errorCode = 'AUTH_TOKEN_EXPIRED';
@@ -170,6 +170,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             errorCode = 'AUTH_INVALID_TOKEN';
           }
           break;
+        }
         case HttpStatus.FORBIDDEN:
           errorCode = 'RES_FORBIDDEN';
           break;

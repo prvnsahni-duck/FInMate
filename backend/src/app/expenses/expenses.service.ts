@@ -13,6 +13,7 @@ import {
   Expense,
   ExpenseSplit,
   Group,
+  GroupKeyVersion,
   GroupMember,
   GroupMemberContribution,
   User,
@@ -147,6 +148,28 @@ export class ExpensesService {
     }
 
     return { groupMemberById, activeOrInvitedByUserId };
+  }
+
+  private async getOrCreateActiveGroupKeyVersion(
+    group: Group,
+    manager: EntityManager,
+  ): Promise<GroupKeyVersion> {
+    const existing = await manager.getRepository(GroupKeyVersion).findOne({
+      where: { group: { id: group.id }, status: 'ACTIVE' },
+      order: { version: 'DESC' },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    return manager.getRepository(GroupKeyVersion).save(
+      manager.getRepository(GroupKeyVersion).create({
+        group,
+        version: 1,
+        algorithm: 'AES-256-GCM',
+        status: 'ACTIVE',
+      }),
+    );
   }
 
   private async ensureExpenseAccess(
@@ -315,30 +338,16 @@ export class ExpensesService {
     }
 
     if (scope === 'direct_shared') {
-      const participantIds = this.getDirectParticipantIds(dto, userId);
-      if (participantIds.length < 2) {
-        throw new BadRequestException({
-          errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
-          message: 'Direct-shared encryption requires at least two participants',
-        });
-      }
-
-      const wrappedUserIds = new Set(
-        (dto.wrappedContentKeys ?? []).map((key) => key.userId),
-      );
-      const missingKeyFor = participantIds.find((id) => !wrappedUserIds.has(id));
-      if (missingKeyFor) {
-        throw new BadRequestException({
-          errorCode: 'EXP_MISSING_WRAPPED_KEY',
-          message: 'Direct-shared expenses require wrapped keys for all participants',
-        });
-      }
+      throw new BadRequestException({
+        errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
+        message: 'Shared expenses must belong to a group and use group encryption scope',
+      });
     }
 
     if (scope === 'personal' && this.getDirectParticipantIds(dto, userId).length > 1) {
       throw new BadRequestException({
         errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
-        message: 'Shared personal expenses must use direct-shared encryption scope',
+        message: 'Shared expenses must belong to a group and use group encryption scope',
       });
     }
   }
@@ -368,6 +377,8 @@ export class ExpensesService {
       paidByUserId: expense.paidByUser.id,
       ownerUserId: expense.ownerUser.id,
       groupId: expense.group?.id ?? null,
+      groupKeyVersionId: expense.groupKeyVersion?.id ?? null,
+      groupKeyVersion: expense.groupKeyVersion?.version ?? null,
       expenseDate: expense.expenseDate,
       status: expense.status,
       encryptionScope: expense.encryptionScope ?? 'personal',
@@ -618,6 +629,10 @@ export class ExpensesService {
       dto.encryptionScope ?? (group ? 'group' : 'personal');
 
     const saved = await this.dataSource.transaction(async (manager) => {
+      const groupKeyVersion = group
+        ? await this.getOrCreateActiveGroupKeyVersion(group, manager)
+        : undefined;
+
       const expense = await manager.getRepository(Expense).save(
         manager.getRepository(Expense).create({
           title: dto.title,
@@ -631,6 +646,7 @@ export class ExpensesService {
           expenseDate: dto.expenseDate,
           status: dto.status || 'posted',
           encryptionScope: effectiveEncryptionScope,
+          groupKeyVersion,
           // Auto-assign ledgerMonth for household groups
           ledgerMonth:
             group?.groupType === 'household'
@@ -692,7 +708,7 @@ export class ExpensesService {
 
       return manager.getRepository(Expense).findOne({
         where: { id: expense.id },
-        relations: ['paidByUser', 'ownerUser', 'group'],
+        relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
       });
     });
 
@@ -831,7 +847,7 @@ export class ExpensesService {
   ): Promise<Record<string, unknown>> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
     });
 
     if (!expense) {
@@ -850,7 +866,7 @@ export class ExpensesService {
   ): Promise<Record<string, unknown>> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
     });
 
     if (!expense) {
@@ -967,6 +983,13 @@ export class ExpensesService {
     );
 
     const saved = await this.dataSource.transaction(async (manager) => {
+      if (expense.group && !expense.groupKeyVersion) {
+        expense.groupKeyVersion = await this.getOrCreateActiveGroupKeyVersion(
+          expense.group,
+          manager,
+        );
+      }
+
       await manager.getRepository(Expense).save(expense);
 
       if (dto.splits) {
@@ -1049,7 +1072,7 @@ export class ExpensesService {
 
       return manager.getRepository(Expense).findOne({
         where: { id: expense.id },
-        relations: ['paidByUser', 'ownerUser', 'group'],
+        relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
       });
     });
 
@@ -1083,7 +1106,7 @@ export class ExpensesService {
   async deleteExpense(userId: string, id: string): Promise<void> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
     });
 
     if (!expense) {
@@ -1134,7 +1157,7 @@ export class ExpensesService {
     // withDeleted: true so we can find soft-deleted records
     const expense = await this.expenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
       withDeleted: true,
     });
 
@@ -1193,7 +1216,7 @@ export class ExpensesService {
 
     const restored = await this.expenseRepository.findOne({
       where: { id: expense.id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
     });
 
     if (!restored) {

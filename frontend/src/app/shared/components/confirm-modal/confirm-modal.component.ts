@@ -15,14 +15,14 @@ export class ConfirmModalComponent {
   @Input() cancelText = 'Cancel';
   @Input() type: 'danger' | 'warning' | 'info' = 'warning';
 
-  @Output() confirm = new EventEmitter<void>();
-  @Output() cancel = new EventEmitter<void>();
+  @Output() confirmed = new EventEmitter<void>();
+  @Output() cancelled = new EventEmitter<void>();
 
   onConfirm() {
-    this.confirm.emit();
+    this.confirmed.emit();
   }
 
   onCancel() {
-    this.cancel.emit();
+    this.cancelled.emit();
   }
 }

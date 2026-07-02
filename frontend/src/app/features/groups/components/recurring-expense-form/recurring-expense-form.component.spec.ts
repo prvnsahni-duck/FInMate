@@ -7,7 +7,6 @@ import { of } from 'rxjs';
 describe('RecurringExpenseFormComponent', () => {
   let component: RecurringExpenseFormComponent;
   let fixture: ComponentFixture<RecurringExpenseFormComponent>;
-  let serviceSpy: jest.Mocked<RecurringExpensesService>;
 
   beforeEach(async () => {
     const spy = {
@@ -22,10 +21,6 @@ describe('RecurringExpenseFormComponent', () => {
 
     fixture = TestBed.createComponent(RecurringExpenseFormComponent);
     component = fixture.componentInstance;
-    serviceSpy = TestBed.inject(
-      RecurringExpensesService,
-    ) as jest.Mocked<RecurringExpensesService>;
-
     component.groupId = 'group-1';
     component.groupCurrency = 'USD';
     component.members = [];
@@ -42,8 +37,8 @@ describe('RecurringExpenseFormComponent', () => {
   });
 
   it('should trigger cancel output on cancel click', () => {
-    jest.spyOn(component.cancel, 'emit');
-    component.cancel.emit();
-    expect(component.cancel.emit).toHaveBeenCalled();
+    jest.spyOn(component.cancelled, 'emit');
+    component.cancelled.emit();
+    expect(component.cancelled.emit).toHaveBeenCalled();
   });
 });

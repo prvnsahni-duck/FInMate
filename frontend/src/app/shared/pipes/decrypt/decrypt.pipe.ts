@@ -1,4 +1,4 @@
-import { Pipe, PipeTransform } from '@angular/core';
+import { Pipe, PipeTransform, inject } from '@angular/core';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import { AuthState } from '../../../core/auth/auth.state';
 import { SESSION_EXPIRED_MESSAGE } from '../../../core/constants/crypto.constants';
@@ -9,12 +9,9 @@ import { Store } from '@ngxs/store';
   pure: false,
 })
 export class DecryptPipe implements PipeTransform {
+  private encryptionService = inject(ClientEncryptionService);
+  private store = inject(Store);
   private keyPromise: Promise<CryptoKey | null> | null = null;
-
-  constructor(
-    private encryptionService: ClientEncryptionService,
-    private store: Store,
-  ) {}
 
   private async getKey(): Promise<CryptoKey> {
     if (!this.keyPromise) {
@@ -39,7 +36,7 @@ export class DecryptPipe implements PipeTransform {
     try {
       const key = await this.getKey();
       return await this.encryptionService.decrypt(ciphertext, key);
-    } catch (e) {
+    } catch {
       // Return placeholder on failure
       return '••••••••••';
     }

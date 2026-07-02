@@ -1,4 +1,7 @@
+import { TestBed } from '@angular/core/testing';
 import { DecryptPipe } from './decrypt.pipe';
+import { ClientEncryptionService } from '../../../core/services/encryption.service';
+import { Store } from '@ngxs/store';
 
 describe('DecryptPipe', () => {
   let pipe: DecryptPipe;
@@ -13,7 +16,15 @@ describe('DecryptPipe', () => {
     mockStore = {
       selectSnapshot: jest.fn().mockReturnValue({ email: 'test@example.com' }),
     };
-    pipe = new DecryptPipe(mockEncryptionService, mockStore);
+
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: ClientEncryptionService, useValue: mockEncryptionService },
+        { provide: Store, useValue: mockStore },
+      ],
+    });
+
+    pipe = TestBed.runInInjectionContext(() => new DecryptPipe());
   });
 
   it('should decrypt ciphertext and return the plaintext', async () => {

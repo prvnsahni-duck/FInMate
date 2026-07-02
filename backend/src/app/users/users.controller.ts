@@ -6,6 +6,7 @@ import {
   UseGuards,
   Req,
   NotFoundException,
+  BadRequestException,
   Query,
   Post,
   Param,
@@ -20,6 +21,23 @@ import { SuccessResponse } from '../common/response.util';
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('lookup')
+  async lookup(@Query('identifier') identifier: string) {
+    if (!identifier) {
+      throw new BadRequestException('identifier query parameter is required');
+    }
+    const user = await this.usersService.lookupUser(identifier);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return new SuccessResponse('User looked up successfully', {
+      userId: user.id,
+      publicWrappingKey: user.publicWrappingKey || null,
+      displayName: user.displayName,
+      email: user.email,
+    });
+  }
 
   @Get('search')
   async search(@Query('query') query: string, @Req() req: any) {

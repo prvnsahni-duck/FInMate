@@ -9,6 +9,7 @@ import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import {
   Attachment,
   AuditLog,
+  EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
   Group,
@@ -72,6 +73,13 @@ describe('ExpensesService', () => {
       create: jest.fn((data) => data),
     };
 
+    const mockEncryptedExpenseKeyRepository = {
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn(),
+      create: jest.fn((data) => data),
+      delete: jest.fn(),
+    };
+
     const mockContributionRepository = {
       createQueryBuilder: jest.fn(() => ({
         innerJoinAndSelect: jest.fn().mockReturnThis(),
@@ -90,6 +98,8 @@ describe('ExpensesService', () => {
         if (entity === User) return mockUserRepository;
         if (entity === Attachment) return mockAttachmentRepository;
         if (entity === AuditLog) return mockAuditLogRepository;
+        if (entity === EncryptedExpenseKey)
+          return mockEncryptedExpenseKeyRepository;
         if (
           entity &&
           (entity.name === 'GroupMemberContribution' ||
@@ -132,6 +142,10 @@ describe('ExpensesService', () => {
         {
           provide: getRepositoryToken(AuditLog),
           useValue: mockAuditLogRepository,
+        },
+        {
+          provide: getRepositoryToken(EncryptedExpenseKey),
+          useValue: mockEncryptedExpenseKeyRepository,
         },
         { provide: getDataSourceToken(), useValue: mockDataSource },
       ],
@@ -216,6 +230,48 @@ describe('ExpensesService', () => {
             splitType: 'equal',
             shareValue: 1,
           },
+        ],
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should reject create with direct_shared encryption scope', async () => {
+    userRepository.findOne
+      .mockResolvedValueOnce({ id: 'caller-id' } as any)
+      .mockResolvedValueOnce({ id: 'caller-id' } as any);
+
+    await expect(
+      service.createExpense('caller-id', {
+        title: 'Shared Lunch',
+        amountTotal: 100,
+        currency: 'USD',
+        category: 'Food',
+        paidByUserId: 'caller-id',
+        expenseDate: '2026-06-10',
+        encryptionScope: 'direct_shared',
+        splits: [
+          { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
+        ],
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should reject personal create with multiple participants when no group is provided', async () => {
+    userRepository.findOne
+      .mockResolvedValueOnce({ id: 'caller-id' } as any)
+      .mockResolvedValueOnce({ id: 'caller-id' } as any);
+
+    await expect(
+      service.createExpense('caller-id', {
+        title: 'Shared Ride',
+        amountTotal: 100,
+        currency: 'USD',
+        category: 'Travel',
+        paidByUserId: 'caller-id',
+        expenseDate: '2026-06-10',
+        splits: [
+          { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
+          { participantUserId: 'friend-id', splitType: 'equal', shareValue: 1 },
         ],
       } as any),
     ).rejects.toThrow(BadRequestException);

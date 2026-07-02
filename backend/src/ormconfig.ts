@@ -15,6 +15,8 @@ import {
   AuditLog,
   RecurringExpense,
   RecurringExpenseSplit,
+  GroupInvite,
+  EncryptedGroupKey,
 } from '@finmate/data-models';
 import * as Migrations from './migrations';
 import { SnakeNamingStrategy } from './app/common/snake-naming-strategy';
@@ -42,6 +44,8 @@ export default new DataSource({
     Goal,
     Attachment,
     AuditLog,
+    GroupInvite,
+    EncryptedGroupKey,
   ],
   migrations: [...Object.values(Migrations)],
   namingStrategy: new SnakeNamingStrategy(),

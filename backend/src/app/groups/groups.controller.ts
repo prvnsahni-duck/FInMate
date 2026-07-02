@@ -12,7 +12,6 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { CreateGroupDto, UpdateContributionDto, UpdateGroupDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -24,9 +23,7 @@ import {
   GroupsMembershipService,
 } from './services';
 import { SuccessResponse } from '../common/response.util';
-import { InjectRepository } from '@nestjs/typeorm';
-import { EncryptedGroupKey, GroupMember } from '@finmate/data-models';
-import { In, Repository } from 'typeorm';
+import { RotateGroupKeyDto } from '@finmate/data-models';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard)
@@ -37,10 +34,6 @@ export class GroupsController {
     private readonly groupsAuditService: GroupsAuditService,
     private readonly groupsContributionsService: GroupsContributionsService,
     private readonly expensesCarryForwardService: ExpensesCarryForwardService,
-    @InjectRepository(EncryptedGroupKey)
-    private readonly encryptedGroupKeyRepository: Repository<EncryptedGroupKey>,
-    @InjectRepository(GroupMember)
-    private readonly groupMemberRepository: Repository<GroupMember>,
   ) {}
 
   @Post()
@@ -123,10 +116,21 @@ export class GroupsController {
     const result = await this.groupsMembershipService.getPendingInvitations(
       req.user.id,
     );
-    return new SuccessResponse(
-      'Pending group invitations retrieved successfully',
-      result,
+    return new SuccessResponse('Pending invitations retrieved successfully', result);
+  }
+
+  @Post(':id/invites')
+  async createInvite(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { wrappedGroupKey?: string },
+    @Req() req: any,
+  ) {
+    const result = await this.groupsMembershipService.createGroupInvite(
+      req.user.id,
+      id,
+      body,
     );
+    return new SuccessResponse('Invite link generated successfully', result);
   }
 
   @Get(':id')
@@ -314,65 +318,27 @@ export class GroupsController {
     @Body() body: { keys: Array<{ userId: string; wrappedKey: string }> },
     @Req() req: Request & { user: { id: string } },
   ) {
-    // Verify caller is an active member. Only owner/admin can provision keys
-    // for other members; users may only create/update their own wrapped key.
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: {
-        group: { id },
-        user: { id: req.user.id },
-        joinStatus: 'active',
-      },
-    });
-    if (!callerMember) {
-      throw new BadRequestException('You do not have access to this group');
-    }
-
     if (!body.keys || !Array.isArray(body.keys) || body.keys.length === 0) {
       throw new BadRequestException('keys must be a non-empty array');
     }
 
-    for (const entry of body.keys) {
-      const isSelfProvision = entry.userId === req.user.id;
-      const canProvisionOthers =
-        callerMember.role === 'owner' || callerMember.role === 'admin';
-
-      if (!isSelfProvision && !canProvisionOthers) {
-        throw new ForbiddenException(
-          'Only owners and admins can provision group keys for other members',
-        );
-      }
-
-      // Verify target user is a member of the group
-      const targetMember = await this.groupMemberRepository.findOne({
-        where: {
-          group: { id },
-          user: { id: entry.userId },
-          joinStatus: In(['active', 'invited']),
-        },
-      });
-      if (!targetMember) {
-        continue; // Skip non-members silently
-      }
-
-      // Upsert: update if exists, insert if not
-      const existing = await this.encryptedGroupKeyRepository.findOne({
-        where: { group: { id }, user: { id: entry.userId } },
-      });
-      if (existing) {
-        existing.wrappedKey = entry.wrappedKey;
-        await this.encryptedGroupKeyRepository.save(existing);
-      } else {
-        await this.encryptedGroupKeyRepository.save(
-          this.encryptedGroupKeyRepository.create({
-            group: { id } as any,
-            user: { id: entry.userId } as any,
-            wrappedKey: entry.wrappedKey,
-          }),
-        );
-      }
-    }
+    await this.groupsMembershipService.provisionGroupKeys(req.user.id, id, body.keys);
 
     return new SuccessResponse('Group keys provisioned successfully', null);
+  }
+
+  @Post(':id/keys/rotate')
+  async rotateGroupKey(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RotateGroupKeyDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.groupsMembershipService.rotateGroupKey(
+      req.user.id,
+      id,
+      body,
+    );
+    return new SuccessResponse('Group key rotated successfully', result);
   }
 
   /**
@@ -383,27 +349,11 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
   ) {
-    // Verify caller is a member
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: {
-        group: { id },
-        user: { id: req.user.id },
-        joinStatus: 'active',
-      },
-    });
-    if (!callerMember) {
-      throw new BadRequestException('You do not have access to this group');
-    }
-
-    const key = await this.encryptedGroupKeyRepository.findOne({
-      where: { group: { id }, user: { id: req.user.id } },
-    });
-
-    return new SuccessResponse('Group key retrieved', {
-      groupId: id,
-      userId: req.user.id,
-      wrappedKey: key?.wrappedKey ?? null,
-    });
+    const result = await this.groupsMembershipService.getMyGroupKey(
+      req.user.id,
+      id,
+    );
+    return new SuccessResponse('Group key retrieved', result);
   }
 
   /**
@@ -414,36 +364,10 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: any,
   ) {
-    const callerMember = await this.groupMemberRepository.findOne({
-      where: {
-        group: { id },
-        user: { id: req.user.id },
-        joinStatus: 'active',
-      },
-    });
-    if (!callerMember) {
-      throw new BadRequestException('You do not have access to this group');
-    }
-    if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
-      throw new ForbiddenException(
-        'Only owners and admins can inspect missing group keys',
-      );
-    }
-
-    const members = await this.groupMemberRepository.find({
-      where: { group: { id }, joinStatus: In(['active', 'invited']) },
-      relations: ['user'],
-    });
-
-    const existingKeys = await this.encryptedGroupKeyRepository.find({
-      where: { group: { id } },
-      relations: ['user'],
-    });
-
-    const existingUserIds = new Set(existingKeys.map((k) => k.user?.id).filter(Boolean));
-    const missingUserIds = members
-      .map((m) => m.user?.id)
-      .filter((uid): uid is string => !!uid && !existingUserIds.has(uid));
+    const missingUserIds = await this.groupsMembershipService.getMissingGroupKeys(
+      req.user.id,
+      id,
+    );
 
     return new SuccessResponse('Missing keys retrieved', missingUserIds);
   }

@@ -12,7 +12,6 @@ import { of } from 'rxjs';
 
 describe('RecurringExpensesState', () => {
   let store: Store;
-  let serviceSpy: jest.Mocked<RecurringExpensesService>;
 
   beforeEach(() => {
     const spy = {
@@ -34,9 +33,6 @@ describe('RecurringExpensesState', () => {
     });
 
     store = TestBed.inject(Store);
-    serviceSpy = TestBed.inject(
-      RecurringExpensesService,
-    ) as jest.Mocked<RecurringExpensesService>;
   });
 
   it('should load recurring expenses', () => {

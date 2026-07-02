@@ -7,9 +7,10 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource, EntityManager, In } from 'typeorm';
 import {
   Group,
+  GroupKeyVersion,
   GroupMember,
   User,
   AuditLog,
@@ -21,6 +22,9 @@ import {
   UpdateContributionDto,
   Expense,
   Settlement,
+  GroupInvite,
+  MemberWrappedGroupKey,
+  RotateGroupKeyDto,
 } from '@finmate/data-models';
 import { createHash } from 'crypto';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
@@ -38,6 +42,12 @@ export class GroupsService {
     private readonly groupMemberRepository: Repository<GroupMember>,
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
+    @InjectRepository(GroupInvite)
+    private readonly groupInviteRepository: Repository<GroupInvite>,
+    @InjectRepository(GroupKeyVersion)
+    private readonly groupKeyVersionRepository: Repository<GroupKeyVersion>,
+    @InjectRepository(MemberWrappedGroupKey)
+    private readonly memberWrappedGroupKeyRepository: Repository<MemberWrappedGroupKey>,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
@@ -46,6 +56,57 @@ export class GroupsService {
   private getIpHash(ip?: string): string | undefined {
     if (!ip) return undefined;
     return createHash('sha256').update(ip).digest('hex');
+  }
+
+  private isInviteExpired(invite: GroupInvite): boolean {
+    return !!invite.expiresAt && invite.expiresAt.getTime() < Date.now();
+  }
+
+  private async getActiveMembership(
+    userId: string,
+    groupId: string,
+  ): Promise<GroupMember> {
+    const member = await this.groupMemberRepository.findOne({
+      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+      relations: ['user', 'group'],
+    });
+    if (!member) {
+      throw new BadRequestException('You do not have access to this group');
+    }
+    return member;
+  }
+
+  private async getActiveGroupKeyVersion(
+    groupId: string,
+    manager?: EntityManager,
+  ): Promise<GroupKeyVersion | null> {
+    const repo = manager
+      ? manager.getRepository(GroupKeyVersion)
+      : this.groupKeyVersionRepository;
+    return repo.findOne({
+      where: { group: { id: groupId }, status: 'ACTIVE' },
+      relations: ['group'],
+      order: { version: 'DESC' },
+    });
+  }
+
+  private async ensureActiveGroupKeyVersion(
+    group: Group,
+    manager: EntityManager,
+  ): Promise<GroupKeyVersion> {
+    const existing = await this.getActiveGroupKeyVersion(group.id, manager);
+    if (existing) {
+      return existing;
+    }
+
+    return manager.getRepository(GroupKeyVersion).save(
+      manager.getRepository(GroupKeyVersion).create({
+        group,
+        version: 1,
+        algorithm: 'AES-256-GCM',
+        status: 'ACTIVE',
+      }),
+    );
   }
 
   private async writeAuditLog(opts: {
@@ -105,6 +166,8 @@ export class GroupsService {
         joinedAt: new Date(),
       });
       await manager.save(GroupMember, member);
+
+      await this.ensureActiveGroupKeyVersion(savedGroup, manager);
 
       // Invite initial members if provided
       if (dto.members && dto.members.length > 0) {
@@ -368,7 +431,7 @@ export class GroupsService {
     groupId: string,
     dto: InviteMemberDto,
     context?: { ip?: string; userAgent?: string },
-  ): Promise<GroupMember> {
+  ): Promise<any> {
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
       .leftJoinAndSelect('member.user', 'user')
@@ -463,6 +526,8 @@ export class GroupsService {
 
     let savedMember: GroupMember;
 
+    let inviteToken: string | undefined;
+
     if (existingMember) {
       if (
         existingMember.joinStatus === 'active' ||
@@ -489,6 +554,52 @@ export class GroupsService {
       savedMember = await this.groupMemberRepository.save(newMember);
     }
 
+    if (dto.wrappedGroupKey) {
+      const activeVersion =
+        (await this.getActiveGroupKeyVersion(group.id)) ||
+        (await this.dataSource.transaction((manager) =>
+          this.ensureActiveGroupKeyVersion(group, manager),
+        ));
+
+      if (targetUser.status === 'active') {
+        const existingKey = await this.memberWrappedGroupKeyRepository.findOne({
+          where: {
+            groupKeyVersion: { id: activeVersion.id },
+            user: { id: targetUser.id },
+          },
+        });
+        if (!existingKey) {
+          await this.memberWrappedGroupKeyRepository.save(
+            this.memberWrappedGroupKeyRepository.create({
+              groupKeyVersion: activeVersion,
+              group,
+              user: targetUser,
+              wrappedGroupKey: dto.wrappedGroupKey,
+            }),
+          );
+        }
+      } else {
+        // Unregistered / placeholder user, save to group_invites
+        const token = randomUUID();
+        inviteToken = token;
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+        await this.groupInviteRepository.save(
+          this.groupInviteRepository.create({
+            group,
+            inviteToken: token,
+            invitedEmail: targetUser.email,
+            inviteeUser: targetUser,
+            wrappedGroupKey: dto.wrappedGroupKey,
+            groupKeyVersion: activeVersion,
+            status: 'pending',
+            expiresAt,
+          }),
+        );
+      }
+    }
+
     if (
       targetUser &&
       targetUser.email &&
@@ -497,7 +608,11 @@ export class GroupsService {
       const frontendUrl =
         this.configService.get<string>('FRONTEND_URL') ||
         'http://localhost:4200';
-      const inviteUrl = `${frontendUrl}/groups/join/${group.inviteToken}`;
+      const token = inviteToken || group.inviteToken;
+      const safeHash = (dto.inviteKeyHash ?? '').replace(/[^A-Za-z0-9_-]/g, '');
+      const inviteUrl = safeHash
+        ? `${frontendUrl}/groups/join/${token}#${safeHash}`
+        : `${frontendUrl}/groups/join/${token}`;
       const inviterName =
         callerMember.user.displayName || callerMember.user.email;
       this.emailService
@@ -520,7 +635,10 @@ export class GroupsService {
       userAgent: context?.userAgent,
     });
 
-    return savedMember;
+    return {
+      member: savedMember,
+      inviteToken: inviteToken || group.inviteToken,
+    };
   }
 
   async listMembers(userId: string, groupId: string): Promise<GroupMember[]> {
@@ -851,6 +969,48 @@ export class GroupsService {
   }
 
   async getInviteDetails(inviteToken: string) {
+    // 1. Try group_invites first
+    const invite = await this.groupInviteRepository.findOne({
+      where: { inviteToken, status: 'pending' },
+      relations: ['group', 'group.ownerUser', 'groupKeyVersion'],
+    });
+
+    if (invite) {
+      if (this.isInviteExpired(invite)) {
+        invite.status = 'expired';
+        await this.groupInviteRepository.save(invite);
+        throw new NotFoundException('Invalid or expired invitation link');
+      }
+
+      const group = invite.group;
+      const members = await this.groupMemberRepository.find({
+        where: { group: { id: group.id }, joinStatus: In(['active', 'invited']) },
+        relations: ['user'],
+      });
+
+      return {
+        id: group.id,
+        name: group.name,
+        description: group.description,
+        currency: group.currency,
+        groupType: group.groupType,
+        ownerName: group.ownerUser.displayName || group.ownerUser.email,
+        wrappedGroupKey: invite.wrappedGroupKey || null,
+        groupKeyVersionId: invite.groupKeyVersion?.id ?? null,
+        groupKeyVersion: invite.groupKeyVersion?.version ?? null,
+        members: members.map((m) => ({
+          displayName: m.user.displayName || null,
+          email: m.user.email.endsWith('@placeholder.finmate')
+            ? null
+            : m.user.email,
+          phoneNumber: m.user.phoneNumber || null,
+          role: m.role,
+          joinStatus: m.joinStatus,
+        })),
+      };
+    }
+
+    // 2. Fallback to groups.inviteToken lookup
     const group = await this.groupRepository.findOne({
       where: { inviteToken },
       relations: ['ownerUser'],
@@ -871,6 +1031,9 @@ export class GroupsService {
       currency: group.currency,
       groupType: group.groupType,
       ownerName: group.ownerUser.displayName || group.ownerUser.email,
+      wrappedGroupKey: null,
+      groupKeyVersionId: null,
+      groupKeyVersion: null,
       members: members.map((m) => ({
         displayName: m.user.displayName || null,
         email: m.user.email.endsWith('@placeholder.finmate')
@@ -887,12 +1050,40 @@ export class GroupsService {
     userId: string,
     inviteToken: string,
     context?: { ip?: string; userAgent?: string },
-  ): Promise<GroupMember> {
-    const group = await this.groupRepository.findOne({
-      where: { inviteToken },
+  ): Promise<any> {
+    // 1. Try finding in group_invites
+    const invite = await this.groupInviteRepository.findOne({
+      where: { inviteToken, status: 'pending' },
+      relations: ['group', 'groupKeyVersion'],
     });
-    if (!group) {
-      throw new NotFoundException('Invalid or expired invitation link');
+
+    let group: Group;
+    let wrappedGroupKey: string | null = null;
+    let groupKeyVersionId: string | null = null;
+    let groupKeyVersion: number | null = null;
+
+    if (invite) {
+      if (this.isInviteExpired(invite)) {
+        invite.status = 'expired';
+        await this.groupInviteRepository.save(invite);
+        throw new NotFoundException('Invalid or expired invitation link');
+      }
+
+      group = invite.group;
+      wrappedGroupKey = invite.wrappedGroupKey || null;
+      groupKeyVersionId = invite.groupKeyVersion?.id ?? null;
+      groupKeyVersion = invite.groupKeyVersion?.version ?? null;
+      invite.status = 'accepted';
+      await this.groupInviteRepository.save(invite);
+    } else {
+      // 2. Fallback to groups.inviteToken
+      const g = await this.groupRepository.findOne({
+        where: { inviteToken },
+      });
+      if (!g) {
+        throw new NotFoundException('Invalid or expired invitation link');
+      }
+      group = g;
     }
 
     const user = await this.dataSource
@@ -908,14 +1099,36 @@ export class GroupsService {
       .andWhere('member.user_id = :userId', { userId })
       .getOne();
 
+    let savedMember: GroupMember;
+
     if (existingMember) {
       if (existingMember.joinStatus === 'active') {
-        return existingMember;
+        savedMember = existingMember;
+      } else {
+        existingMember.joinStatus = 'active';
+        existingMember.joinedAt = new Date();
+        existingMember.leftAt = undefined;
+        savedMember = await this.groupMemberRepository.save(existingMember);
+
+        void this.writeAuditLog({
+          actorUser: user,
+          action: 'group.member_joined',
+          entityId: savedMember.id,
+          groupId: group.id,
+          metadata: { role: savedMember.role },
+          ip: context?.ip,
+          userAgent: context?.userAgent,
+        });
       }
-      existingMember.joinStatus = 'active';
-      existingMember.joinedAt = new Date();
-      existingMember.leftAt = undefined;
-      const savedMember = await this.groupMemberRepository.save(existingMember);
+    } else {
+      const newMember = this.groupMemberRepository.create({
+        group,
+        user,
+        role: 'member',
+        joinStatus: 'active',
+        joinedAt: new Date(),
+      });
+      savedMember = await this.groupMemberRepository.save(newMember);
 
       void this.writeAuditLog({
         actorUser: user,
@@ -926,30 +1139,250 @@ export class GroupsService {
         ip: context?.ip,
         userAgent: context?.userAgent,
       });
-
-      return savedMember;
     }
 
-    const newMember = this.groupMemberRepository.create({
-      group,
-      user,
-      role: 'member',
-      joinStatus: 'active',
-      joinedAt: new Date(),
-    });
-    const savedMember = await this.groupMemberRepository.save(newMember);
-
-    void this.writeAuditLog({
-      actorUser: user,
-      action: 'group.member_joined',
-      entityId: savedMember.id,
+    return {
+      member: savedMember,
+      wrappedGroupKey,
+      groupKeyVersionId,
+      groupKeyVersion,
       groupId: group.id,
-      metadata: { role: savedMember.role },
-      ip: context?.ip,
-      userAgent: context?.userAgent,
+    };
+  }
+
+  async createGroupInvite(
+    userId: string,
+    groupId: string,
+    dto: { wrappedGroupKey?: string },
+  ) {
+    const callerMember = await this.groupMemberRepository.findOne({
+      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+    });
+    if (!callerMember || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
+      throw new ForbiddenException('Only owners and admins can create invite links');
+    }
+
+    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
+
+    const activeVersion =
+      (await this.getActiveGroupKeyVersion(group.id)) ||
+      (await this.dataSource.transaction((manager) =>
+        this.ensureActiveGroupKeyVersion(group, manager),
+      ));
+
+    const inviteToken = randomUUID();
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+
+    const invite = this.groupInviteRepository.create({
+      group,
+      inviteToken,
+      wrappedGroupKey: dto.wrappedGroupKey,
+      groupKeyVersion: activeVersion,
+      status: 'pending',
+      expiresAt,
     });
 
-    return savedMember;
+    const saved = await this.groupInviteRepository.save(invite);
+    return {
+      inviteToken: saved.inviteToken,
+      expiresAt: saved.expiresAt,
+    };
+  }
+
+  async provisionGroupKeys(
+    userId: string,
+    groupId: string,
+    keys: Array<{ userId: string; wrappedKey: string }>,
+  ): Promise<void> {
+    const callerMember = await this.getActiveMembership(userId, groupId);
+    const canProvisionOthers =
+      callerMember.role === 'owner' || callerMember.role === 'admin';
+
+    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const activeVersion = await this.ensureActiveGroupKeyVersion(group, manager);
+
+      for (const entry of keys) {
+        const isSelfProvision = entry.userId === userId;
+        if (!isSelfProvision && !canProvisionOthers) {
+          throw new ForbiddenException(
+            'Only owners and admins can provision group keys for other members',
+          );
+        }
+
+        const targetMember = await manager.getRepository(GroupMember).findOne({
+          where: {
+            group: { id: groupId },
+            user: { id: entry.userId },
+            joinStatus: In(['active', 'invited']),
+          },
+        });
+        if (!targetMember) {
+          continue;
+        }
+
+        const existing = await manager.getRepository(MemberWrappedGroupKey).findOne({
+          where: {
+            groupKeyVersion: { id: activeVersion.id },
+            user: { id: entry.userId },
+          },
+        });
+
+        if (!existing) {
+          await manager.getRepository(MemberWrappedGroupKey).save(
+            manager.getRepository(MemberWrappedGroupKey).create({
+              group,
+              groupKeyVersion: activeVersion,
+              user: { id: entry.userId } as User,
+              wrappedGroupKey: entry.wrappedKey,
+            }),
+          );
+        }
+      }
+    });
+  }
+
+  async getMyGroupKey(userId: string, groupId: string) {
+    await this.getActiveMembership(userId, groupId);
+
+    const activeVersion = await this.getActiveGroupKeyVersion(groupId);
+    if (!activeVersion) {
+      return {
+        groupId,
+        userId,
+        groupKeyVersionId: null,
+        groupKeyVersion: null,
+        wrappedKey: null,
+      };
+    }
+
+    const key = await this.memberWrappedGroupKeyRepository.findOne({
+      where: {
+        groupKeyVersion: { id: activeVersion.id },
+        user: { id: userId },
+      },
+    });
+
+    return {
+      groupId,
+      userId,
+      groupKeyVersionId: activeVersion.id,
+      groupKeyVersion: activeVersion.version,
+      wrappedKey: key?.wrappedGroupKey ?? null,
+    };
+  }
+
+  async getMissingGroupKeys(userId: string, groupId: string): Promise<string[]> {
+    const callerMember = await this.getActiveMembership(userId, groupId);
+    if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
+      throw new ForbiddenException(
+        'Only owners and admins can inspect missing group keys',
+      );
+    }
+
+    const members = await this.groupMemberRepository.find({
+      where: { group: { id: groupId }, joinStatus: In(['active', 'invited']) },
+      relations: ['user'],
+    });
+
+    const activeVersion = await this.getActiveGroupKeyVersion(groupId);
+    const existingKeys = activeVersion
+      ? await this.memberWrappedGroupKeyRepository.find({
+          where: { groupKeyVersion: { id: activeVersion.id } },
+          relations: ['user'],
+        })
+      : [];
+
+    const existingUserIds = new Set(existingKeys.map((k) => k.user?.id).filter(Boolean));
+    return members
+      .map((m) => m.user?.id)
+      .filter((uid): uid is string => !!uid && !existingUserIds.has(uid));
+  }
+
+  async rotateGroupKey(
+    userId: string,
+    groupId: string,
+    dto: RotateGroupKeyDto,
+  ): Promise<{ groupId: string; groupKeyVersionId: string; groupKeyVersion: number; status: 'ACTIVE' }> {
+    const callerMember = await this.getActiveMembership(userId, groupId);
+    if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
+      throw new ForbiddenException('Only owners and admins can rotate group keys');
+    }
+    if (!dto.keys || dto.keys.length === 0) {
+      throw new BadRequestException('keys must be a non-empty array');
+    }
+
+    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
+
+    const rotated = await this.dataSource.transaction(async (manager) => {
+      const existingActive = await this.getActiveGroupKeyVersion(groupId, manager);
+      if (existingActive) {
+        existingActive.status = 'SUPERSEDED';
+        existingActive.rotatedAt = new Date();
+        existingActive.rotatedByUser = { id: userId } as User;
+        existingActive.rotationReason = dto.reason;
+        await manager.getRepository(GroupKeyVersion).save(existingActive);
+      }
+
+      const latest = await manager.getRepository(GroupKeyVersion).findOne({
+        where: { group: { id: groupId } },
+        order: { version: 'DESC' },
+      });
+
+      const nextVersion = (latest?.version ?? 0) + 1;
+      const newVersion = await manager.getRepository(GroupKeyVersion).save(
+        manager.getRepository(GroupKeyVersion).create({
+          group,
+          version: nextVersion,
+          algorithm: 'AES-256-GCM',
+          status: 'ACTIVE',
+          rotationReason: dto.reason,
+          rotatedByUser: { id: userId } as User,
+        }),
+      );
+
+      for (const entry of dto.keys) {
+        const targetMember = await manager.getRepository(GroupMember).findOne({
+          where: {
+            group: { id: groupId },
+            user: { id: entry.userId },
+            joinStatus: In(['active', 'invited']),
+          },
+        });
+        if (!targetMember) {
+          continue;
+        }
+
+        await manager.getRepository(MemberWrappedGroupKey).save(
+          manager.getRepository(MemberWrappedGroupKey).create({
+            group,
+            groupKeyVersion: newVersion,
+            user: { id: entry.userId } as User,
+            wrappedGroupKey: entry.wrappedKey,
+          }),
+        );
+      }
+
+      return newVersion;
+    });
+
+    return {
+      groupId,
+      groupKeyVersionId: rotated.id,
+      groupKeyVersion: rotated.version,
+      status: 'ACTIVE',
+    };
   }
 
   async getPendingInvitations(userId: string): Promise<any[]> {
