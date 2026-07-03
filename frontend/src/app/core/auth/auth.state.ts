@@ -2,7 +2,8 @@ import { Injectable, inject } from '@angular/core';
 import { State, Action, StateContext, Selector } from '@ngxs/store';
 import { jwtDecode } from 'jwt-decode';
 import { AuthService } from './auth.service';
-import { tap } from 'rxjs/operators';
+import { from } from 'rxjs';
+import { mergeMap, tap } from 'rxjs/operators';
 import {
   JwtPayload,
   LoginDto,
@@ -83,7 +84,7 @@ export class AuthState {
   @Action(Login)
   login(ctx: StateContext<AuthStateModel>, action: Login) {
     return this.authService.login(action.payload).pipe(
-      tap((result: LoginResponse) => {
+      mergeMap((result: LoginResponse) => {
         localStorage.setItem('finmate_token', result.accessToken);
         if (result.refreshToken) {
           localStorage.setItem('finmate_refresh_token', result.refreshToken);
@@ -94,26 +95,32 @@ export class AuthState {
           user: jwtDecode<JwtPayload>(result.accessToken),
         });
 
-        // Derive and store key client-side asynchronously
-        this.encryptionService
-          .deriveAndStoreKey(action.payload.password, action.payload.email)
-          .then(async (res) => {
+        // Derive and store key, blocking navigation until complete
+        return from(
+          this.encryptionService.deriveAndStoreKey(
+            action.payload.password,
+            action.payload.email,
+          ),
+        ).pipe(
+          mergeMap(async (res) => {
             if (!res.persisted) {
               ctx.dispatch(
                 new SetPersistenceWarning(
-                  "Secure key persistence is unavailable in your browser. Your encrypted data will remain accessible during this session, but you'll need to sign in again after refreshing or reopening the app."
-                )
+                  "Secure key persistence is unavailable in your browser. Your encrypted data will remain accessible during this session, but you'll need to sign in again after refreshing or reopening the app.",
+                ),
               );
             }
             try {
               await this.groupKeyService.getMyAsymmetricKeys();
             } catch (err) {
-              console.error('Failed to auto-provision asymmetric keys on login', err);
+              console.error(
+                'Failed to auto-provision asymmetric keys on login',
+                err,
+              );
             }
-          })
-          .catch((err) => {
-            console.error('Failed to derive master key on login', err);
-          });
+            return result;
+          }),
+        );
       }),
     );
   }

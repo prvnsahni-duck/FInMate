@@ -7,13 +7,13 @@
     <div class="error-banner">{{ errorMessage }}</div>
   }
 
-  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="form-layout">
+  <form data-testid="recurring-form" [formGroup]="form" (ngSubmit)="onSubmit()" class="form-layout">
     <!-- Row 1: Title & Description -->
     <div class="form-row">
       <div class="form-field">
         <label for="title">Title *</label>
         <input
-          id="title"
+          id="title" data-testid="recurring-title-input"
           type="text"
           formControlName="title"
           placeholder="e.g. Netflix Subscription"
@@ -24,7 +24,7 @@
       <div class="form-field">
         <label for="description">Description</label>
         <input
-          id="description"
+          id="description" data-testid="recurring-description-input"
           type="text"
           formControlName="description"
           placeholder="Optional notes"
@@ -40,7 +40,7 @@
         <div class="amount-input-wrapper">
           <span class="currency-symbol">{{ currencySymbol }}</span>
           <input
-            id="amountTotal"
+            id="amountTotal" data-testid="recurring-amount-input"
             type="number"
             formControlName="amountTotal"
             placeholder="0.00"
@@ -99,7 +99,7 @@
       <div class="form-field">
         <label for="startDate">Start Date *</label>
         <input
-          id="startDate"
+          id="startDate" data-testid="recurring-start-date-input"
           type="date"
           formControlName="startDate"
           class="finmate-input"
@@ -124,7 +124,7 @@
         @for (member of availableParticipants; track member.id) {
           <button
             type="button"
-            class="checklist-item"
+            class="checklist-item" data-testid="recurring-participant-button"
             (click)="toggleParticipant(member.id)"
           >
             <input
@@ -151,9 +151,10 @@
       <app-submit-button
         [isLoading]="isSubmitting"
         [disabled]="!form.valid || selectedUserIds.size === 0"
-      >
-        {{ template ? 'Save Changes' : 'Create Template' }}
-      </app-submit-button>
+        [label]="template ? 'Save Changes' : 'Create Template'"
+        [loadingLabel]="template ? 'Saving...' : 'Creating...'"
+      ></app-submit-button>
     </div>
   </form>
 </div>
+

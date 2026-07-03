@@ -8,6 +8,7 @@
   </div>
 
   <button (click)="openExpenseModalEvent.emit({})"
+    data-testid="dashboard-log-expense-button"
     class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-2xl flex items-center space-x-2 text-sm cursor-pointer">
     <span>+ Log Expense</span>
   </button>
@@ -178,6 +179,7 @@
       <p class="text-xs text-secondary/50 max-w-xs mb-6">Aggregate and track your personal expenditures with absolute
         zero-knowledge privacy.</p>
       <button (click)="openExpenseModalEvent.emit({})"
+    data-testid="dashboard-log-expense-button"
         class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-xl text-xs font-bold shadow-md shadow-primary/20 cursor-pointer">
         Log Transaction
       </button>
@@ -186,6 +188,8 @@
     <div class="space-y-4 max-h-[480px] overflow-y-auto pr-1">
       @for (expense of personalExpenses; track expense.id) {
       <div
+        [attr.data-expense-id]="expense.id"
+        data-testid="expense-card"
         class="flex items-center justify-between p-4 rounded-2xl bg-secondary/5 border border-secondary/5 hover:border-primary/25 hover:bg-secondary/10 transition-all duration-300 group">
         <div class="flex items-center space-x-4">
           <!-- Category Icon -->
@@ -194,7 +198,7 @@
             <app-icon [path]="categoryOptions.find(option => option.value === expense.category)?.iconPath || categoryOptions[0].iconPath" className="w-5 h-5"></app-icon>
           </div>
           <div>
-            <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2">
+            <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2" data-testid="expense-title">
               <span>{{ expense.title }}</span>
               <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider"
                 [class]="categoryOptions.find(option => option.value === expense.category)?.class || categoryOptions[0].class">
@@ -207,15 +211,15 @@
         </div>
 
         <div class="flex items-center space-x-4">
-          <p class="font-extrabold text-base text-secondary tracking-tight">{{ expense.amountTotal |
+          <p class="font-extrabold text-base text-secondary tracking-tight" data-testid="expense-amount">{{ expense.amountTotal |
             currency:expense.currency }}</p>
           <div
             class="flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-250">
-            <button (click)="openExpenseModalEvent.emit({ expense })"
+            <button data-action="edit" [attr.data-testid]="'expense-edit-button-' + expense.id" (click)="openExpenseModalEvent.emit({ expense })"
               class="p-2 text-secondary/40 hover:text-primary hover:bg-secondary/15 rounded-xl transition-all cursor-pointer">
               ✏️
             </button>
-            <button (click)="confirmDeleteExpenseEvent.emit(expense.id)"
+            <button data-action="delete" [attr.data-testid]="'expense-delete-button-' + expense.id" (click)="confirmDeleteExpenseEvent.emit(expense.id)"
               class="p-2 text-secondary/40 hover:text-error hover:bg-error/15 rounded-xl transition-all cursor-pointer">
               🗑️
             </button>
@@ -266,3 +270,7 @@
     }
   </div>
 </div>
+
+
+
+

@@ -1,9 +1,11 @@
 <div
+  data-testid="expense-dialog-backdrop"
   class="fixed inset-0 z-[60] flex items-end justify-center md:items-center md:p-4 bg-slate-900/60 backdrop-blur-md transition-all duration-300">
   <div
+    data-testid="expense-dialog"
     class="bg-white dark:bg-finmate-card w-full md:max-w-lg h-[100dvh] md:h-auto md:max-h-[80vh] rounded-none md:rounded-3xl p-6 pb-safe md:p-8 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 relative flex flex-col transform scale-100 transition-all">
     <!-- Close Button -->
-    <button (click)="closeModal()"
+    <button (click)="closeModal()" data-testid="expense-dialog-close-button"
       class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors z-10">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -45,7 +47,7 @@
         <div>
           <label for="expense-title-input"
             class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Title / Name *</label>
-          <input id="expense-title-input" type="text" formControlName="title" placeholder="e.g., Dinner, Groceries"
+          <input id="expense-title-input" data-testid="expense-title-input" type="text" formControlName="title" placeholder="e.g., Dinner, Groceries"
             class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
             [class.border-red-500]="
               expenseForm.get('title')?.touched &&
@@ -76,7 +78,7 @@
               class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Amount *</label>
             <div class="relative flex items-center">
               <span class="absolute left-4 text-slate-400 font-semibold select-none">{{ currencySymbol }}</span>
-              <input id="expense-amount-input" type="number" step="0.01" formControlName="amountTotal"
+              <input id="expense-amount-input" data-testid="expense-amount-input" type="number" step="0.01" formControlName="amountTotal"
                 placeholder="0.00"
                 class="w-full pl-9 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
                 [class.border-red-500]="
@@ -104,7 +106,7 @@
           <div>
             <label for="expense-currency-select"
               class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Currency *</label>
-            <app-dropdown id="expense-currency-select" formControlName="currency" [options]="currencyOptions"
+            <app-dropdown id="expense-currency-select" data-testid="expense-currency-select" formControlName="currency" [options]="currencyOptions"
               placeholder="Select currency..."></app-dropdown>
           </div>
         </div>
@@ -114,13 +116,13 @@
           <div>
             <label for="expense-category-select"
               class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Category *</label>
-            <app-dropdown id="expense-category-select" formControlName="category" [options]="categoryOptions"
+            <app-dropdown id="expense-category-select" data-testid="expense-category-select" formControlName="category" [options]="categoryOptions"
               placeholder="Select category..."></app-dropdown>
           </div>
           <div>
             <label for="expense-date-input"
               class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">Date *</label>
-            <input id="expense-date-input" type="date" formControlName="expenseDate"
+            <input id="expense-date-input" data-testid="expense-date-input" type="date" formControlName="expenseDate"
               class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
               [class.border-red-500]="
                 expenseForm.get('expenseDate')?.touched &&
@@ -278,11 +280,11 @@
 
       <!-- Sticky Footer -->
       <div class="flex-shrink-0 flex space-x-4 pt-4 border-t border-slate-200 dark:border-white/5 mt-4">
-        <button type="button" (click)="closeModal()"
+        <button type="button" (click)="closeModal()" data-testid="expense-cancel-button"
           class="flex-1 py-3 px-4 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded-2xl font-semibold transition-all">
           Cancel
         </button>
-        <app-submit-button [label]="'Save Expense'" [loadingLabel]="'Saving...'" [isLoading]="isSubmitting"
+        <app-submit-button [label]="'Save Expense'" [testId]="'expense-save-button'" [loadingLabel]="'Saving...'" [isLoading]="isSubmitting"
           [disabled]="expenseForm.invalid || selectedUserIds.size === 0" [styleClass]="
             'flex-1 py-3 px-4 bg-primary text-white font-semibold transition-all duration-200 hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 rounded-2xl flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
           "></app-submit-button>
@@ -290,3 +292,5 @@
     </form>
   </div>
 </div>
+
+

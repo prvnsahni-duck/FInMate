@@ -81,6 +81,7 @@ export class ZkKeyVaultService {
     try {
       db = await this.openVault();
     } catch (error) {
+      console.warn('IndexedDB persistence unavailable. Falling back to memory-only key cache.');
       ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
       return false;
     }
@@ -97,11 +98,13 @@ export class ZkKeyVaultService {
         };
         request.onerror = () => {
           logError('Failed to store key in ZK vault', request.error);
+          console.warn('IndexedDB persistence unavailable. Falling back to memory-only key cache.');
           ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
           resolve(false);
         };
       } catch (error) {
         logError('Synchronous error putting key in ZK vault', error);
+        console.warn('IndexedDB persistence unavailable. Falling back to memory-only key cache.');
         ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
         resolve(false);
       }

@@ -305,7 +305,7 @@
           class="flex space-x-1 bg-slate-100 dark:bg-black/20 p-1.5 rounded-2xl border border-slate-200 dark:border-white/5 overflow-x-auto whitespace-nowrap md:overflow-x-visible [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
           <button
-            (click)="setTab('ledger')"
+            (click)="setTab('ledger')" data-testid="group-tab-ledger"
             [class]="
               activeTab() === 'ledger'
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
@@ -316,7 +316,7 @@
             Ledger
           </button>
           <button
-            (click)="setTab('analytics')"
+            (click)="setTab('analytics')" data-testid="group-tab-analytics"
             [class]="
               activeTab() === 'analytics'
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
@@ -327,7 +327,7 @@
             Analytics
           </button>
           <button
-            (click)="setTab('history')"
+            (click)="setTab('history')" data-testid="group-tab-history"
             [class]="
               activeTab() === 'history'
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
@@ -338,7 +338,7 @@
             History
           </button>
           <button
-            (click)="setTab('trash')"
+            (click)="setTab('trash')" data-testid="group-tab-trash"
             [class]="
               activeTab() === 'trash'
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
@@ -349,7 +349,7 @@
             Trash
           </button>
           <button
-            (click)="setTab('settings')"
+            (click)="setTab('settings')" data-testid="group-tab-settings"
             [class]="
               activeTab() === 'settings'
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
@@ -360,7 +360,7 @@
             Settings
           </button>
           <button
-            (click)="setTab('recurring')"
+            (click)="setTab('recurring')" data-testid="group-tab-recurring"
             [class]="
               activeTab() === 'recurring'
                 ? 'bg-white dark:bg-finmate-card shadow text-slate-900 dark:text-white'
@@ -503,12 +503,15 @@
               <div class="space-y-4">
                 @for (expense of expenses(); track expense.id) {
                   <div
+                    [attr.data-expense-id]="expense.id"
+                    data-testid="expense-card"
                     class="flex flex-col p-4 rounded-2xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 hover:border-primary/30 hover:bg-secondary/5 transition-colors group/row"
                   >
                     <div class="flex items-center justify-between w-full">
                       <div class="flex items-center space-x-4">
                         <button
                           (click)="toggleExpenseExpand(expense.id)"
+                          [attr.data-testid]="'expense-expand-button-' + expense.id"
                           class="p-1 rounded hover:bg-secondary/15 text-secondary transition-colors"
                           [title]="'View Splits'"
                         >
@@ -632,7 +635,7 @@
                           }
                         </div>
                         <div>
-                          <h4 class="font-bold flex items-center gap-2">
+                          <h4 class="font-bold flex items-center gap-2" data-testid="expense-title">
                             {{ expense.title }}
                             @if (expense.status === 'void') {
                               <span
@@ -652,6 +655,7 @@
                         <div class="text-right">
                           <p
                             class="font-bold text-lg"
+                            data-testid="expense-amount"
                             [style.text-decoration]="
                               expense.status === 'void'
                                 ? 'line-through'
@@ -690,7 +694,8 @@
                               expense.ownerUserId === currentUserId() ||
                               expense.paidByUserId === currentUserId())
                           ) {
-                            <button
+                            <button data-action="edit"
+                              [attr.data-testid]="'expense-edit-button-' + expense.id"
                               (click)="openExpenseModal(expense)"
                               class="p-2 text-slate-400 hover:text-primary hover:bg-slate-100 dark:hover:bg-white/5 rounded-xl transition-all"
                             >
@@ -708,7 +713,8 @@
                                 ></path>
                               </svg>
                             </button>
-                            <button
+                            <button data-action="delete"
+                              [attr.data-testid]="'expense-delete-button-' + expense.id"
                               (click)="confirmDeleteExpense(expense.id)"
                               class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
                             >
@@ -1543,11 +1549,12 @@
               <div class="space-y-4">
                 @for (template of recurringExpenses(); track template.id) {
                   <div
+                    data-testid="recurring-expense-card"
                     class="p-5 bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4"
                   >
                     <div>
                       <div class="flex items-center gap-3">
-                        <h3 class="font-bold text-slate-800 dark:text-white">
+                        <h3 class="font-bold text-slate-800 dark:text-white" data-testid="recurring-expense-title">
                           {{ template.title }}
                         </h3>
                         <span
@@ -1601,6 +1608,7 @@
                         <div class="flex items-center gap-2">
                           <button
                             (click)="toggleRecurringExpenseStatus(template)"
+                            [attr.data-testid]="'recurring-toggle-button-' + template.id"
                             [title]="
                               template.status === 'active' ? 'Pause' : 'Resume'
                             "
@@ -1644,6 +1652,7 @@
                           </button>
                           <button
                             (click)="openRecurringExpenseForm(template)"
+                            [attr.data-testid]="'recurring-edit-button-' + template.id"
                             title="Edit"
                             class="p-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-all text-slate-600 dark:text-slate-400"
                           >
@@ -1663,6 +1672,7 @@
                           </button>
                           <button
                             (click)="deleteRecurringExpense(template.id)"
+                            [attr.data-testid]="'recurring-delete-button-' + template.id"
                             title="Delete"
                             class="p-2 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 rounded-xl transition-all text-red-500"
                           >
@@ -1768,3 +1778,5 @@
     </div>
   </div>
 }
+
+
