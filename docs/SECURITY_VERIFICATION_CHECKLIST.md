@@ -25,12 +25,16 @@
 - [ ] Wrapped keys are not exposed to unauthorized users.
 - [ ] Refresh flow does not weaken session guarantees.
 - [ ] Logout clears in-memory and vault key material.
+- [ ] Rate limits (throttling) are verified per route to block brute force and DDoS.
+- [ ] Structured logging is audited (confirms NO email, password, JWT, refresh token, or IP leaks).
 
 ## Storage and Offline Security
 - [ ] IndexedDB key vault behavior is validated.
+- [ ] IndexedDB fallback mechanism succeeds with console warning and UI banner when DB is blocked.
 - [ ] Session expiration handling is verified.
 - [ ] Multi-tab behavior does not leak stale key state.
 
 ## Operational Security
 - [ ] Rotation and emergency revocation runbooks exist and are approved.
 - [ ] Security incident rollback path is documented.
+- [ ] **Backup Verification Gate:** Restoring backup to test instance confirms zero plaintext leaks and validates decryption logic.

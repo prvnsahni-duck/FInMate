@@ -36,8 +36,25 @@ Runbook for routine and emergency operations under the approved architecture.
 
 ## Production Deployment
 1. Execute docs/RELEASE_RUNBOOK.md pre-release steps.
-2. Confirm backup completed and restore test is valid.
+2. Confirm backup completed and restore verification gate is valid.
 3. Deploy release and run migrations.
 4. Run post-deploy checks for auth, key retrieval, invite flow.
 5. Observe logs/metrics during stabilization window.
 6. Close deployment with release report.
+
+## Routine Health Monitoring
+1. Set up a cron monitor or Pingdom checker targeting `/api/v1/health` (requires returning HTTP `200` JSON).
+2. Alert on HTTP `503 Service Unavailable` with details on failed sub-systems (`database` or `redis` down).
+3. Check CPU/RAM on Redis and Neon DB when latencies rise.
+
+## Throttling and Rate Limiting Operations
+1. Monitor NestJS log events for `429 Too Many Requests`.
+2. If genuine clients hit limits frequently:
+   * Increase corresponding environment variables (e.g. `THROTTLE_LIMIT_LOGIN`, `THROTTLE_LIMIT_EXPORT`).
+   * Restart NestJS instances to pick up updated limits dynamically.
+
+## Troubleshooting IndexedDB Fallback Reports
+1. When users complain about having to log in on every refresh:
+   * Instruct them to check if private browsing mode is enabled or if browser storage settings block IndexedDB.
+   * Verify the warn logs `IndexedDB persistence unavailable` in client telemetry.
+   * Remind users that Zero-Knowledge design forbids server-side key caching, meaning in-memory fallback is the only path when IndexedDB is blocked.

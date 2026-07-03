@@ -27,23 +27,27 @@ Operational steps to release the current approved architecture safely.
 
 ## Production Deployment
 1. Announce maintenance window.
-2. Take verified database backup/snapshot.
-3. Deploy application build.
-4. Run migrations.
-5. Execute post-deploy smoke tests.
+2. Take database backup/snapshot.
+3. **Verify Backup Integrity (Mandatory Gate):** Restore the taken backup to a temporary test database, start a test app instance against it, login, and confirm that historical encrypted expenses decrypt successfully on the dashboard.
+4. Deploy application build.
+5. Run migrations.
+6. Execute post-deploy smoke tests.
 
 ## Post-deploy Smoke Tests
-1. Authenticate and refresh token flow.
-2. Fetch group key for existing user.
-3. Join group invite and verify wrapped key retrieval.
-4. Perform one key rotation in controlled group.
-5. Verify no duplicate expense records introduced.
+1. Verify deep diagnostic health check endpoint `/api/v1/health` returns status `200` and report sub-systems (`database`: "up", `redis`: "up").
+2. Authenticate and refresh token flow (verify token rotation).
+3. Fetch group key for existing user.
+4. Join group invite and verify wrapped key retrieval.
+5. Perform one key rotation in controlled group.
+6. Verify no duplicate expense records introduced.
+7. Verify IndexedDB fallback behaviour by blocking IndexedDB in a browser session, logging in, seeing the session warning banner, and logging out.
 
 ## Monitoring and Stabilization
-1. Monitor auth failures, key endpoint errors, DB errors.
-2. Monitor latency on groups key endpoints.
-3. Confirm no spike in decryption failure placeholders.
-4. Keep rollback decision deadline explicit.
+1. Monitor rate-limit triggers (Throttler `429` counts) in Prometheus/Grafana or logs.
+2. Monitor auth failures, key endpoint errors, DB errors.
+3. Monitor latency on groups key endpoints.
+4. Confirm no spike in decryption failure placeholders.
+5. Keep rollback decision deadline explicit.
 
 ## Completion
 1. Mark release as successful.

@@ -201,11 +201,18 @@ To avoid duplicate encrypted records and prevent synchronization overhead, the a
 - **Redis Session Caching**: Active session refresh token IDs (`refreshId`) are stored in Redis. To mitigate database compromise or session hijacking, key identifiers in Redis are stored deterministically as `refresh_token:${userId}:${sha256(refreshId)}`, and the value stored is the Argon2 hash of the `refreshId`.
 - **Two-Factor Authentication (MFA)**: TOTP verification via authenticator apps, with secrets encrypted in PostgreSQL using AES-256-GCM.
 
-4. **Rate Limiting**:
-   - Enforced using Redis and `@nestjs/throttler`:
-     - Global API paths: Max 100 requests / minute.
-     - Sensitive auth routes: Max 5 requests / minute.
+4. **Rate Limiting (Route-Specific Throttling)**:
+   - Enforced using Redis and `@nestjs/throttler` (configurable via environment variables):
+     - **Authentication**:
+       - Login / Register / OTP: 5 requests / minute
+       - Forgot / Reset Password: 3 requests / minute
+       - Refresh Token: 15 requests / minute
+     - **Import / Export APIs**:
+       - Import APIs: 10 requests / minute
+       - Export APIs: 20 requests / minute
+     - **Default / Standard APIs**: 100 requests / minute
    - Security headers are enforced globally via Helmet.
+   - Deep diagnostic health status at `/api/v1/health` integrates Postgres and Redis live checks to detect infrastructure health.
 
 ---
 

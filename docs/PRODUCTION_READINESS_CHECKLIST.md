@@ -25,6 +25,8 @@ This checklist is for Release Candidate sign-off of the approved architecture.
 - [ ] Exactly one ACTIVE key version per group.
 - [ ] Invite endpoints require authentication where required.
 - [ ] Session refresh and local key restore are validated.
+- [ ] Route-specific throttling limits configured and verified.
+- [ ] Zero-Knowledge console warnings verified in the fallback path.
 
 ## Database and Migration Readiness
 - [ ] Migration is idempotent.
@@ -32,23 +34,26 @@ This checklist is for Release Candidate sign-off of the approved architecture.
 - [ ] Foreign keys and delete behavior validated.
 - [ ] Indexes exist for new key version tables and references.
 - [ ] Rollback plan is reviewed and tested.
+- [ ] **Backup Integrity Validation Gate:** Backup was restored on test environment, data decrypted successfully, and dashboard load verified.
 
 ## API and Backend Readiness
 - [ ] OpenAPI matches controller behavior.
 - [ ] DTO validation matches request/response contracts.
 - [ ] Authorization enforced on key endpoints.
 - [ ] Rotation transaction behavior validated.
+- [ ] Deep Diagnostic Health endpoint `/api/v1/health` verified with Postgres & Redis checks.
 
 ## Frontend Readiness
 - [ ] Refresh restores keys while session is valid.
 - [ ] Logout clears key cache and vault.
 - [ ] Invite join path handles wrapped group keys safely.
 - [ ] Group switching and key retrieval verified.
+- [ ] UI session warning banner verified when IndexedDB fails.
 
 ## QA and Release Gates
 - [ ] Backend tests pass.
 - [ ] New key-versioning tests pass.
-- [ ] Critical-path smoke tests pass.
+- [ ] Playwright E2E integration test suites pass (Expense Flow, Recurring Expenses, Fallback, Lifecycle).
 - [ ] Release and rollback runbooks approved.
 
 ## Final Sign-off
