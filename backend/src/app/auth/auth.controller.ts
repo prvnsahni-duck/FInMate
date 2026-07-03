@@ -18,12 +18,14 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RequestWithUser } from '../common/interfaces/request-with-user.interface';
 import { Request } from 'express';
 import { SuccessResponse } from '../common/response.util';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle({ register: {} })
   async register(@Body() registerDto: RegisterDto) {
     const result = await this.authService.register(
       registerDto.email,
@@ -34,6 +36,7 @@ export class AuthController {
   }
 
   @Post('login')
+  @Throttle({ login: {} })
   async login(@Body() loginDto: LoginDto, @Req() req: Request) {
     const mfaCode = req.headers['x-mfa-code'] as string | undefined;
     const context = {
@@ -53,6 +56,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @Throttle({ refresh: {} })
   async refresh(@Body() refreshTokenDto: RefreshTokenDto) {
     const result = await this.authService.refresh(refreshTokenDto.refreshToken);
     return new SuccessResponse('Token refreshed successfully', result);
@@ -85,6 +89,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/verify')
+  @Throttle({ otp: {} })
   async verify2Fa(
     @Body() verify2FaDto: Verify2FaDto,
     @Req() req: RequestWithUser,
@@ -106,6 +111,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('2fa/disable')
+  @Throttle({ otp: {} })
   @HttpCode(HttpStatus.OK)
   async disable2Fa(
     @Body() verify2FaDto: Verify2FaDto,

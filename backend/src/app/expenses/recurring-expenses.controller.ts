@@ -19,6 +19,7 @@ import {
   UpdateRecurringExpenseDto,
 } from '@finmate/data-models';
 import { RecurringExpensesService } from './services/recurring-expenses.service';
+import { RecurringExpensesScheduler } from './services/recurring-expenses.scheduler';
 import { SuccessResponse } from '../common/response.util';
 
 @Controller('recurring-expenses')
@@ -26,6 +27,7 @@ import { SuccessResponse } from '../common/response.util';
 export class RecurringExpensesController {
   constructor(
     private readonly recurringExpensesService: RecurringExpensesService,
+    private readonly recurringExpensesScheduler: RecurringExpensesScheduler,
   ) {}
 
   @Post()
@@ -98,5 +100,12 @@ export class RecurringExpensesController {
   ) {
     await this.recurringExpensesService.deleteRecurringExpense(req.user.id, id);
     return new SuccessResponse('Recurring expense deleted successfully', {});
+  }
+
+  @Post('trigger')
+  @HttpCode(HttpStatus.OK)
+  async triggerScheduler() {
+    await this.recurringExpensesScheduler.processDueExpenses();
+    return new SuccessResponse('Scheduler triggered successfully', {});
   }
 }

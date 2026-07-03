@@ -26,21 +26,42 @@ export class RecurringExpensesScheduler {
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
   async handleRecurringExpensesCron() {
+    this.logger.log({
+      event: 'scheduler_started',
+      scheduler: 'recurring_expenses',
+      timestamp: new Date().toISOString(),
+    });
     const lockKey = 'lock:recurring_expenses_cron';
     const acquired = await this.redisService.setNx(lockKey, 'locked', 3600);
     if (!acquired) {
-      this.logger.log(
-        'Another instance is already processing recurring expenses. Skipping.',
-      );
+      this.logger.log({
+        event: 'redis_lock_failed',
+        scheduler: 'recurring_expenses',
+        lockKey,
+        timestamp: new Date().toISOString(),
+      });
       return;
     }
-    this.logger.log(
-      'Acquired scheduler lock. Starting recurring expenses processing...',
-    );
+    this.logger.log({
+      event: 'redis_lock_acquired',
+      scheduler: 'recurring_expenses',
+      lockKey,
+      timestamp: new Date().toISOString(),
+    });
     try {
       await this.processDueExpenses();
-    } finally {
-      this.logger.log('Recurring expenses cron job complete.');
+      this.logger.log({
+        event: 'scheduler_completed',
+        scheduler: 'recurring_expenses',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err: any) {
+      this.logger.error({
+        event: 'scheduler_failed',
+        scheduler: 'recurring_expenses',
+        error: err.message,
+        timestamp: new Date().toISOString(),
+      }, err.stack);
     }
   }
 
@@ -55,18 +76,24 @@ export class RecurringExpensesScheduler {
       relations: ['paidByUser', 'ownerUser', 'group'],
     });
 
-    this.logger.log(
-      `Found ${dueTemplates.length} due recurring expenses to process.`,
-    );
+    this.logger.log({
+      event: 'scheduler_processing_templates',
+      scheduler: 'recurring_expenses',
+      count: dueTemplates.length,
+      timestamp: new Date().toISOString(),
+    });
 
     for (const template of dueTemplates) {
       try {
         await this.processSingleTemplate(template, todayStr);
-      } catch (err) {
-        this.logger.error(
-          `Error processing recurring expense ${template.id}:`,
-          err,
-        );
+      } catch (err: any) {
+        this.logger.error({
+          event: 'scheduler_template_failed',
+          scheduler: 'recurring_expenses',
+          templateId: template.id,
+          error: err.message,
+          timestamp: new Date().toISOString(),
+        }, err.stack);
       }
     }
   }
@@ -133,9 +160,14 @@ export class RecurringExpensesScheduler {
         await manager.getRepository(RecurringExpense).save(template);
       });
 
-      this.logger.log(
-        `Created expense for template ${template.id} on date ${occurrenceDateStr}. Next occurrence is ${nextDate}`,
-      );
+      this.logger.log({
+        event: 'scheduler_expense_created',
+        scheduler: 'recurring_expenses',
+        templateId: template.id,
+        occurrenceDate: occurrenceDateStr,
+        nextDate,
+        timestamp: new Date().toISOString(),
+      });
       currentOccurrenceDate = nextDate;
     }
   }

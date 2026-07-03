@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { RecurringExpensesController } from './recurring-expenses.controller';
 import { RecurringExpensesService } from './services/recurring-expenses.service';
+import { RecurringExpensesScheduler } from './services/recurring-expenses.scheduler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SuccessResponse } from '../common/response.util';
 
@@ -8,6 +9,7 @@ describe('RecurringExpensesController', () => {
   let controller: RecurringExpensesController;
   let service: jest.Mocked<RecurringExpensesService>;
   let mockRecurringExpensesService: Record<string, jest.Mock>;
+  let module: TestingModule;
 
   beforeEach(async () => {
     mockRecurringExpensesService = {
@@ -18,12 +20,18 @@ describe('RecurringExpensesController', () => {
       deleteRecurringExpense: jest.fn(),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       controllers: [RecurringExpensesController],
       providers: [
         {
           provide: RecurringExpensesService,
           useValue: mockRecurringExpensesService,
+        },
+        {
+          provide: RecurringExpensesScheduler,
+          useValue: {
+            processDueExpenses: jest.fn(),
+          },
         },
       ],
     })
@@ -133,5 +141,14 @@ describe('RecurringExpensesController', () => {
       'user-1',
       'rec-1',
     );
+  });
+
+  it('should trigger scheduler manually', async () => {
+    const mockScheduler = module.get(RecurringExpensesScheduler);
+    const result = await controller.triggerScheduler();
+    expect(result).toEqual(
+      new SuccessResponse('Scheduler triggered successfully', {}),
+    );
+    expect(mockScheduler.processDueExpenses).toHaveBeenCalled();
   });
 });

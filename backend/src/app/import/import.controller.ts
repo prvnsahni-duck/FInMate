@@ -13,6 +13,7 @@ import { ImportService } from './import.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Request } from 'express';
 import { SuccessResponse } from '../common/response.util';
+import { Throttle } from '@nestjs/throttler';
 
 interface RequestWithUser extends Request {
   user: {
@@ -26,6 +27,7 @@ export class ImportController {
   constructor(private readonly importService: ImportService) {}
 
   @Post('expenses')
+  @Throttle({ import: {} })
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {

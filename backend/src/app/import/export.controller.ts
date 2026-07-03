@@ -10,6 +10,7 @@ import {
 import { Response, Request } from 'express';
 import { ImportService } from './import.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Throttle } from '@nestjs/throttler';
 
 interface RequestWithUser extends Request {
   user: {
@@ -23,6 +24,7 @@ export class ExportController {
   constructor(private readonly importService: ImportService) {}
 
   @Get('expenses')
+  @Throttle({ export: {} })
   async exportExpenses(
     @Query('format') format: 'csv' | 'xlsx' = 'csv',
     @Query('groupId') groupId?: string,

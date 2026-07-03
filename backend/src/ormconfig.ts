@@ -26,9 +26,16 @@ if (!process.env.DATABASE_URL) {
   dotenv.config({ path: '.env.dev' });
 }
 
+const sslEnabled = process.env.DB_SSL === 'true';
+const sslRejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+const ssl = sslEnabled
+  ? { rejectUnauthorized: sslRejectUnauthorized }
+  : undefined;
+
 export default new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
+  ssl,
   entities: [
     User,
     Profile,
