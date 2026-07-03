@@ -480,8 +480,9 @@ To enforce a Zero-Knowledge Architecture, user data containing transactional det
 - **User Data Key (UDK)**: Used to encrypt personal-scope data (personal expenses, personal notes, goals, and user secrets). It is derived from the user's password using PBKDF2 (AES-256-GCM).
 - **Group Key**: Each group owns a dedicated AES-256-GCM symmetric key. All collaborative data (group expenses, group notes, group attachments) is encrypted using this Group Key. Shared data is never encrypted using a personal UDK.
 - **Key Cache & Refresh Behavior (Current Release)**:
-  - **Temporary Key Cache**: The wrapped/exported User Data Key (UDK) and wrapped Group Keys are stored in a local **IndexedDB** cache via `ZkKeyVaultService` and in memory to prevent password prompts on page refresh.
-  - **Cache Lifetime**: The cache is cleared on logout or session expiration.
+  - **Temporary Key Cache**: The Master Key and wrapped Group Keys are primarily stored in a local **IndexedDB** cache as non-extractable `CryptoKey` objects via `ZkKeyVaultService` using the **Structured Clone** mechanism to persist across page refreshes.
+  - **In-Memory Fallback**: If IndexedDB fails to initialize or write, keys are cached in memory (`fallbackMap`). In this state, encryption/decryption continue working, login succeeds, but page refresh clears keys and requires re-authentication.
+  - **Cache Lifetime**: The cache (both IndexedDB and in-memory fallback) is strictly cleared on logout or session expiration.
 - **Future Key Vault Architecture (Roadmap)**:
   - The temporary cache will be replaced in future releases with an **Encrypted IndexedDB Key Vault** protected by **WebAuthn** / Device Trust, **Biometric Unlock** (Fingerprint/FaceID via Capacitor native APIs), or **PIN Unlock**.
 - **Password Changes**:

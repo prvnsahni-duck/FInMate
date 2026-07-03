@@ -83,6 +83,22 @@ sequenceDiagram
 6. **Decryption Failures**:
    - Handled gracefully using the placeholder `DECRYPTION_FAILED_PLACEHOLDER` (`'Unable to display this item'`) to avoid leaking ciphertexts or raw technical details in the UI.
 
+### Zero-Knowledge Key Lifecycle
+
+Primary storage:
+- IndexedDB (CryptoKey via Structured Clone)
+
+Fallback:
+- In-memory CryptoKey
+
+If IndexedDB persistence is unavailable:
+
+- Login succeeds
+- Encryption continues working
+- Decryption continues working
+- Refresh/browser restart requires re-authentication
+- Zero-Knowledge guarantees remain unchanged
+
 ### Automatic Group Key Provisioning Flow (Zero-Knowledge)
 
 To make key distribution seamless without requiring the group owner to be online or manually approve new keys, the system supports automatic provisioning:

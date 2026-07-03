@@ -120,9 +120,7 @@ describe('ZkKeyVaultService', () => {
         .spyOn(service as any, 'openVault')
         .mockRejectedValue(new Error('IndexedDB unavailable'));
 
-      await expect(service.storeKey('clear-fallback@example.com', mockKey)).rejects.toThrow(
-        'IndexedDB unavailable',
-      );
+      await expect(service.storeKey('clear-fallback@example.com', mockKey)).resolves.toBe(false);
       await expect(service.clearAll()).rejects.toThrow('IndexedDB unavailable');
       const loaded = await service.loadKey('clear-fallback@example.com');
 

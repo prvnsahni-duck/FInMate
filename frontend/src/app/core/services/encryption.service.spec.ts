@@ -204,9 +204,10 @@ describe('ClientEncryptionService', () => {
     const email = 'user-spec@example.com';
 
     // 1. Derive and store key (persists to vault)
-    const key = await service.deriveAndStoreKey(password, email);
-    expect(key).toBeDefined();
-    expect(service.getKey()).toBe(key);
+    const result = await service.deriveAndStoreKey(password, email);
+    expect(result.key).toBeDefined();
+    expect(result.persisted).toBe(true);
+    expect(service.getKey()).toBe(result.key);
 
     // Verify it is NOT in sessionStorage
     const stored = sessionStorage.getItem('finmate_zk_key');
@@ -221,7 +222,8 @@ describe('ClientEncryptionService', () => {
     expect(loadedNull).toBeNull();
 
     // 4. Re-derive, clear only memory cache (by setting service['key'] to null or similar)
-    await service.deriveAndStoreKey(password, email);
+    const rederiveResult = await service.deriveAndStoreKey(password, email);
+    expect(rederiveResult.persisted).toBe(true);
     // Artificially clear in-memory reference to force loading from vault
     (service as any).key = null;
 
@@ -230,6 +232,30 @@ describe('ClientEncryptionService', () => {
     expect(loadedKey).not.toBeNull();
 
     // Cleanup
+    await service.clearKey(email);
+  });
+
+  it('should fall back to memory-only cache and succeed login if IndexedDB persistence fails', async () => {
+    const password = 'fallbackPassword!';
+    const email = 'fallback-spec@example.com';
+    const zkVault = TestBed.inject(ZkKeyVaultService);
+
+    // Mock storeKey to fail (return false)
+    const storeSpy = jest.spyOn(zkVault, 'storeKey').mockResolvedValue(false);
+
+    const result = await service.deriveAndStoreKey(password, email);
+    expect(result.key).toBeDefined();
+    expect(result.persisted).toBe(false);
+    expect(service.getKey()).toBe(result.key); // remains in memory
+
+    // Verify encryption works
+    const plaintext = 'Secret message';
+    const encrypted = await service.encrypt(plaintext, result.key);
+    expect(encrypted).toContain(':');
+    const decrypted = await service.decrypt(encrypted, result.key);
+    expect(decrypted).toBe(plaintext);
+
+    storeSpy.mockRestore();
     await service.clearKey(email);
   });
 

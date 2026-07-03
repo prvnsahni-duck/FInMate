@@ -99,11 +99,14 @@ export class ClientEncryptionService {
    * The key is non-extractable — the browser allows encrypt/decrypt
    * operations but prevents JavaScript from reading the raw key bytes.
    */
-  async deriveAndStoreKey(password: string, email: string): Promise<CryptoKey> {
+  async deriveAndStoreKey(
+    password: string,
+    email: string,
+  ): Promise<{ key: CryptoKey; persisted: boolean }> {
     const derivedKey = await this.deriveMasterKey(password, email);
-    await this.zkVault.storeKey(email, derivedKey);
     this.key = derivedKey;
-    return derivedKey;
+    const persisted = await this.zkVault.storeKey(email, derivedKey);
+    return { key: derivedKey, persisted };
   }
 
   /**

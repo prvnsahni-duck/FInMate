@@ -68,7 +68,13 @@ export class ZkKeyVaultService {
   /**
    * Stores a CryptoKey in the vault, keyed by the user's email (lowercased).
    */
-  async storeKey(email: string, key: CryptoKey): Promise<void> {
+  async storeKey(email: string, key: CryptoKey): Promise<boolean> {
+    if (!email) {
+      throw new Error('Email is required to store key');
+    }
+    if (!key) {
+      throw new Error('CryptoKey is required to store key');
+    }
     const normalizedEmail = email.toLowerCase();
     let db: IDBDatabase;
 
@@ -76,24 +82,29 @@ export class ZkKeyVaultService {
       db = await this.openVault();
     } catch (error) {
       ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
-      throw error;
+      return false;
     }
 
-    return new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
-      const request = store.put(key, normalizedEmail);
+    return new Promise<boolean>((resolve, reject) => {
+      try {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        const request = store.put(key, normalizedEmail);
 
-      request.onsuccess = () => {
-        // Also store in fallback map for environments where IndexedDB cannot persist CryptoKey
+        request.onsuccess = () => {
+          ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
+          resolve(true);
+        };
+        request.onerror = () => {
+          logError('Failed to store key in ZK vault', request.error);
+          ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
+          resolve(false);
+        };
+      } catch (error) {
+        logError('Synchronous error putting key in ZK vault', error);
         ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
-        resolve();
-      };
-      request.onerror = () => {
-        logError('Failed to store key in ZK vault', request.error);
-        ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
-        reject(request.error);
-      };
+        resolve(false);
+      }
     });
   }
 
@@ -210,7 +221,7 @@ export class ZkKeyVaultService {
   }
 
   /** Stores a group's data key in the vault under group:${groupId} */
-  async storeGroupKey(groupId: string, key: CryptoKey): Promise<void> {
+  async storeGroupKey(groupId: string, key: CryptoKey): Promise<boolean> {
     return this.storeKey(`group:${groupId}`, key);
   }
 
@@ -225,7 +236,7 @@ export class ZkKeyVaultService {
   }
 
   /** Stores a user's private wrapping key in the vault under private_wrapping_key:${email} */
-  async storePrivateWrappingKey(email: string, key: CryptoKey): Promise<void> {
+  async storePrivateWrappingKey(email: string, key: CryptoKey): Promise<boolean> {
     return this.storeKey(`private_wrapping_key:${email}`, key);
   }
 

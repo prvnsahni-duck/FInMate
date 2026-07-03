@@ -35,10 +35,16 @@ export class RefreshTokenSuccess {
   ) {}
 }
 
+export class SetPersistenceWarning {
+  static readonly type = '[Auth] Set Persistence Warning';
+  constructor(public payload: string | null) {}
+}
+
 export interface AuthStateModel {
   token: string | null;
   refreshToken: string | null;
   user: JwtPayload | null;
+  persistenceWarning: string | null;
 }
 
 @State<AuthStateModel>({
@@ -49,6 +55,7 @@ export interface AuthStateModel {
     user: localStorage.getItem('finmate_token')
       ? jwtDecode<JwtPayload>(localStorage.getItem('finmate_token') as string)
       : null,
+    persistenceWarning: null,
   },
 })
 @Injectable()
@@ -68,6 +75,11 @@ export class AuthState {
     return state.user;
   }
 
+  @Selector()
+  static getPersistenceWarning(state: AuthStateModel): string | null {
+    return state.persistenceWarning;
+  }
+
   @Action(Login)
   login(ctx: StateContext<AuthStateModel>, action: Login) {
     return this.authService.login(action.payload).pipe(
@@ -85,7 +97,14 @@ export class AuthState {
         // Derive and store key client-side asynchronously
         this.encryptionService
           .deriveAndStoreKey(action.payload.password, action.payload.email)
-          .then(async () => {
+          .then(async (res) => {
+            if (!res.persisted) {
+              ctx.dispatch(
+                new SetPersistenceWarning(
+                  "Secure key persistence is unavailable in your browser. Your encrypted data will remain accessible during this session, but you'll need to sign in again after refreshing or reopening the app."
+                )
+              );
+            }
             try {
               await this.groupKeyService.getMyAsymmetricKeys();
             } catch (err) {
@@ -97,6 +116,13 @@ export class AuthState {
           });
       }),
     );
+  }
+
+  @Action(SetPersistenceWarning)
+  setPersistenceWarning(ctx: StateContext<AuthStateModel>, action: SetPersistenceWarning) {
+    ctx.patchState({
+      persistenceWarning: action.payload,
+    });
   }
 
   @Action(Register)
@@ -124,6 +150,7 @@ export class AuthState {
       token: null,
       refreshToken: null,
       user: null,
+      persistenceWarning: null,
     });
 
     return logout$;

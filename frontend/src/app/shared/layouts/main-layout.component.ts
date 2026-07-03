@@ -5,12 +5,14 @@ import {
   Router,
   NavigationEnd,
 } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs/operators';
 import { APP_NAME } from '../../core/constants/app.constants';
 import { ExpensesUiStore } from '../../features/groups/services/expenses-ui.store';
 import { IconComponent } from '../components/icon/icon.component';
 import { NgClass } from '@angular/common';
+import { Store } from '@ngxs/store';
+import { AuthState, SetPersistenceWarning } from '../../core/auth/auth.state';
 
 const THEME_STORAGE_KEY = 'finmate_theme';
 
@@ -74,6 +76,15 @@ export class MainLayoutComponent {
   private expensesUiStore = inject(ExpensesUiStore);
   private router = inject(Router);
   private destroyRef = inject(DestroyRef);
+  private store = inject(Store);
+
+  persistenceWarning = toSignal(
+    this.store.select(AuthState.getPersistenceWarning)
+  );
+
+  dismissWarning() {
+    this.store.dispatch(new SetPersistenceWarning(null));
+  }
 
   sunIconPath =
     'M12 12m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0 M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M6.34 17.66l-1.41 1.41 M19.07 4.93l-1.41 1.41';
