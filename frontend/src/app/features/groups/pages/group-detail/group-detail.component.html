@@ -140,7 +140,7 @@
     <!-- Household timeline selector -->
     @if (group()!.groupType === 'household') {
       <div
-        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/8 rounded-3xl p-4 mb-8 shadow-xl shadow-black/5 flex items-center justify-between"
+        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-4 mb-8 shadow-xl shadow-black/5 flex items-center justify-between"
       >
         <button
           (click)="changeMonth(-1)"
@@ -197,7 +197,7 @@
       group()!.groupType === 'household' && carryForwardBalances().length > 0
     ) {
       <div
-        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/8 rounded-3xl p-6 mb-8 shadow-xl shadow-black/5"
+        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 mb-8 shadow-xl shadow-black/5"
       >
         <h3
           class="text-sm font-extrabold text-secondary uppercase tracking-wider mb-6 flex items-center gap-2"
@@ -416,7 +416,7 @@
           }
 
           <div
-            class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/8 rounded-3xl p-6 shadow-xl shadow-black/5"
+            class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 shadow-xl shadow-black/5"
           >
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-xl font-bold">Expenses Ledger</h2>
@@ -442,12 +442,7 @@
                 class="sticky top-0 z-30 bg-surface/95 backdrop-blur-md p-4 mb-6 rounded-2xl border border-border/10 grid grid-cols-1 sm:grid-cols-4 gap-4"
               >
                 <div>
-                  <label
-                    class="text-label"
-                    >Category</label
-                  >
-                    Category
-                  </div>
+                  <label class="text-label">Category</label>
                   <app-dropdown
                     [ngModel]="filterCategory()"
                     (ngModelChange)="filterCategory.set($event); applyFilters()"
@@ -881,7 +876,7 @@
         <!-- TAB: Settings -->
         @if (activeTab() === 'settings') {
           <div
-            class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/8 rounded-3xl p-6 shadow-xl shadow-black/5 space-y-8 animate-fadeIn"
+            class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 shadow-xl shadow-black/5 space-y-8 animate-fadeIn"
           >
             <!-- Group Settings Form -->
             <div>
@@ -1341,7 +1336,7 @@
                 </p>
 
                 <div
-                  class="bg-surface border border-border/8 rounded-2xl p-6"
+                  class="bg-surface border border-border/10 rounded-2xl p-6"
                 >
                   <div
                     class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -1425,7 +1420,7 @@
               </p>
 
               <div
-                  class="space-y-4 bg-surface border border-border/8 rounded-2xl p-4"
+                  class="space-y-4 bg-surface border border-border/10 rounded-2xl p-4"
               >
                 @for (member of members(); track member.id) {
                   <div
@@ -1515,7 +1510,7 @@
         <!-- TAB: Recurring -->
         @if (activeTab() === 'recurring') {
           <div
-            class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/8 rounded-3xl p-6 shadow-xl shadow-black/5 animate-fade-in"
+            class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 shadow-xl shadow-black/5 animate-fade-in"
           >
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-xl font-bold">Recurring Expenses</h2>
@@ -1551,7 +1546,7 @@
                 @for (template of recurringExpenses(); track template.id) {
                   <div
                     data-testid="recurring-expense-card"
-                    class="p-5 bg-surface border border-border/8 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4"
+                    class="p-5 bg-surface border border-border/10 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4"
                   >
                     <div>
                       <div class="flex items-center gap-3">

@@ -12,6 +12,9 @@
    ============================================ */
 
 :root {
+  /* Hint to the UA about which color scheme the page supports.
+     This helps prevent browsers (like DuckDuckGo) from forcibly inverting colors. */
+  color-scheme: light;
   /* Brand */
   --color-primary: 0 98 65;       /* #006241 - Deep Green */
   --color-secondary: 30 30 30;    /* #1E1E1E - Dark text/foreground */
@@ -38,6 +41,8 @@
 }
 
 .dark {
+  /* Ensure the browser knows the page supports dark colors when `.dark` is present */
+  color-scheme: dark;
   /* Brand */
   --color-primary: 0 179 122;     /* #00B37A - Vibrant Green */
   --color-secondary: 242 237 230; /* #F2EDE6 - Light text/foreground */
@@ -107,7 +112,7 @@ body {
 
   /* Inner section panel (e.g., form groups inside a card) */
   .section-panel {
-    @apply bg-surface p-6 rounded-2xl border border-border/8;
+    @apply bg-surface p-6 rounded-2xl border border-border/10;
   }
 
   /* Small uppercase label */
@@ -117,7 +122,7 @@ body {
 
   /* Tab bar container */
   .tab-bar {
-    @apply flex space-x-1 bg-surface p-1.5 rounded-2xl border border-border/8;
+    @apply flex space-x-1 bg-surface p-1.5 rounded-2xl border border-border/10;
   }
 
   /* Active tab pill */
