@@ -19,6 +19,7 @@ module.exports = {
         '2xl': '1536px',
       },
       colors: {
+        // Core semantic tokens — all mapped to CSS vars in styles.scss
         primary: 'rgb(var(--color-primary) / <alpha-value>)',
         secondary: 'rgb(var(--color-secondary) / <alpha-value>)',
         accent: 'rgb(var(--color-accent) / <alpha-value>)',
@@ -28,14 +29,22 @@ module.exports = {
         'finmate-bg': 'rgb(var(--color-bg) / <alpha-value>)',
         'finmate-card': 'rgb(var(--color-card) / <alpha-value>)',
 
-        // Backward compatibility fallbacks
+        // Surface tokens — for inputs, panels, inner cards
+        surface: 'rgb(var(--color-surface) / <alpha-value>)',
+        'surface-alt': 'rgb(var(--color-surface-alt) / <alpha-value>)',
+
+        // Text token — warm muted gray
+        muted: 'rgb(var(--color-muted) / <alpha-value>)',
+
+        // Border token — used at low opacity
+        border: 'rgb(var(--color-border) / <alpha-value>)',
+
+        // Legacy aliases (for gradients and backward compat)
         finmate: {
           dark: '#121212',
-          card: '#1e1e1e',
+          card: 'rgb(var(--color-card))',
           neon: 'rgb(var(--color-primary))',
           neon2: 'rgb(var(--color-accent))',
-          light: '#f8fafc',
-          lightCard: '#ffffff',
         },
       },
       backgroundImage: {

@@ -5,23 +5,21 @@
     >
       Personal Finance Settings
     </h1>
-    <p class="text-secondary/60 mt-1 font-medium">
+    <p class="text-muted mt-1 font-medium">
       Configure monthly limit alarms, salary inputs, and AI integrations.
     </p>
   </div>
 
   <div class="card-glass p-6 space-y-6">
     <!-- Budget & Currency thresholds config -->
-    <div
-      class="space-y-6 bg-secondary/5 p-6 rounded-2xl border border-secondary/10"
-    >
+    <div class="section-panel space-y-6">
       <h4 class="font-bold text-sm text-secondary">
         Income, Budgeting & Currency
       </h4>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
           <label
-            class="block text-xs font-bold uppercase text-secondary/60 mb-2"
+            class="text-label"
             htmlFor="new-currency-dropdown"
             >Default Currency</label
           >
@@ -34,7 +32,7 @@
         </div>
         <div>
           <label
-            class="block text-xs font-bold uppercase text-secondary/60 mb-2"
+            class="text-label"
             htmlFor="new-income-input"
             >Monthly Salary / Income</label
           >
@@ -42,13 +40,13 @@
             type="number"
             [ngModel]="newIncome"
             (ngModelChange)="newIncomeChange.emit($event)"
-            class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary"
+            class="input-base"
             placeholder="e.g. 5000"
           />
         </div>
         <div>
           <label
-            class="block text-xs font-bold uppercase text-secondary/60 mb-2"
+            class="text-label"
             htmlFor="new-budget-input"
             >Monthly Budget Limit</label
           >
@@ -56,7 +54,7 @@
             type="number"
             [ngModel]="newBudget"
             (ngModelChange)="newBudgetChange.emit($event)"
-            class="w-full bg-finmate-card border border-secondary/15 rounded-xl px-4 py-3 text-sm outline-none focus:ring-1 focus:ring-primary/50 text-secondary"
+            class="input-base"
             placeholder="e.g. 1500"
           />
         </div>
@@ -72,9 +70,7 @@
     </div>
 
     <!-- AI privacy configs -->
-    <div
-      class="space-y-6 bg-secondary/5 p-6 rounded-2xl border border-secondary/10"
-    >
+    <div class="section-panel space-y-6">
       <h4 class="font-bold text-sm text-secondary">
         ZK Security & Privacy Preferences
       </h4>
@@ -83,7 +79,7 @@
           <span class="text-secondary font-semibold"
             >Enable Zero-Knowledge AI Forecasting</span
           >
-          <p class="text-xs text-secondary/55 mt-0.5">
+          <p class="text-xs text-muted mt-0.5">
             Encrypt descriptions locally and only evaluate transaction amounts
             securely.
           </p>
@@ -96,7 +92,7 @@
             class="sr-only peer"
           />
           <div
-            class="w-11 h-6 bg-secondary/20 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"
+            class="w-11 h-6 bg-surface-alt peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"
           ></div>
         </label>
       </div>

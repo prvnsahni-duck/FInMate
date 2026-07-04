@@ -4,27 +4,63 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Theme Color System Variables */
+/* ============================================
+   FINMATE THEME COLOR SYSTEM
+   All colors are defined here as CSS variables.
+   Tailwind tokens map to these in tailwind.config.js.
+   Components should ONLY use token names, never raw colors.
+   ============================================ */
+
 :root {
-  --color-primary: 0 98 65; /* #006241 - Deep Green */
-  --color-secondary: 30 30 30; /* #1E1E1E - Dark text/foreground */
-  --color-accent: 212 160 23; /* #D4A017 - Gold */
-  --color-success: 16 185 129; /* #10B981 */
-  --color-warning: 245 158 11; /* #F59E0B */
-  --color-error: 239 68 68; /* #EF4444 */
-  --color-bg: 242 237 230; /* #F2EDE6 - Cream Background */
-  --color-card: 255 255 255; /* #FFFFFF - White Card */
+  /* Brand */
+  --color-primary: 0 98 65;       /* #006241 - Deep Green */
+  --color-secondary: 30 30 30;    /* #1E1E1E - Dark text/foreground */
+  --color-accent: 212 160 23;     /* #D4A017 - Gold */
+
+  /* Status */
+  --color-success: 16 185 129;    /* #10B981 */
+  --color-warning: 245 158 11;    /* #F59E0B */
+  --color-error: 239 68 68;       /* #EF4444 */
+
+  /* Layout */
+  --color-bg: 242 237 230;        /* #F2EDE6 - Cream Background */
+  --color-card: 255 255 255;      /* #FFFFFF - White Card */
+
+  /* Surfaces & Inputs (warm-toned for light) */
+  --color-surface: 247 244 240;       /* #F7F4F0 - input bg, inner panels */
+  --color-surface-alt: 237 233 227;   /* #EDE9E3 - hover on surface, deeper accent */
+
+  /* Text */
+  --color-muted: 120 113 108;     /* #78716C - warm gray muted text */
+
+  /* Borders */
+  --color-border: 30 30 30;       /* same as secondary, used at low opacity */
 }
 
 .dark {
-  --color-primary: 0 179 122; /* #00B37A - Vibrant Green */
+  /* Brand */
+  --color-primary: 0 179 122;     /* #00B37A - Vibrant Green */
   --color-secondary: 242 237 230; /* #F2EDE6 - Light text/foreground */
-  --color-accent: 255 204 77; /* #FFCC4D - Bright Gold */
-  --color-success: 52 211 153; /* #34D399 */
-  --color-warning: 251 191 36; /* #FBBF24 */
-  --color-error: 251 113 133; /* #FB7185 */
-  --color-bg: 18 18 18; /* #121212 - Dark Background */
-  --color-card: 30 30 30; /* #1E1E1E - Dark Card */
+  --color-accent: 255 204 77;     /* #FFCC4D - Bright Gold */
+
+  /* Status */
+  --color-success: 52 211 153;    /* #34D399 */
+  --color-warning: 251 191 36;    /* #FBBF24 */
+  --color-error: 251 113 133;     /* #FB7185 */
+
+  /* Layout */
+  --color-bg: 18 18 18;           /* #121212 - Dark Background */
+  --color-card: 30 30 30;         /* #1E1E1E - Dark Card */
+
+  /* Surfaces & Inputs */
+  --color-surface: 38 38 38;          /* #262626 - input bg, inner panels */
+  --color-surface-alt: 51 51 51;      /* #333333 - hover on surface */
+
+  /* Text */
+  --color-muted: 163 163 163;     /* #A3A3A3 - muted text */
+
+  /* Borders */
+  --color-border: 255 255 255;    /* white, used at low opacity */
 }
 
 /* Global base overrides */
@@ -47,23 +83,59 @@ body {
   padding-bottom: var(--safe-area-inset-bottom);
 }
 
-/* Premium utility classes */
+/* ============================================
+   REUSABLE UTILITY CLASSES
+   Use these in templates for consistent styling.
+   ============================================ */
 @layer utilities {
   .btn-premium-primary {
     @apply bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20;
   }
   .btn-premium-secondary {
-    @apply border border-secondary/30 text-secondary font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:bg-secondary/5 active:scale-95;
+    @apply border border-border/15 text-secondary font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:bg-surface active:scale-95;
   }
+
+  /* Card with glass effect — works in both light & dark */
   .card-glass {
-    @apply bg-white dark:bg-finmate-card/75 dark:backdrop-blur-md border border-secondary/15 rounded-3xl shadow-xl shadow-black/5 dark:shadow-black/20;
+    @apply bg-finmate-card dark:bg-finmate-card/75 dark:backdrop-blur-md border border-border/10 rounded-3xl shadow-lg shadow-secondary/5 dark:shadow-black/20;
   }
+
+  /* Standard input styling */
+  .input-base {
+    @apply w-full bg-surface border border-border/10 rounded-xl px-4 py-3 text-sm text-secondary outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all placeholder:text-muted/60;
+  }
+
+  /* Inner section panel (e.g., form groups inside a card) */
+  .section-panel {
+    @apply bg-surface p-6 rounded-2xl border border-border/8;
+  }
+
+  /* Small uppercase label */
+  .text-label {
+    @apply text-xs font-bold uppercase text-muted mb-2 block tracking-wider;
+  }
+
+  /* Tab bar container */
+  .tab-bar {
+    @apply flex space-x-1 bg-surface p-1.5 rounded-2xl border border-border/8;
+  }
+
+  /* Active tab pill */
+  .tab-active {
+    @apply bg-finmate-card shadow text-secondary font-bold;
+  }
+
+  /* Inactive tab pill */
+  .tab-inactive {
+    @apply text-muted hover:text-secondary;
+  }
+
   .skeleton-shimmer {
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.03) 25%,
-      rgba(255, 255, 255, 0.08) 50%,
-      rgba(255, 255, 255, 0.03) 75%
+      rgba(var(--color-surface), 0.5) 25%,
+      rgba(var(--color-surface-alt), 0.8) 50%,
+      rgba(var(--color-surface), 0.5) 75%
     );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;

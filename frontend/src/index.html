@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <title>FinMate</title>
@@ -29,6 +29,13 @@
       content="FinMate — Smart expense tracking and group finance management"
     />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!-- Inline theme init: prevents flash of wrong theme before Angular boots -->
+    <script>
+      (function() {
+        var t = localStorage.getItem('finmate_theme') || 'light';
+        if (t === 'dark') document.documentElement.classList.add('dark');
+      })();
+    </script>
   </head>
   <body class="bg-finmate-bg text-secondary antialiased">
     <app-root></app-root>
