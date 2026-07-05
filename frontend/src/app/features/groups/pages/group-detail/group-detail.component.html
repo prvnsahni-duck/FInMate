@@ -442,7 +442,7 @@
                 class="sticky top-0 z-30 bg-surface/95 backdrop-blur-md p-4 mb-6 rounded-2xl border border-border/10 grid grid-cols-1 sm:grid-cols-4 gap-4"
               >
                 <div>
-                  <label class="text-label">Category</label>
+                  <label class="text-label" for="filterCategory">Category</label>
                   <app-dropdown
                     [ngModel]="filterCategory()"
                     (ngModelChange)="filterCategory.set($event); applyFilters()"

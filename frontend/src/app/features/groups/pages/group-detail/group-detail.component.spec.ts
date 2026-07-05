@@ -14,6 +14,7 @@ import { ClientEncryptionService } from '../../../../core/services/encryption.se
 
 import { RecurringExpensesService } from '../../services/recurring-expenses.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { signal } from '@angular/core';
 
 describe('GroupDetailComponent', () => {
   let component: GroupDetailComponent;
@@ -133,7 +134,8 @@ describe('GroupDetailComponent', () => {
       getMyAsymmetricKeys: jest.fn().mockResolvedValue({}),
       getGroupDataKey: jest.fn().mockResolvedValue({}),
       checkAndProvisionMissingKeys: jest.fn().mockResolvedValue({}),
-      rateLimitError: jest.fn().mockReturnValue(null),
+      // Provide a Signal compatible object used by the component/template
+      rateLimitError: signal<string | null>(null),
     };
 
     mockEncryptionService = {
@@ -250,9 +252,9 @@ describe('GroupDetailComponent', () => {
   it('should call updateMember when updateMemberRole is called', () => {
     fixture.detectChanges();
     const contributor = mockMembers.find((m) => m.role === 'member')!;
-    const mockEvent = { target: { value: 'admin' } };
 
-    component.updateMemberRole(contributor, mockEvent);
+    // `updateMemberRole` accepts `Event | string`; pass a string to avoid Event typing issues in unit tests
+    component.updateMemberRole(contributor, 'admin');
 
     expect(mockGroupsService.updateMember).toHaveBeenCalledWith(
       'group-1',
