@@ -33,6 +33,15 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // When deployed behind a reverse proxy (nginx, ALB, Cloudflare), enable trust proxy
+  // so `req.ip` and `req.headers['x-forwarded-for']` are populated correctly.
+  // Only enable when running behind a trusted proxy.
+  try {
+    app.set('trust proxy', true);
+  } catch (err) {
+    // older Nest/Express versions may not expose set; ignore if unavailable
+  }
+
   // Register global filter and validation pipes
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalPipes(

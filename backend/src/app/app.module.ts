@@ -5,6 +5,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { ConditionalThrottleGuard } from './guards/conditional-throttle.guard';
+import { UserThrottlerGuard } from './guards/user-throttler.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import * as Migrations from '../migrations';
@@ -133,6 +134,6 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
     EmailModule,
   ],
   controllers: [AppController],
-  providers: [AppService, ThrottlerGuard, { provide: APP_GUARD, useClass: ConditionalThrottleGuard }],
+  providers: [AppService, { provide: ThrottlerGuard, useClass: UserThrottlerGuard }, { provide: APP_GUARD, useClass: ConditionalThrottleGuard }],
 })
 export class AppModule {}

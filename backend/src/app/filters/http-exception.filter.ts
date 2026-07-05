@@ -245,3 +245,4 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(statusCode).send(errorPayload);
   }
 }
+
