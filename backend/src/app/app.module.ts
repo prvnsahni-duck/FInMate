@@ -6,9 +6,10 @@ import { RedisService } from './redis/redis.service';
 import { ThrottlerRedisStorage } from './throttler/throttler-redis.storage';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConditionalThrottleGuard } from './guards/conditional-throttle.guard';
 import { UserThrottlerGuard } from './guards/user-throttler.guard';
+import { LoggingInterceptor } from './interceptors/logging.interceptor';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import * as Migrations from '../migrations';
@@ -22,13 +23,20 @@ import { ImportModule } from './import/import.module';
 import { AiModule } from './ai/ai.module';
 import { EmailModule } from './email/email.module';
 import { Note, Goal, AuditLog } from '@finmate/data-models';
+import { ThrottlerConfigModule } from './throttler/throttler-config.module';
+import { ThrottlePolicyResolver } from './throttler/throttle-policy.resolver';
+import { THROTTLE_PROFILES } from './throttler/throttle.constants';
 
 @Module({
   imports: [
     ThrottlerModule.forRootAsync({
-      imports: [ConfigModule, RedisModule],
-      inject: [ConfigService, RedisService],
-      useFactory: (config: ConfigService, redisService: RedisService) => {
+      imports: [ConfigModule, RedisModule, ThrottlerConfigModule],
+      inject: [ConfigService, RedisService, ThrottlePolicyResolver],
+      useFactory: (
+        config: ConfigService,
+        redisService: RedisService,
+        resolver: ThrottlePolicyResolver,
+      ) => {
         const envNode = config.get('NODE_ENV') || process.env.NODE_ENV;
         // Detect automated E2E/test contexts and disable throttling there.
         // Conditions covered:
@@ -50,51 +58,66 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
           return Number(config.get(key)) || defaultValue;
         };
 
+        // Helper: creates a skipIf callback that skips a named throttler
+        // unless the route's resolved policy matches it.
+        const skipUnlessPolicy = (profileName: string) => {
+          return (ctx: any) => resolver.resolvePolicy(ctx) !== profileName;
+        };
+
         const throttlers = [
           {
-            name: 'default',
+            name: THROTTLE_PROFILES.DEFAULT,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_DEFAULT', 100),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.DEFAULT),
           },
           {
-            name: 'login',
+            name: THROTTLE_PROFILES.LOGIN,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_LOGIN', 5),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.LOGIN),
           },
           {
-            name: 'register',
+            name: THROTTLE_PROFILES.REGISTER,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_REGISTER', 5),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.REGISTER),
           },
           {
-            name: 'forgotPassword',
+            name: THROTTLE_PROFILES.FORGOT_PASSWORD,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_FORGOT', 3),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.FORGOT_PASSWORD),
           },
           {
-            name: 'resetPassword',
+            name: THROTTLE_PROFILES.RESET_PASSWORD,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_RESET', 3),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.RESET_PASSWORD),
           },
           {
-            name: 'otp',
+            name: THROTTLE_PROFILES.OTP,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_OTP', 5),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.OTP),
           },
           {
-            name: 'refresh',
+            name: THROTTLE_PROFILES.REFRESH,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_REFRESH', 15),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.REFRESH),
           },
           {
-            name: 'import',
+            name: THROTTLE_PROFILES.IMPORT,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_IMPORT', 10),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.IMPORT),
           },
           {
-            name: 'export',
+            name: THROTTLE_PROFILES.EXPORT,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_EXPORT', 20),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.EXPORT),
           },
         ];
 
@@ -143,6 +166,11 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
     EmailModule,
   ],
   controllers: [AppController],
-  providers: [AppService, { provide: ThrottlerGuard, useClass: UserThrottlerGuard }, { provide: APP_GUARD, useClass: ConditionalThrottleGuard }],
+  providers: [
+    AppService,
+    { provide: ThrottlerGuard, useClass: UserThrottlerGuard },
+    { provide: APP_GUARD, useClass: ConditionalThrottleGuard },
+    { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
+  ],
 })
 export class AppModule {}

@@ -242,51 +242,58 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errorPayload.retryable = retryable;
     }
 
-    // If this is a rate-limit response, attach standard headers and structured logs
+    // If this is a rate-limit response, provide user-friendly message and headers
     if (statusCode === HttpStatus.TOO_MANY_REQUESTS) {
-      // Try to extract TTL/seconds from exception response when available
-      let retryAfterSec: number | undefined = undefined;
-      try {
-        const ex = exception as any;
-        const resp = ex.getResponse ? ex.getResponse() : ex;
-        // common field names that might be present: ttl, seconds, retryAfter
-        retryAfterSec = Number(resp?.ttl ?? resp?.seconds ?? resp?.retryAfter ?? undefined) || undefined;
-      } catch {}
+      // Override the framework exception message — never expose "ThrottlerException: Too Many Requests"
+      errorPayload.message = 'Too many requests. Please wait a few seconds and try again.';
 
-      if (!retryAfterSec) retryAfterSec = 60; // fallback
+      const throttleCtx = request.throttleContext || {};
+      const retryAfterSec = throttleCtx.retryAfter || 60;
 
       // Set informative headers for clients
       try {
         response.setHeader('Retry-After', String(retryAfterSec));
-        // These values are best-effort; try to include if available
-        const limit = (exception as any)?.limit ?? undefined;
-        const remaining = (exception as any)?.remaining ?? undefined;
-        if (limit) response.setHeader('X-RateLimit-Limit', String(limit));
-        if (typeof remaining !== 'undefined') response.setHeader('X-RateLimit-Remaining', String(remaining));
+        if (throttleCtx.limit) {
+          response.setHeader('X-RateLimit-Limit', String(throttleCtx.limit));
+        }
+        if (typeof throttleCtx.remaining !== 'undefined') {
+          response.setHeader('X-RateLimit-Remaining', String(throttleCtx.remaining));
+        }
       } catch (e) {
         // ignore header set errors
       }
 
-      // Structured logging for monitoring
+      errorPayload.retryAfter = retryAfterSec;
+
+      // Structured logging for rate limit exceeded
       try {
-        const userId = request.user?.id || null;
-        const clientIp = request.ip || request.headers['x-forwarded-for'] || request.socket?.remoteAddress || null;
+        const timestamp = new Date().toISOString();
+        const method = request.method;
+        const url = request.url;
+        const userId = request.user?.id || request.user?.userId || throttleCtx.userId || 'anonymous';
+        const ip = request.ip || request.headers['x-forwarded-for'] || request.socket?.remoteAddress || null;
+        const responseTime = request.startTime ? `${Date.now() - request.startTime}ms` : 'N/A';
+
         this.logger.warn(
           JSON.stringify({
-            event: 'rate_limit_exceeded',
-            path: request.url,
-            method: request.method,
+            timestamp,
+            method,
+            url,
             userId,
-            clientIp,
-            statusCode,
-            retryAfterSec,
-            timestamp: new Date().toISOString(),
+            ip,
+            status: statusCode,
+            responseTime,
+            throttleKey: throttleCtx.throttleKey || ip,
+            profile: throttleCtx.profile || 'unknown',
+            limit: throttleCtx.limit ?? 'N/A',
+            remaining: throttleCtx.remaining ?? 'N/A',
           }),
         );
       } catch {}
     }
 
     response.status(statusCode).send(errorPayload);
+
   }
 }
 

@@ -10,7 +10,8 @@ import {
 import { Response, Request } from 'express';
 import { ImportService } from './import.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Throttle } from '@nestjs/throttler';
+import { ThrottleAs } from '../throttler/throttle-policy.decorator';
+import { THROTTLE_PROFILES } from '../throttler/throttle.constants';
 
 interface RequestWithUser extends Request {
   user: {
@@ -24,7 +25,7 @@ export class ExportController {
   constructor(private readonly importService: ImportService) {}
 
   @Get('expenses')
-  @Throttle({ export: {} })
+  @ThrottleAs(THROTTLE_PROFILES.EXPORT)
   async exportExpenses(
     @Query('format') format: 'csv' | 'xlsx' = 'csv',
     @Query('groupId') groupId?: string,

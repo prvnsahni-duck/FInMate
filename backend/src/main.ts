@@ -42,6 +42,12 @@ async function bootstrap() {
     // older Nest/Express versions may not expose set; ignore if unavailable
   }
 
+  // Global middleware to record request start time for response-time logging
+  app.use((req: any, res: any, next: () => void) => {
+    req.startTime = Date.now();
+    next();
+  });
+
   // Register global filter and validation pipes
   app.useGlobalFilters(new HttpExceptionFilter());
   app.useGlobalPipes(
