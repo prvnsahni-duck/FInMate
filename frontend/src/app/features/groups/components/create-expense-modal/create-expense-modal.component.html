@@ -242,6 +242,7 @@
         </div>
 
         <!-- Attachments Section (Zero-Knowledge file uploader simulation) -->
+        <!-- Commented out in v1.0 Release Sprint (Unsafe localStorage mock storage)
         <div>
           <div class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
             Attachments (Optional)
@@ -258,7 +259,6 @@
               <input type="file" (change)="onFileSelected($event)" multiple class="hidden" />
             </label>
           </div>
-          <!-- List attached files -->
           @if (attachedFiles.length > 0) {
           <div class="mt-2 flex flex-wrap gap-2">
             @for (file of attachedFiles; track file.name; let idx = $index) {
@@ -276,6 +276,7 @@
           </div>
           }
         </div>
+        -->
       </div>
 
       <!-- Sticky Footer -->

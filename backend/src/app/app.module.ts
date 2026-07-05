@@ -50,7 +50,7 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
           return Number(config.get(key)) || defaultValue;
         };
 
-        const buckets = [
+        const throttlers = [
           {
             name: 'default',
             ttl: 60000,
@@ -99,13 +99,9 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
         ];
 
         return {
-          storage: new ThrottlerRedisStorage(redisService) as any,
-          // Convert named buckets to the expected format used by the application
-          // The ThrottlerModule accepts either { ttl, limit } or named buckets depending on version.
-          // Provide the array of buckets for compatibility.
-          // @ts-ignore
-          buckets,
-        } as any;
+          storage: new ThrottlerRedisStorage(redisService),
+          throttlers,
+        };
       },
     }),
     RedisModule,

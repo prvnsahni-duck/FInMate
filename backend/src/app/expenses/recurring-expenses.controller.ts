@@ -12,6 +12,8 @@ import {
   Query,
   Req,
   UseGuards,
+  Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
@@ -104,7 +106,16 @@ export class RecurringExpensesController {
 
   @Post('trigger')
   @HttpCode(HttpStatus.OK)
-  async triggerScheduler() {
+  async triggerScheduler(@Headers('x-cron-secret') cronSecret?: string) {
+    const expectedSecret = process.env.CRON_SECRET;
+    if (expectedSecret && cronSecret !== expectedSecret) {
+      throw new UnauthorizedException('Invalid cron secret');
+    }
+    if (!expectedSecret && (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production')) {
+      throw new UnauthorizedException(
+        'Manual triggers are disabled in production without CRON_SECRET configured',
+      );
+    }
     await this.recurringExpensesScheduler.processDueExpenses();
     return new SuccessResponse('Scheduler triggered successfully', {});
   }

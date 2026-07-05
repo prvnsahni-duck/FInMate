@@ -7,6 +7,7 @@ import {
   RecurringExpenseSplit,
   Expense,
   ExpenseSplit,
+  GroupKeyVersion,
 } from '@finmate/data-models';
 import { RedisService } from '../../redis/redis.service';
 
@@ -110,6 +111,29 @@ export class RecurringExpensesScheduler {
       const nextDate = this.advanceDate(occurrenceDateStr, template.frequency);
 
       await this.dataSource.transaction(async (manager) => {
+        let groupKeyVersion: GroupKeyVersion | undefined;
+        let encryptionScope: 'personal' | 'group' | 'direct_shared' = 'personal';
+
+        if (template.group) {
+          encryptionScope = 'group';
+          const activeKeyVersion = await manager.getRepository(GroupKeyVersion).findOne({
+            where: { group: { id: template.group.id }, status: 'ACTIVE' },
+            order: { version: 'DESC' },
+          });
+          if (activeKeyVersion) {
+            groupKeyVersion = activeKeyVersion;
+          } else {
+            groupKeyVersion = await manager.getRepository(GroupKeyVersion).save(
+              manager.getRepository(GroupKeyVersion).create({
+                group: template.group,
+                version: 1,
+                algorithm: 'AES-256-GCM',
+                status: 'ACTIVE',
+              }),
+            );
+          }
+        }
+
         // 1. Create standard Expense
         const expense = manager.getRepository(Expense).create({
           title: template.title,
@@ -120,6 +144,8 @@ export class RecurringExpensesScheduler {
           paidByUser: template.paidByUser,
           ownerUser: template.ownerUser,
           group: template.group,
+          encryptionScope,
+          groupKeyVersion,
           expenseDate: occurrenceDateStr,
           status: 'posted',
           ledgerMonth:

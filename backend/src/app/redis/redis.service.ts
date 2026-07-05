@@ -125,6 +125,48 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async incr(key: string): Promise<number> {
+    try {
+      return await this.client.incr(key);
+    } catch (err: any) {
+      this.logger.error(
+        `Redis incr operation failed: ${err.message}`,
+        err.stack,
+      );
+      throw new ServiceUnavailableException(
+        'Cache service is temporarily unavailable',
+      );
+    }
+  }
+
+  async ttl(key: string): Promise<number> {
+    try {
+      return await this.client.ttl(key);
+    } catch (err: any) {
+      this.logger.error(
+        `Redis ttl operation failed: ${err.message}`,
+        err.stack,
+      );
+      throw new ServiceUnavailableException(
+        'Cache service is temporarily unavailable',
+      );
+    }
+  }
+
+  async expire(key: string, ttlSeconds: number): Promise<boolean> {
+    try {
+      return !!(await this.client.expire(key, ttlSeconds));
+    } catch (err: any) {
+      this.logger.error(
+        `Redis expire operation failed: ${err.message}`,
+        err.stack,
+      );
+      throw new ServiceUnavailableException(
+        'Cache service is temporarily unavailable',
+      );
+    }
+  }
+
   async ping(): Promise<boolean> {
     try {
       const result = await this.client.ping();

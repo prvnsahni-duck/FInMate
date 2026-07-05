@@ -1034,6 +1034,191 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
 
+  /groups/{id}/expenses/deleted:
+    get:
+      summary: List soft-deleted expenses for the group
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List of deleted expenses retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PaginatedResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ExpenseResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /groups/{id}/carry-forward:
+    get:
+      summary: Get the carry-forward balance summary for a specific month
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: string
+            example: '2026-06'
+      responses:
+        '200':
+          description: Carry-forward summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CarryForwardBalance'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /groups/{id}/close-month:
+    post:
+      summary: Close the billing month and roll over carry-forward balances
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ledgerMonth
+              properties:
+                ledgerMonth:
+                  type: string
+                  example: '2026-06'
+      responses:
+        '200':
+          description: Billing month closed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - nextLedgerMonth
+                  - carryForwardExpenseCount
+                properties:
+                  nextLedgerMonth:
+                    type: string
+                  carryForwardExpenseCount:
+                    type: integer
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /groups/{id}/contributions:
+    get:
+      summary: Get custom contribution percentages for a ledger month
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: string
+            example: '2026-06'
+      responses:
+        '200':
+          description: Group contribution shares retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupContributionResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+    post:
+      summary: Update custom contribution percentages for a ledger month
+      tags:
+        - Groups
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContributionsPayload'
+      responses:
+        '200':
+          description: Group contribution shares updated successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GroupContributionResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
   /expenses:
     post:
       summary: Create a personal or group expense
@@ -2962,3 +3147,63 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    CarryForwardBalance:
+      type: object
+      required:
+        - userId
+        - displayName
+        - netBalance
+        - currency
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+          nullable: true
+        netBalance:
+          type: number
+        currency:
+          type: string
+
+    GroupContributionResponse:
+      type: object
+      required:
+        - userId
+        - displayName
+        - contributionPercentage
+        - ledgerMonth
+      properties:
+        userId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+          nullable: true
+        contributionPercentage:
+          type: number
+        ledgerMonth:
+          type: string
+
+    UpdateContributionsPayload:
+      type: object
+      required:
+        - ledgerMonth
+        - contributions
+      properties:
+        ledgerMonth:
+          type: string
+        contributions:
+          type: array
+          items:
+            type: object
+            required:
+              - userId
+              - contributionPercentage
+            properties:
+              userId:
+                type: string
+                format: uuid
+              contributionPercentage:
+                type: number

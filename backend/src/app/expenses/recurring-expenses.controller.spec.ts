@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { UnauthorizedException } from '@nestjs/common';
 import { RecurringExpensesController } from './recurring-expenses.controller';
 import { RecurringExpensesService } from './services/recurring-expenses.service';
 import { RecurringExpensesScheduler } from './services/recurring-expenses.scheduler';
@@ -143,12 +144,63 @@ describe('RecurringExpensesController', () => {
     );
   });
 
-  it('should trigger scheduler manually', async () => {
-    const mockScheduler = module.get(RecurringExpensesScheduler);
-    const result = await controller.triggerScheduler();
-    expect(result).toEqual(
-      new SuccessResponse('Scheduler triggered successfully', {}),
-    );
-    expect(mockScheduler.processDueExpenses).toHaveBeenCalled();
+  describe('triggerScheduler', () => {
+    let mockScheduler: any;
+
+    beforeEach(() => {
+      mockScheduler = module.get(RecurringExpensesScheduler);
+      mockScheduler.processDueExpenses.mockReset();
+      delete process.env.CRON_SECRET;
+      delete process.env.NODE_ENV;
+      delete process.env.APP_ENV;
+    });
+
+    afterEach(() => {
+      delete process.env.CRON_SECRET;
+      delete process.env.NODE_ENV;
+      delete process.env.APP_ENV;
+    });
+
+    it('should trigger scheduler manually in development when no secret is set', async () => {
+      process.env.NODE_ENV = 'development';
+      const result = await controller.triggerScheduler();
+      expect(result).toEqual(
+        new SuccessResponse('Scheduler triggered successfully', {}),
+      );
+      expect(mockScheduler.processDueExpenses).toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException in production when no secret is set', async () => {
+      process.env.NODE_ENV = 'production';
+      await expect(controller.triggerScheduler()).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockScheduler.processDueExpenses).not.toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException when secret is configured but not provided', async () => {
+      process.env.CRON_SECRET = 'secret123';
+      await expect(controller.triggerScheduler()).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockScheduler.processDueExpenses).not.toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException when secret is configured but invalid one is provided', async () => {
+      process.env.CRON_SECRET = 'secret123';
+      await expect(controller.triggerScheduler('wrong_secret')).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(mockScheduler.processDueExpenses).not.toHaveBeenCalled();
+    });
+
+    it('should trigger scheduler successfully when valid secret is provided', async () => {
+      process.env.CRON_SECRET = 'secret123';
+      const result = await controller.triggerScheduler('secret123');
+      expect(result).toEqual(
+        new SuccessResponse('Scheduler triggered successfully', {}),
+      );
+      expect(mockScheduler.processDueExpenses).toHaveBeenCalled();
+    });
   });
 });

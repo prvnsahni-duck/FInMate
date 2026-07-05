@@ -13,6 +13,10 @@ import { IconComponent } from '../components/icon/icon.component';
 import { NgClass } from '@angular/common';
 import { Store } from '@ngxs/store';
 import { AuthState, SetPersistenceWarning } from '../../core/auth/auth.state';
+import {
+  APP_HTTP_ERROR_EVENT,
+  AppHttpErrorEventDetail,
+} from '../../core/interceptors/error.interceptor';
 
 const THEME_STORAGE_KEY = 'finmate_theme';
 
@@ -82,6 +86,8 @@ export class MainLayoutComponent {
     this.store.select(AuthState.getPersistenceWarning)
   );
 
+  rateLimitError = signal<string | null>(null);
+
   dismissWarning() {
     this.store.dispatch(new SetPersistenceWarning(null));
   }
@@ -97,6 +103,16 @@ export class MainLayoutComponent {
         'light';
       this.themeState.set(storedTheme);
       this.applyTheme(storedTheme);
+
+      window.addEventListener(APP_HTTP_ERROR_EVENT, (event: any) => {
+        const detail = event.detail as AppHttpErrorEventDetail;
+        if (detail.status === 429) {
+          this.rateLimitError.set(
+            detail.message || 'Too many requests. Please slow down and try again later.',
+          );
+          setTimeout(() => this.rateLimitError.set(null), 7000);
+        }
+      });
     }
 
     // Track active navigation tab based on route changes

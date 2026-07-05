@@ -8,9 +8,9 @@
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
     "target": "es2022",
-    "moduleResolution": "node16",
+    "moduleResolution": "bundler",
     "emitDecoratorMetadata": false,
-    "module": "Node16"
+    "module": "esnext"
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

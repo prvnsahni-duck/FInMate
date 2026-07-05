@@ -1,10 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ThrottlerStorage } from '@nestjs/throttler';
+import { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage-record.interface';
 import { RedisService } from '../redis/redis.service';
 
 /**
- * Minimal Redis-backed Throttler storage adapter that reuses the app's `RedisService`.
- * Implements the small surface required by @nestjs/throttler: `getRecord` and `addRecord`.
+ * Redis-backed Throttler storage adapter that reuses the app's `RedisService`.
+ * Implements the `@nestjs/throttler` v6 interface.
  */
 @Injectable()
 export class ThrottlerRedisStorage implements ThrottlerStorage {
@@ -12,31 +13,70 @@ export class ThrottlerRedisStorage implements ThrottlerStorage {
 
   constructor(private readonly redis: RedisService) {}
 
-  // Expect records to be stored as JSON array of timestamps
-  async getRecord(key: string): Promise<number[]> {
+  async increment(
+    key: string,
+    ttl: number, // TTL in milliseconds
+    limit: number,
+    blockDuration: number, // Block duration in milliseconds
+    throttlerName: string,
+  ): Promise<ThrottlerStorageRecord> {
     try {
-      const val = await this.redis.get(key);
-      if (!val) return [];
-      const parsed = JSON.parse(val) as number[];
-      if (Array.isArray(parsed)) return parsed;
-      return [];
-    } catch (err: any) {
-      this.logger.error(`Failed to get throttle record for ${key}: ${err?.message}`);
-      return [];
-    }
-  }
+      const blockKey = `block:${key}`;
 
-  async addRecord(key: string, ttl: number): Promise<void> {
-    try {
-      const now = Date.now();
-      const records = await this.getRecord(key);
-      records.push(now);
-      // Trim records older than ttl
-      const cutoff = now - ttl;
-      const trimmed = records.filter((ts) => ts >= cutoff);
-      await this.redis.set(key, JSON.stringify(trimmed), Math.ceil(ttl / 1000));
+      // 1. Check if the block key exists
+      const blockTtl = await this.redis.ttl(blockKey);
+      if (blockTtl > 0) {
+        return {
+          totalHits: limit + 1,
+          timeToExpire: 0,
+          isBlocked: true,
+          timeToBlockExpire: blockTtl,
+        };
+      }
+
+      // 2. Increment hits count
+      const totalHits = await this.redis.incr(key);
+
+      // If it is the first hit, set the TTL for the rate limiting window
+      if (totalHits === 1) {
+        await this.redis.expire(key, Math.ceil(ttl / 1000));
+      }
+
+      // Get the remaining TTL of the rate limiting window
+      const timeToExpire = await this.redis.ttl(key);
+
+      // 3. If limit exceeded, block the key
+      if (totalHits > limit) {
+        await this.redis.set(
+          blockKey,
+          'locked',
+          Math.ceil(blockDuration / 1000),
+        );
+        return {
+          totalHits,
+          timeToExpire: timeToExpire > 0 ? timeToExpire : 0,
+          isBlocked: true,
+          timeToBlockExpire: Math.ceil(blockDuration / 1000),
+        };
+      }
+
+      return {
+        totalHits,
+        timeToExpire: timeToExpire > 0 ? timeToExpire : 0,
+        isBlocked: false,
+        timeToBlockExpire: 0,
+      };
     } catch (err: any) {
-      this.logger.error(`Failed to add throttle record for ${key}: ${err?.message}`);
+      this.logger.error(
+        `ThrottlerRedisStorage increment failed for ${key}: ${err?.message}`,
+      );
+      // Fallback: return unblocked record to prevent locking out users on Redis failure
+      return {
+        totalHits: 1,
+        timeToExpire: Math.ceil(ttl / 1000),
+        isBlocked: false,
+        timeToBlockExpire: 0,
+      };
     }
   }
 }
