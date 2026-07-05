@@ -242,6 +242,50 @@ export class HttpExceptionFilter implements ExceptionFilter {
       errorPayload.retryable = retryable;
     }
 
+    // If this is a rate-limit response, attach standard headers and structured logs
+    if (statusCode === HttpStatus.TOO_MANY_REQUESTS) {
+      // Try to extract TTL/seconds from exception response when available
+      let retryAfterSec: number | undefined = undefined;
+      try {
+        const ex = exception as any;
+        const resp = ex.getResponse ? ex.getResponse() : ex;
+        // common field names that might be present: ttl, seconds, retryAfter
+        retryAfterSec = Number(resp?.ttl ?? resp?.seconds ?? resp?.retryAfter ?? undefined) || undefined;
+      } catch {}
+
+      if (!retryAfterSec) retryAfterSec = 60; // fallback
+
+      // Set informative headers for clients
+      try {
+        response.setHeader('Retry-After', String(retryAfterSec));
+        // These values are best-effort; try to include if available
+        const limit = (exception as any)?.limit ?? undefined;
+        const remaining = (exception as any)?.remaining ?? undefined;
+        if (limit) response.setHeader('X-RateLimit-Limit', String(limit));
+        if (typeof remaining !== 'undefined') response.setHeader('X-RateLimit-Remaining', String(remaining));
+      } catch (e) {
+        // ignore header set errors
+      }
+
+      // Structured logging for monitoring
+      try {
+        const userId = request.user?.id || null;
+        const clientIp = request.ip || request.headers['x-forwarded-for'] || request.socket?.remoteAddress || null;
+        this.logger.warn(
+          JSON.stringify({
+            event: 'rate_limit_exceeded',
+            path: request.url,
+            method: request.method,
+            userId,
+            clientIp,
+            statusCode,
+            retryAfterSec,
+            timestamp: new Date().toISOString(),
+          }),
+        );
+      } catch {}
+    }
+
     response.status(statusCode).send(errorPayload);
   }
 }

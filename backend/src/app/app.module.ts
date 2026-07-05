@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { RedisModule } from './redis/redis.module';
+import { RedisService } from './redis/redis.service';
+import { ThrottlerRedisStorage } from './throttler/throttler-redis.storage';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
@@ -23,9 +26,9 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
 @Module({
   imports: [
     ThrottlerModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+      imports: [ConfigModule, RedisModule],
+      inject: [ConfigService, RedisService],
+      useFactory: (config: ConfigService, redisService: RedisService) => {
         const envNode = config.get('NODE_ENV') || process.env.NODE_ENV;
         // Detect automated E2E/test contexts and disable throttling there.
         // Conditions covered:
@@ -47,7 +50,7 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
           return Number(config.get(key)) || defaultValue;
         };
 
-        return [
+        const buckets = [
           {
             name: 'default',
             ttl: 60000,
@@ -94,8 +97,18 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
             limit: getLimit('THROTTLE_LIMIT_EXPORT', 20),
           },
         ];
+
+        return {
+          storage: new ThrottlerRedisStorage(redisService) as any,
+          // Convert named buckets to the expected format used by the application
+          // The ThrottlerModule accepts either { ttl, limit } or named buckets depending on version.
+          // Provide the array of buckets for compatibility.
+          // @ts-ignore
+          buckets,
+        } as any;
       },
     }),
+    RedisModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
