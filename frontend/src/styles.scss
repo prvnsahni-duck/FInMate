@@ -122,7 +122,12 @@ body {
 
   /* Tab bar container */
   .tab-bar {
-    @apply flex space-x-1 bg-surface p-1.5 rounded-2xl border border-border/10;
+    @apply flex space-x-1 bg-surface p-1.5 rounded-2xl border border-border/10 overflow-x-auto flex-nowrap;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE 10+ */
+    &::-webkit-scrollbar {
+      display: none; /* Safari/Chrome */
+    }
   }
 
   /* Active tab pill */

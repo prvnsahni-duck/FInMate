@@ -19,6 +19,7 @@ export class GroupKeyService {
   private groupKeysMemoryCache = new Map<string, CryptoKey>();
   private myAsymmetricKeys: { publicKey: CryptoKey; privateKey: CryptoKey } | null = null;
   rateLimitError = signal<string | null>(null);
+  requiresKeyProvisioning = signal<boolean>(false);
 
   private getSubtleCrypto(): SubtleCrypto {
     if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
@@ -131,6 +132,12 @@ export class GroupKeyService {
     this.activeGroupKeyRequests.clear();
     this.myAsymmetricKeys = null;
     this.rateLimitError.set(null);
+    this.requiresKeyProvisioning.set(false);
+  }
+
+  invalidateGroupKey(groupId: string): void {
+    this.groupKeysMemoryCache.delete(groupId);
+    this.activeGroupKeyRequests.delete(groupId);
   }
 
   /**
@@ -181,12 +188,20 @@ export class GroupKeyService {
     // Fetch wrapped key from server
     try {
       const response = await firstValueFrom(
-        this.http.get<{ data: { wrappedKey: string | null } }>(
+        this.http.get<{ data: { wrappedKey: string | null; groupKeyVersionId: string | null } }>(
           `${this.baseUrl}/groups/${groupId}/keys/me`,
         ),
       );
 
       const wrappedKey = response?.data?.wrappedKey;
+      const versionId = response?.data?.groupKeyVersionId;
+
+      if (versionId && !wrappedKey) {
+        this.requiresKeyProvisioning.set(true);
+      } else {
+        this.requiresKeyProvisioning.set(false);
+      }
+
       if (wrappedKey) {
         let unwrappedKey: CryptoKey;
         if (wrappedKey.includes(':')) {
@@ -209,6 +224,7 @@ export class GroupKeyService {
       }
     } catch (e: any) {
       console.error('Failed to unwrap group data key', e);
+      this.requiresKeyProvisioning.set(true);
       if (e?.status === 429) {
         this.rateLimitError.set('Too many requests. Please try again later.');
       }
@@ -222,6 +238,12 @@ export class GroupKeyService {
    * Generates a new group key, wraps it for self symmetrically, and posts to server.
    */
   async createAndStoreGroupKey(groupId: string): Promise<CryptoKey> {
+    if (this.requiresKeyProvisioning()) {
+      throw new Error(
+        "Your group key hasn't been shared with you yet. Try refreshing, or contact the group owner."
+      );
+    }
+
     const user = this.store.selectSnapshot((state: any) => state.auth?.user);
     if (!user || !user.email) {
       throw new Error('No user session found');

@@ -73,60 +73,81 @@ export class JoinGroupComponent implements OnInit {
       const hash = window.location.hash;
       const tikUrlSafe = hash ? hash.substring(1) : '';
 
-      if (wrappedGroupKey && tikUrlSafe) {
-        // TIK symmetric key decryption flow
+      if (wrappedGroupKey) {
+        let groupKey: CryptoKey;
         const subtle = window.crypto.subtle || (globalThis as any).crypto?.subtle;
         if (!subtle) {
           throw new Error('Web Cryptography API is not available');
         }
 
-        // Convert URL-safe base64 back to raw ArrayBuffer
-        let base64 = tikUrlSafe.replace(/-/g, '+').replace(/_/g, '/');
-        while (base64.length % 4) {
-          base64 += '=';
-        }
-        const rawTik = base64ToArrayBuffer(base64);
+        try {
+          if (tikUrlSafe) {
+            // TIK symmetric key decryption flow
+            // Convert URL-safe base64 back to raw ArrayBuffer
+            let base64 = tikUrlSafe.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) {
+              base64 += '=';
+            }
+            const rawTik = base64ToArrayBuffer(base64);
 
-        // Import TIK as AES-GCM key
-        const tik = await subtle.importKey(
-          'raw',
-          rawTik,
-          { name: 'AES-GCM' },
-          false,
-          ['decrypt']
-        );
-
-        // Decrypt group key using TIK to get raw key bytes
-        const decryptedGroupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, tik);
-
-        // Export decrypted key as raw to import it with appropriate usages
-        const rawGk = await subtle.exportKey('raw', decryptedGroupKey);
-        const groupKey = await subtle.importKey(
-          'raw',
-          rawGk,
-          { name: 'AES-GCM' },
-          true, // extractable so we can wrap it for self
-          ['encrypt', 'decrypt']
-        );
-
-        // Resolve user's derived master key
-        const user = this.store.selectSnapshot((state: any) => state.auth?.user);
-        if (user && user.email) {
-          const masterKey = await this.encryptionService.loadKeyFromSession(user.email);
-          if (masterKey) {
-            // Wrap group key with master key for self
-            const wrappedGkForSelf = await this.encryptionService.wrapKey(groupKey, masterKey);
-
-            // Save wrapped key to server
-            await firstValueFrom(
-              this.http.post(`${environment.apiBaseUrl}/groups/${groupId}/keys`, {
-                keys: [{ userId: user.userId ?? user.id, wrappedKey: wrappedGkForSelf }],
-              })
+            // Import TIK as AES-GCM key
+            const tik = await subtle.importKey(
+              'raw',
+              rawTik,
+              { name: 'AES-GCM' },
+              false,
+              ['decrypt']
             );
 
-            // Store in IndexedDB vault
-            await this.zkVault.storeGroupKey(groupId, groupKey);
+            // Decrypt group key using TIK to get raw key bytes
+            const decryptedGroupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, tik);
+
+            // Export decrypted key as raw to import it with appropriate usages
+            const rawGk = await subtle.exportKey('raw', decryptedGroupKey);
+            groupKey = await subtle.importKey(
+              'raw',
+              rawGk,
+              { name: 'AES-GCM' },
+              true, // extractable so we can wrap it for self
+              ['encrypt', 'decrypt']
+            );
+          } else {
+            // Flow B asymmetric invitation decryption flow
+            const { privateKey } = await this.groupKeyService.getMyAsymmetricKeys();
+            const decryptedGroupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, privateKey);
+
+            const rawGk = await subtle.exportKey('raw', decryptedGroupKey);
+            groupKey = await subtle.importKey(
+              'raw',
+              rawGk,
+              { name: 'AES-GCM' },
+              true, // extractable
+              ['encrypt', 'decrypt']
+            );
           }
+
+          // Resolve user's derived master key
+          const user = this.store.selectSnapshot((state: any) => state.auth?.user);
+          if (user && user.email) {
+            const masterKey = await this.encryptionService.loadKeyFromSession(user.email);
+            if (masterKey) {
+              // Wrap group key with master key for self
+              const wrappedGkForSelf = await this.encryptionService.wrapKey(groupKey, masterKey);
+
+              // Save wrapped key to server
+              await firstValueFrom(
+                this.http.post(`${environment.apiBaseUrl}/groups/${groupId}/keys`, {
+                  keys: [{ userId: user.userId ?? user.id, wrappedKey: wrappedGkForSelf }],
+                })
+              );
+
+              // Store in IndexedDB vault
+              await this.zkVault.storeGroupKey(groupId, groupKey);
+            }
+          }
+        } catch (e: any) {
+          console.error('Failed to decrypt group key on joining:', e);
+          throw new Error("Unable to access this group's encryption key. Please try refreshing your group key or contact the group owner.");
         }
       }
 

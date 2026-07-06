@@ -5,9 +5,13 @@ import {
   DestroyRef,
   signal,
   computed,
+  ViewChild,
+  ElementRef,
+  AfterViewInit,
+  HostListener,
 } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CreateExpenseModalComponent } from '../../components/create-expense-modal/create-expense-modal.component';
 import { RecurringExpenseFormComponent } from '../../components/recurring-expense-form/recurring-expense-form.component';
 import { RecurringExpensesService } from '../../services/recurring-expenses.service';
@@ -22,6 +26,7 @@ import { DropdownComponent, DropdownOption } from '../../../../shared/components
 import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../../core/constants/crypto.constants';
 
 import {
   BalanceEntry,
@@ -89,11 +94,12 @@ export interface GroupExpense extends Expense {
   templateUrl: './group-detail.component.html',
   styleUrls: ['./group-detail.component.scss'],
 })
-export class GroupDetailComponent implements OnInit {
+export class GroupDetailComponent implements OnInit, AfterViewInit {
   private groupsService = inject(GroupsService);
   private expensesService = inject(ExpensesService);
   private recurringExpensesService = inject(RecurringExpensesService);
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private destroyRef = inject(DestroyRef);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
@@ -186,6 +192,19 @@ export class GroupDetailComponent implements OnInit {
   isGroupKeyLoaded = signal<boolean>(true);
   isMasterKeyLoaded = signal<boolean>(true);
   rateLimitError = this.groupKeyService.rateLimitError;
+  readonly DECRYPTION_FAILED_PLACEHOLDER = DECRYPTION_FAILED_PLACEHOLDER;
+  isRefreshingKey = signal<boolean>(false);
+  requiresKeyProvisioning = this.groupKeyService.requiresKeyProvisioning;
+  showLeftScrollCue = signal<boolean>(false);
+  showRightScrollCue = signal<boolean>(false);
+  isExportDropdownOpen = signal<boolean>(false);
+  isFilterBottomSheetOpen = signal<boolean>(false);
+  showSkeleton = signal<boolean>(false);
+  isOffline = signal<boolean>(typeof window !== 'undefined' ? !navigator.onLine : false);
+  private skeletonTimeoutId?: any;
+  membersError = signal<boolean>(false);
+  balancesError = signal<boolean>(false);
+  analyticsError = signal<boolean>(false);
 
   // Categories list
   categories = [
@@ -250,14 +269,67 @@ export class GroupDetailComponent implements OnInit {
   ngOnInit() {
     this.currentUserId.set(this.getCurrentUserId());
     this.closeMonthSelected.set(this.getCurrentMonthString());
+
+    // Subscribe to query parameters to sync tab and filters
+    this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((qParams) => {
+      const tab = qParams['tab'] || 'ledger';
+      if (['ledger', 'analytics', 'history', 'trash', 'settings', 'recurring'].includes(tab)) {
+        this.activeTab.set(tab as any);
+        
+        // Load settings or recurring data if target tab is active
+        if (tab === 'settings') {
+          const g = this.group();
+          if (g) {
+            this.editGroupName = g.name;
+            this.editGroupDescription = g.description || '';
+            this.editGroupVisibility = g.visibility || 'private';
+            this.editGroupCurrency = g.currency || 'USD';
+            this.editGroupCarryForward = g.carryForwardEnabled || false;
+            this.loadContributionsForMonth();
+          }
+        } else if (tab === 'recurring') {
+          const g = this.group();
+          if (g?.id) {
+            this.fetchRecurringExpenses(g.id);
+          }
+        }
+      }
+
+      const category = qParams['category'] || '';
+      const start = qParams['start'] || '';
+      const end = qParams['end'] || '';
+
+      const isFilterChanged =
+        this.filterCategory() !== category ||
+        this.filterStartDate() !== start ||
+        this.filterEndDate() !== end;
+
+      this.filterCategory.set(category);
+      this.filterStartDate.set(start);
+      this.filterEndDate.set(end);
+
+      const groupId = this.group()?.id;
+      if (groupId && isFilterChanged) {
+        this.fetchExpenses(groupId);
+      }
+
+      this.scrollToActiveTab();
+      this.checkScrollCues();
+    });
+
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       const groupId = params.get('id');
       if (groupId) {
-        this.isLoading.set(true);
+        this.startLoading();
         this.currentPage.set(1);
-        this.filterCategory.set('');
-        this.filterStartDate.set('');
-        this.filterEndDate.set('');
+
+        // Prefill filters from URL before initial fetch
+        const initialCategory = this.route.snapshot.queryParams['category'] || '';
+        const initialStart = this.route.snapshot.queryParams['start'] || '';
+        const initialEnd = this.route.snapshot.queryParams['end'] || '';
+        this.filterCategory.set(initialCategory);
+        this.filterStartDate.set(initialStart);
+        this.filterEndDate.set(initialEnd);
 
         this.groupsService.getGroup(groupId).subscribe({
           next: (res) => {
@@ -272,7 +344,7 @@ export class GroupDetailComponent implements OnInit {
               this.fetchCarryForward(groupId);
             }
           },
-          error: () => this.isLoading.set(false),
+          error: () => this.stopLoading(),
         });
       }
     });
@@ -301,6 +373,166 @@ export class GroupDetailComponent implements OnInit {
       console.warn('Failed to initialize group encryption keys / self-heal', e);
       this.isGroupKeyLoaded.set(false);
     }
+  }
+
+  async refreshGroupKey() {
+    const g = this.group();
+    if (!g?.id || this.isRefreshingKey()) return;
+
+    this.isRefreshingKey.set(true);
+    try {
+      this.groupKeyService.invalidateGroupKey(g.id);
+      await this.initializeGroupKeysAndSelfHeal(g.id);
+      this.fetchExpenses(g.id);
+      this.fetchBalances(g.id);
+    } catch (e) {
+      console.error('Failed to refresh group key:', e);
+    } finally {
+      this.isRefreshingKey.set(false);
+    }
+  }
+
+  @ViewChild('tabBarContainer') tabBarContainer!: ElementRef<HTMLDivElement>;
+
+  ngAfterViewInit() {
+    this.checkScrollCues();
+    this.scrollToActiveTab();
+  }
+
+  scrollToActiveTab() {
+    setTimeout(() => {
+      const activeEl = this.tabBarContainer?.nativeElement?.querySelector('.tab-active');
+      if (activeEl) {
+        activeEl.scrollIntoView({
+          behavior: 'smooth',
+          inline: 'center',
+          block: 'nearest',
+        });
+      }
+    }, 150);
+  }
+
+  onTabBarScroll() {
+    const el = this.tabBarContainer?.nativeElement;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      this.showLeftScrollCue.set(el.scrollLeft > 5);
+      this.showRightScrollCue.set(el.scrollLeft < el.scrollWidth - el.clientWidth - 5);
+    });
+  }
+
+  checkScrollCues() {
+    setTimeout(() => this.onTabBarScroll(), 200);
+  }
+
+  startLoading() {
+    this.isLoading.set(true);
+    this.showSkeleton.set(false);
+    if (this.skeletonTimeoutId) {
+      clearTimeout(this.skeletonTimeoutId);
+    }
+    this.skeletonTimeoutId = setTimeout(() => {
+      if (this.isLoading()) {
+        this.showSkeleton.set(true);
+      }
+    }, 200);
+  }
+
+  stopLoading() {
+    this.isLoading.set(false);
+    this.showSkeleton.set(false);
+    if (this.skeletonTimeoutId) {
+      clearTimeout(this.skeletonTimeoutId);
+      this.skeletonTimeoutId = undefined;
+    }
+  }
+
+  applyFilters() {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        category: this.filterCategory() || null,
+        start: this.filterStartDate() || null,
+        end: this.filterEndDate() || null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  resetFilters() {
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: {
+        category: null,
+        start: null,
+        end: null,
+      },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
+  }
+
+  @ViewChild('filterBtn') filterBtn!: ElementRef<HTMLButtonElement>;
+
+  setFilterBottomSheet(isOpen: boolean) {
+    this.isFilterBottomSheetOpen.set(isOpen);
+    if (!isOpen) {
+      setTimeout(() => {
+        this.filterBtn?.nativeElement?.focus();
+      }, 100);
+    } else {
+      setTimeout(() => {
+        const firstEl = document.querySelector('#filterCategoryMobile button') as HTMLElement;
+        firstEl?.focus();
+      }, 150);
+    }
+  }
+
+  onBottomSheetKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      this.setFilterBottomSheet(false);
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      const modalEl = document.querySelector('.z-\\[100\\]');
+      if (!modalEl) return;
+
+      const focusableEls = modalEl.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (focusableEls.length === 0) return;
+      const firstEl = focusableEls[0] as HTMLElement;
+      const lastEl = focusableEls[focusableEls.length - 1] as HTMLElement;
+
+      if (event.shiftKey) {
+        if (document.activeElement === firstEl) {
+          lastEl.focus();
+          event.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastEl) {
+          firstEl.focus();
+          event.preventDefault();
+        }
+      }
+    }
+  }
+
+  @HostListener('window:online')
+  onOnline() {
+    this.isOffline.set(false);
+    const g = this.group();
+    if (g?.id) {
+      this.fetchExpenses(g.id);
+      this.fetchBalances(g.id);
+    }
+  }
+
+  @HostListener('window:offline')
+  onOffline() {
+    this.isOffline.set(true);
   }
 
   async unlockVault(password: string) {
@@ -359,6 +591,7 @@ export class GroupDetailComponent implements OnInit {
   }
 
   fetchExpenses(groupId: string) {
+    this.startLoading();
     let start = this.filterStartDate();
     let end = this.filterEndDate();
     const g = this.group();
@@ -422,17 +655,18 @@ export class GroupDetailComponent implements OnInit {
           });
           this.expenses.set(mappedExpenses);
           this.totalExpenses.set(res.meta?.totalItems || 0);
-          this.isLoading.set(false);
+          this.stopLoading();
           this.ledgerError.set(false);
         },
         error: () => {
-          this.isLoading.set(false);
+          this.stopLoading();
           this.ledgerError.set(true);
         },
       });
   }
 
   fetchMembers(groupId: string) {
+    this.membersError.set(false);
     this.groupsService.getMembers(groupId).subscribe({
       next: (res) => {
         this.members.set(res);
@@ -443,13 +677,17 @@ export class GroupDetailComponent implements OnInit {
 
         this.initializeGroupKeysAndSelfHeal(groupId);
       },
-      error: (err) => console.error('Failed to fetch group members', err),
+      error: (err) => {
+        console.error('Failed to fetch group members', err);
+        this.membersError.set(true);
+      },
     });
   }
 
   fetchBalances(groupId: string) {
     const g = this.group();
     if (!g) return;
+    this.balancesError.set(false);
     this.groupsService.getBalances(groupId).subscribe({
       next: (res) => {
         this.balances.set(res.balances);
@@ -461,7 +699,10 @@ export class GroupDetailComponent implements OnInit {
         );
         this.userBalance.set(myBalanceEntry ? myBalanceEntry.netBalance : 0);
       },
-      error: (err) => console.error('Failed to fetch balances', err),
+      error: (err) => {
+        console.error('Failed to fetch balances', err);
+        this.balancesError.set(true);
+      },
     });
   }
 
@@ -819,23 +1060,11 @@ export class GroupDetailComponent implements OnInit {
       | 'settings'
       | 'recurring',
   ) {
-    this.activeTab.set(tab);
-    if (tab === 'settings') {
-      const g = this.group();
-      if (g) {
-        this.editGroupName = g.name;
-        this.editGroupDescription = g.description || '';
-        this.editGroupVisibility = g.visibility || 'private';
-        this.editGroupCurrency = g.currency || 'USD';
-        this.editGroupCarryForward = g.carryForwardEnabled || false;
-        this.loadContributionsForMonth();
-      }
-    } else if (tab === 'recurring') {
-      const g = this.group();
-      if (g?.id) {
-        this.fetchRecurringExpenses(g.id);
-      }
-    }
+    this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab },
+      queryParamsHandling: 'merge',
+    });
   }
 
   saveGroupSettings() {

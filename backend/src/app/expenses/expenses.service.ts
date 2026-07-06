@@ -770,10 +770,18 @@ export class ExpensesService {
       .createQueryBuilder('expense')
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
       .leftJoinAndSelect('expense.ownerUser', 'ownerUser')
-      .leftJoinAndSelect('expense.group', 'group')
-      .where(
+      .leftJoinAndSelect('expense.group', 'group');
+
+    if (params.groupId) {
+      if (params.groupId === 'personal') {
+        query.where('group.id IS NULL AND ownerUser.id = :userId', { userId });
+      } else {
+        query.where('group.id = :groupId', { groupId: params.groupId });
+      }
+    } else {
+      query.where(
         new Brackets((qb) => {
-          qb.where('(ownerUser.id = :userId AND group.id IS NULL)', { userId });
+          qb.where('ownerUser.id = :userId AND group.id IS NULL', { userId });
           if (membershipGroupIds.length > 0) {
             qb.orWhere('group.id IN (:...groupIds)', {
               groupIds: membershipGroupIds,
@@ -781,13 +789,6 @@ export class ExpensesService {
           }
         }),
       );
-
-    if (params.groupId) {
-      if (params.groupId === 'personal') {
-        query.andWhere('group.id IS NULL');
-      } else {
-        query.andWhere('group.id = :groupId', { groupId: params.groupId });
-      }
     }
 
     if (params.category) {
