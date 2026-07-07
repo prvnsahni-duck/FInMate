@@ -128,14 +128,21 @@ describe('GroupDetailComponent', () => {
 
     mockActivatedRoute = {
       paramMap: of(convertToParamMap({ id: 'group-1' })),
+      queryParams: of({}),
+      snapshot: {
+        queryParams: {},
+      },
     };
 
     mockGroupKeyService = {
       getMyAsymmetricKeys: jest.fn().mockResolvedValue({}),
       getGroupDataKey: jest.fn().mockResolvedValue({}),
+      createGroupKey: jest.fn().mockResolvedValue({}),
       checkAndProvisionMissingKeys: jest.fn().mockResolvedValue({}),
-      // Provide a Signal compatible object used by the component/template
+      invalidateGroupKey: jest.fn(),
+      // Provide Signal-compatible objects used by the component/template
       rateLimitError: signal<string | null>(null),
+      requiresKeyProvisioning: signal<boolean>(false),
     };
 
     mockEncryptionService = {

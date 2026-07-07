@@ -473,7 +473,7 @@
 
                 @if (isExportDropdownOpen()) {
                   <!-- Backdrop to dismiss dropdown -->
-                  <div (click)="isExportDropdownOpen.set(false)" class="fixed inset-0 z-40 bg-transparent"></div>
+                  <div (click)="isExportDropdownOpen.set(false)" (keydown.escape)="isExportDropdownOpen.set(false)" role="presentation" class="fixed inset-0 z-40 bg-transparent"></div>
                   
                   <div class="absolute right-0 mt-2 w-32 bg-finmate-card dark:bg-finmate-card border border-border/10 rounded-xl shadow-xl z-50 p-1 py-1.5 animate-fade-in">
                     <button
@@ -573,15 +573,15 @@
 
             <!-- Mobile Filters Bottom Sheet -->
             @if (isFilterBottomSheetOpen()) {
-              <div (keydown)="onBottomSheetKeyDown($event)" class="fixed inset-0 z-[100] flex items-end justify-center select-none animate-fade-in">
+              <div (keydown)="onBottomSheetKeyDown($event)" tabindex="-1" role="dialog" aria-modal="true" aria-label="Filter options" class="fixed inset-0 z-[100] flex items-end justify-center select-none animate-fade-in">
                 <!-- Backdrop -->
-                <div (click)="setFilterBottomSheet(false)" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"></div>
+                <div (click)="setFilterBottomSheet(false)" (keydown.escape)="setFilterBottomSheet(false)" role="presentation" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"></div>
                 
                 <!-- Content Panel -->
                 <div class="relative w-full max-w-lg bg-finmate-card dark:bg-finmate-card/90 rounded-t-3xl shadow-2xl p-6 border-t border-border/10 transform transition-transform duration-300 translate-y-0 select-text flex flex-col max-h-[85vh] overflow-y-auto">
                   
                   <!-- Drag Handle indicator -->
-                  <div (click)="setFilterBottomSheet(false)" class="mx-auto w-12 h-1.5 bg-muted/20 rounded-full mb-6 cursor-pointer hover:bg-muted/40 transition-colors"></div>
+                  <div (click)="setFilterBottomSheet(false)" (keydown.escape)="setFilterBottomSheet(false)" role="button" tabindex="0" aria-label="Close filter panel" class="mx-auto w-12 h-1.5 bg-muted/20 rounded-full mb-6 cursor-pointer hover:bg-muted/40 transition-colors"></div>
                   
                   <div class="flex items-center justify-between mb-6">
                     <h3 class="text-lg font-bold text-primary">Filter Ledger</h3>

@@ -41,7 +41,7 @@ describe('CreateExpenseModalComponent', () => {
     const mockCryptoKey = {} as CryptoKey;
     mockGroupKeyService = {
       getGroupDataKey: jest.fn().mockResolvedValue(mockCryptoKey),
-      createAndStoreGroupKey: jest.fn().mockResolvedValue(mockCryptoKey),
+      createGroupKey: jest.fn().mockResolvedValue(mockCryptoKey),
       rateLimitError: jest.fn().mockReturnValue(null),
     };
 

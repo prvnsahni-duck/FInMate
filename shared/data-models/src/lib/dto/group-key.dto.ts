@@ -5,11 +5,28 @@ import {
   IsArray,
   ValidateNested,
   IsOptional,
+  IsIn,
+  MinLength,
   MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-/** A single wrapped key entry for provisioning a group data key to a member. */
+/**
+ * Supported wrapping methods for the group data key.
+ *
+ * - 'AES-KW'   : symmetric wrap using the member's AES master key (iv:ciphertext format)
+ * - 'RSA-OAEP' : asymmetric wrap using the member's RSA-OAEP public wrapping key (base64url)
+ */
+export type WrappingMethod = 'AES-KW' | 'RSA-OAEP';
+
+/**
+ * A single wrapped-key entry for provisioning a group data key to one member.
+ *
+ * Length bounds:
+ *  - AES-KW (symmetric):  iv (16B) + : (1B) + ciphertext (32-64B) ≈ 66–110 chars base64url
+ *  - RSA-OAEP 2048:       256 raw bytes → ~344 chars base64url
+ *  - Upper bound 1 KB to reject obviously malformed payloads.
+ */
 export class WrappedKeyEntryDto {
   @IsUUID('4', { message: 'userId must be a valid UUID v4' })
   @IsNotEmpty({ message: 'userId is required' })
@@ -17,7 +34,16 @@ export class WrappedKeyEntryDto {
 
   @IsString({ message: 'wrappedKey must be a string' })
   @IsNotEmpty({ message: 'wrappedKey is required' })
+  @MinLength(32, { message: 'wrappedKey is too short to be a valid wrapped key' })
+  @MaxLength(1024, { message: 'wrappedKey exceeds the maximum allowed length' })
   wrappedKey!: string;
+
+  @IsString({ message: 'wrappingMethod must be a string' })
+  @IsIn(['AES-KW', 'RSA-OAEP'], {
+    message: 'wrappingMethod must be one of: AES-KW, RSA-OAEP',
+  })
+  @IsOptional()
+  wrappingMethod?: WrappingMethod;
 }
 
 /** Request body for provisioning group data keys for one or more members. */

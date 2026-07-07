@@ -54,7 +54,7 @@ export class RecurringExpensesService {
           scope = 'group';
           let gKey = await this.groupKeyService.getGroupDataKey((payload as any).groupId);
           if (!gKey) {
-            gKey = await this.groupKeyService.createAndStoreGroupKey((payload as any).groupId);
+            gKey = await this.groupKeyService.createGroupKey((payload as any).groupId);
           }
           key = gKey;
         }

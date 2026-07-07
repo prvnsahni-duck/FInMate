@@ -422,7 +422,7 @@ export class CreateExpenseModalComponent implements OnChanges {
           scope = 'group';
           scopeKey = await this.groupKeyService.getGroupDataKey(this.groupId);
           if (!scopeKey) {
-            scopeKey = await this.groupKeyService.createAndStoreGroupKey(this.groupId);
+            scopeKey = await this.groupKeyService.createGroupKey(this.groupId);
           }
         } else {
           const otherParticipants = splits.filter(

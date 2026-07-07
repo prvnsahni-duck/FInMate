@@ -362,7 +362,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         const role = this.getCallerRole();
         if (role === 'owner' || role === 'admin') {
           console.info('No group key found. Generating new group data key...');
-          key = await this.groupKeyService.createAndStoreGroupKey(groupId);
+          key = await this.groupKeyService.createGroupKey(groupId);
         }
       }
       this.isGroupKeyLoaded.set(!!key);
@@ -864,24 +864,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  applyFilters() {
-    this.currentPage.set(1);
-    const g = this.group();
-    if (g?.id) {
-      this.fetchExpenses(g.id);
-    }
-  }
-
-  resetFilters() {
-    this.filterCategory.set('');
-    this.filterStartDate.set('');
-    this.filterEndDate.set('');
-    this.currentPage.set(1);
-    const g = this.group();
-    if (g?.id) {
-      this.fetchExpenses(g.id);
-    }
-  }
 
   changePage(delta: number) {
     this.currentPage.update((val) => val + delta);

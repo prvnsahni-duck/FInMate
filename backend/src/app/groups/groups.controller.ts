@@ -23,7 +23,7 @@ import {
   GroupsMembershipService,
 } from './services';
 import { SuccessResponse } from '../common/response.util';
-import { RotateGroupKeyDto } from '@finmate/data-models';
+import { ProvisionGroupKeysDto, RotateGroupKeyDto } from '@finmate/data-models';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard)
@@ -315,15 +315,10 @@ export class GroupsController {
   @Post(':id/keys')
   async provisionGroupKeys(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: { keys: Array<{ userId: string; wrappedKey: string }> },
+    @Body() body: ProvisionGroupKeysDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    if (!body.keys || !Array.isArray(body.keys) || body.keys.length === 0) {
-      throw new BadRequestException('keys must be a non-empty array');
-    }
-
     await this.groupsMembershipService.provisionGroupKeys(req.user.id, id, body.keys);
-
     return new SuccessResponse('Group keys provisioned successfully', null);
   }
 

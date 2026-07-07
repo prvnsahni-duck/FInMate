@@ -12,7 +12,6 @@ import {
 } from '@finmate/data-models';
 import { ClientEncryptionService } from '../services/encryption.service';
 import { GroupKeyService } from '../services/group-key.service';
-import { ZkKeyVaultService } from '../services/zk-key-vault.service';
 
 export class Login {
   static readonly type = '[Auth] Login';
@@ -64,7 +63,6 @@ export class AuthState {
   private authService = inject(AuthService);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
-  private zkVault = inject(ZkKeyVaultService);
 
   @Selector()
   static isAuthenticated(state: AuthStateModel): boolean {
@@ -147,8 +145,7 @@ export class AuthState {
     if (state.user?.email) {
       void this.encryptionService.clearKey(state.user.email);
     }
-    this.groupKeyService.clearLocalState();
-    void this.zkVault.clearAll();
+    void this.groupKeyService.clearPersistentCache();
 
     // Clear local storage and state regardless of API success to ensure client safety
     localStorage.removeItem('finmate_token');
