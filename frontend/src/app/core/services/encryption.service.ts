@@ -431,7 +431,11 @@ export class ClientEncryptionService {
    * Unwraps (decrypts) a wrapped key using an unwrapping key (such as the master key or a private key).
    * Returns a non-extractable CryptoKey.
    */
-  async unwrapKey(wrappedStr: string, unwrappingKey: CryptoKey): Promise<CryptoKey> {
+  async unwrapKey(
+    wrappedStr: string,
+    unwrappingKey: CryptoKey,
+    extractable = false,
+  ): Promise<CryptoKey> {
     if (!wrappedStr) {
       throw new Error('Wrapped key string cannot be empty');
     }
@@ -449,7 +453,7 @@ export class ClientEncryptionService {
           name: 'AES-GCM',
           length: 256,
         },
-        false, // non-extractable for security
+        extractable,
         ['encrypt', 'decrypt'],
       );
     }
@@ -484,7 +488,7 @@ export class ClientEncryptionService {
       {
         name: 'AES-GCM',
       },
-      false, // non-extractable for security
+      extractable,
       ['encrypt', 'decrypt'],
     );
   }

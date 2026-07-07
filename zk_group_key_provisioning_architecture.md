@@ -56,8 +56,8 @@ sequenceDiagram
 
 ---
 
-### Flow B: Lookup Invite for Registered Users (Direct Invite)
-When User A invites User B directly by entering User B's email or username in the application, User A is online by definition. The client-side app resolves the key immediately.
+### Flow B: Lookup Invite for Registered Users (Direct Invite - Canonical Flow)
+When User A invites User B directly, User A's client resolves User B's public wrapping key. Because of the automatic RSA key bootstrapping (`CryptoBootstrapService`), registered users are guaranteed to have their RSA key pairs created and registered on the server.
 
 ```mermaid
 sequenceDiagram
@@ -70,29 +70,31 @@ sequenceDiagram
     Inviter->>API: GET /users/lookup?email=userB@example.com
     API->>DB: SELECT id, public_wrapping_key
     API-->>Inviter: Return User B ID & Public Wrapping Key (PWK_B)
-    Inviter->>Inviter: Encrypt Group Key (GK) with PWK_B -> Wrapped_GK_B
-    Inviter->>API: POST /groups/:id/invites (userId=UserB, Wrapped_GK_B)
-    API->>DB: INSERT invite & save Wrapped_GK_B in encrypted_group_keys (status='invited')
+    Inviter->>Inviter: Encrypt Group Key (GK) with PWK_B (RSA-OAEP) -> Wrapped_GK_B
+    Inviter->>API: POST /groups/:id/members (identifier=UserB, Wrapped_GK_B, wrappingMethod="RSA-OAEP")
+    API->>DB: Save Wrapped_GK_B directly to member_wrapped_group_keys for User B
     
-    Note over Invitee: Log in / Open Dashboard
-    Invitee->>API: POST /groups/accept-invite/:inviteId
-    API->>DB: UPDATE group_members status to 'active'
-    API-->>Invitee: Accept Success
-    Invitee->>Invitee: Fetch Wrapped_GK_B from database
+    Note over Invitee: Open Dashboard / Groups
+    Invitee->>API: GET /groups/:id/keys/me
+    API-->>Invitee: Return Wrapped_GK_B (wrappingMethod: RSA-OAEP)
     Invitee->>Invitee: Decrypt Wrapped_GK_B using own Private Wrapping Key (PrWK_B) -> GK
-    Invitee->>Invitee: Re-encrypt GK with own Master Key for quick IndexedDB caching
+    Invitee->>Invitee: Re-encrypt GK symmetrically with own Master Key & Store in IndexedDB
     Note over Invitee: Group decrypted automatically!
 ```
 
+**RSA Bootstrap (`CryptoBootstrapService`):**
+To ensure that `public_wrapping_key` is always available for registered users, a dedicated `CryptoBootstrapService` runs automatically during app initialization (refresh) and upon successful login actions. It checks if the key pair exists on the server, and if not, generates the RSA-OAEP key pair and uploads it.
+
 ---
 
-### Flow C: Lookup Invite for Unregistered Users (Fallback)
-If User A invites an email address that is not yet registered on FinMate:
-1. User A's browser cannot retrieve a `public_wrapping_key` for the invitee.
-2. The browser automatically generates a random **Temporary Invite Key (TIK)**.
-3. The browser encrypts the `GroupKey` using the `TIK` -> `Wrapped_GK_TIK` and uploads it.
-4. The system sends an email invitation containing: `/register?inviteToken=xyz#TIK`.
-5. When the invitee registers, their browser extracts `TIK` from the hash fragment, decrypts the `GroupKey`, generates their asymmetric keypair, and uploads their newly wrapped key.
+### Flow C: Lookup Invite for Unregistered Users (Legacy Compatibility Fallback)
+If User A invites an email address that is not registered, the client falls back to the symmetric Temporary Invite Key (TIK) wrapping method.
+1. The inviter's browser cannot retrieve a `public_wrapping_key`.
+2. The browser generates a random **Temporary Invite Key (TIK)**.
+3. The browser encrypts the `GroupKey` with the `TIK` -> `Wrapped_GK_TIK` and uploads it with `wrappingMethod: "AES-KW"`.
+4. The system stores the key in the `GroupInvite` table and sends an email invitation.
+5. Once the invitee registers and logs in, they join using the TIK hash fragment, decrypt the key, initialize their own RSA wrapping keys, and save their master-key-wrapped key.
+*Note: This flow is for compatibility and unregistered users only. All active/registered users must go through Flow B.*
 
 ---
 
@@ -123,12 +125,33 @@ We evaluated two alternative approaches before final selection:
 
 ---
 
-## 5. Storage Specification
+## 5. Cache Hierarchy & Storage Specification
 
-### Current Release Storage (Standard PWA)
-- **In-Memory Cache**: Active `CryptoKey` objects are stored in memory (`Map<groupId, CryptoKey>`) in `GroupKeyService` and `ClientEncryptionService` for fast access.
-- **IndexedDB Vault**: The Master Key and unwrapped Group Keys are stored in IndexedDB using `ZkKeyVaultService` with `extractable: false`. This ensures session survival across page refreshes.
-- **Session Lifetimes**: Log out clears both the memory caches and IndexedDB key tables.
+Group keys are managed across a three-tier hierarchy designed for high performance, security, and refresh resilience:
+
+```mermaid
+graph TD
+    A[Request Group Key] --> B{1. Memory Cache}
+    B -- Hit --> C[Return CryptoKey]
+    B -- Miss --> D{2. IndexedDB Vault}
+    D -- Hit --> E[Cache to Memory & Return]
+    D -- Miss --> F[3. Fetch from Backend /keys/me]
+    F -- Success --> G[Unwrap Key & Store in Memory + IndexedDB]
+    G --> C
+    F -- Missing Key --> H[Set requiresKeyProvisioning = True]
+```
+
+### 1. Memory Cache
+Active `CryptoKey` handles are cached in-memory (`Map<groupId, CryptoKey>`) in `GroupKeyService` and `ClientEncryptionService` for instant sub-millisecond lookups during navigation and data updates.
+
+### 2. IndexedDB Vault
+Unwrapped group keys and the user's derived Master Key are stored in the local IndexedDB vault using `ZkKeyVaultService` (with `extractable: false`). This allows decrypted data to survive page refreshes and offline sessions without raw key material ever being exposed to JavaScript or XSS.
+
+### 3. Backend (Persistent Key Store)
+If both local tiers miss, the client fetches the wrapped key from the backend (`GET /groups/:groupId/keys/me`). The backend serves the key wrapped according to its `wrappingMethod` (RSA-OAEP for Flow B, or AES-KW for legacy Flow C). The client decrypts it, registers it into the memory and IndexedDB caches, and clears the key-missing banner.
+
+### 4. Session Lifetimes
+Upon logout, all in-memory caches and the entire IndexedDB keys table are cleared to ensure complete client-side data sanitization.
 
 ### Future Release Storage (Native Packaging / Roadmap)
 - **Biometric Unlock**: Replaces standard IndexedDB caching with a hardware-backed keystore (Keychain/Keystore via Capacitor) unlocked via FaceID/Fingerprint.

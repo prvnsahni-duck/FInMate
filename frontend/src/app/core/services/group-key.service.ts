@@ -410,6 +410,7 @@ export class GroupKeyService {
       const cachedKey = await this.zkVault.loadGroupKey(groupId);
       if (cachedKey) {
         this.groupKeysMemoryCache.set(groupId, cachedKey);
+        this.requiresKeyProvisioning.set(false);
         return cachedKey;
       }
     } catch (e) {
@@ -429,15 +430,16 @@ export class GroupKeyService {
 
     try {
       const response = await firstValueFrom(
-        this.http.get<{ data: { wrappedKey: string | null; groupKeyVersionId: string | null } }>(
+        this.http.get<{ data: { wrappedKey: string | null; groupKeyVersionId: string | null; hasActiveKeys?: boolean } }>(
           `${this.baseUrl}/groups/${groupId}/keys/me`,
         ),
       );
 
       const wrappedKey = response?.data?.wrappedKey;
       const versionId = response?.data?.groupKeyVersionId;
+      const hasActiveKeys = response?.data?.hasActiveKeys ?? false;
 
-      if (versionId && !wrappedKey) {
+      if (versionId && !wrappedKey && hasActiveKeys) {
         this.requiresKeyProvisioning.set(true);
       } else {
         this.requiresKeyProvisioning.set(false);
@@ -447,10 +449,8 @@ export class GroupKeyService {
         let unwrappedKey: CryptoKey;
 
         if (wrappedKey.includes(':')) {
-          // Symmetrically wrapped with the user's master key
           unwrappedKey = await this.encryptionService.unwrapKey(wrappedKey, masterKey);
         } else {
-          // Asymmetrically wrapped with the user's public RSA-OAEP key
           const { privateKey } = await this.getMyAsymmetricKeys();
           unwrappedKey = await this.encryptionService.unwrapKey(wrappedKey, privateKey);
         }
@@ -463,6 +463,8 @@ export class GroupKeyService {
           console.warn('Failed to store unwrapped group key in IndexedDB', e);
         }
 
+        // Only clear requiresKeyProvisioning after successful unwrap and cache write
+        this.requiresKeyProvisioning.set(false);
         this.rateLimitError.set(null);
         return unwrappedKey;
       }

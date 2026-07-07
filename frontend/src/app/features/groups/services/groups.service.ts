@@ -1,7 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { mergeMap } from 'rxjs/operators';
+import { Store } from '@ngxs/store';
 import { environment } from '../../../../environments/environment';
+import { AuthState } from '../../../core/auth/auth.state';
+import { ClientEncryptionService } from '../../../core/services/encryption.service';
+import { GroupKeyService } from '../../../core/services/group-key.service';
+import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../core/constants/crypto.constants';
 import {
   CarryForwardBalance,
   CreateGroupDto,
@@ -24,6 +30,9 @@ import {
 })
 export class GroupsService {
   private http = inject(HttpClient);
+  private store = inject(Store);
+  private groupKeyService = inject(GroupKeyService);
+  private encryptionService = inject(ClientEncryptionService);
   private baseUrl = environment.apiBaseUrl;
 
   /**
@@ -65,13 +74,63 @@ export class GroupsService {
     );
   }
 
-  /**
-   * Fetch history/audit logs of a group.
-   */
   getHistoryLogs(groupId: string): Observable<GroupAuditLogResponse> {
-    return this.http.get<GroupAuditLogResponse>(
-      `${this.baseUrl}/groups/${groupId}/history`,
-    );
+    return this.http
+      .get<GroupAuditLogResponse>(`${this.baseUrl}/groups/${groupId}/history`)
+      .pipe(
+        mergeMap(async (res) => {
+          const logs = res.data || [];
+          if (logs.length === 0) return res;
+
+          const user = this.store.selectSnapshot(AuthState.getUser);
+          const email = user?.email;
+          if (!email) return res;
+
+          const key = await this.groupKeyService.getGroupDataKey(groupId);
+
+          const decryptedLogs = await Promise.all(
+            logs.map(async (log: any) => {
+              if (!log.metadata) return log;
+
+              const decryptedMetadata = { ...log.metadata };
+
+              const decryptField = async (field: string, val: string) => {
+                if (!val) return '';
+                if (!key) {
+                  console.warn(
+                    `[History Decrypt] Missing group key for log ${log.id}, field '${field}'. Ciphertext: "${val}"`
+                  );
+                  return DECRYPTION_FAILED_PLACEHOLDER;
+                }
+                try {
+                  return await this.encryptionService.decrypt(val, key);
+                } catch (err: any) {
+                  console.error(
+                    `[History Decrypt] Decryption failed for log ${log.id}, field '${field}'. ` +
+                    `Ciphertext: "${val}". Error: ${err?.message || err}`,
+                    err
+                  );
+                  return DECRYPTION_FAILED_PLACEHOLDER;
+                }
+              };
+
+              if (log.metadata.title) {
+                decryptedMetadata.title = await decryptField('title', log.metadata.title);
+              }
+              if (log.metadata.newTitle) {
+                decryptedMetadata.newTitle = await decryptField('newTitle', log.metadata.newTitle);
+              }
+              if (log.metadata.previousTitle) {
+                decryptedMetadata.previousTitle = await decryptField('previousTitle', log.metadata.previousTitle);
+              }
+
+              return { ...log, metadata: decryptedMetadata };
+            }),
+          );
+
+          return { ...res, data: decryptedLogs };
+        }),
+      );
   }
 
   /**
@@ -170,6 +229,7 @@ export class GroupsService {
       role?: string;
       displayName?: string;
       wrappedGroupKey?: string;
+      wrappingMethod?: 'AES-KW' | 'RSA-OAEP';
       inviteKeyHash?: string;
     },
   ): Observable<{ member: GroupMember; inviteToken: string }> {

@@ -561,7 +561,11 @@ export class GroupsService {
           this.ensureActiveGroupKeyVersion(group, manager),
         ));
 
-      if (targetUser.status === 'active') {
+      const wrappingMethod =
+        dto.wrappingMethod ||
+        (dto.wrappedGroupKey.includes(':') ? 'AES-KW' : 'RSA-OAEP');
+
+      if (wrappingMethod === 'RSA-OAEP' && targetUser.status === 'active') {
         const existingKey = await this.memberWrappedGroupKeyRepository.findOne({
           where: {
             groupKeyVersion: { id: activeVersion.id },
@@ -575,11 +579,12 @@ export class GroupsService {
               group,
               user: targetUser,
               wrappedGroupKey: dto.wrappedGroupKey,
+              wrappingAlgorithm: 'RSA-OAEP',
             }),
           );
         }
       } else {
-        // Unregistered / placeholder user, save to group_invites
+        // Compatibility or Unregistered user: save to GroupInvite
         const token = randomUUID();
         inviteToken = token;
         const expiresAt = new Date();
@@ -1261,6 +1266,7 @@ export class GroupsService {
         groupKeyVersionId: null,
         groupKeyVersion: null,
         wrappedKey: null,
+        hasActiveKeys: false,
       };
     }
 
@@ -1271,12 +1277,17 @@ export class GroupsService {
       },
     });
 
+    const totalKeys = await this.memberWrappedGroupKeyRepository.count({
+      where: { groupKeyVersion: { id: activeVersion.id } },
+    });
+
     return {
       groupId,
       userId,
       groupKeyVersionId: activeVersion.id,
       groupKeyVersion: activeVersion.version,
       wrappedKey: key?.wrappedGroupKey ?? null,
+      hasActiveKeys: totalKeys > 0,
     };
   }
 

@@ -277,6 +277,7 @@ export class GroupMembersComponent {
           } catch {
             // User not registered or lookup failed
           }
+          let wrappingMethod: 'AES-KW' | 'RSA-OAEP' | undefined;
 
           if (lookupData && lookupData.publicWrappingKey) {
             // Flow B: User is registered and has public wrapping key
@@ -288,11 +289,13 @@ export class GroupMembersComponent {
               ['wrapKey'],
             );
             wrappedGroupKey = await this.encryptionService.wrapKey(groupKey, publicKey);
+            wrappingMethod = 'RSA-OAEP';
           } else {
             // Flow C: User is unregistered or doesn't have public wrapping key
             // Generate TIK (AES-GCM 256-bit)
             const tik = await this.encryptionService.generateDataKey();
             wrappedGroupKey = await this.encryptionService.wrapKey(groupKey, tik);
+            wrappingMethod = 'AES-KW';
 
             const rawTik = await subtle.exportKey('raw', tik);
             const tikBase64 = arrayBufferToBase64(rawTik);
@@ -306,6 +309,7 @@ export class GroupMembersComponent {
               role: invite.role,
               displayName: invite.isRegisteredUser ? undefined : invite.name,
               wrappedGroupKey,
+              wrappingMethod,
               inviteKeyHash: tikUrlSafe,
             })
           );

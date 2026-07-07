@@ -4,15 +4,36 @@ import {
   HttpTestingController,
 } from '@angular/common/http/testing';
 import { GroupsService } from './groups.service';
+import { Store } from '@ngxs/store';
+import { ClientEncryptionService } from '../../../core/services/encryption.service';
+import { GroupKeyService } from '../../../core/services/group-key.service';
 
 describe('GroupsService', () => {
   let service: GroupsService;
   let httpMock: HttpTestingController;
+  let encryptionServiceSpy: any;
+  let groupKeyServiceSpy: any;
+  let storeMock: any;
 
   beforeEach(() => {
+    encryptionServiceSpy = {
+      decrypt: jest.fn().mockImplementation((val) => Promise.resolve(`decrypted:${val}`)),
+    };
+    groupKeyServiceSpy = {
+      getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
+    };
+    storeMock = {
+      selectSnapshot: jest.fn().mockReturnValue({ email: 'test@finmate.local', userId: 'user-1' }),
+    };
+
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [GroupsService],
+      providers: [
+        GroupsService,
+        { provide: ClientEncryptionService, useValue: encryptionServiceSpy },
+        { provide: GroupKeyService, useValue: groupKeyServiceSpy },
+        { provide: Store, useValue: storeMock },
+      ],
     });
 
     service = TestBed.inject(GroupsService);
@@ -83,15 +104,31 @@ describe('GroupsService', () => {
   });
 
   describe('getHistoryLogs', () => {
-    it('should fetch audit logs', (done) => {
+    it('should fetch and decrypt audit logs', (done) => {
+      const mockLogs = {
+        data: [
+          {
+            id: 'log-1',
+            action: 'expense.created',
+            metadata: {
+              title: 'enc-title',
+              newTitle: 'enc-new-title',
+              previousTitle: 'enc-prev-title',
+            },
+          },
+        ],
+      };
+
       service.getHistoryLogs('group-1').subscribe((res) => {
-        expect(res).toBeDefined();
+        expect(res.data[0].metadata.title).toBe('decrypted:enc-title');
+        expect(res.data[0].metadata.newTitle).toBe('decrypted:enc-new-title');
+        expect(res.data[0].metadata.previousTitle).toBe('decrypted:enc-prev-title');
         done();
       });
 
       const req = httpMock.expectOne('/api/groups/group-1/history');
       expect(req.request.method).toBe('GET');
-      req.flush({ data: [] });
+      req.flush(mockLogs);
     });
   });
 

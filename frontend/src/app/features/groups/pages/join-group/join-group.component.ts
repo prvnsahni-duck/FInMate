@@ -100,30 +100,11 @@ export class JoinGroupComponent implements OnInit {
             );
 
             // Decrypt group key using TIK to get raw key bytes
-            const decryptedGroupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, tik);
-
-            // Export decrypted key as raw to import it with appropriate usages
-            const rawGk = await subtle.exportKey('raw', decryptedGroupKey);
-            groupKey = await subtle.importKey(
-              'raw',
-              rawGk,
-              { name: 'AES-GCM' },
-              true, // extractable so we can wrap it for self
-              ['encrypt', 'decrypt']
-            );
+            groupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, tik, true);
           } else {
             // Flow B asymmetric invitation decryption flow
             const { privateKey } = await this.groupKeyService.getMyAsymmetricKeys();
-            const decryptedGroupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, privateKey);
-
-            const rawGk = await subtle.exportKey('raw', decryptedGroupKey);
-            groupKey = await subtle.importKey(
-              'raw',
-              rawGk,
-              { name: 'AES-GCM' },
-              true, // extractable
-              ['encrypt', 'decrypt']
-            );
+            groupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, privateKey, true);
           }
 
           // Resolve user's derived master key

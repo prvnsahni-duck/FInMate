@@ -301,7 +301,9 @@ graph TD
   ```json
   {
     "email": "bob.friend@example.com",
-    "role": "member"
+    "role": "member",
+    "wrappedGroupKey": "WmxAZKdpJOvKCT8L:YnfEcqGKlw2enoWkGAmJ2c3Hg1Ry1Rjp...",
+    "wrappingMethod": "RSA-OAEP"
   }
   ```
 - **Response Example (`201 Created`)**:

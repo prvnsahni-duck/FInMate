@@ -12,32 +12,31 @@ FinMate uses a Zero-Knowledge (ZK) encryption system to ensure that all personal
 - **Wrapping**: Content keys are wrapped symmetrically using the user's master key and stored on the server.
 - **Decryption**: Direct symmetric unwrap using the active session key.
 
-### Flow B: Direct Invitation (Asymmetric)
+### Flow B: Direct Invitation (Asymmetric - Canonical Flow)
 - **Target**: Registered users invited to a group.
 - **Key**: Group symmetric key (AES-256-GCM), wrapped using the recipient's public wrapping key (RSA-OAEP 2048-bit).
+- **RSA Key Bootstrapping**: A dedicated `CryptoBootstrapService` runs automatically when the app initializes or whenever a user logs in. It ensures that every registered user has an active RSA public/private keypair and registers the public key on the server.
 - **Wrapping**:
   - The inviter fetches the recipient's public wrapping key from `/users/:userId/public-key`.
   - The inviter encrypts/wraps the group key using this public key.
-  - The inviter uploads the wrapped key to the server under `/groups/:groupId/keys` mapped to the recipient's user ID.
+  - The inviter uploads the wrapped key to `/groups/:groupId/members` with `wrappingMethod: "RSA-OAEP"`.
 - **Joining & Decryption**:
   - The recipient accepts the invite.
   - The recipient's browser fetches the wrapped key from `/groups/:groupId/keys/me`.
-  - The recipient unwraps it using their asymmetric private wrapping key (stored locally/IndexedDB, unlocked by master key).
-  - The recipient re-wraps the group key symmetrically using their master key, posts this symmetric version to the server, and caches the raw group key in IndexedDB.
+  - The recipient unwraps it using their asymmetric private wrapping key (stored locally and unlocked by their master key).
+  - The recipient re-wraps the group key symmetrically using their master key, posts this symmetric version to `/groups/:groupId/keys`, and caches the raw group key in IndexedDB.
 
-### Flow C: Link Invitation (Temporary Invite Key - TIK)
-- **Target**: Unregistered users or users without active public wrapping keys invited via secure link.
+### Flow C: Link Invitation (Temporary Invite Key - TIK - Legacy Compatibility)
+- **Target**: Unregistered users invited via a secure link where public wrapping keys cannot be resolved.
 - **Key**: Group symmetric key (AES-256-GCM), wrapped with a one-time Temporary Invite Key (TIK, AES-GCM 256-bit).
 - **Wrapping**:
-  - The inviter generates a new random TIK.
-  - The inviter wraps the group key with this TIK.
-  - The inviter uploads the wrapped group key and the hash of the TIK to the server.
-  - The inviter generates a link containing the invite token and the raw TIK in the hash fragment: `https://finmate.com/groups/join/:token#:tik`.
+  - The inviter generates a random TIK, wraps the group key with it, and uploads the wrapped group key and TIK hash to `/groups/:groupId/members` with `wrappingMethod: "AES-KW"`.
+  - The inviter generates a link containing the invite token and the raw TIK in the hash fragment: `/groups/join/:token#TIK`.
 - **Joining & Decryption**:
-  - The recipient clicks the link. The browser loads the TIK from `window.location.hash` (the server never sees the hash fragment).
-  - The recipient's browser joins the group and receives the TIK-wrapped group key from `/groups/join/:token`.
-  - The browser decrypts/unwraps the group key using the TIK.
+  - The recipient clicks the link. The browser extracts the TIK from the hash fragment, joins the group, and receives the TIK-wrapped group key.
+  - The browser decrypts the group key using the TIK.
   - The browser re-wraps the group key symmetrically with the user's master key, uploads the self-wrapped symmetric key to `/groups/:groupId/keys`, and stores the key in IndexedDB.
+*Note: This flow is kept for backwards compatibility only. Standard key sharing is done via Flow B (RSA-OAEP).*
 
 ---
 
@@ -64,6 +63,18 @@ sequenceDiagram
     Member->>Server: Uploads GKey (wrapped with Member Master Key)
     Note over Member: Caches GKey in IndexedDB
 ```
+
+---
+
+---
+
+## Cache Precedence & Hierarchy
+
+To provide high performance, offline functionality, and seamless decryption across routing, group keys are cached and loaded using a strict three-tier precedence model:
+
+1. **Memory Cache (Tier 1):** Checked first. In-memory storage inside `GroupKeyService` and `ClientEncryptionService` returns the `CryptoKey` handle instantly (sub-millisecond) for active views.
+2. **IndexedDB Vault (Tier 2):** Checked if the memory cache misses. The service loads the unwrapped `CryptoKey` (stored securely with `extractable: false`) from IndexedDB, caches it to memory, and returns it.
+3. **Backend (Tier 3):** Checked if local caches miss. The client fetches the wrapped key from the backend (`GET /groups/:groupId/keys/me`). The wrapped key is decrypted client-side (using the user's master key or private wrapping key), written to both memory and IndexedDB caches, and the key-missing banner is automatically cleared.
 
 ---
 

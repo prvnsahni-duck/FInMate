@@ -11,6 +11,7 @@ import {
   ValidateNested,
   IsNumber,
   IsUUID,
+  IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -130,6 +131,13 @@ export class InviteMemberDto {
   @IsString()
   @IsOptional()
   inviteKeyHash?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['AES-KW', 'RSA-OAEP'], {
+    message: 'wrappingMethod must be one of: AES-KW, RSA-OAEP',
+  })
+  wrappingMethod?: 'AES-KW' | 'RSA-OAEP';
 
   /**
    * Role for the invited member.
