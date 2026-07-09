@@ -13,6 +13,7 @@ import {
   DefaultValuePipe,
   BadRequestException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { CreateGroupDto, UpdateContributionDto, UpdateGroupDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ExpensesCarryForwardService } from '../expenses/services';
@@ -345,13 +346,16 @@ export class GroupsController {
    * Get the caller's wrapped group data key.
    */
   @Get(':id/keys/me')
+  @Throttle({ groupKeysMe: {} })
   async getMyGroupKey(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
+    @Query('versionId') versionId?: string,
   ) {
     const result = await this.groupsMembershipService.getMyGroupKey(
       req.user.id,
       id,
+      versionId,
     );
     return new SuccessResponse('Group key retrieved', result);
   }

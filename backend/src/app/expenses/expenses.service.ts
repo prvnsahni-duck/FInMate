@@ -771,6 +771,7 @@ export class ExpensesService {
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
       .leftJoinAndSelect('expense.ownerUser', 'ownerUser')
       .leftJoinAndSelect('expense.group', 'group')
+      .leftJoinAndSelect('expense.groupKeyVersion', 'groupKeyVersion')
       .where(
         new Brackets((qb) => {
           qb.where('(ownerUser.id = :userId AND group.id IS NULL)', { userId });

@@ -19,9 +19,10 @@ async function resolveExpenseKey(
   try {
     const scope = item.encryptionScope || 'personal';
     const groupId = item.groupId;
+    const groupKeyVersionId = item.groupKeyVersionId;
 
     if (scope === 'group' && groupId) {
-      return await groupKeyService.getGroupDataKey(groupId);
+      return await groupKeyService.getGroupDataKey(groupId, groupKeyVersionId);
     }
 
     if (scope === 'direct_shared') {

@@ -664,9 +664,10 @@ export class GroupDetailComponent implements OnInit {
         let scopeKey: CryptoKey | null = null;
         const scope = (expense as any).encryptionScope || 'personal';
         const gId = (expense as any).groupId;
+        const gKeyVersionId = (expense as any).groupKeyVersionId;
 
         if (scope === 'group' && gId) {
-          scopeKey = await this.groupKeyService.getGroupDataKey(gId);
+          scopeKey = await this.groupKeyService.getGroupDataKey(gId, gKeyVersionId);
         } else if (scope === 'direct_shared') {
           const wrappedContentKeys = (expense as any).wrappedContentKeys || [];
           const myWrapped = wrappedContentKeys.find((wk: any) => wk.userId === user);

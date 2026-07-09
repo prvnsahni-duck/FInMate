@@ -62,6 +62,10 @@ export class GroupsService {
     return !!invite.expiresAt && invite.expiresAt.getTime() < Date.now();
   }
 
+  private getWrappedGroupKeyMethod(wrappedGroupKey: string): 'RSA-OAEP' | 'TIK' {
+    return wrappedGroupKey.includes(':') ? 'TIK' : 'RSA-OAEP';
+  }
+
   private async getActiveMembership(
     userId: string,
     groupId: string,
@@ -561,7 +565,9 @@ export class GroupsService {
           this.ensureActiveGroupKeyVersion(group, manager),
         ));
 
-      if (targetUser.status === 'active') {
+      const wrappingMethod = this.getWrappedGroupKeyMethod(dto.wrappedGroupKey);
+
+      if (wrappingMethod === 'RSA-OAEP') {
         const existingKey = await this.memberWrappedGroupKeyRepository.findOne({
           where: {
             groupKeyVersion: { id: activeVersion.id },
@@ -575,11 +581,13 @@ export class GroupsService {
               group,
               user: targetUser,
               wrappedGroupKey: dto.wrappedGroupKey,
+              wrappingAlgorithm: wrappingMethod,
             }),
           );
         }
       } else {
-        // Unregistered / placeholder user, save to group_invites
+        // TIK-wrapped keys must stay in the invite until the client joins,
+        // unwraps with the URL hash TIK, and provisions a self-wrapped key.
         const token = randomUUID();
         inviteToken = token;
         const expiresAt = new Date();
@@ -1141,6 +1149,7 @@ export class GroupsService {
       });
     }
 
+
     return {
       member: savedMember,
       wrappedGroupKey,
@@ -1250,11 +1259,26 @@ export class GroupsService {
     });
   }
 
-  async getMyGroupKey(userId: string, groupId: string) {
+  async getMyGroupKey(userId: string, groupId: string, versionId?: string) {
     await this.getActiveMembership(userId, groupId);
 
-    const activeVersion = await this.getActiveGroupKeyVersion(groupId);
-    if (!activeVersion) {
+    let targetVersion: GroupKeyVersion | null = null;
+    if (versionId) {
+      targetVersion = await this.groupKeyVersionRepository.findOne({
+        where: { id: versionId, group: { id: groupId } },
+        relations: ['group'],
+      });
+      if (!targetVersion) {
+        throw new BadRequestException({
+          errorCode: 'GRP_KEY_VERSION_NOT_FOUND',
+          message: `Requested group key version ${versionId} not found for group ${groupId}`,
+        });
+      }
+    } else {
+      targetVersion = await this.getActiveGroupKeyVersion(groupId);
+    }
+
+    if (!targetVersion) {
       return {
         groupId,
         userId,
@@ -1266,17 +1290,45 @@ export class GroupsService {
 
     const key = await this.memberWrappedGroupKeyRepository.findOne({
       where: {
-        groupKeyVersion: { id: activeVersion.id },
+        groupKeyVersion: { id: targetVersion.id },
         user: { id: userId },
       },
     });
 
+    // If a wrapped key is missing this is a backend data integrity problem.
+    if (!key || !key.wrappedGroupKey) {
+      const msg = `Missing wrapped key for user=${userId} group=${groupId} groupKeyVersionId=${targetVersion.id}`;
+      // Log detailed context
+      this.emailService['logger'].error(msg, {
+        groupKeyVersion: targetVersion,
+      });
+
+      const env = this.configService.get<string>('NODE_ENV') || 'production';
+      if (env === 'development' || env === 'dev') {
+        throw new BadRequestException({
+          errorCode: 'GRP_KEY_MISSING',
+          message: msg,
+          details: {
+            groupKeyVersionId: targetVersion.id,
+            groupKeyVersion: targetVersion.version,
+            algorithm: targetVersion.algorithm,
+          },
+        });
+      }
+
+      // In production fail loudly but avoid leaking internals
+      throw new BadRequestException({
+        errorCode: 'GRP_KEY_MISSING',
+        message: 'Wrapped group key unavailable for this member; contact support',
+      });
+    }
+
     return {
       groupId,
       userId,
-      groupKeyVersionId: activeVersion.id,
-      groupKeyVersion: activeVersion.version,
-      wrappedKey: key?.wrappedGroupKey ?? null,
+      groupKeyVersionId: targetVersion.id,
+      groupKeyVersion: targetVersion.version,
+      wrappedKey: key.wrappedGroupKey,
     };
   }
 
@@ -1351,6 +1403,21 @@ export class GroupsService {
           rotatedByUser: { id: userId } as User,
         }),
       );
+
+      // Validate keys cover all active members (invited or active)
+      const members = await manager.getRepository(GroupMember).find({
+        where: { group: { id: groupId }, joinStatus: In(['active', 'invited']) },
+      });
+      const memberIds = new Set(members.map((m) => m.user?.id).filter(Boolean));
+      const providedIds = new Set(dto.keys.map((k) => k.userId));
+      const missing = [...memberIds].filter((id) => !providedIds.has(id));
+      if (missing.length > 0) {
+        throw new BadRequestException({
+          errorCode: 'GRP_ROTATION_MISSING_KEYS',
+          message: 'Wrapped keys not provided for all active group members',
+          missingUserIds: missing,
+        });
+      }
 
       for (const entry of dto.keys) {
         const targetMember = await manager.getRepository(GroupMember).findOne({

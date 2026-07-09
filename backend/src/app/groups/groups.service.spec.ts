@@ -436,6 +436,134 @@ describe('GroupsService', () => {
       expect(existingMember.role).toBe('viewer');
       expect(result).toBeDefined();
     });
+
+    it('should persist RSA-wrapped direct invite keys immediately for registered users', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-id',
+        role: 'owner',
+        joinStatus: 'active',
+        user: {
+          id: 'owner-id',
+          email: 'owner@example.com',
+          displayName: 'Owner',
+        },
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({
+        id: 'group-id',
+        inviteToken: 'group-token',
+        name: 'Trip',
+      } as any);
+      userRepository.findOne.mockResolvedValueOnce({
+        id: 'target-user-id',
+        email: 'target@example.com',
+        status: 'active',
+      } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce(null);
+      groupMemberRepository.save.mockResolvedValueOnce({ id: 'member-id' } as any);
+      memberWrappedGroupKeyRepository.findOne.mockResolvedValueOnce(null);
+
+      await service.inviteMember('owner-id', 'group-id', {
+        email: 'target@example.com',
+        role: 'member',
+        wrappedGroupKey: 'rsaWrappedBase64Payload',
+      });
+
+      expect(memberWrappedGroupKeyRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          user: expect.objectContaining({ id: 'target-user-id' }),
+          wrappedGroupKey: 'rsaWrappedBase64Payload',
+          wrappingAlgorithm: 'RSA-OAEP',
+        }),
+      );
+      expect(groupInviteRepository.save).not.toHaveBeenCalled();
+    });
+
+    it('should create a TIK invite for registered users without immediately persisting member wrapped keys', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-id',
+        role: 'owner',
+        joinStatus: 'active',
+        user: {
+          id: 'owner-id',
+          email: 'owner@example.com',
+          displayName: 'Owner',
+        },
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({
+        id: 'group-id',
+        inviteToken: 'group-token',
+        name: 'Trip',
+      } as any);
+      userRepository.findOne.mockResolvedValueOnce({
+        id: 'target-user-id',
+        email: 'target@example.com',
+        status: 'active',
+        publicWrappingKey: null,
+      } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce(null);
+      groupMemberRepository.save.mockResolvedValueOnce({ id: 'member-id' } as any);
+
+      const result = await service.inviteMember('owner-id', 'group-id', {
+        email: 'target@example.com',
+        role: 'member',
+        wrappedGroupKey: 'ivBase64:ciphertextBase64',
+        inviteKeyHash: 'tik-url-safe',
+      });
+
+      expect(memberWrappedGroupKeyRepository.save).not.toHaveBeenCalled();
+      expect(groupInviteRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inviteeUser: expect.objectContaining({ id: 'target-user-id' }),
+          wrappedGroupKey: 'ivBase64:ciphertextBase64',
+          status: 'pending',
+        }),
+      );
+      expect(result.inviteToken).not.toBe('group-token');
+    });
+
+    it('should keep guest TIK invitations in group_invites', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-id',
+        role: 'owner',
+        joinStatus: 'active',
+        user: {
+          id: 'owner-id',
+          email: 'owner@example.com',
+          displayName: 'Owner',
+        },
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({
+        id: 'group-id',
+        inviteToken: 'group-token',
+        name: 'Trip',
+      } as any);
+      userRepository.findOne.mockResolvedValueOnce(null);
+      (argon2.hash as jest.Mock).mockResolvedValue('hashed-dummy-pass');
+      userRepository.save.mockResolvedValueOnce({
+        id: 'guest-user-id',
+        email: 'guest@example.com',
+        status: 'invited',
+      });
+      groupMemberRepository.findOne.mockResolvedValueOnce(null);
+      groupMemberRepository.save.mockResolvedValueOnce({ id: 'member-id' } as any);
+
+      await service.inviteMember('owner-id', 'group-id', {
+        email: 'guest@example.com',
+        role: 'member',
+        wrappedGroupKey: 'ivBase64:ciphertextBase64',
+        inviteKeyHash: 'tik-url-safe',
+      });
+
+      expect(memberWrappedGroupKeyRepository.save).not.toHaveBeenCalled();
+      expect(groupInviteRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          inviteeUser: expect.objectContaining({ id: 'guest-user-id' }),
+          invitedEmail: 'guest@example.com',
+          wrappedGroupKey: 'ivBase64:ciphertextBase64',
+          status: 'pending',
+        }),
+      );
+    });
   });
 
   describe('listMembers', () => {
@@ -504,6 +632,37 @@ describe('GroupsService', () => {
     });
   });
 
+
+  describe('joinGroupByToken TIK provisioning handoff', () => {
+    it('should return the TIK-wrapped key without saving it as a member wrapped key', async () => {
+      const invite = {
+        id: 'invite-id',
+        inviteToken: 'invite-token',
+        status: 'pending',
+        wrappedGroupKey: 'ivBase64:ciphertextBase64',
+        groupKeyVersion: { id: 'active-version-id', version: 1 },
+        group: { id: 'group-id' },
+      } as any;
+
+      groupInviteRepository.findOne.mockResolvedValueOnce(invite);
+      userRepository.findOne.mockResolvedValueOnce({
+        id: 'user-id',
+        email: 'target@example.com',
+      } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'member-id',
+        joinStatus: 'invited',
+        role: 'member',
+      } as any);
+
+      const result = await service.joinGroupByToken('user-id', 'invite-token');
+
+      expect(result.wrappedGroupKey).toBe('ivBase64:ciphertextBase64');
+      expect(result.groupKeyVersionId).toBe('active-version-id');
+      expect(invite.status).toBe('accepted');
+      expect(memberWrappedGroupKeyRepository.save).not.toHaveBeenCalled();
+    });
+  });
   describe('updateMember', () => {
     it('should throw ForbiddenException if caller does not have access', async () => {
       groupMemberRepository.findOne.mockResolvedValueOnce(null);
@@ -762,6 +921,14 @@ describe('GroupsService', () => {
       };
 
       const managerGroupMemberRepo = {
+        find: jest.fn().mockResolvedValue([
+          {
+            id: 'target-member-id',
+            user: { id: 'target-user-id' },
+            group: { id: 'group-id' },
+            joinStatus: 'active',
+          },
+        ]),
         findOne: jest.fn().mockResolvedValue({
           id: 'target-member-id',
           user: { id: 'target-user-id' },
@@ -823,6 +990,14 @@ describe('GroupsService', () => {
       };
 
       const managerGroupMemberRepo = {
+        find: jest.fn().mockResolvedValue([
+          {
+            id: 'target-member-id',
+            user: { id: 'target-user-id' },
+            group: { id: 'group-id' },
+            joinStatus: 'active',
+          },
+        ]),
         findOne: jest.fn().mockResolvedValue({
           id: 'target-member-id',
           user: { id: 'target-user-id' },

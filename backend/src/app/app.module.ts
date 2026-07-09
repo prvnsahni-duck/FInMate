@@ -92,6 +92,11 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_EXPORT', 20),
           },
+          {
+            name: 'groupKeysMe',
+            ttl: 60000,
+            limit: getLimit('THROTTLE_LIMIT_GROUP_KEYS_ME', 200),
+          },
         ];
       },
     }),

@@ -8,6 +8,7 @@ import { ClientEncryptionService } from '../../../core/services/encryption.servi
 import { Store } from '@ngxs/store';
 import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../core/constants/crypto.constants';
 import { firstValueFrom } from 'rxjs';
+import { GroupKeyService } from '../../../core/services/group-key.service';
 
 describe('ExpensesService', () => {
   let service: ExpensesService;
@@ -39,6 +40,12 @@ describe('ExpensesService', () => {
       providers: [
         ExpensesService,
         { provide: ClientEncryptionService, useValue: encSpy },
+        {
+          provide: GroupKeyService,
+          useValue: {
+            getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
+          },
+        },
         { provide: Store, useValue: storeMock },
       ],
     });
@@ -94,6 +101,30 @@ describe('ExpensesService', () => {
       req.flush({ data: [], meta: { totalItems: 0 } });
     });
 
+    it('should decrypt expenses from paginated response payloads', (done) => {
+      const mockData = {
+        data: [
+          {
+            id: 'exp-1',
+            title: 'enc:Groceries',
+            description: 'enc:Weekly groceries',
+            encryptionScope: 'group',
+            groupId: 'group-1',
+            groupKeyVersionId: 'version-1',
+          },
+        ],
+        meta: { totalItems: 1 },
+      } as any;
+
+      service.getExpenses('group-1').subscribe((res: any) => {
+        expect(res.data.data).toHaveLength(1);
+        expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalledTimes(1);
+        done();
+      });
+
+      const req = httpMock.expectOne('/api/expenses?groupId=group-1');
+      req.flush({ data: mockData });
+    });
     it('should return placeholder text when decryption fails — never ciphertext', (done) => {
       encryptionServiceSpy.decryptExpense.mockRejectedValue(
         new Error('Internal decryption error'),
@@ -117,15 +148,16 @@ describe('ExpensesService', () => {
       req.flush({ data: mockData });
     });
 
-    it('should return raw data when no encryption key is available', (done) => {
+    it('should mask encrypted data when no encryption key is available', (done) => {
       encryptionServiceSpy.loadKeyFromSession.mockResolvedValue(null);
 
       const mockData = [
-        { id: 'exp-1', title: 'Raw Title', description: 'Raw Desc' },
+        { id: 'exp-1', title: 'abc123:xyz789', description: 'cipher:text', encryptionScope: 'group' },
       ];
 
       service.getExpenses('group-1').subscribe((res) => {
-        expect(res.data[0].title).toBe('Raw Title');
+        expect(res.data[0].title).toBe(DECRYPTION_FAILED_PLACEHOLDER);
+        expect(res.data[0].description).toBe('');
         expect(encryptionServiceSpy.decryptExpense).not.toHaveBeenCalled();
         done();
       });

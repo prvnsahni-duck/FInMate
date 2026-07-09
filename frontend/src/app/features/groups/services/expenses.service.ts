@@ -33,6 +33,26 @@ function yieldToBrowser(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+function looksEncryptedExpense(expense: Partial<Expense> & { title?: unknown }): boolean {
+  return expense.encryptionScope === 'group' ||
+    expense.encryptionScope === 'personal' ||
+    (typeof expense.title === 'string' && expense.title.includes(':'));
+}
+
+function maskEncryptedExpenses(expenses: Expense[]): Expense[] {
+  return expenses.map((expense) => {
+    if (!looksEncryptedExpense(expense as any)) {
+      return expense;
+    }
+
+    return {
+      ...expense,
+      title: DECRYPTION_FAILED_PLACEHOLDER,
+      description: '',
+    };
+  });
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -140,19 +160,34 @@ export class ExpensesService {
       .get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params })
       .pipe(
         mergeMap(async (res) => {
-          const expenses = res.data as Expense[] | undefined;
+          const payload = res.data as Expense[] | { data?: Expense[] } | undefined;
+          const expenses = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : undefined;
           if (!expenses || expenses.length === 0) {
             return res;
           }
 
+          const setExpenses = (nextExpenses: Expense[]) => {
+            if (Array.isArray(payload)) {
+              res.data = nextExpenses as any;
+            } else if (payload && Array.isArray(payload.data)) {
+              payload.data = nextExpenses;
+            }
+          };
+
           const user = this.store.selectSnapshot(AuthState.getUser);
           const email = user?.email;
           if (!email) {
+            setExpenses(maskEncryptedExpenses(expenses));
             return res;
           }
 
           const key = await this.encryptionService.loadKeyFromSession(email);
           if (!key) {
+            setExpenses(maskEncryptedExpenses(expenses));
             return res;
           }
 
@@ -173,9 +208,10 @@ export class ExpensesService {
                   let key: CryptoKey | null = null;
                   const scope = expense.encryptionScope || 'personal';
                   const gId = expense.groupId;
+                  const gKeyVersionId = expense.groupKeyVersionId;
 
                   if (scope === 'group' && gId) {
-                    key = await this.groupKeyService.getGroupDataKey(gId);
+                    key = await this.groupKeyService.getGroupDataKey(gId, gKeyVersionId);
                   } else if (scope === 'direct_shared') {
                     const wrappedContentKeys = expense.wrappedContentKeys || [];
                     const myWrapped = wrappedContentKeys.find((wk: any) => wk.userId === user?.userId);
@@ -219,7 +255,7 @@ export class ExpensesService {
             }
           }
 
-          res.data = decryptedExpenses;
+          setExpenses(decryptedExpenses);
           return res;
         }),
       );

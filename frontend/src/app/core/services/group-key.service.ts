@@ -16,9 +16,14 @@ export class GroupKeyService {
   private store = inject(Store);
   private baseUrl = environment.apiBaseUrl;
 
+  // Cache keyed by `${groupId}:${groupKeyVersionId}` to avoid stale-key usage
   private groupKeysMemoryCache = new Map<string, CryptoKey>();
   private myAsymmetricKeys: { publicKey: CryptoKey; privateKey: CryptoKey } | null = null;
   rateLimitError = signal<string | null>(null);
+
+  private buildVersionedKey(groupId: string, groupKeyVersionId?: string | null): string {
+    return `${groupId}:${groupKeyVersionId ?? 'active'}`;
+  }
 
   private getSubtleCrypto(): SubtleCrypto {
     if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
@@ -137,31 +142,33 @@ export class GroupKeyService {
    * Retrieves a group's symmetric data key.
    * Checks in-memory cache -> Deduplicated active request -> IndexedDB vault -> API (and unwraps it).
    */
-  async getGroupDataKey(groupId: string): Promise<CryptoKey | null> {
-    if (this.groupKeysMemoryCache.has(groupId)) {
-      return this.groupKeysMemoryCache.get(groupId)!;
+  async getGroupDataKey(groupId: string, groupKeyVersionId?: string): Promise<CryptoKey | null> {
+    const requestKey = this.buildVersionedKey(groupId, groupKeyVersionId);
+    if (this.groupKeysMemoryCache.has(requestKey)) {
+      return this.groupKeysMemoryCache.get(requestKey)!;
     }
 
-    if (this.activeGroupKeyRequests.has(groupId)) {
-      return await this.activeGroupKeyRequests.get(groupId)!;
+    if (this.activeGroupKeyRequests.has(requestKey)) {
+      return await this.activeGroupKeyRequests.get(requestKey)!;
     }
 
-    const promise = this.fetchAndCacheGroupKey(groupId);
-    this.activeGroupKeyRequests.set(groupId, promise);
+    const promise = this.fetchAndCacheGroupKey(groupId, groupKeyVersionId);
+    this.activeGroupKeyRequests.set(requestKey, promise);
 
     try {
       return await promise;
     } finally {
-      this.activeGroupKeyRequests.delete(groupId);
+      this.activeGroupKeyRequests.delete(requestKey);
     }
   }
 
-  private async fetchAndCacheGroupKey(groupId: string): Promise<CryptoKey | null> {
+  private async fetchAndCacheGroupKey(groupId: string, groupKeyVersionId?: string): Promise<CryptoKey | null> {
+    const requestKey = this.buildVersionedKey(groupId, groupKeyVersionId);
     // Try IndexedDB first
     try {
-      const cachedKey = await this.zkVault.loadGroupKey(groupId);
+      const cachedKey = await this.zkVault.loadGroupKey(requestKey);
       if (cachedKey) {
-        this.groupKeysMemoryCache.set(groupId, cachedKey);
+        this.groupKeysMemoryCache.set(requestKey, cachedKey);
         return cachedKey;
       }
     } catch (e) {
@@ -178,15 +185,17 @@ export class GroupKeyService {
       return null;
     }
 
-    // Fetch wrapped key from server
+    // Fetch wrapped key from server. Ask server for the caller's wrapped key for the active version.
     try {
+      const url = `${this.baseUrl}/groups/${groupId}/keys/me` + (groupKeyVersionId ? `?versionId=${groupKeyVersionId}` : '');
       const response = await firstValueFrom(
-        this.http.get<{ data: { wrappedKey: string | null } }>(
-          `${this.baseUrl}/groups/${groupId}/keys/me`,
+        this.http.get<{ data: { wrappedKey: string | null; groupKeyVersionId?: string } }>(
+          url,
         ),
       );
 
       const wrappedKey = response?.data?.wrappedKey;
+      const returnedVersionId = response?.data?.groupKeyVersionId ?? groupKeyVersionId ?? 'active';
       if (wrappedKey) {
         let unwrappedKey: CryptoKey;
         if (wrappedKey.includes(':')) {
@@ -198,9 +207,10 @@ export class GroupKeyService {
           unwrappedKey = await this.encryptionService.unwrapKey(wrappedKey, privateKey);
         }
 
-        this.groupKeysMemoryCache.set(groupId, unwrappedKey);
+        const cacheKey = this.buildVersionedKey(groupId, returnedVersionId);
+        this.groupKeysMemoryCache.set(cacheKey, unwrappedKey);
         try {
-          await this.zkVault.storeGroupKey(groupId, unwrappedKey);
+          await this.zkVault.storeGroupKey(cacheKey, unwrappedKey);
         } catch (e) {
           console.warn('Failed to store unwrapped group key in IndexedDB', e);
         }
@@ -208,6 +218,9 @@ export class GroupKeyService {
         return unwrappedKey;
       }
     } catch (e: any) {
+      if (e?.status === 400 && e?.error?.errorCode === 'GRP_KEY_MISSING') {
+        return null;
+      }
       console.error('Failed to unwrap group data key', e);
       if (e?.status === 429) {
         this.rateLimitError.set('Too many requests. Please try again later.');
@@ -236,8 +249,9 @@ export class GroupKeyService {
     const wrappedKeyForSelf = await this.encryptionService.wrapKey(groupKey, masterKey);
 
     // Save locally
-    this.groupKeysMemoryCache.set(groupId, groupKey);
-    await this.zkVault.storeGroupKey(groupId, groupKey);
+    const cacheKey = this.buildVersionedKey(groupId, 'active');
+    this.groupKeysMemoryCache.set(cacheKey, groupKey);
+    await this.zkVault.storeGroupKey(cacheKey, groupKey);
 
     // Post to server
     await firstValueFrom(
