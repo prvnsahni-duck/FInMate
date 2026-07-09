@@ -5,6 +5,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { ConditionalThrottleGuard } from './guards/conditional-throttle.guard';
+import { validate } from './env.validation';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import * as Migrations from '../migrations';
@@ -104,6 +105,7 @@ import { Note, Goal, AuditLog } from '@finmate/data-models';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '.env.dev'],
+      validate,
     }),
     TypeOrmModule.forFeature([Note, Goal, AuditLog]),
     TypeOrmModule.forRootAsync({

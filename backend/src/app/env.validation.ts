@@ -1,0 +1,32 @@
+import { plainToInstance } from 'class-transformer';
+import { IsBoolean, IsOptional, validateSync } from 'class-validator';
+
+export class EnvironmentVariables {
+  @IsOptional()
+  @IsBoolean()
+  RATE_LIMIT_ENABLED?: boolean;
+}
+
+export function validate(config: Record<string, unknown>) {
+  // Safe default value if environment variable is missing
+  if (
+    config.RATE_LIMIT_ENABLED === undefined ||
+    config.RATE_LIMIT_ENABLED === null ||
+    config.RATE_LIMIT_ENABLED === ''
+  ) {
+    config.RATE_LIMIT_ENABLED = 'true';
+  }
+
+  const validatedConfig = plainToInstance(
+    EnvironmentVariables,
+    config,
+    { enableImplicitConversion: true },
+  );
+
+  const errors = validateSync(validatedConfig, { skipMissingProperties: false });
+
+  if (errors.length > 0) {
+    throw new Error(`Environment validation failed: ${errors.toString()}`);
+  }
+  return validatedConfig;
+}
