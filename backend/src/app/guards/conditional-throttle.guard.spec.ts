@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { ConditionalThrottleGuard } from './conditional-throttle.guard';
 
 describe('ConditionalThrottleGuard', () => {
+  const originalNodeEnv = process.env.NODE_ENV;
   let guard: ConditionalThrottleGuard;
   let mockThrottlerGuard: jest.Mocked<ThrottlerGuard>;
   let mockConfigService: jest.Mocked<ConfigService>;
@@ -49,6 +50,11 @@ describe('ConditionalThrottleGuard', () => {
         getRequest: jest.fn().mockReturnValue({}),
       } as unknown as ExecutionContext;
       jest.clearAllMocks();
+      process.env.NODE_ENV = 'development';
+    });
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
     });
 
     it('should bypass throttling (return true) when RATE_LIMIT_ENABLED is false', async () => {
@@ -90,7 +96,6 @@ describe('ConditionalThrottleGuard', () => {
     });
 
     it('should bypass throttling when isE2E returns true (NODE_ENV is test)', async () => {
-      const originalNodeEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = 'test';
 
       mockConfigService.get.mockImplementation((key: string) => {
@@ -102,8 +107,7 @@ describe('ConditionalThrottleGuard', () => {
 
       expect(result).toBe(true);
       expect(mockThrottlerGuard.canActivate).not.toHaveBeenCalled();
-
-      process.env.NODE_ENV = originalNodeEnv;
     });
   });
 });
+
