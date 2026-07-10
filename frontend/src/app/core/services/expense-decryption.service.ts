@@ -139,6 +139,22 @@ export class ExpenseDecryptionService {
     return out;
   }
 
+  /**
+   * Public: resolve the scope key for an expense (group / direct_shared /
+   * personal) with a classified status. Shared with non-title flows such as
+   * attachment download so they don't re-implement key resolution.
+   */
+  async resolveExpenseKey(
+    expense: DecryptableExpense,
+  ): Promise<{ key: CryptoKey | null; keyStatus: GroupKeyStatus }> {
+    const user = this.store.selectSnapshot(AuthState.getUser);
+    const email = user?.email;
+    if (!email) {
+      return { key: null, keyStatus: 'no_session' };
+    }
+    return this.resolveKey(expense, user, email);
+  }
+
   /** Resolve the decryption key for an expense's scope, with a status. */
   private async resolveKey(
     expense: DecryptableExpense,

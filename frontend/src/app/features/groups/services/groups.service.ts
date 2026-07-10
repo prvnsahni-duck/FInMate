@@ -8,6 +8,7 @@ import { AuthState } from '../../../core/auth/auth.state';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../core/services/group-key.service';
 import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../core/constants/crypto.constants';
+import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
 import {
   CarryForwardBalance,
   CreateGroupDto,
@@ -33,6 +34,7 @@ export class GroupsService {
   private store = inject(Store);
   private groupKeyService = inject(GroupKeyService);
   private encryptionService = inject(ClientEncryptionService);
+  private decryptor = inject(ExpenseDecryptionService);
   private baseUrl = environment.apiBaseUrl;
 
   /**
@@ -137,9 +139,19 @@ export class GroupsService {
    * Fetch deleted/soft-deleted expenses in a group.
    */
   getDeletedExpenses(groupId: string): Observable<{ data: Expense[] }> {
-    return this.http.get<{ data: Expense[] }>(
-      `${this.baseUrl}/groups/${groupId}/expenses/deleted`,
-    );
+    return this.http
+      .get<{ data: Expense[] }>(
+        `${this.baseUrl}/groups/${groupId}/expenses/deleted`,
+      )
+      .pipe(
+        // Decrypt trashed expenses through the same central pipeline as the
+        // ledger so titles render (and get contextual states) instead of
+        // showing raw ciphertext.
+        mergeMap(async (res) => {
+          res.data = await this.decryptor.decryptExpenses(res.data || []);
+          return res;
+        }),
+      );
   }
 
   /**
