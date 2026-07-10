@@ -9,7 +9,6 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../../environments/environment';
 import { ClientEncryptionService, base64ToArrayBuffer } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
-import { ZkKeyVaultService } from '../../../../core/services/zk-key-vault.service';
 
 @Component({
   selector: 'app-join-group',
@@ -24,7 +23,6 @@ export class JoinGroupComponent implements OnInit {
   private store = inject(Store);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
-  private zkVault = inject(ZkKeyVaultService);
   private http = inject(HttpClient);
 
   inviteToken = '';
@@ -124,8 +122,10 @@ export class JoinGroupComponent implements OnInit {
               })
             );
 
-            // Store in IndexedDB vault
-            await this.zkVault.storeGroupKey(groupId, groupKey);
+            // Warm the cache through GroupKeyService so the key is stored under
+            // the same versioned vault/memory keys the ledger later looks up
+            // (avoids the group:${id} vs ${id}:${version} mismatch).
+            await this.groupKeyService.getGroupDataKey(groupId);
           }
         }
       }

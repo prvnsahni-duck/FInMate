@@ -23,6 +23,8 @@ import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
 import { ExpenseDecryptCoordinator } from '../../../../core/services/expense-decrypt-coordinator.service';
+import { ExpenseDecryptionService } from '../../../../core/services/expense-decryption.service';
+import { classifyDecryptionError } from '../../../../core/models/decryption-state';
 
 import {
   BalanceEntry,
@@ -99,6 +101,7 @@ export class GroupDetailComponent implements OnInit {
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
   private decryptCoordinator = inject(ExpenseDecryptCoordinator);
+  private expenseDecryption = inject(ExpenseDecryptionService);
   private store = inject(Store);
   private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
@@ -690,36 +693,18 @@ export class GroupDetailComponent implements OnInit {
   async downloadAttachment(file: any) {
     if (file.encryptedFileKey && file.encryptedOriginalName) {
       try {
-        const user = this.currentUserId();
-        const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
-
         const expense = this.expenses().find((e) => e.id === file.expenseId);
         if (!expense) {
           throw new Error('Expense context not found for attachment');
         }
 
-        let scopeKey: CryptoKey | null = null;
-        const scope = (expense as any).encryptionScope || 'personal';
-        const gId = (expense as any).groupId;
-        const gKeyVersionId = (expense as any).groupKeyVersionId;
-
-        if (scope === 'group' && gId) {
-          scopeKey = await this.groupKeyService.getGroupDataKey(gId, gKeyVersionId);
-        } else if (scope === 'direct_shared') {
-          const wrappedContentKeys = (expense as any).wrappedContentKeys || [];
-          const myWrapped = wrappedContentKeys.find((wk: any) => wk.userId === user);
-          if (myWrapped) {
-            const masterKey = await this.encryptionService.loadKeyFromSession(email || undefined);
-            if (masterKey) {
-              scopeKey = await this.encryptionService.unwrapKey(myWrapped.wrappedKey, masterKey);
-            }
-          }
-        } else {
-          scopeKey = await this.encryptionService.loadKeyFromSession(email || undefined);
-        }
+        // Reuse the central pipeline's scope-key resolution + classification
+        // instead of re-implementing it here.
+        const { key: scopeKey, keyStatus } =
+          await this.expenseDecryption.resolveExpenseKey(expense as any);
 
         if (!scopeKey) {
-          throw new Error('Decryption key not available.');
+          throw new Error(classifyDecryptionError({ keyStatus }).message);
         }
 
         const fileKey = await this.encryptionService.unwrapKey(file.encryptedFileKey, scopeKey);
