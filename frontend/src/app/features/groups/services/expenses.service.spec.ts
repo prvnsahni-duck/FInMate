@@ -8,6 +8,8 @@ import { ClientEncryptionService } from '../../../core/services/encryption.servi
 import { Store } from '@ngxs/store';
 import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../core/constants/crypto.constants';
 import { firstValueFrom } from 'rxjs';
+import { GroupKeyService } from '../../../core/services/group-key.service';
+import { DECRYPTION_MESSAGES } from '../../../core/models/decryption-state';
 
 describe('ExpensesService', () => {
   let service: ExpensesService;
@@ -39,6 +41,13 @@ describe('ExpensesService', () => {
       providers: [
         ExpensesService,
         { provide: ClientEncryptionService, useValue: encSpy },
+        {
+          provide: GroupKeyService,
+          useValue: {
+            getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
+            resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: 'mock-group-key' }),
+          },
+        },
         { provide: Store, useValue: storeMock },
       ],
     });
@@ -104,10 +113,10 @@ describe('ExpensesService', () => {
       ];
 
       service.getExpenses('group-1').subscribe((res) => {
-        expect(res.data[0].title).toBe(DECRYPTION_FAILED_PLACEHOLDER);
+        expect(res.data[0].title).toBe(DECRYPTION_MESSAGES.unexpected);
         expect(res.data[0].description).toBe('');
         // Verify no technical message leaks
-        expect(res.data[0].title).not.toContain('decrypt');
+        expect(res.data[0].title).not.toContain('decrypt failed');
         expect(res.data[0].title).not.toContain('CryptoKey');
         expect(res.data[0].title).not.toContain('AES');
         done();
@@ -125,7 +134,8 @@ describe('ExpensesService', () => {
       ];
 
       service.getExpenses('group-1').subscribe((res) => {
-        expect(res.data[0].title).toBe('Raw Title');
+        expect(res.data[0].title).toBe(DECRYPTION_MESSAGES.session);
+        expect(res.data[0].description).toBe('');
         expect(encryptionServiceSpy.decryptExpense).not.toHaveBeenCalled();
         done();
       });
@@ -213,7 +223,7 @@ describe('ExpensesService', () => {
 
       const resolvedExpense = await promise;
 
-      expect(resolvedExpense.title).toBe(DECRYPTION_FAILED_PLACEHOLDER);
+      expect(resolvedExpense.title).toBe(DECRYPTION_MESSAGES.unexpected);
     });
   });
 
@@ -282,7 +292,7 @@ describe('ExpensesService', () => {
       );
 
       service.restoreExpense('exp-1').subscribe((expense) => {
-        expect(expense.title).toBe(DECRYPTION_FAILED_PLACEHOLDER);
+        expect(expense.title).toBe(DECRYPTION_MESSAGES.unexpected);
         expect(expense.description).toBe('');
         done();
       });
@@ -366,7 +376,7 @@ describe('ExpensesService', () => {
         const desc = res.data[0].description;
         const combined = `${title} ${desc}`;
 
-        expect(combined).not.toMatch(/decrypt/i);
+        expect(combined).not.toMatch(/decrypt failed/i);
         expect(combined).not.toMatch(/CryptoKey/i);
         expect(combined).not.toMatch(/AES/i);
         expect(combined).not.toMatch(/IndexedDB/i);

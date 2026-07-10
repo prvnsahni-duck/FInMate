@@ -22,14 +22,14 @@ export interface DecryptionSummary {
   settled: boolean;
 }
 
-export interface CoordinatorConfig {
+export interface CoordinatorConfig<T extends DecryptableExpense = DecryptableExpense> {
   groupId: string;
   /** Caller's role in the group (owner/admin can mint & provision keys). */
   role: string;
   /** Current list to decrypt (ciphertext preserved on each item). */
-  getExpenses: () => DecryptableExpense[];
+  getExpenses: () => T[];
   /** Publish the freshly decrypted list back to the view. */
-  publish: (expenses: DecryptableExpense[]) => void;
+  publish: (expenses: T[]) => void;
 }
 
 /**
@@ -75,7 +75,7 @@ export class ExpenseDecryptCoordinator {
    * Start (or restart) decryption + recovery for a group's current list.
    * Fire-and-forget; state is exposed via `phase` / `summary` signals.
    */
-  start(config: CoordinatorConfig): void {
+  start<T extends DecryptableExpense>(config: CoordinatorConfig<T>): void {
     const token = ++this.session;
     void this.run(config, token);
   }
@@ -92,14 +92,14 @@ export class ExpenseDecryptCoordinator {
    * members' keys even before the first expense is decrypted.
    */
   async provision(groupId: string, role: string): Promise<void> {
-    await this.recoverKeys({ groupId, role } as CoordinatorConfig, this.session);
+    await this.recoverKeys({ groupId, role } as CoordinatorConfig<any>, this.session);
   }
 
   private isCurrent(token: number): boolean {
     return token === this.session;
   }
 
-  private async run(config: CoordinatorConfig, token: number): Promise<void> {
+  private async run<T extends DecryptableExpense>(config: CoordinatorConfig<T>, token: number): Promise<void> {
     this.phase.set('loading');
     let attempt = 0;
 
@@ -131,7 +131,7 @@ export class ExpenseDecryptCoordinator {
   }
 
   /** One decryption pass over the current list; publishes + updates summary. */
-  private async decryptPass(config: CoordinatorConfig, token: number): Promise<void> {
+  private async decryptPass<T extends DecryptableExpense>(config: CoordinatorConfig<T>, token: number): Promise<void> {
     const source = config.getExpenses();
     const decrypted = await this.decryptor.decryptExpenses(source);
     if (!this.isCurrent(token)) return;
@@ -145,7 +145,7 @@ export class ExpenseDecryptCoordinator {
    * provisions any members missing a wrapped key. All failures are logged and
    * swallowed — the next decrypt pass reflects whatever became available.
    */
-  private async recoverKeys(config: CoordinatorConfig, token: number): Promise<void> {
+  private async recoverKeys(config: CoordinatorConfig<any>, token: number): Promise<void> {
     const { groupId, role } = config;
     try {
       await this.groupKeys.getMyAsymmetricKeys();

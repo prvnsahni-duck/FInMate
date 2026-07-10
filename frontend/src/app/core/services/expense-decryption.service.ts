@@ -27,7 +27,6 @@ export interface DecryptableExpense {
   groupKeyVersionId?: string;
   wrappedContentKeys?: Array<{ userId: string; wrappedKey: string }>;
   decryption?: ExpenseDecryptionMeta;
-  [key: string]: unknown;
 }
 
 const DECRYPTION_BATCH_SIZE = 25;

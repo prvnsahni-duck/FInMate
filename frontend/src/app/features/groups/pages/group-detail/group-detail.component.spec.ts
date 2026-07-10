@@ -138,6 +138,8 @@ describe('GroupDetailComponent', () => {
       getMyAsymmetricKeys: jest.fn().mockResolvedValue({}),
       getGroupDataKey: jest.fn().mockResolvedValue({}),
       createGroupKey: jest.fn().mockResolvedValue({}),
+      createAndStoreGroupKey: jest.fn().mockResolvedValue({}),
+      resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: {} }),
       checkAndProvisionMissingKeys: jest.fn().mockResolvedValue({}),
       invalidateGroupKey: jest.fn(),
       // Provide Signal-compatible objects used by the component/template
