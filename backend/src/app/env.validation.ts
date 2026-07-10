@@ -14,7 +14,14 @@ export function validate(config: Record<string, unknown>) {
     config.RATE_LIMIT_ENABLED === null ||
     config.RATE_LIMIT_ENABLED === ''
   ) {
-    config.RATE_LIMIT_ENABLED = 'true';
+    config.RATE_LIMIT_ENABLED = true;
+  } else if (typeof config.RATE_LIMIT_ENABLED === 'string') {
+    const normalized = config.RATE_LIMIT_ENABLED.trim().toLowerCase();
+    if (normalized === 'true') {
+      config.RATE_LIMIT_ENABLED = true;
+    } else if (normalized === 'false') {
+      config.RATE_LIMIT_ENABLED = false;
+    }
   }
 
   const validatedConfig = plainToInstance(
@@ -30,3 +37,4 @@ export function validate(config: Record<string, unknown>) {
   }
   return validatedConfig;
 }
+
