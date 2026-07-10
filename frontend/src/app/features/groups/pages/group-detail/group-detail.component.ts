@@ -27,6 +27,7 @@ import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
 import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../../core/constants/crypto.constants';
+import { ExpenseDecryptCoordinator } from '../../../../core/services/expense-decrypt-coordinator.service';
 
 import {
   BalanceEntry,
@@ -103,6 +104,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   private destroyRef = inject(DestroyRef);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
+  private decryptCoordinator = inject(ExpenseDecryptCoordinator);
   private store = inject(Store);
   private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
@@ -112,6 +114,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         clearInterval(this.retryCooldownIntervalId);
         this.retryCooldownIntervalId = undefined;
       }
+      // Cancel any in-flight decryption retry loop for this group.
+      this.decryptCoordinator.stop();
     });
   }
 
@@ -189,7 +193,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   currentTimelineMonth = signal<Date>(new Date());
   isMonthLocked = signal<boolean>(false);
   isViewer = signal<boolean>(false);
-  isGroupKeyLoaded = signal<boolean>(true);
   isMasterKeyLoaded = signal<boolean>(true);
   rateLimitError = this.groupKeyService.rateLimitError;
   readonly DECRYPTION_FAILED_PLACEHOLDER = DECRYPTION_FAILED_PLACEHOLDER;
@@ -205,6 +208,29 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   membersError = signal<boolean>(false);
   balancesError = signal<boolean>(false);
   analyticsError = signal<boolean>(false);
+
+  // Decryption lifecycle state (owned by the coordinator).
+  decryptionPhase = this.decryptCoordinator.phase;
+  decryptionSummary = this.decryptCoordinator.summary;
+
+  /** Some expenses are still waiting for keys after the retry budget settled. */
+  showKeysWaitingBanner = computed(
+    () =>
+      this.decryptionPhase() === 'settled' &&
+      this.decryptionSummary().waiting > 0,
+  );
+
+  /** Some expenses can never be decrypted (no access / corrupted). */
+  showKeysPermanentBanner = computed(
+    () => this.decryptionSummary().permanent > 0,
+  );
+
+  /** Active automatic recovery in progress (drives the "retrying" hint). */
+  isRecoveringKeys = computed(
+    () =>
+      this.decryptionPhase() === 'loading' ||
+      this.decryptionPhase() === 'recovering',
+  );
 
   // Categories list
   categories = [
@@ -350,29 +376,37 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
+  /**
+   * Called once membership (and therefore the caller's role) is known.
+   * Proactively provisions key material, then hands the expense list to the
+   * decryption coordinator which owns the decrypt → retry → success lifecycle.
+   */
   async initializeGroupKeysAndSelfHeal(groupId: string) {
-    try {
-      const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
-      const masterKey = await this.encryptionService.loadKeyFromSession(email || undefined);
-      this.isMasterKeyLoaded.set(!!masterKey);
+    const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
+    const masterKey = await this.encryptionService.loadKeyFromSession(email || undefined);
+    this.isMasterKeyLoaded.set(!!masterKey);
 
-      await this.groupKeyService.getMyAsymmetricKeys();
-      let key = await this.groupKeyService.getGroupDataKey(groupId);
-      if (!key) {
-        const role = this.getCallerRole();
-        if (role === 'owner' || role === 'admin') {
-          console.info('No group key found. Generating new group data key...');
-          key = await this.groupKeyService.createGroupKey(groupId);
-        }
-      }
-      this.isGroupKeyLoaded.set(!!key);
-      if (key) {
-        await this.groupKeyService.checkAndProvisionMissingKeys(groupId);
-      }
-    } catch (e) {
-      console.warn('Failed to initialize group encryption keys / self-heal', e);
-      this.isGroupKeyLoaded.set(false);
-    }
+    const role = this.getCallerRole();
+    // Proactively ensure keys exist / are provisioned for all members, even
+    // before any expense is decrypted (matters for empty or new groups).
+    await this.decryptCoordinator.provision(groupId, role);
+    this.startDecryption();
+  }
+
+  /**
+   * Start (or restart) the coordinator over the current expense list. Safe to
+   * call repeatedly — it cancels any prior session and re-decrypts from the
+   * ciphertext preserved on each item (no server round-trip needed).
+   */
+  private startDecryption() {
+    const g = this.group();
+    if (!g?.id) return;
+    this.decryptCoordinator.start({
+      groupId: g.id,
+      role: this.getCallerRole(),
+      getExpenses: () => this.expenses(),
+      publish: (list) => this.expenses.set(list as GroupExpense[]),
+    });
   }
 
   async refreshGroupKey() {
@@ -657,6 +691,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.totalExpenses.set(res.meta?.totalItems || 0);
           this.stopLoading();
           this.ledgerError.set(false);
+          // Hand the freshly-fetched list to the coordinator for
+          // classification + automatic retry/recovery.
+          this.startDecryption();
         },
         error: () => {
           this.stopLoading();

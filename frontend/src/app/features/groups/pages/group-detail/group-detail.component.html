@@ -43,32 +43,19 @@
       </div>
     }
 
-    @if (requiresKeyProvisioning()) {
+    @if (showKeysWaitingBanner() || showKeysPermanentBanner()) {
       <div class="bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-3xl p-6 mb-6 flex items-start space-x-3 shadow-lg">
         <svg class="w-6 h-6 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
         </svg>
         <div class="w-full">
-          <h4 class="font-bold text-sm">Unable to access the group key</h4>
-          <p class="text-xs opacity-90 font-medium mb-4">Your group data key has not been shared with you yet. Try refreshing, or contact the group owner.</p>
-          <div class="flex flex-wrap gap-2">
-            <button (click)="refreshGroupKey()" [disabled]="isRefreshingKey()" class="bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-xl text-xs transition cursor-pointer">
-              {{ isRefreshingKey() ? 'Refreshing...' : 'Refresh Group Key' }}
-            </button>
-            <a href="mailto:?subject=FinMate%20-%20Please%20sync%20group%20key" class="bg-surface hover:bg-surface-alt border border-border/10 text-secondary font-bold px-4 py-2 rounded-xl text-xs transition flex items-center justify-center">
-              Contact Group Owner
-            </a>
-          </div>
-        </div>
-      </div>
-    } @else if (!isGroupKeyLoaded()) {
-      <div class="bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-3xl p-6 mb-6 flex items-start space-x-3 shadow-lg">
-        <svg class="w-6 h-6 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-        </svg>
-        <div class="w-full">
-          <h4 class="font-bold text-sm">Encryption key missing for this group</h4>
-          <p class="text-xs opacity-90 font-medium">Your group data key has not been provisioned yet. Ask the group creator or an admin to open this group page while you are online to provision your key.</p>
+          @if (showKeysWaitingBanner()) {
+            <h4 class="font-bold text-sm">Waiting for group encryption keys</h4>
+            <p class="text-xs opacity-90 font-medium">Some expenses can't be shown yet because your group key hasn't been provisioned. Ask the group creator or an admin to open this group page while you're online — the affected expenses will appear automatically once your key arrives.</p>
+          } @else {
+            <h4 class="font-bold text-sm">Some expenses can't be decrypted</h4>
+            <p class="text-xs opacity-90 font-medium">One or more expenses can't be decrypted because the required encryption key is unavailable or you no longer have access to them.</p>
+          }
 
           @if (!isMasterKeyLoaded()) {
             <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 max-w-md">
@@ -800,7 +787,30 @@
                         </div>
                         <div>
                           <h4 class="font-bold flex items-center gap-2" data-testid="expense-title">
-                            {{ expense.title }}
+                            @if (!$any(expense).decryption || $any(expense).decryption.state === 'success') {
+                              {{ expense.title }}
+                            } @else if ($any(expense).decryption.category === 'temporary' || $any(expense).decryption.category === 'recoverable') {
+                              <span
+                                class="inline-flex items-center gap-1.5 text-sm font-medium italic text-slate-400 dark:text-slate-500"
+                                [attr.data-decryption-state]="$any(expense).decryption.state"
+                              >
+                                <svg class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
+                                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                </svg>
+                                {{ $any(expense).decryption.message }}
+                              </span>
+                            } @else {
+                              <span
+                                class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 dark:text-slate-500"
+                                [attr.data-decryption-state]="$any(expense).decryption.state"
+                              >
+                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                </svg>
+                                {{ $any(expense).decryption.message }}
+                              </span>
+                            }
                             @if (expense.status === 'void') {
                               <span
                                 class="px-2 py-0.5 bg-surface text-[10px] rounded text-muted capitalize"

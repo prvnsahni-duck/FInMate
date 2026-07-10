@@ -14,24 +14,10 @@ import {
   MonthlyAnalyticsPoint,
   UpdateExpenseDto,
 } from '@finmate/data-models';
-import {
-  DECRYPTION_FAILED_PLACEHOLDER,
-  SESSION_EXPIRED_MESSAGE,
-} from '../../../core/constants/crypto.constants';
+import { SESSION_EXPIRED_MESSAGE } from '../../../core/constants/crypto.constants';
 import { mapDecryptExpense } from '../../../core/utils/crypto-operators';
 import { GroupKeyService } from '../../../core/services/group-key.service';
-
-type EncryptedExpensePayload = Expense & {
-  title: string;
-  description?: string;
-  [key: string]: unknown;
-};
-
-const EXPENSE_DECRYPTION_BATCH_SIZE = 25;
-
-function yieldToBrowser(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}
+import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
 
 @Injectable({
   providedIn: 'root',
@@ -41,6 +27,7 @@ export class ExpensesService {
   private store = inject(Store);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
+  private decryptor = inject(ExpenseDecryptionService);
   private baseUrl = environment.apiBaseUrl;
 
   /**
@@ -140,86 +127,27 @@ export class ExpensesService {
       .get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params })
       .pipe(
         mergeMap(async (res) => {
-          const expenses = res.data as Expense[] | undefined;
+          const payload = res.data as Expense[] | { data?: Expense[] } | undefined;
+          const expenses = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : undefined;
           if (!expenses || expenses.length === 0) {
             return res;
           }
 
-          const user = this.store.selectSnapshot(AuthState.getUser);
-          const email = user?.email;
-          if (!email) {
-            return res;
+          // Single decryption pipeline: resolves keys per scope, classifies any
+          // failure, and preserves ciphertext so items can be retried later.
+          const decryptedExpenses = await this.decryptor.decryptExpenses(
+            expenses as any[],
+          );
+
+          if (Array.isArray(payload)) {
+            res.data = decryptedExpenses as any;
+          } else if (payload && Array.isArray(payload.data)) {
+            payload.data = decryptedExpenses as any;
           }
-
-          const key = await this.encryptionService.loadKeyFromSession(email);
-          if (!key) {
-            return res;
-          }
-
-          const decryptedExpenses: Expense[] = [];
-
-          for (
-            let index = 0;
-            index < expenses.length;
-            index += EXPENSE_DECRYPTION_BATCH_SIZE
-          ) {
-            const batch = expenses.slice(
-              index,
-              index + EXPENSE_DECRYPTION_BATCH_SIZE,
-            );
-            const decryptedBatch = await Promise.all(
-              batch.map(async (expense: any) => {
-                try {
-                  let key: CryptoKey | null = null;
-                  const scope = expense.encryptionScope || 'personal';
-                  const gId = expense.groupId;
-
-                  if (scope === 'group' && gId) {
-                    key = await this.groupKeyService.getGroupDataKey(gId);
-                  } else if (scope === 'direct_shared') {
-                    const wrappedContentKeys = expense.wrappedContentKeys || [];
-                    const myWrapped = wrappedContentKeys.find((wk: any) => wk.userId === user?.userId);
-                    if (myWrapped) {
-                      const masterKey = await this.encryptionService.loadKeyFromSession(email);
-                      if (masterKey) {
-                        key = await this.encryptionService.unwrapKey(myWrapped.wrappedKey, masterKey);
-                      }
-                    }
-                  } else {
-                    key = await this.encryptionService.loadKeyFromSession(email);
-                  }
-
-                  if (!key) {
-                    throw new Error('Key not available for scope ' + scope);
-                  }
-
-                  const decrypted = await this.encryptionService.decryptExpense(
-                    expense as EncryptedExpensePayload,
-                    key,
-                  );
-                  return {
-                    ...expense,
-                    title: decrypted.title,
-                    description: decrypted.description,
-                  };
-                } catch (e) {
-                  console.error('Decryption failed for expense', expense.id, e);
-                  return {
-                    ...expense,
-                    title: DECRYPTION_FAILED_PLACEHOLDER,
-                    description: '',
-                  };
-                }
-              }),
-            );
-            decryptedExpenses.push(...decryptedBatch);
-
-            if (index + EXPENSE_DECRYPTION_BATCH_SIZE < expenses.length) {
-              await yieldToBrowser();
-            }
-          }
-
-          res.data = decryptedExpenses;
           return res;
         }),
       );
@@ -233,7 +161,7 @@ export class ExpensesService {
       mergeMap((encryptedPayload) =>
         this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload),
       ),
-      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
+      mapDecryptExpense(this.decryptor),
     );
   }
 
@@ -248,7 +176,7 @@ export class ExpensesService {
           encryptedPayload,
         ),
       ),
-      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
+      mapDecryptExpense(this.decryptor),
     );
   }
 
@@ -265,7 +193,7 @@ export class ExpensesService {
   restoreExpense(id: string): Observable<Expense> {
     return this.http
       .post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {})
-      .pipe(mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService));
+      .pipe(mapDecryptExpense(this.decryptor));
   }
 
   /**
