@@ -1,13 +1,11 @@
 import { Component, inject, OnInit, OnDestroy } from '@angular/core';
 import { Subscription } from 'rxjs';
-import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Store } from '@ngxs/store';
 import { AuthState, Logout } from '../../../../core/auth/auth.state';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CreateExpenseModalComponent } from '../../../groups/components/create-expense-modal/create-expense-modal.component';
-import { AnalyticsChartsComponent } from '../../../groups/components/analytics-charts/analytics-charts.component';
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
 
 import { GroupsService } from '../../../groups/services/groups.service';
@@ -31,10 +29,7 @@ import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
   standalone: true,
   imports: [
     FormsModule,
-    CurrencyPipe,
-    DatePipe,
     CreateExpenseModalComponent,
-    AnalyticsChartsComponent,
     ConfirmModalComponent,
     DashboardHomeComponent,
     DashboardAnalyticsComponent,

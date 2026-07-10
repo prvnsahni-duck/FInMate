@@ -4,6 +4,7 @@ import {
   HttpTestingController,
 } from '@angular/common/http/testing';
 import { GroupsService } from './groups.service';
+import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
 
 describe('GroupsService', () => {
   let service: GroupsService;
@@ -12,7 +13,16 @@ describe('GroupsService', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [HttpClientTestingModule],
-      providers: [GroupsService],
+      providers: [
+        GroupsService,
+        {
+          provide: ExpenseDecryptionService,
+          useValue: {
+            decryptExpenses: jest.fn().mockImplementation((expenses) => Promise.resolve(expenses)),
+            decryptExpense: jest.fn().mockImplementation((expense) => Promise.resolve(expense)),
+          },
+        },
+      ],
     });
 
     service = TestBed.inject(GroupsService);

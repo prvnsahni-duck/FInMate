@@ -336,7 +336,7 @@ export class GroupDetailComponent implements OnInit {
       groupId: g.id,
       role: this.getCallerRole(),
       getExpenses: () => this.expenses(),
-      publish: (list) => this.expenses.set(list as GroupExpense[]),
+      publish: (list) => this.expenses.set(list),
     });
   }
 

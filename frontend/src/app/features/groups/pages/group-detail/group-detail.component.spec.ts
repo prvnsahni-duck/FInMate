@@ -132,6 +132,7 @@ describe('GroupDetailComponent', () => {
     mockGroupKeyService = {
       getMyAsymmetricKeys: jest.fn().mockResolvedValue({}),
       getGroupDataKey: jest.fn().mockResolvedValue({}),
+      resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: {} }),
       checkAndProvisionMissingKeys: jest.fn().mockResolvedValue({}),
       rateLimitError: jest.fn().mockReturnValue(null),
     };

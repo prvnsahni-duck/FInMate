@@ -6,6 +6,7 @@ import {
 import { RecurringExpensesService } from './recurring-expenses.service';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import { Store } from '@ngxs/store';
+import { GroupKeyService } from '../../../core/services/group-key.service';
 
 describe('RecurringExpensesService', () => {
   let service: RecurringExpensesService;
@@ -32,6 +33,13 @@ describe('RecurringExpensesService', () => {
       providers: [
         RecurringExpensesService,
         { provide: ClientEncryptionService, useValue: encSpy },
+        {
+          provide: GroupKeyService,
+          useValue: {
+            getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
+            resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: 'mock-group-key' }),
+          },
+        },
         { provide: Store, useValue: storeMock },
       ],
     });
@@ -52,7 +60,7 @@ describe('RecurringExpensesService', () => {
   });
 
   it('should fetch recurring expenses and decrypt them', (done) => {
-    const mockData = [{ id: '1', title: 'enc-title', description: 'enc-desc' }];
+    const mockData = [{ id: '1', title: 'enc:title', description: 'enc:desc' }];
 
     service.getRecurringExpenses('group-1').subscribe((data) => {
       expect(data).toHaveLength(1);
