@@ -14,6 +14,7 @@ import {
   mapDecryptExpense,
   mapDecryptExpenses,
 } from '../../../core/utils/crypto-operators';
+import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
 
 @Injectable({
   providedIn: 'root',
@@ -23,6 +24,7 @@ export class RecurringExpensesService {
   private store = inject(Store);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
+  private decryptor = inject(ExpenseDecryptionService);
   private baseUrl = environment.apiBaseUrl;
 
   private getSubtleCrypto(): SubtleCrypto {
@@ -89,7 +91,7 @@ export class RecurringExpensesService {
       .get<any>(`${this.baseUrl}/recurring-expenses`, { params })
       .pipe(
         map((res) => res.data || []),
-        mapDecryptExpenses(this.store, this.encryptionService, this.groupKeyService),
+        mapDecryptExpenses(this.decryptor),
       );
   }
 
@@ -102,7 +104,7 @@ export class RecurringExpensesService {
         ),
       ),
       map((res) => res.data),
-      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
+      mapDecryptExpense(this.decryptor),
     );
   }
 
@@ -118,7 +120,7 @@ export class RecurringExpensesService {
         ),
       ),
       map((res) => res.data),
-      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
+      mapDecryptExpense(this.decryptor),
     );
   }
 

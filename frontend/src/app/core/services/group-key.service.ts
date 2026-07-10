@@ -5,6 +5,15 @@ import { Store } from '@ngxs/store';
 import { environment } from '../../../environments/environment';
 import { ClientEncryptionService } from './encryption.service';
 import { ZkKeyVaultService } from './zk-key-vault.service';
+import { GroupKeyStatus } from '../models/decryption-state';
+
+/**
+ * Classified outcome of resolving a group data key. `ready` carries the key;
+ * every other variant is a distinct, actionable reason it is unavailable.
+ */
+export type GroupKeyResult =
+  | { status: 'ready'; key: CryptoKey }
+  | { status: Exclude<GroupKeyStatus, 'ready'>; error?: unknown };
 
 @Injectable({
   providedIn: 'root',
@@ -129,7 +138,7 @@ export class GroupKeyService {
     return this.myAsymmetricKeys;
   }
 
-  private activeGroupKeyRequests = new Map<string, Promise<CryptoKey | null>>();
+  private activeGroupKeyRequests = new Map<string, Promise<GroupKeyResult>>();
 
   clearLocalState(): void {
     this.groupKeysMemoryCache.clear();
@@ -139,17 +148,24 @@ export class GroupKeyService {
   }
 
   /**
-   * Retrieves a group's symmetric data key.
-   * Checks in-memory cache -> Deduplicated active request -> IndexedDB vault -> API (and unwraps it).
+   * Single source of truth for group-key availability.
+   *
+   * Returns a *classified* result so callers can distinguish a key that is
+   * merely not provisioned yet (temporary, auto-recoverable) from one that will
+   * never be available (removed from group), from transient conditions
+   * (rate-limit, missing session). Checks in-memory cache -> deduplicated
+   * in-flight request -> IndexedDB vault -> server (and unwraps).
    */
-  async getGroupDataKey(groupId: string, groupKeyVersionId?: string): Promise<CryptoKey | null> {
+  async resolveGroupKey(groupId: string, groupKeyVersionId?: string): Promise<GroupKeyResult> {
     const requestKey = this.buildVersionedKey(groupId, groupKeyVersionId);
-    if (this.groupKeysMemoryCache.has(requestKey)) {
-      return this.groupKeysMemoryCache.get(requestKey)!;
+    const cached = this.groupKeysMemoryCache.get(requestKey);
+    if (cached) {
+      return { status: 'ready', key: cached };
     }
 
-    if (this.activeGroupKeyRequests.has(requestKey)) {
-      return await this.activeGroupKeyRequests.get(requestKey)!;
+    const inFlight = this.activeGroupKeyRequests.get(requestKey);
+    if (inFlight) {
+      return await inFlight;
     }
 
     const promise = this.fetchAndCacheGroupKey(groupId, groupKeyVersionId);
@@ -162,14 +178,23 @@ export class GroupKeyService {
     }
   }
 
-  private async fetchAndCacheGroupKey(groupId: string, groupKeyVersionId?: string): Promise<CryptoKey | null> {
+  /**
+   * Backwards-compatible accessor used by the encryption (write) paths and
+   * attachment download. Returns the key, or `null` for any non-ready result.
+   */
+  async getGroupDataKey(groupId: string, groupKeyVersionId?: string): Promise<CryptoKey | null> {
+    const result = await this.resolveGroupKey(groupId, groupKeyVersionId);
+    return result.status === 'ready' ? result.key : null;
+  }
+
+  private async fetchAndCacheGroupKey(groupId: string, groupKeyVersionId?: string): Promise<GroupKeyResult> {
     const requestKey = this.buildVersionedKey(groupId, groupKeyVersionId);
     // Try IndexedDB first
     try {
       const cachedKey = await this.zkVault.loadGroupKey(requestKey);
       if (cachedKey) {
         this.groupKeysMemoryCache.set(requestKey, cachedKey);
-        return cachedKey;
+        return { status: 'ready', key: cachedKey };
       }
     } catch (e) {
       console.warn('Failed to load group key from IndexedDB', e);
@@ -177,12 +202,12 @@ export class GroupKeyService {
 
     const user = this.store.selectSnapshot((state: any) => state.auth?.user);
     if (!user || !user.email) {
-      return null;
+      return { status: 'no_session' };
     }
 
     const masterKey = await this.encryptionService.loadKeyFromSession(user.email);
     if (!masterKey) {
-      return null;
+      return { status: 'no_session' };
     }
 
     // Fetch wrapped key from server. Ask server for the caller's wrapped key for the active version.
@@ -196,39 +221,55 @@ export class GroupKeyService {
 
       const wrappedKey = response?.data?.wrappedKey;
       const returnedVersionId = response?.data?.groupKeyVersionId ?? groupKeyVersionId ?? 'active';
-      if (wrappedKey) {
-        let unwrappedKey: CryptoKey;
-        if (wrappedKey.includes(':')) {
-          // Wrapped symmetrically with the user's master key
-          unwrappedKey = await this.encryptionService.unwrapKey(wrappedKey, masterKey);
-        } else {
-          // Wrapped asymmetrically with the user's public wrapping key
-          const { privateKey } = await this.getMyAsymmetricKeys();
-          unwrappedKey = await this.encryptionService.unwrapKey(wrappedKey, privateKey);
-        }
+      if (!wrappedKey) {
+        // Server has no wrapped key for this member/version yet.
+        return { status: 'pending' };
+      }
 
-        const cacheKey = this.buildVersionedKey(groupId, returnedVersionId);
-        this.groupKeysMemoryCache.set(cacheKey, unwrappedKey);
-        try {
-          await this.zkVault.storeGroupKey(cacheKey, unwrappedKey);
-        } catch (e) {
-          console.warn('Failed to store unwrapped group key in IndexedDB', e);
-        }
-        this.rateLimitError.set(null);
-        return unwrappedKey;
+      let unwrappedKey: CryptoKey;
+      if (wrappedKey.includes(':')) {
+        // Wrapped symmetrically with the user's master key
+        unwrappedKey = await this.encryptionService.unwrapKey(wrappedKey, masterKey);
+      } else {
+        // Wrapped asymmetrically with the user's public wrapping key
+        const { privateKey } = await this.getMyAsymmetricKeys();
+        unwrappedKey = await this.encryptionService.unwrapKey(wrappedKey, privateKey);
       }
+
+      // Cache under both the concrete returned version and the requested alias
+      // so later lookups (which carry the concrete versionId) hit memory.
+      this.groupKeysMemoryCache.set(this.buildVersionedKey(groupId, returnedVersionId), unwrappedKey);
+      this.groupKeysMemoryCache.set(requestKey, unwrappedKey);
+      try {
+        await this.zkVault.storeGroupKey(this.buildVersionedKey(groupId, returnedVersionId), unwrappedKey);
+      } catch (e) {
+        console.warn('Failed to store unwrapped group key in IndexedDB', e);
+      }
+      this.rateLimitError.set(null);
+      return { status: 'ready', key: unwrappedKey };
     } catch (e: any) {
+      // Backend-status → classified reason. A wrapped key that simply is not
+      // provisioned yet is temporary; a revoked membership is permanent.
       if (e?.status === 400 && e?.error?.errorCode === 'GRP_KEY_MISSING') {
-        return null;
+        return { status: 'pending' };
       }
-      console.error('Failed to unwrap group data key', e);
+      if (e?.status === 404) {
+        // Key/version resource not found for this member yet.
+        return { status: 'pending' };
+      }
+      if (e?.status === 403) {
+        return { status: 'no_access' };
+      }
+      if (e?.status === 400) {
+        // e.g. "You do not have access to this group" — membership revoked.
+        return { status: 'no_access' };
+      }
       if (e?.status === 429) {
         this.rateLimitError.set('Too many requests. Please try again later.');
+        return { status: 'rate_limited' };
       }
-      throw e;
+      return { status: 'error', error: e };
     }
-
-    return null;
   }
 
   /**
