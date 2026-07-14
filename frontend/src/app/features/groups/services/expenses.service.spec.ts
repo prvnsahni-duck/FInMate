@@ -103,6 +103,30 @@ describe('ExpensesService', () => {
       req.flush({ data: [], meta: { totalItems: 0 } });
     });
 
+    it('should decrypt expenses from paginated response payloads', (done) => {
+      const mockData = {
+        data: [
+          {
+            id: 'exp-1',
+            title: 'enc:Groceries',
+            description: 'enc:Weekly groceries',
+            encryptionScope: 'group',
+            groupId: 'group-1',
+            groupKeyVersionId: 'version-1',
+          },
+        ],
+        meta: { totalItems: 1 },
+      } as any;
+
+      service.getExpenses('group-1').subscribe((res: any) => {
+        expect(res.data.data).toHaveLength(1);
+        expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalledTimes(1);
+        done();
+      });
+
+      const req = httpMock.expectOne('/api/expenses?groupId=group-1');
+      req.flush({ data: mockData });
+    });
     it('should return placeholder text when decryption fails — never ciphertext', (done) => {
       encryptionServiceSpy.decryptExpense.mockRejectedValue(
         new Error('Internal decryption error'),
@@ -126,11 +150,11 @@ describe('ExpensesService', () => {
       req.flush({ data: mockData });
     });
 
-    it('should return raw data when no encryption key is available', (done) => {
+    it('should mask encrypted data when no encryption key is available', (done) => {
       encryptionServiceSpy.loadKeyFromSession.mockResolvedValue(null);
 
       const mockData = [
-        { id: 'exp-1', title: 'Raw Title', description: 'Raw Desc' },
+        { id: 'exp-1', title: 'abc123:xyz789', description: 'cipher:text', encryptionScope: 'group' },
       ];
 
       service.getExpenses('group-1').subscribe((res) => {
