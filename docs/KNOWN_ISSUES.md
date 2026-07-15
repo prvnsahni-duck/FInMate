@@ -10,8 +10,16 @@ cycle, not before a freeze.
 - **Area:** Frontend · Group detail → History tab (`group-history-log.component.ts`)
 - **Severity:** Low — UX polish only. Not a functional bug, security issue, or
   data-corruption risk. **Not release-blocking.**
-- **Status:** Deferred (post-freeze). Revisit in v2.1 / a stabilization sprint.
-- **Direction agreed:** Option 1 (neutral phrasing). Option 3 rejected.
+- **Status:** Interim mitigation shipped (2026-07-14 merge of the Developement
+  branch): `GroupsService.getHistoryLogs` now decrypts `metadata.title` /
+  `newTitle` / `previousTitle` client-side using the group's **active** key,
+  with a placeholder on failure. This is effectively Option 3 behavior — it
+  works for all entries until a key rotation occurs, after which entries
+  encrypted under superseded versions show the placeholder (audit metadata
+  still carries no `groupKeyVersionId`). The agreed end-state below still
+  stands for v2.1.
+- **Direction agreed:** Option 1 (neutral phrasing). Option 3 rejected as the
+  *final* design (see status note above for the shipped interim).
 
 ### Symptom
 Audit entries render the raw ciphertext instead of the title, e.g.

@@ -1121,6 +1121,14 @@ This section records all completed and outstanding implementation work specifica
 
 ## 📝 Change Log
 
+### 2026-07-15
+
+- **Summary**: Rebased `Expense-module` onto `Developement` (Flow-B key management + expense-decryption state machine merged; both branches' fixes preserved). Fixed migration CLI DataSource missing the key-versioning entities (`GroupKeyVersion`, `MemberWrappedGroupKey`, `EncryptedExpenseKey` added to `backend/src/ormconfig.ts`). Synced `package-lock.json` with the `husky` devDependency. Documented the central decryption pipeline and `RATE_LIMIT_ENABLED` in ARCHITECTURE.md; recorded the interim history-title decryption behavior in KNOWN_ISSUES.md (KI-1). Full architecture audit of the merged expense module produced (see audit artifact); verification: frontend+backend builds green, frontend 181/181 tests, backend 190/190 in runnable suites.
+- **Artifacts Updated**:
+  - expsnsis-module-plan.md
+  - ARCHITECTURE.md
+  - docs/KNOWN_ISSUES.md
+
 ### 2026-06-28
 
 - **Summary**: Completed documentation sync audit. Updated database schemas, frontend service code block, tracker checklist, API endpoint directory, and architectural descriptions to match the actual codebase implementation.
