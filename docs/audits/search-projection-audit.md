@@ -1,0 +1,50 @@
+# Search & Projection Audit — 2026-07-16
+
+## Summary
+
+FinMate's search and projection surface is deliberately minimal, and what exists is largely consistent with the zero-knowledge (ZK) model. Key conclusions:
+
+- **Blind Index Search (`title_search_hash` / `title_ciphertext`) is roadmap-only.** It appears solely as a future item in `ARCHITECTURE.md:198-199` under "Future Cryptography & Integration Roadmap." No such columns exist in any entity or migration. The `expenses.title` column is a single `text` field that stores client-side ciphertext.
+- **There is no server-side search over encrypted content (titles/descriptions/notes) at all** — implemented or scaffolded. The only text search in the system is `/users/search`, which runs `ILIKE` over **plaintext identity fields** (email/username/phone) for friend discovery — not encrypted content, so no ZK violation.
+- **No current search or list path leaks encrypted-field plaintext to the server.** Titles/descriptions are encrypted in the browser before upload and decrypted in the browser after fetch. The server never reads them for querying.
+- **There are no projection/read-model tables or materialized views.** All dashboard/report aggregation is computed on-the-fly and operates exclusively on plaintext columns (`amount_total`, `currency`, `category`, `expense_date`) — ZK-compliant.
+- The one class of *derived-and-persisted* data is household **carry-forward expenses**, which are stored as normal `expenses` rows; there is no rebuild mechanism (and regeneration is explicitly blocked as a duplicate).
+
+## Findings table
+
+| # | Documented guarantee | Status | Evidence (file:line) | Gap | Priority |
+|---|---|---|---|---|---|
+| 1 | Blind Index Search via `title_search_hash` + `title_ciphertext` for server-side exact-match without plaintext exposure | 📋 Roadmap-only | `ARCHITECTURE.md:198-199`; absent from `shared/data-models/src/lib/expense.entity.ts:24-25`; absent from all `backend/src/migrations/*` | Feature entirely unbuilt; `title` is one `text` ciphertext column (`1718700000000-ChangeTitlesToText.ts:8`) | Low (roadmap) |
+| 2 | Search must not expose encrypted-field plaintext to server | ✅ | `frontend/.../groups/services/expenses.service.ts:76-88` (client-side encrypt); list/analytics never SELECT `title`/`description` — `expenses.service.ts:769-822`, `1292-1298`, `1379-1385` | None — no server search touches encrypted fields | — |
+| 3 | Dashboard aggregation runs only on plaintext columns (ZK model) | ✅ | `expenses.service.ts:1408-1435` (`buildBaseAnalyticsQuery` selects only `amountTotal`, `currency`, `category`, `expenseDate`); `getMonthlySummary/YearlySummary/CategoryDistribution` `1276-1406`; `getCombinedMonthlyAnalytics` `1852-1933` | None | — |
+| 4 | Personal dashboard aggregation joins `expense_splits`+`expenses`, no duplicate encrypted records | ✅ | `ARCHITECTURE.md:182-188`, `PRD.md:142-144`; impl `expenses.service.ts:1852-1933` | None | — |
+| 5 | Filtering/sorting on encrypted fields | ✅ (by omission) | Filters limited to `category`/`status`/`startDate`/`endDate`/`groupId` — `list-expenses-query.dto.ts:12-47`, `expenses.service.ts:794-818`; sort by `expenseDate`,`createdAt` `820-822` | No title/description filter or sort exists; the roadmap blind-index that would enable it is unbuilt | Low |
+| 6 | Read-model / projection / materialized views rebuildable from source of truth | ✅ (N/A) | No `MATERIALIZED`/`CREATE VIEW`/read-model tables in `backend/src/migrations/*` or entities | No projections exist, so no rebuild needed | — |
+| 7 | Cache monthly balance aggregations in Redis, invalidate on post/void | ❌ | Documented `TRD.md:116`; no caching in `expenses.service.ts` analytics methods (all query DB live) | Promised aggregation cache not implemented | Low |
+| 8 | List filtering documented (`groupId`,`category`,`status`,`startDate`,`endDate`) | ✅ | `API.md:50-55`, `openapi.yaml:1298-1340` match `expenses.service.ts:794-818` | None | — |
+
+## Detailed findings for each ⚠/❌
+
+### Finding 7 — Redis aggregation cache not implemented (❌)
+
+`TRD.md:116` states: *"Caching Aggregations: Cache monthly balance summaries in Redis, invalidating them only when a new expense is posted or voided."* The analytics methods `getMonthlySummary`, `getYearlySummary`, `getCategoryDistribution`, and `getCombinedMonthlyAnalytics` (`backend/src/app/expenses/expenses.service.ts:1276-1933`) each execute a fresh `createQueryBuilder` against Postgres on every call with no Redis lookup or cache-invalidation hook on expense create/void. Redis in this codebase is used only for sessions/throttling, not aggregation caching.
+
+- **Impact:** Performance-only; no correctness or ZK impact. Every dashboard load recomputes from the DB.
+- **Priority:** Low.
+
+## Undocumented behavior found
+
+1. **Cursor pagination key does not match the sort key (potential correctness bug).** `listExpenses` orders by `expense.expenseDate DESC, expense.createdAt DESC` (`expenses.service.ts:820-822`) but the cursor filter is `expense.id < :cursor` (`expenses.service.ts:816-817`), comparing on the UUID primary key. Because `id` is unrelated to the `expenseDate` sort order, cursor-based paging can skip or duplicate rows. This is undocumented and inconsistent with the "cursor-based pagination prevents duplication/skipping" claim in `API.md:47-49`.
+
+2. **Audit-log metadata persists ciphertext titles.** Expense audit entries store `title`/`previousTitle`/`newTitle` into `audit_logs.metadataJson` (`expenses.service.ts:725-729, 1090-1096, 1138-1143, 1234`). Since titles are client-encrypted, this is ciphertext (not a plaintext leak), but it silently duplicates encrypted expense content into the audit table — undocumented, and a subtle key-lifecycle concern (audit rows outlive expenses and reference a group key version that may later be rotated/deleted, making them permanently undecryptable — acceptable, but undocumented).
+
+3. **`expenseDate LIKE :monthPrefix` string matching for month analytics.** `getCombinedMonthlyAnalytics` filters months via `expense.expenseDate LIKE '2026-07%'` and `expense.ledgerMonth = :month` (`expenses.service.ts:1864, 1888`). This relies on the ISO `YYYY-MM-DD` string format of a `date` column rather than a range predicate — functional but brittle and undocumented.
+
+4. **`/users/search` is a live server-side text search not framed as such in the search architecture.** `users.service.ts:searchUsers` runs `email ILIKE / username ILIKE / phoneNumber ILIKE` (`backend/src/app/users/users.service.ts`). These are **plaintext identity columns** (`user.entity.ts:18-21`), used for friend/member discovery — legitimately outside the ZK-encrypted content set, but it is the only real text-search path in the product and is not mentioned in the "Blind Index Search" roadmap discussion, which could mislead a reader into thinking no server search exists.
+
+5. **Carry-forward expenses are derived data persisted as source-of-truth rows with no rebuild path.** `closeMonth` generates `isCarryForward: true` expense rows from computed net balances via `simplifyDebts` (`expenses.service.ts:1675-1805`). These are derived from prior-month balances but stored as ordinary `expenses`; regeneration is blocked by a duplicate guard (`existingCarryForward` count, `1724-1736`). There is no idempotent rebuild/replay mechanism — if these rows are corrupted, they cannot be safely recomputed. Not strictly a "projection table," but the closest thing to derived persisted state in the system, and undocumented as such.
+
+### Notes on sources of truth
+- Blind index: `ARCHITECTURE.md:198-199` (roadmap section header at `:190`).
+- Plaintext-vs-encrypted split: `PRD.md:140` (amounts/category/currency plaintext `DECIMAL`), `ARCHITECTURE.md:43`.
+- No `title_search_hash`/`title_ciphertext`/`blind`/`search_hash` tokens exist anywhere in `backend/src`, `shared/data-models/src`, or migrations (grep returned zero matches).

@@ -1,0 +1,93 @@
+# FinMate v2 Gap Tracker
+
+Single source of truth for architecture-vs-implementation gaps found in the 2026-07-16 audit sweep.
+Each row has a stable ID — say **"Implement GRP-001"** rather than re-describing the work.
+
+**Status legend:** `Pending` (not started) · `In Progress` · `Done` · `Won't Fix` (decision to accept/defer)
+**Priority:** `Critical` · `High` · `Medium` · `Low`
+**ADR column:** the on-disk source-of-truth section (ADR files not yet imported — see [architecture-inventory.md](architecture-inventory.md)).
+
+> Full evidence for every row is in the linked module audit under [`docs/audits/`](../audits/).
+> This table lists only ⚠ Partial / ❌ Missing findings. ✅ Compliant items are recorded in the audits.
+
+## Critical
+
+| ID | Module | Source-of-truth | Finding | Status | Priority |
+|----|--------|-----------------|---------|--------|----------|
+| GRP-001 | Groups | ARCHITECTURE §2.5 / RBAC | **Privilege escalation:** any active member (incl. viewer) can PATCH any member's role to `owner`, demoting the real owner. No caller-role check in `updateMember` (`groups.service.ts:700-741`). | Pending | Critical |
+| AI-001 | AI | PROJECT_DECISIONS "AI opt-in" (APPROVED) | AI opt-in enforced only via frontend `localStorage`; no `ai_opt_in` user column, no backend check. `POST /ai/proxy` reaches OpenAI without consent (`ai.controller.ts:21-24`, `ai.service.ts:32-108`). | Pending | Critical |
+
+## High
+
+| ID | Module | Source-of-truth | Finding | Status | Priority |
+|----|--------|-----------------|---------|--------|----------|
+| ENC-001 | Encryption | ARCHITECTURE §8 | Server `EncryptionService` falls back to a hardcoded literal `ENCRYPTION_KEY` when env unset (`encryption.service.ts:18-19`) — 2FA secrets encrypted under a public constant. Should fail-fast at boot. | Pending | High |
+| AUTH-001 | Auth | ARCHITECTURE §2.4 (line 203) | Refresh tokens are returned in JSON body + stored in `localStorage`, not HTTP-only secure cookies (`auth.service.ts:162-166`, `jwt.interceptor.ts:12,31`). XSS-exfiltratable. (Conflicts with API_SPECIFICATION.md — reconcile docs vs impl.) | Pending | High |
+| AUTH-002 | Auth | ARCHITECTURE §2 (lines 77-78) | Password change / forgot / reset flow does not exist — no route, no UDK re-wrap. Users cannot change or recover passwords (`auth.controller.ts`). | Pending | High |
+| EXP-001 | Expense | Checklist "settled edits → adjustments" | Editing an expense deletes **all** splits incl. `isSettled=true` and recreates them with `isSettled=false`, silently reversing settlement with no adjustment trail (`expenses.service.ts:1008-1021`). | Pending | High |
+| PF-001 | Personal Finance | PROJECT_DECISIONS "User deletion removes PII only" | `DELETE /users/me` documented but entirely unimplemented — no route, no PII-purge logic (`users.controller.ts`, `users.service.ts`). | Pending | High |
+| PF-002 | Personal Finance | PRD.md:108,137 (goal titles encrypted) | `Goal.title` stored plaintext `varchar(160)`, no `@IsCiphertext` (`goal.entity.ts:20`, `dto/goal.dto.ts`) — violates ZK requirement. (Also feature is roadmap: no Goals CRUD.) | Pending | High |
+| ATT-001 | Attachments | ARCHITECTURE §"ZK Attachment Storage" | No real storage backend — attachments live in browser `localStorage` (`sim_storage:`), not Supabase. Non-persistent, non-shareable (`create-expense-modal.component.ts:467`). | Pending | High |
+| ATT-002 | Attachments | ZK model | Legacy `attachmentKeys` path stores plaintext filenames/storage keys (`expenses.service.ts:693-706`) — metadata leak vs ZK goal. | Pending | High |
+| NOTIF-001 | Notifications | ARCHITECTURE §2 rate limiting | Group-invite email endpoints have no throttle (`members.controller.ts:29`, `groups.controller.ts:39,122`) — email-bombing / enumeration vector. | Pending | High |
+
+## Medium
+
+| ID | Module | Source-of-truth | Finding | Status | Priority |
+|----|--------|-----------------|---------|--------|----------|
+| ENC-002 | Encryption | ARCHITECTURE §2.7 / KI-1 | `GET /groups/:id/keys/me` ignores `?versionId=` and always serves ACTIVE; post-rotation history undecryptable after logout / for new members (`groups.controller.ts:342-352`, `groups.service.ts:1261-1291`). | Pending | Medium |
+| ENC-003 | Encryption | ARCHITECTURE §8 | `profile.avatarUrl` encrypted with server `ENCRYPTION_KEY` — undocumented server-side encryption scope (`users.service.ts:115,130`). Document or reconsider. | Pending | Medium |
+| EXP-002 | Expense | PROJECT_DECISIONS "reference key version used" | `RecurringExpense` encrypts title/desc with group key but has no `groupKeyVersionId` column (`recurring-expense.entity.ts:20-23`). | Pending | Medium |
+| EXP-003 | Expense | PROJECT_DECISIONS "reference key version used" | On update, `groupKeyVersion` is not refreshed to ACTIVE while FE re-encrypts with the active key → stored ciphertext/version mismatch after rotation (`expenses.service.ts:987-992`). | Pending | Medium |
+| EXP-004 | Expense | ARCHITECTURE §4.3 | `expense_splits` are hard-deleted on edit (no `@DeleteDateColumn`), contradicting "expenses and splits use soft-deletion" (`expense-split.entity.ts`, `expenses.service.ts:1008-1010`). | Pending | Medium |
+| EXP-005 | Expense | ARCHITECTURE §4.2 | `ExpenseSplit` has no `@VersionColumn`; `deleteExpense`/`restoreExpense` do no version check — stale-client races possible (`expenses.service.ts:1107-1216`). | Pending | Medium |
+| EXP-006 | Expense | ARCHITECTURE §4.3 | Restore grace is "month-of-deletion + 7 days" (~10–37 days), not a flat 7 days (`expenses.service.ts:1189-1203`). Reconcile code or doc. | Pending | Medium |
+| EXP-007 | Expense | ARCHITECTURE §5 (currency consistency) | Recurring group expenses skip the `currency == group.currency` validation applied to one-off expenses (`recurring-expenses.service.ts:219-291`). | Pending | Medium |
+| GRP-002 | Groups | ARCHITECTURE §6 audit logging | No audit log for `rotateGroupKey`, `provisionGroupKeys`, `createGroupInvite`, `regenerateInviteToken`, `updateContributions` — incl. security-sensitive key rotation. | Pending | Medium |
+| GRP-003 | Groups | ARCHITECTURE §2.5 roles | `spectator` role honored in expense logic but missing from `GroupRoles` decorator union / every `@GroupRoles()` list — spectators blocked from member routes (`group-roles.decorator.ts:3-5`). | Pending | Medium |
+| GRP-004 | Groups | ARCHITECTURE §2.5 invites | No revoke endpoint for pending `group_invites`; `group.inviteToken` join link never expires (`group.entity.ts:49-50`). | Pending | Medium |
+| GRP-005 | Groups | ARCHITECTURE §2.5 (leavers) | Leaving fully revokes API access AND never revokes/rotates the member's wrapped key — contradicts "retain access to historical data only"; cached key still decrypts (`removeMember:833-856`). Reconcile doc vs impl. | Pending | Medium |
+| AUTH-003 | Auth | TRD.md:71 | HS256 not pinned on sign/verify; relies on library default (`auth.service.ts:348-365`, `jwt.strategy.ts:14-19`). Pin `algorithm`/`algorithms`. | Pending | Medium |
+| AUTH-004 | Auth | ARCHITECTURE §8 CORS | `CORS_ORIGINS` replaces rather than augments `FRONTEND_URL` (`main.ts:28-30`). Merge the two. | Pending | Medium |
+| AUTH-005 | Auth | Hardening | `trust proxy` + Swagger `/docs` enabled unconditionally in all envs; `x-forwarded-for` spoofable → poisons rate-limit key + audit ipHash (`main.ts:40,60-68`). | Pending | Medium |
+| AI-002 | AI | Spec:933-936 / TRD.md:11 | Uses standard OpenAI endpoint, not ZDR/enterprise; user-controllable `model` + `systemInstruction` (prompt-injection); no server-side ZK-content guard on `prompt`. | Pending | Medium |
+| AI-003 | AI | ARCHITECTURE §2 rate limiting | No dedicated AI throttle — inherits DEFAULT 100/min for a paid external call; no cost cap/circuit breaker (`ai.controller.ts`). | Pending | Medium |
+| SYNC-001 | Sync | TRD.md:24 / PRD.md:202 / Spec:1012 | No service worker / PWA at all — app cannot boot offline. "PWA" is a label with no implementation. | Pending | Medium |
+| SYNC-002 | Sync | Spec:471-472,792 / PRD.md:91 | No offline mutation queue/outbox — offline create/edit just errors. (ARCHITECTURE marks roadmap; TRD/Spec/PRD oversell as shipped.) | Pending | Medium |
+| NOTIF-002 | Notifications | Docs imply verification/reset | `sendVerificationEmail` / `sendPasswordResetEmail` are dead code (no routes/callers) — ties to AUTH-002 (`email.service.ts:83-120`). | Pending | Medium |
+| NOTIF-003 | Notifications | TRD.md:36 | No WebSocket/Socket.io real-time push; shared-ledger updates rely on manual refresh. | Pending | Medium |
+| NOTIF-004 | Notifications | Product | No in-app notification system (no entity/endpoints/UI); only `alert()` + a 429 banner. | Pending | Medium |
+| SRCH-001 | Search | API.md:47-49 | Cursor pagination filters on `id < :cursor` but sorts by `expenseDate DESC, createdAt DESC` — mismatched key can skip/duplicate rows (`expenses.service.ts:816-822`). | Pending | Medium |
+
+## Low
+
+| ID | Module | Source-of-truth | Finding | Status | Priority |
+|----|--------|-----------------|---------|--------|----------|
+| EXP-008 | Expense | DATABASE_SCHEMA.md:242 | Settlement `note` labeled "client-side encrypted" but not `@IsCiphertext`-validated — client could persist plaintext (`settlement.dto.ts:31-33`). | Pending | Low |
+| EXP-009 | Expense | — | Dead `direct_shared` scope: plumbed through entities/DTOs but rejected by validator and never emitted by FE (`expenses.service.ts:340-352`). Remove or document + enable. | Pending | Low |
+| AUTH-006 | Auth | ARCHITECTURE §6 | Failed-login events not audited — brute-force leaves no trail (`auth.service.ts:100-113`). | Pending | Low |
+| AUTH-007 | Auth | Hardening | `saveKeys` overwrites wrapping keys with no re-auth/step-up (`users.service.ts:154-166`); TOTP compared non-constant-time (`totp.util.ts:68`). | Pending | Low |
+| GRP-006 | Groups | ARCHITECTURE.md:267 | `trip` group type documented but unimplemented (entity/DTO/DB CHECK only allow normal/household). Doc drift. | Pending | Low |
+| GRP-007 | Groups | KNOWN_ISSUES KI-1 | History decrypt uses ACTIVE key only; post-rotation entries show placeholder. Agreed end-state (stop storing titles in audit metadata) not done. | Pending | Low |
+| ENC-004 | Encryption | zk_group_key…md §4 | Group key minted `extractable:true` and cached extractable in the originator's vault (`encryption.service.ts:377`, `group-key.service.ts:230-237`). | Pending | Low |
+| ENC-005 | Encryption | — | `wrappingMethod`/`wrappingAlgorithm` dropped on `/keys` provisioning path; client sniffs format instead (`groups.service.ts:1245-1252`). | Pending | Low |
+| SRCH-002 | Search | TRD.md:116 | Redis aggregation cache for monthly summaries not implemented — analytics recompute from DB every call. Performance-only. | Pending | Low |
+| SYNC-003 | Sync | — | Group-detail "Offline – Showing cached data" banner is misleading (in-memory only, lost on reload) (`group-detail.component.ts:26-33`). | Pending | Low |
+
+## Roadmap-only (📋 — not gaps, tracked so they aren't mistaken for regressions)
+
+| ID | Module | Item | Source |
+|----|--------|------|--------|
+| RM-01 | Search | Blind Index Search (`title_search_hash`) | ARCHITECTURE §Blind Index Search |
+| RM-02 | Attachments | Receipt OCR workflow | ARCHITECTURE §Receipt OCR |
+| RM-03 | Personal Finance | Goals CRUD + UI | PRD goals |
+| RM-04 | Personal Finance | Notes CRUD + UI (schema/DTO ready) | ARCHITECTURE Key Entities |
+| RM-05 | Sync | Offline mutation queue + full PWA | ARCHITECTURE §2 "Future offline support" |
+| RM-06 | Notifications | Push (Capacitor) + BullMQ email queue | TRD.md:31 |
+
+## Doc-drift items (fix the docs, not the code)
+
+- Refresh-token transport: ARCHITECTURE.md says HTTP-only cookie; code + API_SPECIFICATION.md use body. Pick one (see AUTH-001).
+- Offline-first: TRD/Spec/PRD present offline drafting + IndexedDB ledger as shipped; only ARCHITECTURE.md correctly marks roadmap (see SYNC-002).
+- Offline key restoration: implemented already but ARCHITECTURE.md §2 labels it "future."
+- `trip` group type (GRP-006), Supabase attachment storage (ATT-001).

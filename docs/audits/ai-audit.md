@@ -1,0 +1,55 @@
+# AI Module Audit — 2026-07-16
+
+## Summary
+
+FinMate's shipped AI surface is a **single backend proxy endpoint** (`POST /ai/proxy`, `backend/src/app/ai/ai.controller.ts`) that forwards a user prompt plus a context system-instruction to the **OpenAI Chat Completions API** (`gpt-4`), and a **dashboard chatbot** on the frontend (`frontend/src/app/features/dashboard/`). The AI Assistant is functionally a general-purpose financial chat companion pre-loaded with the user's plaintext budget/income/spend numbers.
+
+Good news: the API key is read from config (not hardcoded), no prompt/response plaintext is persisted to the DB (matches the "in-memory only / zero-retention" claim), and there is a UUID-redaction sweep before egress. The roadmap "Receipt OCR" workflow is **not implemented** (roadmap-only, correctly).
+
+The **critical gap** is the approved decision "**AI features are opt-in**": the opt-in is enforced **only** as a frontend `localStorage` flag (`finmate_ai_opt_in`). There is **no `ai_opt_in` column** on the `User` entity, **no migration**, and **no backend check** before user data is transmitted to OpenAI. Any authenticated user (or a stolen/replayed token) can call `POST /ai/proxy` directly and reach OpenAI regardless of consent. Additionally the endpoint accepts a fully **user-controllable `systemInstruction` and `model`**, uses the **standard (non-ZDR) OpenAI endpoint**, and has **no dedicated rate limit** (falls back to the 100/min DEFAULT throttle) — all divergent from documented guarantees.
+
+## Findings table
+
+| # | Documented guarantee | Status | Evidence (file:line) | Gap | Priority |
+|---|---|---|---|---|---|
+| 1 | AI Assistant (opt-in chatbot / smart insights) exists | ✅ | `backend/src/app/ai/ai.controller.ts:21-35`; `ai.service.ts:32-108`; `frontend/.../dashboard/services/ai.service.ts:15-23`; `dashboard.component.ts:404-448` | Implemented as generic chat, not the "smart insights/summarization/tagging" breadth described | Info |
+| 2 | AI is opt-in; disabled until user sets `ai_opt_in = true`, enforced before any user data leaves to provider (PRD.md:121; Spec:926-928; PROJECT_DECISIONS.md:27 APPROVED) | ❌ | Opt-in is only `localStorage` (`dashboard.component.ts:134,386-388`); `User` entity has **no** `ai_opt_in` column (`shared/data-models/src/lib/user.entity.ts:11-52`); controller guards only with `JwtAuthGuard` (`ai.controller.ts:21-24`); service never checks consent (`ai.service.ts:32-108`) | Approved decision unenforced server-side; endpoint reachable without consent; `sendAiMessage` doesn't re-check the flag either (`dashboard.component.ts:404`) | **High** |
+| 3 | Plaintext sent for AI is never written to persistent DB; exists in-memory only (Spec:924-925) | ✅ | `ai.service.ts:32-108` performs axios call and returns; no repository/save; no AI persistence anywhere (grep for `save.*prompt`/`aiLog` = none) | — | — |
+| 4 | Sweep metadata/IDs (user_id, group_id) before sending prompts (PRD.md:118; Spec:938) | ✅ (partial) | `ai.service.ts:22-27,49-53` `redactUuids()` strips UUIDs from prompt + systemInstruction | Only UUID-shaped IDs stripped; `userName` and profile numbers are still sent (see undocumented #3); free-text prompt unfiltered | Low |
+| 5 | ZK-protected fields (titles, notes) only sent on explicit opt-in; receipts plaintext never persisted (Spec:508-538, 924) | ⚠ | Chat sends aggregates + `userName` only (`dashboard.component.ts:424-428`); no titles/notes currently sent | But there is **no server-side guard** preventing ZK plaintext in the free-form `prompt` field; nothing enforces the "opt-in only" gate for such content (ties to #2) | Medium |
+| 6 | Receipt OCR: transient AI engine, plaintext receipts never saved to DB (ARCHITECTURE.md:196-197) | 📋 Roadmap-only | No OCR/vision/receipt-extraction code exists in `backend/src` or `frontend/src` (grep OCR/tesseract/vision = false positives only) | Not implemented — correctly roadmap; no action beyond tracking | Info |
+| 7 | Zero-Retention (ZDR) + no-training enterprise AI endpoint (Spec:933-936); "OpenAI Enterprise API" (TRD.md:11) | ⚠ | `ai.service.ts:63` posts to standard `https://api.openai.com/v1/chat/completions` | Standard consumer endpoint is not ZDR-by-default; no org/enterprise/ZDR project header; contractual claim not backed by code/config | Medium |
+| 8 | Provider = OpenAI GPT-4; API key not in code (Spec:55; ARCHITECTURE env table) | ✅ | Key via `configService.get('OPENAI_API_KEY')` (`ai.service.ts:15`); `.env.example:30 OPENAI_API_KEY=` empty; no hardcoded secret | — | — |
+| 9 | Rate limiting on AI endpoints (ARCHITECTURE.md:207-216; Spec:842 "OpenAI rates limited") | ⚠ | No AI profile in `throttle.constants.ts` (DEFAULT/LOGIN/…/IMPORT/EXPORT only); `ai.controller.ts` has no `@ThrottleAs`/`@Throttle` → inherits DEFAULT 100/min (`app.module.ts:70-73`) | No dedicated throttle for an expensive external paid call; 100/min per user is high for AI; no cost cap/circuit breaker | Medium |
+
+## Detailed findings
+
+### ❌ #2 — Opt-in is not enforced (violates an APPROVED decision)
+
+`PROJECT_DECISIONS.md:27` lists "AI features are opt-in" as APPROVED, and `PRD.md:121` / `Spec:926-928` specify a durable `ai_opt_in = true` setting gating all AI.
+
+In the implementation the opt-in is purely cosmetic frontend state:
+- `dashboard.component.ts:134` — `this.aiOptIn = localStorage.getItem('finmate_ai_opt_in') === 'true';`
+- `dashboard.component.ts:386-388` — toggle just writes `localStorage`.
+
+There is no persisted flag: `shared/data-models/src/lib/user.entity.ts` (columns lines 11-52) has no `ai_opt_in`/`aiEnabled`; no migration defines one. The backend endpoint `ai.controller.ts:21-24` is protected only by `JwtAuthGuard` and `ai.service.callOpenAiProxy` (`ai.service.ts:32-108`) transmits to OpenAI without ever checking consent. Consequences:
+1. Any authenticated user can `POST /ai/proxy` with curl and reach OpenAI even with the toggle off.
+2. The flag is per-device/per-browser (localStorage), so consent is not authoritative or auditable.
+3. Even in-app, `sendAiMessage` (`dashboard.component.ts:404`) does not re-check `aiOptIn` before calling the service.
+
+Fix direction: add a persisted `ai_opt_in` user column + migration, and enforce it in the AI controller/service (guard or explicit check) before any egress.
+
+### ⚠ #5 / #7 — No server-side ZK/ZDR guardrails
+
+The proxy accepts an arbitrary `prompt` (`ai.controller.ts:8-11`) with no content-classification. The spec's "opt-in only" gate for ZK fields (titles/notes) is only respected by convention on the client; the server would forward any ZK plaintext a caller places in `prompt`. Separately, the destination is the standard OpenAI endpoint (`ai.service.ts:63`) with no ZDR/enterprise project configuration, so the "Zero-Data-Retention / no-training" guarantee (`Spec:933-936`, `TRD.md:11`) is unsubstantiated in code.
+
+### ⚠ #9 — No dedicated AI rate limiting
+
+`throttle.constants.ts` registers no AI profile and `ai.controller.ts` applies no throttle decorator, so AI inherits the global DEFAULT (100 req/min/user, `app.module.ts:70-73`). For a paid external LLM call this is a cost/abuse exposure; docs imply AI-specific rate control (`Spec:842`).
+
+## Undocumented behavior found
+
+1. **User-controllable model** — `AiProxyDto.model` (`ai.controller.ts:16-18`) is passed straight through to OpenAI (`ai.service.ts:35,65`). A caller can request any/more-expensive model; default `gpt-4` is only applied when omitted. Not documented; cost/abuse risk.
+2. **User-controllable `systemInstruction`** — the DTO accepts an arbitrary `systemInstruction` (`ai.controller.ts:12-14`) forwarded as the system message (`ai.service.ts:51-58`). This enables prompt-injection / jailbreak of the "financial companion" role; undocumented.
+3. **PII sent to OpenAI beyond IDs** — the client system-instruction embeds `userName`, monthly spending, budget, income, total balance (`dashboard.component.ts:424-428`). `redactUuids` (`ai.service.ts:22-27`) strips only UUIDs, so the user's name and financial figures egress in cleartext. Amounts are plaintext by design, but sending the user's name to OpenAI is not documented in the AI data-handling rules.
+4. **Fixed 10s timeout** (`ai.service.ts:73`) and no retry/caching, despite `Spec:842` promising "auto-fallback to cache for repeating smart forecast questions." Minor.
