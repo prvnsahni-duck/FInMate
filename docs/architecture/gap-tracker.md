@@ -1,5 +1,10 @@
 # FinMate v2 Gap Tracker
 
+> **PROVISIONAL until ADR reconciliation.** IDs, rows, and priorities here are frozen inputs, not
+> final decisions. No row will be closed, merged, or removed until reconciled against the imported
+> ADRs (see [canonical-sources.md](canonical-sources.md)). Execution planning lives in
+> [implementation-roadmap-pre-adr.md](implementation-roadmap-pre-adr.md) — this file stays the raw backlog.
+
 Single source of truth for architecture-vs-implementation gaps found in the 2026-07-16 audit sweep.
 Each row has a stable ID — say **"Implement GRP-001"** rather than re-describing the work.
 
