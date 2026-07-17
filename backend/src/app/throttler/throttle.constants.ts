@@ -20,6 +20,7 @@ export const THROTTLE_PROFILES = {
   REFRESH: 'refresh',
   IMPORT: 'import',
   EXPORT: 'export',
+  INVITE: 'invite',
 } as const;
 
 export type ThrottleProfile =

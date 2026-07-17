@@ -90,8 +90,13 @@ export class UsersService {
       throw new NotFoundException('Profile not found');
     }
 
-    if (data.displayName !== undefined) {
-      user.displayName = data.displayName;
+    if (data.displayName !== undefined || data.aiOptIn !== undefined) {
+      if (data.displayName !== undefined) {
+        user.displayName = data.displayName;
+      }
+      if (data.aiOptIn !== undefined) {
+        user.aiOptIn = data.aiOptIn;
+      }
       await this.userRepository.save(user);
     }
 

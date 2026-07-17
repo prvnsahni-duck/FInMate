@@ -118,6 +118,7 @@ export class UsersController {
       phoneNumber: user.phoneNumber,
       displayName: user.displayName,
       status: user.status,
+      aiOptIn: user.aiOptIn,
       lastLoginAt: user.lastLoginAt,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,

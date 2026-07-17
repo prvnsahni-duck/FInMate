@@ -74,7 +74,7 @@ export class RecurringExpensesScheduler {
         status: 'active',
         nextOccurrenceDate: LessThanOrEqual(todayStr),
       },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
     });
 
     this.logger.log({
@@ -116,21 +116,28 @@ export class RecurringExpensesScheduler {
 
         if (template.group) {
           encryptionScope = 'group';
-          const activeKeyVersion = await manager.getRepository(GroupKeyVersion).findOne({
-            where: { group: { id: template.group.id }, status: 'ACTIVE' },
-            order: { version: 'DESC' },
-          });
-          if (activeKeyVersion) {
-            groupKeyVersion = activeKeyVersion;
+          // The generated expense copies the TEMPLATE's ciphertext, so it must
+          // carry the template's key version — stamping ACTIVE would break
+          // decryption after a rotation (ciphertext/version mismatch).
+          if (template.groupKeyVersion) {
+            groupKeyVersion = template.groupKeyVersion;
           } else {
-            groupKeyVersion = await manager.getRepository(GroupKeyVersion).save(
-              manager.getRepository(GroupKeyVersion).create({
-                group: template.group,
-                version: 1,
-                algorithm: 'AES-256-GCM',
-                status: 'ACTIVE',
-              }),
-            );
+            const activeKeyVersion = await manager.getRepository(GroupKeyVersion).findOne({
+              where: { group: { id: template.group.id }, status: 'ACTIVE' },
+              order: { version: 'DESC' },
+            });
+            if (activeKeyVersion) {
+              groupKeyVersion = activeKeyVersion;
+            } else {
+              groupKeyVersion = await manager.getRepository(GroupKeyVersion).save(
+                manager.getRepository(GroupKeyVersion).create({
+                  group: template.group,
+                  version: 1,
+                  algorithm: 'AES-256-GCM',
+                  status: 'ACTIVE',
+                }),
+              );
+            }
           }
         }
 

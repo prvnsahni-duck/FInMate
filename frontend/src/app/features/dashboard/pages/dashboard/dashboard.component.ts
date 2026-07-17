@@ -193,6 +193,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.newIncome = res.profile.monthlyIncome || 0;
         this.newBudget = res.profile.monthlyBudget || 0;
         this.newCurrency = res.profile.defaultCurrency || 'USD';
+        // Server-side consent flag is authoritative; localStorage is only a
+        // pre-login hint. Keep both in sync.
+        const serverOptIn = (res as any).user?.aiOptIn;
+        if (typeof serverOptIn === 'boolean') {
+          this.aiOptIn = serverOptIn;
+          localStorage.setItem('finmate_ai_opt_in', serverOptIn ? 'true' : 'false');
+        }
         this.recalculatePercentages();
       },
       error: () => {
@@ -386,6 +393,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   toggleAiOptIn(event: any) {
     this.aiOptIn = event.target.checked;
     localStorage.setItem('finmate_ai_opt_in', this.aiOptIn ? 'true' : 'false');
+    // Consent is enforced server-side (AI_OPT_IN_REQUIRED) — persist it there.
+    this.authService.updateProfile({ aiOptIn: this.aiOptIn } as any).subscribe({
+      error: () => console.error('Failed to persist AI opt-in preference'),
+    });
     if (this.aiOptIn && this.aiMessages.length === 0) {
       this.initAiGreeting();
     }

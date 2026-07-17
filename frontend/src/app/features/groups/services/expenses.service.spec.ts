@@ -46,6 +46,11 @@ describe('ExpensesService', () => {
           useValue: {
             getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
             resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: 'mock-group-key' }),
+            getGroupKeyForEncryption: jest
+              .fn()
+              .mockResolvedValue({ key: 'mock-group-key', versionId: 'v1-id' }),
+            getKnownActiveVersionId: jest.fn().mockReturnValue('v1-id'),
+            createGroupKey: jest.fn().mockResolvedValue('mock-group-key'),
           },
         },
         { provide: Store, useValue: storeMock },
@@ -220,6 +225,37 @@ describe('ExpensesService', () => {
         'mock-crypto-key',
       );
       expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalled();
+    });
+
+    it('should declare the concrete group key version on group creates', async () => {
+      const payload = {
+        title: 'Dinner',
+        amountTotal: 150,
+        currency: 'USD',
+        category: 'food',
+        expenseDate: '2026-06-28',
+        paidByUserId: 'user-1',
+        groupId: 'group-1',
+        splits: [],
+      };
+
+      const promise = firstValueFrom(service.createExpense(payload));
+
+      // Wait for encryptPayload microtask to execute and request to be scheduled
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const req = httpMock.expectOne('/api/expenses');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body.groupKeyVersionId).toBe('v1-id');
+      expect(req.request.body.title).toBe('enc:Dinner');
+      req.flush({ id: 'exp-new', title: 'enc:Dinner' });
+
+      await promise;
+
+      expect(encryptionServiceSpy.encrypt).toHaveBeenCalledWith(
+        'Dinner',
+        'mock-group-key',
+      );
     });
 
     it('should return placeholder on decryption failure for created expense', async () => {

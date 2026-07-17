@@ -38,6 +38,10 @@ export class User {
   @Column({ type: 'boolean', default: false })
   isTwoFactorEnabled!: boolean;
 
+  /** Server-enforced consent gate: no user data reaches an AI provider unless true. */
+  @Column({ name: 'ai_opt_in', type: 'boolean', default: false })
+  aiOptIn!: boolean;
+
   /** The user's public RSA-OAEP wrapping key. */
   @Column({ name: 'public_wrapping_key', type: 'text', nullable: true })
   publicWrappingKey?: string;

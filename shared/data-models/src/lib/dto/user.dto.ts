@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsString,
   IsOptional,
   MaxLength,
@@ -40,4 +41,8 @@ export class UpdateProfileDto {
   @IsOptional()
   @Min(0, { message: 'Monthly income cannot be negative' })
   monthlyIncome?: number;
+
+  @IsBoolean({ message: 'aiOptIn must be a boolean' })
+  @IsOptional()
+  aiOptIn?: boolean;
 }

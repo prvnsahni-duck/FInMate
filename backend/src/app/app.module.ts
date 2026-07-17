@@ -109,6 +109,12 @@ import { THROTTLE_PROFILES } from './throttler/throttle.constants';
             skipIf: skipUnlessPolicy(THROTTLE_PROFILES.REFRESH),
           },
           {
+            name: THROTTLE_PROFILES.INVITE,
+            ttl: 60000,
+            limit: getLimit('THROTTLE_LIMIT_INVITE', 10),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.INVITE),
+          },
+          {
             name: THROTTLE_PROFILES.IMPORT,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_IMPORT', 10),

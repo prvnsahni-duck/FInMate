@@ -54,11 +54,18 @@ export class RecurringExpensesService {
 
         if ((payload as any).groupId) {
           scope = 'group';
-          let gKey = await this.groupKeyService.getGroupDataKey((payload as any).groupId);
-          if (!gKey) {
-            gKey = await this.groupKeyService.createGroupKey((payload as any).groupId);
+          const groupId = (payload as any).groupId as string;
+          const resolved = await this.groupKeyService.getGroupKeyForEncryption(groupId);
+          if (resolved) {
+            key = resolved.key;
+            encrypted.groupKeyVersionId = resolved.versionId;
+          } else {
+            key = await this.groupKeyService.createGroupKey(groupId);
+            const mintedVersionId = this.groupKeyService.getKnownActiveVersionId(groupId);
+            if (mintedVersionId) {
+              encrypted.groupKeyVersionId = mintedVersionId;
+            }
           }
-          key = gKey;
         }
 
         encrypted.encryptionScope = scope;

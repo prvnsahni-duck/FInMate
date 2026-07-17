@@ -82,6 +82,10 @@ export class CreateRecurringExpenseDto {
   @IsOptional()
   groupId?: string;
 
+  @IsUUID('4', { message: 'Group key version ID must be a valid UUID' })
+  @IsOptional()
+  groupKeyVersionId?: string;
+
   @IsEnum(['daily', 'weekly', 'monthly', 'yearly'], {
     message: 'Invalid frequency option',
   })
@@ -109,6 +113,10 @@ export class CreateRecurringExpenseDto {
 }
 
 export class UpdateRecurringExpenseDto {
+  @IsUUID('4', { message: 'Group key version ID must be a valid UUID' })
+  @IsOptional()
+  groupKeyVersionId?: string;
+
   @IsString()
   @IsOptional()
   @MaxLength(1000, { message: 'Expense title cannot exceed 1000 characters' })

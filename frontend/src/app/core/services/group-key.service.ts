@@ -12,7 +12,7 @@ import { GroupKeyStatus } from '../models/decryption-state';
  * every other variant is a distinct, actionable reason it is unavailable.
  */
 export type GroupKeyResult =
-  | { status: 'ready'; key: CryptoKey }
+  | { status: 'ready'; key: CryptoKey; versionId?: string }
   | { status: Exclude<GroupKeyStatus, 'ready'>; error?: unknown };
 
 @Injectable({
@@ -27,6 +27,10 @@ export class GroupKeyService {
 
   // ─── In-memory cache keyed by `${groupId}:${groupKeyVersionId}` ──────────
   private groupKeysMemoryCache = new Map<string, CryptoKey>();
+
+  // ─── Concrete ACTIVE version id per group, learned from the backend. Lets
+  //     write paths declare which version their ciphertext was produced with. ─
+  private activeGroupKeyVersionIds = new Map<string, string>();
 
   // ─── Cached RSA-OAEP key pair for asymmetric envelope sharing ───────────
   private myAsymmetricKeys: { publicKey: CryptoKey; privateKey: CryptoKey } | null = null;
@@ -84,7 +88,11 @@ export class GroupKeyService {
     const requestKey = this.buildVersionedKey(groupId, groupKeyVersionId);
     const cached = this.groupKeysMemoryCache.get(requestKey);
     if (cached) {
-      return { status: 'ready', key: cached };
+      return {
+        status: 'ready',
+        key: cached,
+        versionId: groupKeyVersionId ?? this.activeGroupKeyVersionIds.get(groupId),
+      };
     }
 
     const inFlight = this.activeGroupKeyRequests.get(requestKey);
@@ -112,6 +120,47 @@ export class GroupKeyService {
   }
 
   /**
+   * Write-path resolver: returns the group key together with the concrete
+   * key-version id it belongs to, so callers can declare which version their
+   * ciphertext was produced with. A previously learned (key, versionId) pair
+   * is served from cache — even if since superseded, the pair is internally
+   * consistent so the stamp stays correct. Only when the concrete version is
+   * unknown (e.g. the 'active' alias was restored from IndexedDB after a
+   * reload) is the alias evicted and resolution forced through the backend.
+   */
+  async getGroupKeyForEncryption(
+    groupId: string,
+  ): Promise<{ key: CryptoKey; versionId: string } | null> {
+    const knownVersionId = this.activeGroupKeyVersionIds.get(groupId);
+    if (knownVersionId) {
+      const key = await this.getGroupDataKey(groupId, knownVersionId);
+      if (key) {
+        return { key, versionId: knownVersionId };
+      }
+    }
+
+    const aliasKey = this.buildVersionedKey(groupId);
+    this.groupKeysMemoryCache.delete(aliasKey);
+    this.activeGroupKeyRequests.delete(aliasKey);
+    try {
+      await this.zkVault.deleteGroupKey(aliasKey);
+    } catch (e) {
+      console.warn('Failed to evict aliased group key from IndexedDB', e);
+    }
+
+    const result = await this.resolveGroupKey(groupId);
+    if (result.status === 'ready' && result.versionId) {
+      return { key: result.key, versionId: result.versionId };
+    }
+    return null;
+  }
+
+  /** Last concrete ACTIVE version id learned from the backend for this group. */
+  getKnownActiveVersionId(groupId: string): string | undefined {
+    return this.activeGroupKeyVersionIds.get(groupId);
+  }
+
+  /**
    * Bypasses all caches and reloads the group key from the backend.
    * Intended for: post-provisioning, self-healing, key rotation.
    * NOT exposed in the UI — call from services only.
@@ -126,6 +175,7 @@ export class GroupKeyService {
       }
     }
     this.activeGroupKeyRequests.delete(requestKey);
+    this.activeGroupKeyVersionIds.delete(groupId);
 
     try {
       await this.zkVault.deleteGroupKey(requestKey);
@@ -151,6 +201,7 @@ export class GroupKeyService {
   clearCache(): void {
     this.groupKeysMemoryCache.clear();
     this.activeGroupKeyRequests.clear();
+    this.activeGroupKeyVersionIds.clear();
     this.myAsymmetricKeys = null;
     this.rateLimitError.set(null);
     this.requiresKeyProvisioning.set(false);
@@ -184,6 +235,7 @@ export class GroupKeyService {
         this.activeGroupKeyRequests.delete(key);
       }
     }
+    this.activeGroupKeyVersionIds.delete(groupId);
   }
 
   /**
@@ -250,6 +302,29 @@ export class GroupKeyService {
         ],
       }),
     );
+
+    // Learn the concrete version id the backend bound the wrapped key to, so
+    // write paths can declare it (ciphertext / version-stamp consistency).
+    try {
+      const versionResponse = await firstValueFrom(
+        this.http.get<{ data: { groupKeyVersionId: string | null } }>(
+          `${this.baseUrl}/groups/${groupId}/keys/me`,
+        ),
+      );
+      const mintedVersionId = versionResponse?.data?.groupKeyVersionId;
+      if (mintedVersionId) {
+        this.activeGroupKeyVersionIds.set(groupId, mintedVersionId);
+        const versionedCacheKey = this.buildVersionedKey(groupId, mintedVersionId);
+        this.groupKeysMemoryCache.set(versionedCacheKey, groupKey);
+        try {
+          await this.zkVault.storeGroupKey(versionedCacheKey, groupKey);
+        } catch (e) {
+          console.warn('Failed to persist versioned group key to IndexedDB', e);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to resolve minted group key version id', e);
+    }
 
     // Pre-provision asymmetric key pair for future member sharing
     try {
@@ -318,6 +393,116 @@ export class GroupKeyService {
         keys: [{ userId: targetUserId, wrappedKey }],
       }),
     );
+  }
+
+  /**
+   * Owner/admin rotation flow: generates a fresh group data key, wraps it for
+   * every active/invited member (master-key wrap for self, RSA-OAEP for
+   * others), and posts the set to POST /groups/:id/keys/rotate. Historical
+   * versions stay decryptable via their per-expense version stamps; local
+   * caches are moved to the new ACTIVE version. Members whose public wrapping
+   * key is unavailable are reported back so the caller can surface follow-up
+   * provisioning.
+   */
+  async rotateGroupKey(
+    groupId: string,
+    reason?: string,
+  ): Promise<{ groupKeyVersionId: string | null; skippedUserIds: string[] }> {
+    const user = this.store.selectSnapshot((state: any) => state.auth?.user);
+    if (!user || !user.email) {
+      throw new Error('No user session found');
+    }
+    const masterKey = await this.encryptionService.loadKeyFromSession(user.email);
+    if (!masterKey) {
+      throw new Error('Master key not loaded');
+    }
+    const selfId = user.userId ?? user.id;
+
+    const newKey = await this.encryptionService.generateDataKey();
+
+    const membersRes = await firstValueFrom(
+      this.http.get<{ data: Array<{ user?: { id: string }; joinStatus: string }> }>(
+        `${this.baseUrl}/groups/${groupId}/members`,
+      ),
+    );
+    const members = (membersRes?.data ?? []).filter(
+      (m) => m.user?.id && (m.joinStatus === 'active' || m.joinStatus === 'invited'),
+    );
+
+    const keys: Array<{ userId: string; wrappedKey: string }> = [];
+    const skippedUserIds: string[] = [];
+    const subtle = this.getSubtleCrypto();
+
+    for (const member of members) {
+      const uid = member.user?.id as string;
+      if (uid === selfId) {
+        keys.push({
+          userId: uid,
+          wrappedKey: await this.encryptionService.wrapKey(newKey, masterKey),
+        });
+        continue;
+      }
+      try {
+        const keyRes = await firstValueFrom(
+          this.http.get<{ data: { publicWrappingKey: string | null } }>(
+            `${this.baseUrl}/users/${uid}/public-key`,
+          ),
+        );
+        const publicWrappingKeyStr = keyRes?.data?.publicWrappingKey;
+        if (!publicWrappingKeyStr) {
+          skippedUserIds.push(uid);
+          continue;
+        }
+        const targetPublicKey = await subtle.importKey(
+          'jwk',
+          JSON.parse(publicWrappingKeyStr),
+          { name: 'RSA-OAEP', hash: 'SHA-256' },
+          true,
+          ['wrapKey'],
+        );
+        keys.push({
+          userId: uid,
+          wrappedKey: await this.encryptionService.wrapKey(newKey, targetPublicKey),
+        });
+      } catch (e) {
+        console.warn(`Failed to wrap rotated key for member ${uid}`, e);
+        skippedUserIds.push(uid);
+      }
+    }
+
+    if (keys.length === 0) {
+      throw new Error('Could not wrap the rotated key for any member');
+    }
+
+    const rotateRes = await firstValueFrom(
+      this.http.post<{ data: { groupKeyVersionId: string } }>(
+        `${this.baseUrl}/groups/${groupId}/keys/rotate`,
+        { reason, keys },
+      ),
+    );
+    const newVersionId = rotateRes?.data?.groupKeyVersionId ?? null;
+
+    // Move local caches to the new ACTIVE version.
+    this.invalidateGroupKey(groupId);
+    const aliasKey = this.buildVersionedKey(groupId);
+    try {
+      await this.zkVault.deleteGroupKey(aliasKey);
+    } catch (e) {
+      console.warn('Failed to evict aliased group key during rotation', e);
+    }
+    if (newVersionId) {
+      this.activeGroupKeyVersionIds.set(groupId, newVersionId);
+      const versionedCacheKey = this.buildVersionedKey(groupId, newVersionId);
+      this.groupKeysMemoryCache.set(versionedCacheKey, newKey);
+      this.groupKeysMemoryCache.set(aliasKey, newKey);
+      try {
+        await this.zkVault.storeGroupKey(versionedCacheKey, newKey);
+      } catch (e) {
+        console.warn('Failed to persist rotated group key to IndexedDB', e);
+      }
+    }
+
+    return { groupKeyVersionId: newVersionId, skippedUserIds };
   }
 
   /**
@@ -534,10 +719,20 @@ export class GroupKeyService {
         console.warn('Failed to store unwrapped group key in IndexedDB', e);
       }
 
+      // An unversioned request resolves the ACTIVE version — remember its
+      // concrete id so write paths can declare it on their ciphertext.
+      if (!groupKeyVersionId && returnedVersionId !== 'active') {
+        this.activeGroupKeyVersionIds.set(groupId, returnedVersionId);
+      }
+
       // Only clear requiresKeyProvisioning after successful unwrap and cache write
       this.requiresKeyProvisioning.set(false);
       this.rateLimitError.set(null);
-      return { status: 'ready', key: unwrappedKey };
+      return {
+        status: 'ready',
+        key: unwrappedKey,
+        versionId: returnedVersionId !== 'active' ? returnedVersionId : undefined,
+      };
     } catch (e: any) {
       // Backend-status → classified reason. A wrapped key that simply is not
       // provisioned yet is temporary; a revoked membership is permanent.

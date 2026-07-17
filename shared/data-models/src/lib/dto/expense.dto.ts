@@ -109,6 +109,10 @@ export class CreateExpenseDto {
   @IsOptional()
   groupId?: string;
 
+  @IsUUID('4', { message: 'Group key version ID must be a valid UUID' })
+  @IsOptional()
+  groupKeyVersionId?: string;
+
   @IsDateString(
     {},
     { message: 'Expense date must be a valid ISO date string (YYYY-MM-DD)' },
@@ -184,6 +188,10 @@ export class UpdateExpenseDto {
   @IsUUID('4', { message: 'Paid-by User ID must be a valid UUID' })
   @IsOptional()
   paidByUserId?: string;
+
+  @IsUUID('4', { message: 'Group key version ID must be a valid UUID' })
+  @IsOptional()
+  groupKeyVersionId?: string;
 
   @IsDateString(
     {},

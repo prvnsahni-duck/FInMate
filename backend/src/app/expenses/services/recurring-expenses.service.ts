@@ -12,6 +12,7 @@ import {
   Expense,
   ExpenseSplit,
   Group,
+  GroupKeyVersion,
   GroupMember,
   User,
   CreateRecurringExpenseDto,
@@ -216,6 +217,47 @@ export class RecurringExpensesService {
     }
   }
 
+  /**
+   * Resolves the key version to stamp on a template. A declared version must
+   * belong to the group and not be REVOKED (the stamp records the version the
+   * ciphertext was actually produced with); otherwise falls back to ACTIVE.
+   */
+  private async resolveTemplateGroupKeyVersion(
+    group: Group,
+    declaredVersionId: string | undefined,
+    manager: EntityManager,
+  ): Promise<GroupKeyVersion> {
+    if (declaredVersionId) {
+      const declared = await manager.getRepository(GroupKeyVersion).findOne({
+        where: { id: declaredVersionId, group: { id: group.id } },
+      });
+      if (!declared || declared.status === 'REVOKED') {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message:
+            'groupKeyVersionId must reference a usable key version of the selected group',
+        });
+      }
+      return declared;
+    }
+
+    const active = await manager.getRepository(GroupKeyVersion).findOne({
+      where: { group: { id: group.id }, status: 'ACTIVE' },
+      order: { version: 'DESC' },
+    });
+    if (active) {
+      return active;
+    }
+    return manager.getRepository(GroupKeyVersion).save(
+      manager.getRepository(GroupKeyVersion).create({
+        group,
+        version: 1,
+        algorithm: 'AES-256-GCM',
+        status: 'ACTIVE',
+      }),
+    );
+  }
+
   async createRecurringExpense(
     userId: string,
     dto: CreateRecurringExpenseDto,
@@ -254,9 +296,26 @@ export class RecurringExpensesService {
       if (!group) {
         throw new NotFoundException('Group not found');
       }
+      if (
+        group.currency &&
+        dto.currency.toUpperCase() !== group.currency.toUpperCase()
+      ) {
+        throw new BadRequestException({
+          errorCode: 'EXP_CURRENCY_MISMATCH',
+          message: `Expense currency must match the group's base currency (${group.currency})`,
+        });
+      }
     }
 
     const saved = await this.dataSource.transaction(async (manager) => {
+      const groupKeyVersion = group
+        ? await this.resolveTemplateGroupKeyVersion(
+            group,
+            dto.groupKeyVersionId,
+            manager,
+          )
+        : undefined;
+
       const template = await manager.getRepository(RecurringExpense).save(
         manager.getRepository(RecurringExpense).create({
           title: dto.title,
@@ -267,6 +326,7 @@ export class RecurringExpensesService {
           paidByUser,
           ownerUser,
           group,
+          groupKeyVersion,
           frequency: dto.frequency,
           startDate: dto.startDate,
           endDate: dto.endDate,
@@ -279,7 +339,7 @@ export class RecurringExpensesService {
 
       return manager.getRepository(RecurringExpense).findOne({
         where: { id: template.id },
-        relations: ['paidByUser', 'ownerUser', 'group'],
+        relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
       });
     });
 
@@ -389,7 +449,22 @@ export class RecurringExpensesService {
     if (dto.endDate !== undefined) template.endDate = dto.endDate;
     if (dto.status !== undefined) template.status = dto.status;
 
+    if (dto.groupKeyVersionId && !template.group) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'groupKeyVersionId is only valid for group templates',
+      });
+    }
+
     const saved = await this.dataSource.transaction(async (manager) => {
+      if (template.group && dto.groupKeyVersionId) {
+        // Re-stamp to the version the client re-encrypted with.
+        template.groupKeyVersion = await this.resolveTemplateGroupKeyVersion(
+          template.group,
+          dto.groupKeyVersionId,
+          manager,
+        );
+      }
       await manager.getRepository(RecurringExpense).save(template);
 
       if (dto.splits) {
@@ -410,7 +485,7 @@ export class RecurringExpensesService {
 
       return manager.getRepository(RecurringExpense).findOne({
         where: { id: template.id },
-        relations: ['paidByUser', 'ownerUser', 'group'],
+        relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
       });
     });
 
@@ -452,6 +527,7 @@ export class RecurringExpensesService {
       paidByUserId: template.paidByUser.id,
       ownerUserId: template.ownerUser.id,
       groupId: template.group?.id ?? null,
+      groupKeyVersionId: template.groupKeyVersion?.id ?? null,
       frequency: template.frequency,
       startDate: template.startDate,
       endDate: template.endDate ?? null,

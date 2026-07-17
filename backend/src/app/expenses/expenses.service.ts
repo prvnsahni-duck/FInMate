@@ -172,6 +172,29 @@ export class ExpensesService {
     );
   }
 
+  /**
+   * Resolves the key version the client declared it encrypted with. The stamp
+   * must record the version actually used — not whatever is ACTIVE at write
+   * time — or a rotation racing a write leaves the ciphertext undecryptable.
+   */
+  private async resolveDeclaredGroupKeyVersion(
+    group: Group,
+    declaredVersionId: string,
+    manager: EntityManager,
+  ): Promise<GroupKeyVersion> {
+    const declared = await manager.getRepository(GroupKeyVersion).findOne({
+      where: { id: declaredVersionId, group: { id: group.id } },
+    });
+    if (!declared || declared.status === 'REVOKED') {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message:
+          'groupKeyVersionId must reference a usable key version of the selected group',
+      });
+    }
+    return declared;
+  }
+
   private async ensureExpenseAccess(
     userId: string,
     expense: Expense,
@@ -622,6 +645,12 @@ export class ExpensesService {
             'Personal expenses cannot include participantGroupMemberId in splits',
         });
       }
+      if (dto.groupKeyVersionId) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'groupKeyVersionId is only valid for group expenses',
+        });
+      }
     }
 
     this.validateExpenseEncryptionMetadata(userId, dto, group?.id);
@@ -630,7 +659,13 @@ export class ExpensesService {
 
     const saved = await this.dataSource.transaction(async (manager) => {
       const groupKeyVersion = group
-        ? await this.getOrCreateActiveGroupKeyVersion(group, manager)
+        ? dto.groupKeyVersionId
+          ? await this.resolveDeclaredGroupKeyVersion(
+              group,
+              dto.groupKeyVersionId,
+              manager,
+            )
+          : await this.getOrCreateActiveGroupKeyVersion(group, manager)
         : undefined;
 
       const expense = await manager.getRepository(Expense).save(
@@ -698,7 +733,9 @@ export class ExpensesService {
               uploaderUser: ownerUser,
               expense,
               storageKey: key,
-              originalName: this.basename(key),
+              // ZK: never persist a plaintext filename — names live only in
+              // encryptedOriginalName on the new attachment model.
+              originalName: 'encrypted',
               mimeType: 'application/octet-stream',
               sizeBytes: '0',
             }),
@@ -814,12 +851,30 @@ export class ExpensesService {
     }
 
     if (params.cursor) {
-      query.andWhere('expense.id < :cursor', { cursor: params.cursor });
+      // Keyset pagination must key on the same columns as the sort
+      // (expenseDate DESC, createdAt DESC) — a bare `id < cursor` skips or
+      // repeats rows because ids are not ordered by date.
+      const cursorExpense = await this.expenseRepository.findOne({
+        where: { id: params.cursor },
+      });
+      if (cursorExpense) {
+        query.andWhere(
+          '(expense.expenseDate < :cursorDate OR ' +
+            '(expense.expenseDate = :cursorDate AND expense.createdAt < :cursorCreatedAt) OR ' +
+            '(expense.expenseDate = :cursorDate AND expense.createdAt = :cursorCreatedAt AND expense.id < :cursorId))',
+          {
+            cursorDate: cursorExpense.expenseDate,
+            cursorCreatedAt: cursorExpense.createdAt,
+            cursorId: cursorExpense.id,
+          },
+        );
+      }
     }
 
     query
       .orderBy('expense.expenseDate', 'DESC')
-      .addOrderBy('expense.createdAt', 'DESC');
+      .addOrderBy('expense.createdAt', 'DESC')
+      .addOrderBy('expense.id', 'DESC');
 
     const total = await query.getCount();
     const expenses = await query
@@ -983,8 +1038,23 @@ export class ExpensesService {
       expense.group?.id,
     );
 
+    if (dto.groupKeyVersionId && !expense.group) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'groupKeyVersionId is only valid for group expenses',
+      });
+    }
+
     const saved = await this.dataSource.transaction(async (manager) => {
-      if (expense.group && !expense.groupKeyVersion) {
+      if (expense.group && dto.groupKeyVersionId) {
+        // Re-stamp to the version the client re-encrypted with; keeping the
+        // old stamp after a post-rotation edit breaks decryption permanently.
+        expense.groupKeyVersion = await this.resolveDeclaredGroupKeyVersion(
+          expense.group,
+          dto.groupKeyVersionId,
+          manager,
+        );
+      } else if (expense.group && !expense.groupKeyVersion) {
         expense.groupKeyVersion = await this.getOrCreateActiveGroupKeyVersion(
           expense.group,
           manager,
@@ -1005,9 +1075,11 @@ export class ExpensesService {
           });
         }
 
+        // Soft-delete: splits are ledger history (ARCHITECTURE §4.3) — the
+        // replaced allocation stays queryable for audit/adjustment trails.
         await manager
           .getRepository(ExpenseSplit)
-          .delete({ expense: { id: expense.id } as Partial<Expense> });
+          .softDelete({ expense: { id: expense.id } as Partial<Expense> });
         await this.persistSplits(
           expense,
           {
@@ -1063,7 +1135,9 @@ export class ExpensesService {
               uploaderUser: expense.ownerUser,
               expense,
               storageKey: key,
-              originalName: this.basename(key),
+              // ZK: never persist a plaintext filename — names live only in
+              // encryptedOriginalName on the new attachment model.
+              originalName: 'encrypted',
               mimeType: 'application/octet-stream',
               sizeBytes: '0',
             }),

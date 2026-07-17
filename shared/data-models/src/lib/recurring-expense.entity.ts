@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
+import { GroupKeyVersion } from './group-key-version.entity';
 
 @Entity('recurring_expenses')
 @Index(['nextOccurrenceDate', 'status'])
@@ -40,6 +41,10 @@ export class RecurringExpense {
 
   @ManyToOne(() => Group, { nullable: true })
   group?: Group;
+
+  /** Key version the template's ciphertext was produced with (group scope). */
+  @ManyToOne(() => GroupKeyVersion, { nullable: true, onDelete: 'SET NULL' })
+  groupKeyVersion?: GroupKeyVersion;
 
   @Column({ type: 'varchar', length: 20 })
   frequency!: 'daily' | 'weekly' | 'monthly' | 'yearly';

@@ -29,6 +29,13 @@ describe('EncryptionService', () => {
     expect(service).toBeDefined();
   });
 
+  it('should fail fast when ENCRYPTION_KEY is not configured (ENC-001)', () => {
+    const emptyConfig = { get: jest.fn(() => null) };
+    expect(() => new EncryptionService(emptyConfig as any)).toThrow(
+      /ENCRYPTION_KEY is not configured/,
+    );
+  });
+
   it('should encrypt and decrypt correctly', () => {
     const plainText = 'https://supabase.storage.finmate/avatars/avatar.png';
 
