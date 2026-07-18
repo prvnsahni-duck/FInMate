@@ -58,6 +58,13 @@ export class GroupKeyService {
     throw new Error('Web Cryptography API is not available');
   }
 
+  private unwrapHttpData<T>(response: T | { data: T } | null | undefined): T | undefined {
+    if (response && typeof response === 'object' && 'data' in response) {
+      return (response as { data: T }).data;
+    }
+    return response ?? undefined;
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Public API – components should normally call only ensureGroupKey()
   // ─────────────────────────────────────────────────────────────────────────
@@ -307,11 +314,15 @@ export class GroupKeyService {
     // write paths can declare it (ciphertext / version-stamp consistency).
     try {
       const versionResponse = await firstValueFrom(
-        this.http.get<{ data: { groupKeyVersionId: string | null } }>(
+        this.http.get<
+          | { groupKeyVersionId: string | null }
+          | { data: { groupKeyVersionId: string | null } }
+        >(
           `${this.baseUrl}/groups/${groupId}/keys/me`,
         ),
       );
-      const mintedVersionId = versionResponse?.data?.groupKeyVersionId;
+      const versionData = this.unwrapHttpData(versionResponse);
+      const mintedVersionId = versionData?.groupKeyVersionId;
       if (mintedVersionId) {
         this.activeGroupKeyVersionIds.set(groupId, mintedVersionId);
         const versionedCacheKey = this.buildVersionedKey(groupId, mintedVersionId);
@@ -365,12 +376,16 @@ export class GroupKeyService {
 
     // Get target's public wrapping key
     const targetKeyRes = await firstValueFrom(
-      this.http.get<{ data: { publicWrappingKey: string | null } }>(
+      this.http.get<
+        | { publicWrappingKey: string | null }
+        | { data: { publicWrappingKey: string | null } }
+      >(
         `${this.baseUrl}/users/${targetUserId}/public-key`,
       ),
     );
 
-    const publicWrappingKeyStr = targetKeyRes?.data?.publicWrappingKey;
+    const targetKeyData = this.unwrapHttpData(targetKeyRes);
+    const publicWrappingKeyStr = targetKeyData?.publicWrappingKey;
     if (!publicWrappingKeyStr) {
       console.warn(`Target user ${targetUserId} has not generated a public key yet.`);
       return;
@@ -421,11 +436,14 @@ export class GroupKeyService {
     const newKey = await this.encryptionService.generateDataKey();
 
     const membersRes = await firstValueFrom(
-      this.http.get<{ data: Array<{ user?: { id: string }; joinStatus: string }> }>(
+      this.http.get<
+        | Array<{ user?: { id: string }; joinStatus: string }>
+        | { data: Array<{ user?: { id: string }; joinStatus: string }> }
+      >(
         `${this.baseUrl}/groups/${groupId}/members`,
       ),
     );
-    const members = (membersRes?.data ?? []).filter(
+    const members = (this.unwrapHttpData(membersRes) ?? []).filter(
       (m) => m.user?.id && (m.joinStatus === 'active' || m.joinStatus === 'invited'),
     );
 
@@ -444,11 +462,15 @@ export class GroupKeyService {
       }
       try {
         const keyRes = await firstValueFrom(
-          this.http.get<{ data: { publicWrappingKey: string | null } }>(
+          this.http.get<
+            | { publicWrappingKey: string | null }
+            | { data: { publicWrappingKey: string | null } }
+          >(
             `${this.baseUrl}/users/${uid}/public-key`,
           ),
         );
-        const publicWrappingKeyStr = keyRes?.data?.publicWrappingKey;
+        const keyData = this.unwrapHttpData(keyRes);
+        const publicWrappingKeyStr = keyData?.publicWrappingKey;
         if (!publicWrappingKeyStr) {
           skippedUserIds.push(uid);
           continue;
@@ -475,12 +497,16 @@ export class GroupKeyService {
     }
 
     const rotateRes = await firstValueFrom(
-      this.http.post<{ data: { groupKeyVersionId: string } }>(
+      this.http.post<
+        | { groupKeyVersionId: string }
+        | { data: { groupKeyVersionId: string } }
+      >(
         `${this.baseUrl}/groups/${groupId}/keys/rotate`,
         { reason, keys },
       ),
     );
-    const newVersionId = rotateRes?.data?.groupKeyVersionId ?? null;
+    const rotateData = this.unwrapHttpData(rotateRes);
+    const newVersionId = rotateData?.groupKeyVersionId ?? null;
 
     // Move local caches to the new ACTIVE version.
     this.invalidateGroupKey(groupId);
@@ -518,10 +544,10 @@ export class GroupKeyService {
       }
 
       const res = await firstValueFrom(
-        this.http.get<{ data: string[] }>(`${this.baseUrl}/groups/${groupId}/keys/missing`),
+        this.http.get<string[] | { data: string[] }>(`${this.baseUrl}/groups/${groupId}/keys/missing`),
       );
 
-      const missingUserIds = res?.data || [];
+      const missingUserIds = this.unwrapHttpData(res) || [];
       if (missingUserIds.length === 0) {
         return;
       }
@@ -565,12 +591,15 @@ export class GroupKeyService {
 
     // Try loading existing key pair from backend
     const keysResponse = await firstValueFrom(
-      this.http.get<{ data: { publicWrappingKey: string | null; encryptedPrivateWrappingKey: string | null } }>(
+      this.http.get<
+        | { publicWrappingKey: string | null; encryptedPrivateWrappingKey: string | null }
+        | { data: { publicWrappingKey: string | null; encryptedPrivateWrappingKey: string | null } }
+      >(
         `${this.baseUrl}/users/me/keys`,
       ),
     );
 
-    const data = keysResponse.data;
+    const data = this.unwrapHttpData(keysResponse);
     if (data && data.publicWrappingKey && data.encryptedPrivateWrappingKey) {
       const subtle = this.getSubtleCrypto();
 
@@ -679,14 +708,18 @@ export class GroupKeyService {
         `${this.baseUrl}/groups/${groupId}/keys/me` +
         (groupKeyVersionId ? `?versionId=${groupKeyVersionId}` : '');
       const response = await firstValueFrom(
-        this.http.get<{ data: { wrappedKey: string | null; groupKeyVersionId: string | null; hasActiveKeys?: boolean } }>(
+        this.http.get<
+          | { wrappedKey: string | null; groupKeyVersionId: string | null; hasActiveKeys?: boolean }
+          | { data: { wrappedKey: string | null; groupKeyVersionId: string | null; hasActiveKeys?: boolean } }
+        >(
           url,
         ),
       );
 
-      const wrappedKey = response?.data?.wrappedKey;
-      const returnedVersionId = response?.data?.groupKeyVersionId ?? groupKeyVersionId ?? 'active';
-      const hasActiveKeys = response?.data?.hasActiveKeys ?? false;
+      const data = this.unwrapHttpData(response);
+      const wrappedKey = data?.wrappedKey;
+      const returnedVersionId = data?.groupKeyVersionId ?? groupKeyVersionId ?? 'active';
+      const hasActiveKeys = data?.hasActiveKeys ?? false;
 
       if (!wrappedKey) {
         // Server has no wrapped key for this member/version yet. Flag
@@ -694,7 +727,7 @@ export class GroupKeyService {
         // a brand-new group with no keys at all must stay unflagged so the
         // owner can generate the first key.
         this.requiresKeyProvisioning.set(
-          Boolean(response?.data?.groupKeyVersionId) && hasActiveKeys,
+          Boolean(data?.groupKeyVersionId) && hasActiveKeys,
         );
         return { status: 'pending' };
       }

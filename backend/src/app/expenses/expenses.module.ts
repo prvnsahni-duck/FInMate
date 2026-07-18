@@ -3,14 +3,18 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   AuditLog,
   Attachment,
+  AttachmentVersion,
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  ExpenseSplitVersion,
+  ExpenseVersion,
   Group,
   GroupMember,
   User,
   RecurringExpense,
   RecurringExpenseSplit,
+  ReceiptVersion,
 } from '@finmate/data-models';
 import { ExpensesController } from './expenses.controller';
 import { ExpensesService } from './expenses.service';
@@ -29,12 +33,16 @@ import {
     TypeOrmModule.forFeature([
       Expense,
       ExpenseSplit,
+      ExpenseVersion,
+      ExpenseSplitVersion,
       RecurringExpense,
       RecurringExpenseSplit,
       Group,
       GroupMember,
       User,
       Attachment,
+      AttachmentVersion,
+      ReceiptVersion,
       AuditLog,
       EncryptedExpenseKey,
     ]),

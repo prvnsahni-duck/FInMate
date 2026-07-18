@@ -8,13 +8,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import {
   Attachment,
+  AttachmentVersion,
   AuditLog,
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  ExpenseSplitVersion,
+  ExpenseVersion,
   Group,
   GroupKeyVersion,
   GroupMember,
+  ReceiptVersion,
   User,
 } from '@finmate/data-models';
 import { Repository } from 'typeorm';
@@ -29,12 +33,16 @@ describe('ExpensesService', () => {
   let userRepository: jest.Mocked<Repository<User>>;
   let attachmentRepository: jest.Mocked<Repository<Attachment>>;
   let groupKeyVersionRepository: { findOne: jest.Mock; save: jest.Mock; create: jest.Mock };
+  let expenseVersionRepository: jest.Mocked<Repository<ExpenseVersion>>;
+  let expenseSplitVersionRepository: jest.Mocked<Repository<ExpenseSplitVersion>>;
+  let attachmentVersionRepository: jest.Mocked<Repository<AttachmentVersion>>;
+  let receiptVersionRepository: jest.Mocked<Repository<ReceiptVersion>>;
 
   beforeEach(async () => {
     const mockExpenseRepository = {
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
-      save: jest.fn(),
+      save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
       delete: jest.fn(),
       createQueryBuilder: jest.fn(),
@@ -43,10 +51,11 @@ describe('ExpensesService', () => {
     };
 
     const mockSplitRepository = {
-      find: jest.fn(),
-      save: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
       delete: jest.fn(),
+      softDelete: jest.fn(),
     };
 
     const mockGroupRepository = {
@@ -64,14 +73,14 @@ describe('ExpensesService', () => {
     };
 
     const mockAttachmentRepository = {
-      find: jest.fn(),
-      save: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
       delete: jest.fn(),
     };
 
     const mockAuditLogRepository = {
-      save: jest.fn(),
+      save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
     };
 
@@ -97,6 +106,26 @@ describe('ExpensesService', () => {
       create: jest.fn((data) => data),
     };
 
+    const mockExpenseVersionRepository = {
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockExpenseSplitVersionRepository = {
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockAttachmentVersionRepository = {
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockReceiptVersionRepository = {
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
     const mockEntityManager = {
       getRepository: jest.fn((entity) => {
         if (entity === Expense) return mockExpenseRepository;
@@ -107,6 +136,11 @@ describe('ExpensesService', () => {
         if (entity === Attachment) return mockAttachmentRepository;
         if (entity === AuditLog) return mockAuditLogRepository;
         if (entity === GroupKeyVersion) return mockGroupKeyVersionRepository;
+        if (entity === ExpenseVersion) return mockExpenseVersionRepository;
+        if (entity === ExpenseSplitVersion)
+          return mockExpenseSplitVersionRepository;
+        if (entity === AttachmentVersion) return mockAttachmentVersionRepository;
+        if (entity === ReceiptVersion) return mockReceiptVersionRepository;
         if (entity === EncryptedExpenseKey)
           return mockEncryptedExpenseKeyRepository;
         if (
@@ -156,6 +190,22 @@ describe('ExpensesService', () => {
           provide: getRepositoryToken(EncryptedExpenseKey),
           useValue: mockEncryptedExpenseKeyRepository,
         },
+        {
+          provide: getRepositoryToken(ExpenseVersion),
+          useValue: mockExpenseVersionRepository,
+        },
+        {
+          provide: getRepositoryToken(ExpenseSplitVersion),
+          useValue: mockExpenseSplitVersionRepository,
+        },
+        {
+          provide: getRepositoryToken(AttachmentVersion),
+          useValue: mockAttachmentVersionRepository,
+        },
+        {
+          provide: getRepositoryToken(ReceiptVersion),
+          useValue: mockReceiptVersionRepository,
+        },
         { provide: getDataSourceToken(), useValue: mockDataSource },
       ],
     }).compile();
@@ -168,6 +218,14 @@ describe('ExpensesService', () => {
     userRepository = module.get(getRepositoryToken(User));
     attachmentRepository = module.get(getRepositoryToken(Attachment));
     groupKeyVersionRepository = mockGroupKeyVersionRepository;
+    expenseVersionRepository = module.get(getRepositoryToken(ExpenseVersion));
+    expenseSplitVersionRepository = module.get(
+      getRepositoryToken(ExpenseSplitVersion),
+    );
+    attachmentVersionRepository = module.get(
+      getRepositoryToken(AttachmentVersion),
+    );
+    receiptVersionRepository = module.get(getRepositoryToken(ReceiptVersion));
   });
 
   it('should be defined', () => {
@@ -651,11 +709,45 @@ describe('ExpensesService', () => {
       const result = await service.createExpense('caller-id', {
         ...baseGroupDto,
         groupKeyVersionId: 'v1-id',
+        encryptedAttachments: [
+          {
+            storageKey: 'receipts/exp-1',
+            encryptedFileKey: 'iv:key',
+            encryptedOriginalName: 'iv:name',
+            mimeType: 'image/jpeg',
+            sizeBytes: 42,
+          },
+        ],
       } as any);
 
       expect(expenseRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
           groupKeyVersion: expect.objectContaining({ id: 'v1-id' }),
+        }),
+      );
+      expect(expenseVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'created',
+          expense: expect.objectContaining({ id: 'exp-1' }),
+          snapshot: expect.objectContaining({ groupKeyVersionId: 'v1-id' }),
+        }),
+      );
+      expect(expenseSplitVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'created',
+          expense: expect.objectContaining({ id: 'exp-1' }),
+        }),
+      );
+      expect(attachmentVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'created',
+          snapshot: expect.objectContaining({ storageKey: 'receipts/exp-1' }),
+        }),
+      );
+      expect(receiptVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'created',
+          snapshot: expect.objectContaining({ storageKey: 'receipts/exp-1' }),
         }),
       );
       expect(result['groupKeyVersionId']).toBe('v1-id');
@@ -709,6 +801,13 @@ describe('ExpensesService', () => {
       });
       expect(expense.groupKeyVersion).toEqual(
         expect.objectContaining({ id: 'v2-id' }),
+      );
+      expect(expenseVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'updated',
+          expense: expect.objectContaining({ id: 'exp-1' }),
+          snapshot: expect.objectContaining({ groupKeyVersionId: 'v2-id' }),
+        }),
       );
       expect(result['groupKeyVersionId']).toBe('v2-id');
     });

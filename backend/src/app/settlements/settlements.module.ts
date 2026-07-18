@@ -6,6 +6,7 @@ import {
   Expense,
   ExpenseSplit,
   Settlement,
+  SettlementVersion,
   AuditLog,
 } from '@finmate/data-models';
 import { SettlementsService } from './settlements.service';
@@ -21,6 +22,7 @@ import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
       Expense,
       ExpenseSplit,
       Settlement,
+      SettlementVersion,
       AuditLog,
     ]),
   ],
