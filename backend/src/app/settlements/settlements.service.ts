@@ -13,6 +13,7 @@ import {
   Expense,
   ExpenseSplit,
   Settlement,
+  SettlementVersion,
   ProposeSettlementDto,
   UpdateSettlementDto,
   AuditLog,
@@ -86,6 +87,39 @@ export class SettlementsService {
     } catch {
       // Audit log failures should never block primary operations
     }
+  }
+
+  private settlementSnapshot(settlement: Settlement): Record<string, unknown> {
+    return {
+      id: settlement.id,
+      groupId: settlement.group?.id ?? null,
+      fromUserId: settlement.fromUser?.id ?? null,
+      toUserId: settlement.toUser?.id ?? null,
+      amount: Number(settlement.amount),
+      currency: settlement.currency,
+      status: settlement.status,
+      settledOn: settlement.settledOn ?? null,
+      note: settlement.note ?? null,
+      version: settlement.version,
+    };
+  }
+
+  private async recordSettlementVersion(
+    manager: EntityManager,
+    settlement: Settlement,
+    action: SettlementVersion['action'],
+    actorUser?: User | null,
+  ): Promise<void> {
+    await manager.save(
+      SettlementVersion,
+      manager.create(SettlementVersion, {
+        settlement,
+        entityVersion: settlement.version,
+        action,
+        snapshot: this.settlementSnapshot(settlement),
+        actorUser: actorUser ?? undefined,
+      }),
+    );
   }
 
   simplifyDebts(
@@ -380,7 +414,14 @@ export class SettlementsService {
           note: dto.note,
         });
 
-        return manager.save(Settlement, settlement);
+        const saved = await manager.save(Settlement, settlement);
+        await this.recordSettlementVersion(
+          manager,
+          saved,
+          'proposed',
+          callerMember.user,
+        );
+        return saved;
       },
     );
 
@@ -510,6 +551,14 @@ export class SettlementsService {
         }
 
         const updated = await manager.save(Settlement, settlement);
+        if (auditAction) {
+          await this.recordSettlementVersion(
+            manager,
+            updated,
+            auditAction === 'settlement.confirmed' ? 'confirmed' : 'cancelled',
+            callerMember.user,
+          );
+        }
         return {
           savedSettlement: updated,
           callerUser: callerMember.user,

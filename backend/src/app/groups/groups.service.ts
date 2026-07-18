@@ -140,6 +140,34 @@ export class GroupsService {
     }
   }
 
+  /** Loads the acting user and fires a non-blocking audit write. */
+  private auditAsUser(
+    userId: string,
+    action: string,
+    entityId: string,
+    groupId: string,
+    metadata?: Record<string, unknown>,
+  ): void {
+    void (async () => {
+      try {
+        const actorUser = await this.dataSource
+          .getRepository(User)
+          .findOne({ where: { id: userId } });
+        if (actorUser) {
+          await this.writeAuditLog({
+            actorUser,
+            action,
+            entityId,
+            groupId,
+            metadata,
+          });
+        }
+      } catch {
+        // Audit log failures should never block the primary operation
+      }
+    })();
+  }
+
   async createGroup(
     owner: User,
     dto: CreateGroupDto,
@@ -697,8 +725,33 @@ export class GroupsService {
       throw new NotFoundException('Member record not found');
     }
 
-    // Role can be changed by any member, to any role, at any time
     if (dto.role) {
+      if (callerMember.joinStatus !== 'active') {
+        throw new ForbiddenException('You must accept the invitation first');
+      }
+      if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
+        throw new ForbiddenException(
+          'Only owners and admins can change member roles',
+        );
+      }
+      if (dto.role === 'owner' && callerMember.role !== 'owner') {
+        throw new ForbiddenException(
+          'Only the owner can transfer group ownership',
+        );
+      }
+      if (
+        callerMember.role === 'admin' &&
+        (targetMember.role === 'owner' || targetMember.role === 'admin')
+      ) {
+        throw new ForbiddenException(
+          'Admins cannot change the role of other admins or the owner',
+        );
+      }
+      if (targetMember.user.id === userId && dto.role !== 'owner') {
+        throw new ForbiddenException(
+          'Use ownership transfer or leave the group instead of changing your own role',
+        );
+      }
       if (dto.role === 'owner') {
         // If promoting to owner, demote current owner to admin in a transaction
         const saved = await this.dataSource.transaction(async (manager) => {
@@ -765,6 +818,22 @@ export class GroupsService {
         }
       } else {
         if (dto.joinStatus === 'removed') {
+          if (callerMember.joinStatus !== 'active') {
+            throw new ForbiddenException('You must accept the invitation first');
+          }
+          if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
+            throw new ForbiddenException(
+              'Only owners and admins can remove members',
+            );
+          }
+          if (
+            callerMember.role === 'admin' &&
+            (targetMember.role === 'owner' || targetMember.role === 'admin')
+          ) {
+            throw new ForbiddenException(
+              'Admins cannot remove other admins or the owner',
+            );
+          }
           targetMember.joinStatus = 'removed';
           targetMember.leftAt = new Date();
         } else {
@@ -970,7 +1039,9 @@ export class GroupsService {
       throw new NotFoundException('Group not found');
     }
     group.inviteToken = randomUUID();
-    return this.groupRepository.save(group);
+    const saved = await this.groupRepository.save(group);
+    this.auditAsUser(userId, 'group.invite_link_regenerated', groupId, groupId);
+    return saved;
   }
 
   async getInviteDetails(inviteToken: string) {
@@ -1192,6 +1263,10 @@ export class GroupsService {
     });
 
     const saved = await this.groupInviteRepository.save(invite);
+    this.auditAsUser(userId, 'group.invite_created', saved.id, groupId, {
+      expiresAt: saved.expiresAt,
+      groupKeyVersion: activeVersion?.version,
+    });
     return {
       inviteToken: saved.inviteToken,
       expiresAt: saved.expiresAt,
@@ -1253,13 +1328,28 @@ export class GroupsService {
         }
       }
     });
+
+    this.auditAsUser(userId, 'group.keys_provisioned', groupId, groupId, {
+      targetUserIds: keys.map((k) => k.userId),
+    });
   }
 
-  async getMyGroupKey(userId: string, groupId: string) {
+  async getMyGroupKey(userId: string, groupId: string, versionId?: string) {
     await this.getActiveMembership(userId, groupId);
 
-    const activeVersion = await this.getActiveGroupKeyVersion(groupId);
-    if (!activeVersion) {
+    let keyVersion: GroupKeyVersion | null;
+    if (versionId) {
+      keyVersion = await this.groupKeyVersionRepository.findOne({
+        where: { id: versionId, group: { id: groupId } },
+      });
+      if (!keyVersion || keyVersion.status === 'REVOKED') {
+        throw new NotFoundException('Group key version not found');
+      }
+    } else {
+      keyVersion = await this.getActiveGroupKeyVersion(groupId);
+    }
+
+    if (!keyVersion) {
       return {
         groupId,
         userId,
@@ -1272,20 +1362,20 @@ export class GroupsService {
 
     const key = await this.memberWrappedGroupKeyRepository.findOne({
       where: {
-        groupKeyVersion: { id: activeVersion.id },
+        groupKeyVersion: { id: keyVersion.id },
         user: { id: userId },
       },
     });
 
     const totalKeys = await this.memberWrappedGroupKeyRepository.count({
-      where: { groupKeyVersion: { id: activeVersion.id } },
+      where: { groupKeyVersion: { id: keyVersion.id } },
     });
 
     return {
       groupId,
       userId,
-      groupKeyVersionId: activeVersion.id,
-      groupKeyVersion: activeVersion.version,
+      groupKeyVersionId: keyVersion.id,
+      groupKeyVersion: keyVersion.version,
       wrappedKey: key?.wrappedGroupKey ?? null,
       hasActiveKeys: totalKeys > 0,
     };
@@ -1386,6 +1476,12 @@ export class GroupsService {
       }
 
       return newVersion;
+    });
+
+    this.auditAsUser(userId, 'group.key_rotated', rotated.id, groupId, {
+      groupKeyVersion: rotated.version,
+      reason: dto.reason,
+      wrappedForUserIds: dto.keys.map((k) => k.userId),
     });
 
     return {
@@ -1547,6 +1643,35 @@ export class GroupsService {
       }
 
       return savedContributions;
+    }).then((result) => {
+      this.auditAsUser(userId, 'group.contributions_updated', groupId, groupId, {
+        ledgerMonth: dto.ledgerMonth,
+      });
+      return result;
     });
+  }
+
+  /**
+   * Lists every key version of a group (any status). Metadata only — no key
+   * material. Lets clients and provisioning UIs enumerate versions instead of
+   * discovering them one expense stamp at a time.
+   */
+  async listGroupKeyVersions(userId: string, groupId: string) {
+    await this.getActiveMembership(userId, groupId);
+
+    const versions = await this.groupKeyVersionRepository.find({
+      where: { group: { id: groupId } },
+      order: { version: 'DESC' },
+    });
+
+    return versions.map((v) => ({
+      groupKeyVersionId: v.id,
+      groupKeyVersion: v.version,
+      status: v.status,
+      algorithm: v.algorithm,
+      createdAt: v.createdAt,
+      rotatedAt: v.rotatedAt ?? null,
+      rotationReason: v.rotationReason ?? null,
+    }));
   }
 }

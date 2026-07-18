@@ -94,6 +94,7 @@ describe('GroupsService', () => {
     const mockMemberWrappedGroupKeyRepository = {
       findOne: jest.fn(),
       find: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
       save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
     };
@@ -515,7 +516,7 @@ describe('GroupsService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should allow self-update to modify their own role', async () => {
+    it('should reject a member changing their own role', async () => {
       const selfMember = {
         id: 'caller-id',
         joinStatus: 'active',
@@ -524,17 +525,13 @@ describe('GroupsService', () => {
       } as any;
       groupMemberRepository.findOne.mockResolvedValueOnce(selfMember);
       groupMemberRepository.findOne.mockResolvedValueOnce(selfMember);
-      groupMemberRepository.save.mockResolvedValueOnce(selfMember);
 
-      const result = await service.updateMember(
-        'user-id',
-        'group-id',
-        'caller-id',
-        { role: 'admin' },
-      );
-
-      expect(selfMember.role).toBe('admin');
-      expect(result).toBeDefined();
+      await expect(
+        service.updateMember('user-id', 'group-id', 'caller-id', {
+          role: 'admin',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(selfMember.role).toBe('member');
     });
 
     it('should allow self-update to accept invitation', async () => {
@@ -600,7 +597,7 @@ describe('GroupsService', () => {
       expect(result).toBeDefined();
     });
 
-    it('should allow caller to modify someone else even if not owner/admin', async () => {
+    it('should reject role changes from callers who are not owner or admin (GRP-001)', async () => {
       const caller = {
         id: 'caller-id',
         joinStatus: 'active',
@@ -616,20 +613,16 @@ describe('GroupsService', () => {
 
       groupMemberRepository.findOne.mockResolvedValueOnce(caller);
       groupMemberRepository.findOne.mockResolvedValueOnce(target);
-      groupMemberRepository.save.mockResolvedValueOnce(target);
 
-      const result = await service.updateMember(
-        'caller-user-id',
-        'group-id',
-        'target-id',
-        { role: 'admin' },
-      );
-
-      expect(target.role).toBe('admin');
-      expect(result).toBeDefined();
+      await expect(
+        service.updateMember('caller-user-id', 'group-id', 'target-id', {
+          role: 'owner',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(target.role).toBe('member');
     });
 
-    it('should allow any caller to modify owner/admin target role', async () => {
+    it('should reject an admin changing the role of the owner or another admin', async () => {
       const caller = {
         id: 'caller-id',
         joinStatus: 'active',
@@ -645,16 +638,66 @@ describe('GroupsService', () => {
 
       groupMemberRepository.findOne.mockResolvedValueOnce(caller);
       groupMemberRepository.findOne.mockResolvedValueOnce(target);
+
+      await expect(
+        service.updateMember('caller-user-id', 'group-id', 'target-id', {
+          role: 'admin',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(target.role).toBe('owner');
+    });
+
+    it('should reject an admin promoting anyone to owner', async () => {
+      const caller = {
+        id: 'caller-id',
+        joinStatus: 'active',
+        role: 'admin',
+        user: { id: 'caller-user-id' },
+      } as any;
+      const target = {
+        id: 'target-id',
+        joinStatus: 'active',
+        role: 'member',
+        user: { id: 'target-user-id' },
+      } as any;
+
+      groupMemberRepository.findOne.mockResolvedValueOnce(caller);
+      groupMemberRepository.findOne.mockResolvedValueOnce(target);
+
+      await expect(
+        service.updateMember('caller-user-id', 'group-id', 'target-id', {
+          role: 'owner',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(target.role).toBe('member');
+    });
+
+    it('should allow an admin to change a regular member role', async () => {
+      const caller = {
+        id: 'caller-id',
+        joinStatus: 'active',
+        role: 'admin',
+        user: { id: 'caller-user-id' },
+      } as any;
+      const target = {
+        id: 'target-id',
+        joinStatus: 'active',
+        role: 'member',
+        user: { id: 'target-user-id' },
+      } as any;
+
+      groupMemberRepository.findOne.mockResolvedValueOnce(caller);
+      groupMemberRepository.findOne.mockResolvedValueOnce(target);
       groupMemberRepository.save.mockResolvedValueOnce(target);
 
       const result = await service.updateMember(
         'caller-user-id',
         'group-id',
         'target-id',
-        { role: 'admin' },
+        { role: 'viewer' },
       );
 
-      expect(target.role).toBe('admin');
+      expect(target.role).toBe('viewer');
       expect(result).toBeDefined();
     });
 
@@ -856,6 +899,133 @@ describe('GroupsService', () => {
       expect(result.status).toBe('ACTIVE');
       expect(managerGroupKeyVersionRepo.save).toHaveBeenCalledTimes(2);
       expect(managerMemberWrappedRepo.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('getMyGroupKey', () => {
+    const activeMember = {
+      id: 'member-id',
+      joinStatus: 'active',
+      user: { id: 'user-id' },
+      group: { id: 'group-id' },
+    } as any;
+
+    it('should serve the requested key version when versionId is provided', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce(activeMember);
+      groupKeyVersionRepository.findOne.mockResolvedValueOnce({
+        id: 'version-1-id',
+        version: 1,
+        status: 'SUPERSEDED',
+        group: { id: 'group-id' },
+      } as any);
+      memberWrappedGroupKeyRepository.findOne.mockResolvedValueOnce({
+        wrappedGroupKey: 'ciphertext-v1',
+      } as any);
+      memberWrappedGroupKeyRepository.count.mockResolvedValueOnce(2);
+
+      const result = await service.getMyGroupKey(
+        'user-id',
+        'group-id',
+        'version-1-id',
+      );
+
+      expect(groupKeyVersionRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'version-1-id', group: { id: 'group-id' } },
+      });
+      expect(result.groupKeyVersionId).toBe('version-1-id');
+      expect(result.groupKeyVersion).toBe(1);
+      expect(result.wrappedKey).toBe('ciphertext-v1');
+      expect(result.hasActiveKeys).toBe(true);
+    });
+
+    it('should serve the active version when no versionId is provided', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce(activeMember);
+      memberWrappedGroupKeyRepository.findOne.mockResolvedValueOnce({
+        wrappedGroupKey: 'ciphertext-active',
+      } as any);
+      memberWrappedGroupKeyRepository.count.mockResolvedValueOnce(1);
+
+      const result = await service.getMyGroupKey('user-id', 'group-id');
+
+      expect(groupKeyVersionRepository.findOne).toHaveBeenCalledWith({
+        where: { group: { id: 'group-id' }, status: 'ACTIVE' },
+        relations: ['group'],
+        order: { version: 'DESC' },
+      });
+      expect(result.groupKeyVersionId).toBe('active-version-id');
+      expect(result.wrappedKey).toBe('ciphertext-active');
+    });
+
+    it('should reject a versionId that does not belong to the group', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce(activeMember);
+      groupKeyVersionRepository.findOne.mockResolvedValueOnce(null);
+
+      await expect(
+        service.getMyGroupKey('user-id', 'group-id', 'other-group-version-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should reject a revoked key version', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce(activeMember);
+      groupKeyVersionRepository.findOne.mockResolvedValueOnce({
+        id: 'revoked-version-id',
+        version: 1,
+        status: 'REVOKED',
+        group: { id: 'group-id' },
+      } as any);
+
+      await expect(
+        service.getMyGroupKey('user-id', 'group-id', 'revoked-version-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('listGroupKeyVersions', () => {
+    it('should list all versions (metadata only) for an active member', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'member-id',
+        joinStatus: 'active',
+        user: { id: 'user-id' },
+        group: { id: 'group-id' },
+      } as any);
+      (groupKeyVersionRepository as any).find = jest.fn().mockResolvedValue([
+        {
+          id: 'v2-id',
+          version: 2,
+          status: 'ACTIVE',
+          algorithm: 'AES-256-GCM',
+          createdAt: new Date('2026-07-01'),
+          rotatedAt: null,
+        },
+        {
+          id: 'v1-id',
+          version: 1,
+          status: 'SUPERSEDED',
+          algorithm: 'AES-256-GCM',
+          createdAt: new Date('2026-06-01'),
+          rotatedAt: new Date('2026-07-01'),
+          rotationReason: 'scheduled',
+        },
+      ]);
+
+      const result = await service.listGroupKeyVersions('user-id', 'group-id');
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          groupKeyVersionId: 'v2-id',
+          groupKeyVersion: 2,
+          status: 'ACTIVE',
+        }),
+      );
+      expect(result[1]).toEqual(
+        expect.objectContaining({
+          groupKeyVersionId: 'v1-id',
+          status: 'SUPERSEDED',
+          rotationReason: 'scheduled',
+        }),
+      );
+      expect(result[0]).not.toHaveProperty('wrappedKey');
     });
   });
 });

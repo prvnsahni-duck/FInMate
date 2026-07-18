@@ -124,7 +124,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
       // Unhandled generic errors
       const err = exception as Error;
       this.logger.error(
-        `Unhandled Exception: ${err?.message || exception}`,
+        `Unhandled Exception [${(err as any)?.constructor?.name ?? 'Unknown'}]: ${err?.message || exception}`,
         err?.stack,
       );
 

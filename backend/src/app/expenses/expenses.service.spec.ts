@@ -8,12 +8,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { getDataSourceToken, getRepositoryToken } from '@nestjs/typeorm';
 import {
   Attachment,
+  AttachmentVersion,
   AuditLog,
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  ExpenseSplitVersion,
+  ExpenseVersion,
   Group,
+  GroupKeyVersion,
   GroupMember,
+  ReceiptVersion,
   User,
 } from '@finmate/data-models';
 import { Repository } from 'typeorm';
@@ -27,12 +32,17 @@ describe('ExpensesService', () => {
   let groupMemberRepository: jest.Mocked<Repository<GroupMember>>;
   let userRepository: jest.Mocked<Repository<User>>;
   let attachmentRepository: jest.Mocked<Repository<Attachment>>;
+  let groupKeyVersionRepository: { findOne: jest.Mock; save: jest.Mock; create: jest.Mock };
+  let expenseVersionRepository: jest.Mocked<Repository<ExpenseVersion>>;
+  let expenseSplitVersionRepository: jest.Mocked<Repository<ExpenseSplitVersion>>;
+  let attachmentVersionRepository: jest.Mocked<Repository<AttachmentVersion>>;
+  let receiptVersionRepository: jest.Mocked<Repository<ReceiptVersion>>;
 
   beforeEach(async () => {
     const mockExpenseRepository = {
-      find: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
       findOne: jest.fn(),
-      save: jest.fn(),
+      save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
       delete: jest.fn(),
       createQueryBuilder: jest.fn(),
@@ -41,10 +51,11 @@ describe('ExpensesService', () => {
     };
 
     const mockSplitRepository = {
-      find: jest.fn(),
-      save: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
       delete: jest.fn(),
+      softDelete: jest.fn(),
     };
 
     const mockGroupRepository = {
@@ -62,14 +73,14 @@ describe('ExpensesService', () => {
     };
 
     const mockAttachmentRepository = {
-      find: jest.fn(),
-      save: jest.fn(),
+      find: jest.fn().mockResolvedValue([]),
+      save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
       delete: jest.fn(),
     };
 
     const mockAuditLogRepository = {
-      save: jest.fn(),
+      save: jest.fn(async (data) => data),
       create: jest.fn((data) => data),
     };
 
@@ -89,6 +100,32 @@ describe('ExpensesService', () => {
       })),
     };
 
+    const mockGroupKeyVersionRepository = {
+      findOne: jest.fn(),
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockExpenseVersionRepository = {
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockExpenseSplitVersionRepository = {
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockAttachmentVersionRepository = {
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
+    const mockReceiptVersionRepository = {
+      save: jest.fn(async (data) => data),
+      create: jest.fn((data) => data),
+    };
+
     const mockEntityManager = {
       getRepository: jest.fn((entity) => {
         if (entity === Expense) return mockExpenseRepository;
@@ -98,6 +135,12 @@ describe('ExpensesService', () => {
         if (entity === User) return mockUserRepository;
         if (entity === Attachment) return mockAttachmentRepository;
         if (entity === AuditLog) return mockAuditLogRepository;
+        if (entity === GroupKeyVersion) return mockGroupKeyVersionRepository;
+        if (entity === ExpenseVersion) return mockExpenseVersionRepository;
+        if (entity === ExpenseSplitVersion)
+          return mockExpenseSplitVersionRepository;
+        if (entity === AttachmentVersion) return mockAttachmentVersionRepository;
+        if (entity === ReceiptVersion) return mockReceiptVersionRepository;
         if (entity === EncryptedExpenseKey)
           return mockEncryptedExpenseKeyRepository;
         if (
@@ -147,6 +190,22 @@ describe('ExpensesService', () => {
           provide: getRepositoryToken(EncryptedExpenseKey),
           useValue: mockEncryptedExpenseKeyRepository,
         },
+        {
+          provide: getRepositoryToken(ExpenseVersion),
+          useValue: mockExpenseVersionRepository,
+        },
+        {
+          provide: getRepositoryToken(ExpenseSplitVersion),
+          useValue: mockExpenseSplitVersionRepository,
+        },
+        {
+          provide: getRepositoryToken(AttachmentVersion),
+          useValue: mockAttachmentVersionRepository,
+        },
+        {
+          provide: getRepositoryToken(ReceiptVersion),
+          useValue: mockReceiptVersionRepository,
+        },
         { provide: getDataSourceToken(), useValue: mockDataSource },
       ],
     }).compile();
@@ -158,6 +217,15 @@ describe('ExpensesService', () => {
     groupMemberRepository = module.get(getRepositoryToken(GroupMember));
     userRepository = module.get(getRepositoryToken(User));
     attachmentRepository = module.get(getRepositoryToken(Attachment));
+    groupKeyVersionRepository = mockGroupKeyVersionRepository;
+    expenseVersionRepository = module.get(getRepositoryToken(ExpenseVersion));
+    expenseSplitVersionRepository = module.get(
+      getRepositoryToken(ExpenseSplitVersion),
+    );
+    attachmentVersionRepository = module.get(
+      getRepositoryToken(AttachmentVersion),
+    );
+    receiptVersionRepository = module.get(getRepositoryToken(ReceiptVersion));
   });
 
   it('should be defined', () => {
@@ -519,6 +587,256 @@ describe('ExpensesService', () => {
   });
 
   // ─── Phase 5: Additional Unit Tests ────────────────────────────────────────
+
+  describe('group key version stamping (G-ROT write path)', () => {
+    const groupMember = {
+      id: 'membership-id',
+      role: 'member',
+      joinStatus: 'active',
+      user: { id: 'caller-id' },
+    } as any;
+
+    const baseGroupDto = {
+      title: 'cipher:title',
+      amountTotal: 100,
+      currency: 'USD',
+      category: 'Food',
+      paidByUserId: 'caller-id',
+      groupId: 'group-id',
+      expenseDate: '2026-06-10',
+      splits: [
+        { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
+      ],
+    };
+
+    it('should reject a declared groupKeyVersionId on a personal create', async () => {
+      userRepository.findOne
+        .mockResolvedValueOnce({ id: 'caller-id' } as any)
+        .mockResolvedValueOnce({ id: 'caller-id' } as any);
+
+      await expect(
+        service.createExpense('caller-id', {
+          ...baseGroupDto,
+          groupId: undefined,
+          groupKeyVersionId: 'v1-id',
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject a declared version that does not belong to the group', async () => {
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValue(groupMember);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+      groupKeyVersionRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.createExpense('caller-id', {
+          ...baseGroupDto,
+          groupKeyVersionId: 'foreign-version-id',
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(groupKeyVersionRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'foreign-version-id', group: { id: 'group-id' } },
+      });
+    });
+
+    it('should reject a declared version that is revoked', async () => {
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValue(groupMember);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+      groupKeyVersionRepository.findOne.mockResolvedValue({
+        id: 'revoked-id',
+        version: 1,
+        status: 'REVOKED',
+      } as any);
+
+      await expect(
+        service.createExpense('caller-id', {
+          ...baseGroupDto,
+          groupKeyVersionId: 'revoked-id',
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should stamp the declared (even superseded) version on create instead of ACTIVE', async () => {
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValue(groupMember);
+      groupMemberRepository.find.mockResolvedValue([groupMember]);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+
+      const supersededVersion = {
+        id: 'v1-id',
+        version: 1,
+        status: 'SUPERSEDED',
+      } as any;
+      groupKeyVersionRepository.findOne.mockResolvedValue(supersededVersion);
+
+      expenseRepository.save.mockImplementation(async (data: any) => ({
+        ...data,
+        id: 'exp-1',
+      }));
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-1',
+        title: 'cipher:title',
+        amountTotal: 100,
+        currency: 'USD',
+        category: 'Food',
+        expenseDate: '2026-06-10',
+        status: 'posted',
+        encryptionScope: 'group',
+        isCarryForward: false,
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        group: { id: 'group-id' },
+        groupKeyVersion: supersededVersion,
+      } as any);
+      splitRepository.find.mockResolvedValue([]);
+      attachmentRepository.find.mockResolvedValue([]);
+
+      const result = await service.createExpense('caller-id', {
+        ...baseGroupDto,
+        groupKeyVersionId: 'v1-id',
+        encryptedAttachments: [
+          {
+            storageKey: 'receipts/exp-1',
+            encryptedFileKey: 'iv:key',
+            encryptedOriginalName: 'iv:name',
+            mimeType: 'image/jpeg',
+            sizeBytes: 42,
+          },
+        ],
+      } as any);
+
+      expect(expenseRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          groupKeyVersion: expect.objectContaining({ id: 'v1-id' }),
+        }),
+      );
+      expect(expenseVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'created',
+          expense: expect.objectContaining({ id: 'exp-1' }),
+          snapshot: expect.objectContaining({ groupKeyVersionId: 'v1-id' }),
+        }),
+      );
+      expect(expenseSplitVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'created',
+          expense: expect.objectContaining({ id: 'exp-1' }),
+        }),
+      );
+      expect(attachmentVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'created',
+          snapshot: expect.objectContaining({ storageKey: 'receipts/exp-1' }),
+        }),
+      );
+      expect(receiptVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'created',
+          snapshot: expect.objectContaining({ storageKey: 'receipts/exp-1' }),
+        }),
+      );
+      expect(result['groupKeyVersionId']).toBe('v1-id');
+    });
+
+    it('should re-stamp the declared version on update', async () => {
+      const expense = {
+        id: 'exp-1',
+        version: 1,
+        title: 'cipher:old',
+        description: null,
+        amountTotal: 100,
+        currency: 'USD',
+        category: 'Food',
+        expenseDate: '2026-06-10',
+        status: 'posted',
+        encryptionScope: 'group',
+        isCarryForward: false,
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        group: { id: 'group-id' },
+        groupKeyVersion: { id: 'v1-id', version: 1 },
+      } as any;
+
+      expenseRepository.findOne.mockResolvedValue(expense);
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValue(groupMember);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+      splitRepository.find.mockResolvedValue([]);
+      attachmentRepository.find.mockResolvedValue([]);
+
+      const rotatedVersion = {
+        id: 'v2-id',
+        version: 2,
+        status: 'ACTIVE',
+      } as any;
+      groupKeyVersionRepository.findOne.mockResolvedValue(rotatedVersion);
+
+      const result = await service.updateExpense('caller-id', 'exp-1', {
+        version: 1,
+        title: 'cipher:new',
+        groupKeyVersionId: 'v2-id',
+      } as any);
+
+      expect(groupKeyVersionRepository.findOne).toHaveBeenCalledWith({
+        where: { id: 'v2-id', group: { id: 'group-id' } },
+      });
+      expect(expense.groupKeyVersion).toEqual(
+        expect.objectContaining({ id: 'v2-id' }),
+      );
+      expect(expenseVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'updated',
+          expense: expect.objectContaining({ id: 'exp-1' }),
+          snapshot: expect.objectContaining({ groupKeyVersionId: 'v2-id' }),
+        }),
+      );
+      expect(result['groupKeyVersionId']).toBe('v2-id');
+    });
+
+    it('should reject a declared groupKeyVersionId on a personal update', async () => {
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-1',
+        version: 1,
+        title: 'Lunch',
+        amountTotal: 50,
+        currency: 'USD',
+        category: 'Food',
+        expenseDate: '2026-06-10',
+        status: 'posted',
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        group: null,
+      } as any);
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+      splitRepository.find.mockResolvedValue([]);
+
+      await expect(
+        service.updateExpense('caller-id', 'exp-1', {
+          version: 1,
+          groupKeyVersionId: 'v1-id',
+        } as any),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
 
   describe('Phase 5 Verification Rules', () => {
     it('should reject createExpense when currency does not match group base currency', async () => {

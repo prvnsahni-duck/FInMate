@@ -1,0 +1,46 @@
+#!/bin/sh
+set -e
+. "$(dirname "$0")/_/husky.sh"
+
+echo ""
+echo "======================================="
+echo " FinMate Pre-Push Validation"
+echo "======================================="
+echo ""
+
+# Dynamically determine the base remote branch with robust fallbacks
+DEFAULT_BRANCH=""
+if git rev-parse --verify origin/main >/dev/null 2>&1; then
+  DEFAULT_BRANCH="origin/main"
+elif git rev-parse --verify origin/master >/dev/null 2>&1; then
+  DEFAULT_BRANCH="origin/master"
+elif git rev-parse --verify main >/dev/null 2>&1; then
+  DEFAULT_BRANCH="main"
+elif git rev-parse --verify master >/dev/null 2>&1; then
+  DEFAULT_BRANCH="master"
+else
+  DEFAULT_BRANCH="HEAD~1"
+fi
+
+echo "Using base branch reference for affected files: $DEFAULT_BRANCH"
+
+echo "Checking formatting..."
+npx nx format:check
+
+echo ""
+echo "Running lint..."
+npx nx affected -t lint --base=$DEFAULT_BRANCH --head=HEAD
+
+echo ""
+echo "Running unit tests..."
+npx nx affected -t test --base=$DEFAULT_BRANCH --head=HEAD
+
+echo ""
+echo "Running production builds..."
+npx nx affected -t build --base=$DEFAULT_BRANCH --head=HEAD
+
+echo ""
+echo "======================================="
+echo " All pre-push checks passed."
+echo " Push allowed."
+echo "======================================="

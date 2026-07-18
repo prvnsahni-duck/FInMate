@@ -7,6 +7,7 @@ import { GroupsService } from './groups.service';
 import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../core/services/group-key.service';
+import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
 
 describe('GroupsService', () => {
   let service: GroupsService;
@@ -33,6 +34,13 @@ describe('GroupsService', () => {
         { provide: ClientEncryptionService, useValue: encryptionServiceSpy },
         { provide: GroupKeyService, useValue: groupKeyServiceSpy },
         { provide: Store, useValue: storeMock },
+        {
+          provide: ExpenseDecryptionService,
+          useValue: {
+            decryptExpenses: jest.fn().mockImplementation((expenses) => Promise.resolve(expenses)),
+            decryptExpense: jest.fn().mockImplementation((expense) => Promise.resolve(expense)),
+          },
+        },
       ],
     });
 

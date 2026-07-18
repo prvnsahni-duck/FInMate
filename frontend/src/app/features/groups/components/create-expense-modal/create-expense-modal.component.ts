@@ -463,7 +463,7 @@ export class CreateExpenseModalComponent implements OnChanges {
           const wrappedFileKey = await this.encryptionService.wrapKey(fileKey, scopeKey);
 
           const randomUuid = Math.random().toString(36).substring(2, 15);
-          const storageKey = `receipts/${randomUuid}-${fileObj.name}.enc`;
+          const storageKey = `receipts/${randomUuid}.enc`;
           localStorage.setItem(`sim_storage:${storageKey}`, encryptedBytes);
 
           encryptedAttachments.push({

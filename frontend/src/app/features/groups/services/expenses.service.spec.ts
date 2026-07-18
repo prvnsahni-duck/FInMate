@@ -8,6 +8,8 @@ import { ClientEncryptionService } from '../../../core/services/encryption.servi
 import { Store } from '@ngxs/store';
 import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../core/constants/crypto.constants';
 import { firstValueFrom } from 'rxjs';
+import { GroupKeyService } from '../../../core/services/group-key.service';
+import { DECRYPTION_MESSAGES } from '../../../core/models/decryption-state';
 
 describe('ExpensesService', () => {
   let service: ExpensesService;
@@ -39,6 +41,18 @@ describe('ExpensesService', () => {
       providers: [
         ExpensesService,
         { provide: ClientEncryptionService, useValue: encSpy },
+        {
+          provide: GroupKeyService,
+          useValue: {
+            getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
+            resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: 'mock-group-key' }),
+            getGroupKeyForEncryption: jest
+              .fn()
+              .mockResolvedValue({ key: 'mock-group-key', versionId: 'v1-id' }),
+            getKnownActiveVersionId: jest.fn().mockReturnValue('v1-id'),
+            createGroupKey: jest.fn().mockResolvedValue('mock-group-key'),
+          },
+        },
         { provide: Store, useValue: storeMock },
       ],
     });
@@ -94,6 +108,30 @@ describe('ExpensesService', () => {
       req.flush({ data: [], meta: { totalItems: 0 } });
     });
 
+    it('should decrypt expenses from paginated response payloads', (done) => {
+      const mockData = {
+        data: [
+          {
+            id: 'exp-1',
+            title: 'enc:Groceries',
+            description: 'enc:Weekly groceries',
+            encryptionScope: 'group',
+            groupId: 'group-1',
+            groupKeyVersionId: 'version-1',
+          },
+        ],
+        meta: { totalItems: 1 },
+      } as any;
+
+      service.getExpenses('group-1').subscribe((res: any) => {
+        expect(res.data.data).toHaveLength(1);
+        expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalledTimes(1);
+        done();
+      });
+
+      const req = httpMock.expectOne('/api/expenses?groupId=group-1');
+      req.flush({ data: mockData });
+    });
     it('should return placeholder text when decryption fails — never ciphertext', (done) => {
       encryptionServiceSpy.decryptExpense.mockRejectedValue(
         new Error('Internal decryption error'),
@@ -104,10 +142,10 @@ describe('ExpensesService', () => {
       ];
 
       service.getExpenses('group-1').subscribe((res) => {
-        expect(res.data[0].title).toBe(DECRYPTION_FAILED_PLACEHOLDER);
+        expect(res.data[0].title).toBe(DECRYPTION_MESSAGES.unexpected);
         expect(res.data[0].description).toBe('');
         // Verify no technical message leaks
-        expect(res.data[0].title).not.toContain('decrypt');
+        expect(res.data[0].title).not.toContain('decrypt failed');
         expect(res.data[0].title).not.toContain('CryptoKey');
         expect(res.data[0].title).not.toContain('AES');
         done();
@@ -117,15 +155,16 @@ describe('ExpensesService', () => {
       req.flush({ data: mockData });
     });
 
-    it('should return raw data when no encryption key is available', (done) => {
+    it('should mask encrypted data when no encryption key is available', (done) => {
       encryptionServiceSpy.loadKeyFromSession.mockResolvedValue(null);
 
       const mockData = [
-        { id: 'exp-1', title: 'Raw Title', description: 'Raw Desc' },
+        { id: 'exp-1', title: 'abc123:xyz789', description: 'cipher:text', encryptionScope: 'group' },
       ];
 
       service.getExpenses('group-1').subscribe((res) => {
-        expect(res.data[0].title).toBe('Raw Title');
+        expect(res.data[0].title).toBe(DECRYPTION_MESSAGES.session);
+        expect(res.data[0].description).toBe('');
         expect(encryptionServiceSpy.decryptExpense).not.toHaveBeenCalled();
         done();
       });
@@ -188,6 +227,37 @@ describe('ExpensesService', () => {
       expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalled();
     });
 
+    it('should declare the concrete group key version on group creates', async () => {
+      const payload = {
+        title: 'Dinner',
+        amountTotal: 150,
+        currency: 'USD',
+        category: 'food',
+        expenseDate: '2026-06-28',
+        paidByUserId: 'user-1',
+        groupId: 'group-1',
+        splits: [],
+      };
+
+      const promise = firstValueFrom(service.createExpense(payload));
+
+      // Wait for encryptPayload microtask to execute and request to be scheduled
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const req = httpMock.expectOne('/api/expenses');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body.groupKeyVersionId).toBe('v1-id');
+      expect(req.request.body.title).toBe('enc:Dinner');
+      req.flush({ id: 'exp-new', title: 'enc:Dinner' });
+
+      await promise;
+
+      expect(encryptionServiceSpy.encrypt).toHaveBeenCalledWith(
+        'Dinner',
+        'mock-group-key',
+      );
+    });
+
     it('should return placeholder on decryption failure for created expense', async () => {
       encryptionServiceSpy.decryptExpense.mockRejectedValue(
         new Error('Bad key'),
@@ -213,7 +283,7 @@ describe('ExpensesService', () => {
 
       const resolvedExpense = await promise;
 
-      expect(resolvedExpense.title).toBe(DECRYPTION_FAILED_PLACEHOLDER);
+      expect(resolvedExpense.title).toBe(DECRYPTION_MESSAGES.unexpected);
     });
   });
 
@@ -282,7 +352,7 @@ describe('ExpensesService', () => {
       );
 
       service.restoreExpense('exp-1').subscribe((expense) => {
-        expect(expense.title).toBe(DECRYPTION_FAILED_PLACEHOLDER);
+        expect(expense.title).toBe(DECRYPTION_MESSAGES.unexpected);
         expect(expense.description).toBe('');
         done();
       });
@@ -366,7 +436,7 @@ describe('ExpensesService', () => {
         const desc = res.data[0].description;
         const combined = `${title} ${desc}`;
 
-        expect(combined).not.toMatch(/decrypt/i);
+        expect(combined).not.toMatch(/decrypt failed/i);
         expect(combined).not.toMatch(/CryptoKey/i);
         expect(combined).not.toMatch(/AES/i);
         expect(combined).not.toMatch(/IndexedDB/i);

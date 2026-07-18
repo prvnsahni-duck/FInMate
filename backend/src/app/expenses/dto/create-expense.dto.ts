@@ -68,6 +68,10 @@ export class CreateExpenseDto {
   @IsOptional()
   groupId?: string;
 
+  @IsUUID('4', { message: 'groupKeyVersionId must be a valid UUID v4' })
+  @IsOptional()
+  groupKeyVersionId?: string;
+
   @IsString()
   @Matches(/^\d{4}-\d{2}-\d{2}$/, {
     message: 'expenseDate must use YYYY-MM-DD format',

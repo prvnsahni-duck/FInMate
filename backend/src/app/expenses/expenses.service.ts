@@ -8,14 +8,18 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
   Attachment,
+  AttachmentVersion,
   AuditLog,
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  ExpenseSplitVersion,
+  ExpenseVersion,
   Group,
   GroupKeyVersion,
   GroupMember,
   GroupMemberContribution,
+  ReceiptVersion,
   User,
 } from '@finmate/data-models';
 import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
@@ -170,6 +174,29 @@ export class ExpensesService {
         status: 'ACTIVE',
       }),
     );
+  }
+
+  /**
+   * Resolves the key version the client declared it encrypted with. The stamp
+   * must record the version actually used — not whatever is ACTIVE at write
+   * time — or a rotation racing a write leaves the ciphertext undecryptable.
+   */
+  private async resolveDeclaredGroupKeyVersion(
+    group: Group,
+    declaredVersionId: string,
+    manager: EntityManager,
+  ): Promise<GroupKeyVersion> {
+    const declared = await manager.getRepository(GroupKeyVersion).findOne({
+      where: { id: declaredVersionId, group: { id: group.id } },
+    });
+    if (!declared || declared.status === 'REVOKED') {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message:
+          'groupKeyVersionId must reference a usable key version of the selected group',
+      });
+    }
+    return declared;
   }
 
   private async ensureExpenseAccess(
@@ -421,6 +448,128 @@ export class ExpensesService {
     };
   }
 
+  private expenseSnapshot(expense: Expense): Record<string, unknown> {
+    return {
+      id: expense.id,
+      title: expense.title,
+      description: expense.description ?? null,
+      amountTotal: Number(expense.amountTotal),
+      currency: expense.currency,
+      category: expense.category,
+      paidByUserId: expense.paidByUser?.id ?? null,
+      ownerUserId: expense.ownerUser?.id ?? null,
+      groupId: expense.group?.id ?? null,
+      groupKeyVersionId: expense.groupKeyVersion?.id ?? null,
+      expenseDate: expense.expenseDate,
+      status: expense.status,
+      ledgerMonth: expense.ledgerMonth ?? null,
+      isCarryForward: expense.isCarryForward,
+      encryptionScope: expense.encryptionScope,
+      version: expense.version,
+      deletedAt: expense.deletedAt ?? null,
+    };
+  }
+
+  private splitSnapshot(split: ExpenseSplit): Record<string, unknown> {
+    return {
+      id: split.id,
+      expenseId: split.expense?.id ?? null,
+      participantUserId: split.participantUser?.id ?? null,
+      participantGroupMemberId: split.participantGroupMember?.id ?? null,
+      splitType: split.splitType,
+      shareValue: Number(split.shareValue),
+      amountOwed: Number(split.amountOwed),
+      isSettled: split.isSettled,
+      settledAt: split.settledAt ?? null,
+      version: split.version ?? null,
+      deletedAt: split.deletedAt ?? null,
+    };
+  }
+
+  private attachmentSnapshot(attachment: Attachment): Record<string, unknown> {
+    return {
+      id: attachment.id,
+      expenseId: attachment.expense?.id ?? null,
+      uploaderUserId: attachment.uploaderUser?.id ?? null,
+      groupKeyVersionId: attachment.groupKeyVersion?.id ?? null,
+      storageKey: attachment.storageKey,
+      originalName: attachment.originalName,
+      mimeType: attachment.mimeType,
+      sizeBytes: Number(attachment.sizeBytes),
+      checksumSha256: attachment.checksumSha256 ?? null,
+      encryptedFileKey: attachment.encryptedFileKey ?? null,
+      encryptedOriginalName: attachment.encryptedOriginalName ?? null,
+    };
+  }
+
+  private async recordExpenseVersion(
+    manager: EntityManager,
+    expense: Expense,
+    action: ExpenseVersion['action'],
+    actorUser?: User | null,
+  ): Promise<void> {
+    await manager.getRepository(ExpenseVersion).save(
+      manager.getRepository(ExpenseVersion).create({
+        expense,
+        entityVersion: expense.version,
+        action,
+        snapshot: this.expenseSnapshot(expense),
+        actorUser: actorUser ?? undefined,
+      }),
+    );
+  }
+
+  private async recordSplitVersions(
+    manager: EntityManager,
+    expense: Expense,
+    splits: ExpenseSplit[],
+    action: ExpenseSplitVersion['action'],
+    actorUser?: User | null,
+  ): Promise<void> {
+    for (const split of splits) {
+      await manager.getRepository(ExpenseSplitVersion).save(
+        manager.getRepository(ExpenseSplitVersion).create({
+          expense,
+          expenseSplit: split,
+          entityVersion: split.version,
+          action,
+          snapshot: this.splitSnapshot(split),
+          actorUser: actorUser ?? undefined,
+        }),
+      );
+    }
+  }
+
+  private async recordAttachmentVersions(
+    manager: EntityManager,
+    expense: Expense,
+    attachments: Attachment[],
+    action: AttachmentVersion['action'],
+    actorUser?: User | null,
+  ): Promise<void> {
+    for (const attachment of attachments) {
+      const snapshot = this.attachmentSnapshot(attachment);
+      await manager.getRepository(AttachmentVersion).save(
+        manager.getRepository(AttachmentVersion).create({
+          attachment,
+          expense,
+          action,
+          snapshot,
+          actorUser: actorUser ?? undefined,
+        }),
+      );
+      await manager.getRepository(ReceiptVersion).save(
+        manager.getRepository(ReceiptVersion).create({
+          receiptAttachment: attachment,
+          expense,
+          action,
+          snapshot,
+          actorUser: actorUser ?? undefined,
+        }),
+      );
+    }
+  }
+
   private async persistSplits(
     expense: Expense,
     dto: Pick<
@@ -428,7 +577,8 @@ export class ExpensesService {
       'splits' | 'amountTotal' | 'paidByUserId' | 'groupId'
     >,
     manager: EntityManager,
-  ): Promise<void> {
+  ): Promise<ExpenseSplit[]> {
+    const savedSplits: ExpenseSplit[] = [];
     const payerKey = dto.groupId
       ? (
           await manager.getRepository(GroupMember).findOne({
@@ -467,7 +617,7 @@ export class ExpensesService {
           });
         }
 
-        await manager.getRepository(ExpenseSplit).save(
+        const savedSplit = await manager.getRepository(ExpenseSplit).save(
           manager.getRepository(ExpenseSplit).create({
             expense,
             participantUser,
@@ -477,8 +627,9 @@ export class ExpensesService {
             isSettled: false,
           }),
         );
+        savedSplits.push(savedSplit);
       }
-      return;
+      return savedSplits;
     }
 
     const { groupMemberById, activeOrInvitedByUserId } =
@@ -510,7 +661,7 @@ export class ExpensesService {
         });
       }
 
-      await manager.getRepository(ExpenseSplit).save(
+      const savedSplit = await manager.getRepository(ExpenseSplit).save(
         manager.getRepository(ExpenseSplit).create({
           expense,
           participantGroupMember: resolvedMember,
@@ -520,7 +671,9 @@ export class ExpensesService {
           isSettled: false,
         }),
       );
+      savedSplits.push(savedSplit);
     }
+    return savedSplits;
   }
 
   // ─── CRUD Operations ───────────────────────────────────────────────────────
@@ -622,6 +775,12 @@ export class ExpensesService {
             'Personal expenses cannot include participantGroupMemberId in splits',
         });
       }
+      if (dto.groupKeyVersionId) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'groupKeyVersionId is only valid for group expenses',
+        });
+      }
     }
 
     this.validateExpenseEncryptionMetadata(userId, dto, group?.id);
@@ -630,7 +789,13 @@ export class ExpensesService {
 
     const saved = await this.dataSource.transaction(async (manager) => {
       const groupKeyVersion = group
-        ? await this.getOrCreateActiveGroupKeyVersion(group, manager)
+        ? dto.groupKeyVersionId
+          ? await this.resolveDeclaredGroupKeyVersion(
+              group,
+              dto.groupKeyVersionId,
+              manager,
+            )
+          : await this.getOrCreateActiveGroupKeyVersion(group, manager)
         : undefined;
 
       const expense = await manager.getRepository(Expense).save(
@@ -656,7 +821,7 @@ export class ExpensesService {
         }),
       );
 
-      await this.persistSplits(expense, dto, manager);
+      const savedSplits = await this.persistSplits(expense, dto, manager);
 
       // Save wrapped content keys for direct_shared expenses
       if (
@@ -675,9 +840,10 @@ export class ExpensesService {
       }
 
       // Save encrypted attachments (new model)
+      const savedAttachments: Attachment[] = [];
       if (dto.encryptedAttachments?.length) {
         for (const att of dto.encryptedAttachments) {
-          await manager.getRepository(Attachment).save(
+          const savedAttachment = await manager.getRepository(Attachment).save(
             manager.getRepository(Attachment).create({
               uploaderUser: ownerUser,
               expense,
@@ -689,22 +855,42 @@ export class ExpensesService {
               encryptedOriginalName: att.encryptedOriginalName,
             }),
           );
+          savedAttachments.push(savedAttachment);
         }
       } else if (dto.attachmentKeys?.length) {
         // Legacy attachment keys support
         for (const key of dto.attachmentKeys) {
-          await manager.getRepository(Attachment).save(
+          const savedAttachment = await manager.getRepository(Attachment).save(
             manager.getRepository(Attachment).create({
               uploaderUser: ownerUser,
               expense,
               storageKey: key,
-              originalName: this.basename(key),
+              // ZK: never persist a plaintext filename — names live only in
+              // encryptedOriginalName on the new attachment model.
+              originalName: 'encrypted',
               mimeType: 'application/octet-stream',
               sizeBytes: '0',
             }),
           );
+          savedAttachments.push(savedAttachment);
         }
       }
+
+      await this.recordExpenseVersion(manager, expense, 'created', ownerUser);
+      await this.recordSplitVersions(
+        manager,
+        expense,
+        savedSplits,
+        'created',
+        ownerUser,
+      );
+      await this.recordAttachmentVersions(
+        manager,
+        expense,
+        savedAttachments,
+        'created',
+        ownerUser,
+      );
 
       return manager.getRepository(Expense).findOne({
         where: { id: expense.id },
@@ -814,12 +1000,30 @@ export class ExpensesService {
     }
 
     if (params.cursor) {
-      query.andWhere('expense.id < :cursor', { cursor: params.cursor });
+      // Keyset pagination must key on the same columns as the sort
+      // (expenseDate DESC, createdAt DESC) — a bare `id < cursor` skips or
+      // repeats rows because ids are not ordered by date.
+      const cursorExpense = await this.expenseRepository.findOne({
+        where: { id: params.cursor },
+      });
+      if (cursorExpense) {
+        query.andWhere(
+          '(expense.expenseDate < :cursorDate OR ' +
+            '(expense.expenseDate = :cursorDate AND expense.createdAt < :cursorCreatedAt) OR ' +
+            '(expense.expenseDate = :cursorDate AND expense.createdAt = :cursorCreatedAt AND expense.id < :cursorId))',
+          {
+            cursorDate: cursorExpense.expenseDate,
+            cursorCreatedAt: cursorExpense.createdAt,
+            cursorId: cursorExpense.id,
+          },
+        );
+      }
     }
 
     query
       .orderBy('expense.expenseDate', 'DESC')
-      .addOrderBy('expense.createdAt', 'DESC');
+      .addOrderBy('expense.createdAt', 'DESC')
+      .addOrderBy('expense.id', 'DESC');
 
     const total = await query.getCount();
     const expenses = await query
@@ -983,15 +1187,45 @@ export class ExpensesService {
       expense.group?.id,
     );
 
+    if (dto.groupKeyVersionId && !expense.group) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'groupKeyVersionId is only valid for group expenses',
+      });
+    }
+
     const saved = await this.dataSource.transaction(async (manager) => {
-      if (expense.group && !expense.groupKeyVersion) {
+      const replacedSplits =
+        dto.splits !== undefined
+          ? await manager.getRepository(ExpenseSplit).find({
+              where: { expense: { id: expense.id } },
+              relations: ['participantUser', 'participantGroupMember'],
+            })
+          : [];
+      const replacedAttachments =
+        dto.encryptedAttachments !== undefined || dto.attachmentKeys !== undefined
+          ? await manager.getRepository(Attachment).find({
+              where: { expense: { id: expense.id } },
+              relations: ['uploaderUser', 'groupKeyVersion'],
+            })
+          : [];
+
+      if (expense.group && dto.groupKeyVersionId) {
+        // Re-stamp to the version the client re-encrypted with; keeping the
+        // old stamp after a post-rotation edit breaks decryption permanently.
+        expense.groupKeyVersion = await this.resolveDeclaredGroupKeyVersion(
+          expense.group,
+          dto.groupKeyVersionId,
+          manager,
+        );
+      } else if (expense.group && !expense.groupKeyVersion) {
         expense.groupKeyVersion = await this.getOrCreateActiveGroupKeyVersion(
           expense.group,
           manager,
         );
       }
 
-      await manager.getRepository(Expense).save(expense);
+      const savedExpense = await manager.getRepository(Expense).save(expense);
 
       if (dto.splits) {
         if (
@@ -1005,10 +1239,19 @@ export class ExpensesService {
           });
         }
 
+        // Soft-delete: splits are ledger history (ARCHITECTURE §4.3) — the
+        // replaced allocation stays queryable for audit/adjustment trails.
         await manager
           .getRepository(ExpenseSplit)
-          .delete({ expense: { id: expense.id } as Partial<Expense> });
-        await this.persistSplits(
+          .softDelete({ expense: { id: expense.id } as Partial<Expense> });
+        await this.recordSplitVersions(
+          manager,
+          expense,
+          replacedSplits,
+          'replaced',
+          actorUser,
+        );
+        const savedSplits = await this.persistSplits(
           expense,
           {
             splits: dto.splits,
@@ -1017,6 +1260,13 @@ export class ExpensesService {
             groupId: expense.group?.id,
           },
           manager,
+        );
+        await this.recordSplitVersions(
+          manager,
+          expense,
+          savedSplits,
+          'created',
+          actorUser,
         );
       }
 
@@ -1039,8 +1289,16 @@ export class ExpensesService {
         await manager
           .getRepository(Attachment)
           .delete({ expense: { id: expense.id } as Partial<Expense> });
+        await this.recordAttachmentVersions(
+          manager,
+          expense,
+          replacedAttachments,
+          'replaced',
+          actorUser,
+        );
+        const savedAttachments: Attachment[] = [];
         for (const att of dto.encryptedAttachments) {
-          await manager.getRepository(Attachment).save(
+          const savedAttachment = await manager.getRepository(Attachment).save(
             manager.getRepository(Attachment).create({
               uploaderUser: expense.ownerUser,
               expense,
@@ -1052,24 +1310,52 @@ export class ExpensesService {
               encryptedOriginalName: att.encryptedOriginalName,
             }),
           );
+          savedAttachments.push(savedAttachment);
         }
+        await this.recordAttachmentVersions(
+          manager,
+          expense,
+          savedAttachments,
+          'created',
+          actorUser,
+        );
       } else if (dto.attachmentKeys) {
         await manager
           .getRepository(Attachment)
           .delete({ expense: { id: expense.id } as Partial<Expense> });
+        await this.recordAttachmentVersions(
+          manager,
+          expense,
+          replacedAttachments,
+          'replaced',
+          actorUser,
+        );
+        const savedAttachments: Attachment[] = [];
         for (const key of dto.attachmentKeys) {
-          await manager.getRepository(Attachment).save(
+          const savedAttachment = await manager.getRepository(Attachment).save(
             manager.getRepository(Attachment).create({
               uploaderUser: expense.ownerUser,
               expense,
               storageKey: key,
-              originalName: this.basename(key),
+              // ZK: never persist a plaintext filename — names live only in
+              // encryptedOriginalName on the new attachment model.
+              originalName: 'encrypted',
               mimeType: 'application/octet-stream',
               sizeBytes: '0',
             }),
           );
+          savedAttachments.push(savedAttachment);
         }
+        await this.recordAttachmentVersions(
+          manager,
+          expense,
+          savedAttachments,
+          'created',
+          actorUser,
+        );
       }
+
+      await this.recordExpenseVersion(manager, savedExpense, 'updated', actorUser);
 
       return manager.getRepository(Expense).findOne({
         where: { id: expense.id },
@@ -1125,9 +1411,35 @@ export class ExpensesService {
       return;
     }
 
-    // Soft-delete: mark deleted_at + void status
-    expense.status = 'void';
-    await this.expenseRepository.softRemove(expense);
+    await this.dataSource.transaction(async (manager) => {
+      const splits = await manager.getRepository(ExpenseSplit).find({
+        where: { expense: { id: expense.id } },
+        relations: ['participantUser', 'participantGroupMember'],
+      });
+      const attachments = await manager.getRepository(Attachment).find({
+        where: { expense: { id: expense.id } },
+        relations: ['uploaderUser', 'groupKeyVersion'],
+      });
+
+      // Soft-delete: mark deleted_at + void status
+      expense.status = 'void';
+      const deleted = await manager.getRepository(Expense).softRemove(expense);
+      await this.recordExpenseVersion(manager, deleted, 'deleted', actorUser);
+      await this.recordSplitVersions(
+        manager,
+        deleted,
+        splits,
+        'deleted',
+        actorUser,
+      );
+      await this.recordAttachmentVersions(
+        manager,
+        deleted,
+        attachments,
+        'deleted',
+        actorUser,
+      );
+    });
 
     // Write audit log (non-blocking)
     if (actorUser) {
@@ -1209,11 +1521,19 @@ export class ExpensesService {
       where: { id: userId },
     });
 
-    // Restore: clear deleted_at and reset status to posted
-    await this.expenseRepository.restore({ id: expense.id });
-    expense.status = 'posted';
-    expense.deletedAt = undefined;
-    await this.expenseRepository.save(expense);
+    await this.dataSource.transaction(async (manager) => {
+      // Restore: clear deleted_at and reset status to posted
+      await manager.getRepository(Expense).restore({ id: expense.id });
+      expense.status = 'posted';
+      expense.deletedAt = undefined;
+      const restoredExpense = await manager.getRepository(Expense).save(expense);
+      await this.recordExpenseVersion(
+        manager,
+        restoredExpense,
+        'restored',
+        actorUser,
+      );
+    });
 
     const restored = await this.expenseRepository.findOne({
       where: { id: expense.id },

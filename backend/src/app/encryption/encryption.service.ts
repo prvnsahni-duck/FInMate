@@ -14,9 +14,13 @@ export class EncryptionService {
   private readonly key: Buffer;
 
   constructor(private readonly configService: ConfigService) {
-    const rawSecret =
-      this.configService.get<string>('ENCRYPTION_KEY') ||
-      'default_encryption_key_for_finmate_development_phase';
+    const rawSecret = this.configService.get<string>('ENCRYPTION_KEY');
+    if (!rawSecret) {
+      // Fail fast: 2FA secrets must never be encrypted under a public constant.
+      throw new Error(
+        'ENCRYPTION_KEY is not configured. Set it in the environment before starting the server (see .env.example).',
+      );
+    }
     // Ensure key is exactly 32 bytes by hashing the secret using SHA-256
     this.key = createHash('sha256').update(rawSecret).digest();
 

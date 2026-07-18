@@ -82,6 +82,9 @@ sequenceDiagram
    - **Group Ownership**: A group owner is blocked from leaving the group until ownership is explicitly transferred to another member.
 6. **Decryption Failures**:
    - Handled gracefully using the placeholder `DECRYPTION_FAILED_PLACEHOLDER` (`'Unable to display this item'`) to avoid leaking ciphertexts or raw technical details in the UI.
+7. **Central Decryption Pipeline (v2)**:
+   - All expense decryption flows through `ExpenseDecryptionService` (scope-aware key resolution, classified failure states, ciphertext preserved for retries) orchestrated by `ExpenseDecryptCoordinator` (provision → decrypt → retry with backoff). Ledger, dashboard, trash, and create/update/restore responses all use this single pipeline; the group History tab decrypts audit metadata titles field-level in `GroupsService.getHistoryLogs` (see `docs/KNOWN_ISSUES.md` KI-1 for its rotation caveat).
+   - The client group-key cache is **version-keyed** (`${groupId}:${groupKeyVersionId ?? 'active'}`) in both memory and the IndexedDB vault, and `resolveGroupKey(groupId, versionId?)` passes `?versionId=` to `GET /groups/:id/keys/me`. The backend serves the requested version (scoped to the group; SUPERSEDED allowed, REVOKED rejected) and falls back to ACTIVE when no version is requested. On writes, the client declares the concrete `groupKeyVersionId` it encrypted with (`GroupKeyService.getGroupKeyForEncryption`) and the backend validates and stamps exactly that version — the ciphertext and its version stamp always travel as a consistent pair (ENC-002 / EXP-003, implemented 2026-07-17).
 
 ### Zero-Knowledge Key Lifecycle
 
@@ -403,6 +406,7 @@ All backend environment variables are documented in `.env.example`. Key variable
 | `ENCRYPTION_KEY`     | ✅       | AES-256 server-side encryption key      |
 | `FRONTEND_URL`       | ✅       | Frontend origin (CORS + invite links)   |
 | `CORS_ORIGINS`       | ❌       | Comma-separated additional CORS origins |
+| `RATE_LIMIT_ENABLED` | ❌       | Master switch for API throttling (default: `true`; validated at boot) |
 | `PORT`               | ❌       | Server port (default: 3000)             |
 
 ---

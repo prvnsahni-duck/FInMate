@@ -10,6 +10,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConditionalThrottleGuard } from './guards/conditional-throttle.guard';
 import { UserThrottlerGuard } from './guards/user-throttler.guard';
 import { LoggingInterceptor } from './interceptors/logging.interceptor';
+import { validate } from './env.validation';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import * as Migrations from '../migrations';
@@ -108,6 +109,12 @@ import { THROTTLE_PROFILES } from './throttler/throttle.constants';
             skipIf: skipUnlessPolicy(THROTTLE_PROFILES.REFRESH),
           },
           {
+            name: THROTTLE_PROFILES.INVITE,
+            ttl: 60000,
+            limit: getLimit('THROTTLE_LIMIT_INVITE', 10),
+            skipIf: skipUnlessPolicy(THROTTLE_PROFILES.INVITE),
+          },
+          {
             name: THROTTLE_PROFILES.IMPORT,
             ttl: 60000,
             limit: getLimit('THROTTLE_LIMIT_IMPORT', 10),
@@ -132,6 +139,7 @@ import { THROTTLE_PROFILES } from './throttler/throttle.constants';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '.env.dev'],
+      validate,
     }),
     TypeOrmModule.forFeature([Note, Goal, AuditLog]),
     TypeOrmModule.forRootAsync({

@@ -24,6 +24,8 @@ import {
 } from './services';
 import { SuccessResponse } from '../common/response.util';
 import { ProvisionGroupKeysDto, RotateGroupKeyDto } from '@finmate/data-models';
+import { ThrottleAs } from '../throttler/throttle-policy.decorator';
+import { THROTTLE_PROFILES } from '../throttler/throttle.constants';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard)
@@ -120,6 +122,7 @@ export class GroupsController {
   }
 
   @Post(':id/invites')
+  @ThrottleAs(THROTTLE_PROFILES.INVITE)
   async createInvite(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: { wrappedGroupKey?: string },
@@ -170,6 +173,7 @@ export class GroupsController {
   }
 
   @Post(':id/invite-link/regenerate')
+  @ThrottleAs(THROTTLE_PROFILES.INVITE)
   async regenerateInviteToken(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
@@ -343,12 +347,30 @@ export class GroupsController {
   async getMyGroupKey(
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request & { user: { id: string } },
+    @Query('versionId', new ParseUUIDPipe({ optional: true }))
+    versionId?: string,
   ) {
     const result = await this.groupsMembershipService.getMyGroupKey(
       req.user.id,
       id,
+      versionId,
     );
     return new SuccessResponse('Group key retrieved', result);
+  }
+
+  /**
+   * List every key version of the group (metadata only, no key material).
+   */
+  @Get(':id/keys/versions')
+  async listKeyVersions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.groupsMembershipService.listGroupKeyVersions(
+      req.user.id,
+      id,
+    );
+    return new SuccessResponse('Group key versions retrieved', result);
   }
 
   /**

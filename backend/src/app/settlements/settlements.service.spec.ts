@@ -7,6 +7,7 @@ import {
   Expense,
   ExpenseSplit,
   Settlement,
+  SettlementVersion,
   AuditLog,
 } from '@finmate/data-models';
 import { SettlementsService, MemberBalance } from './settlements.service';
@@ -24,6 +25,7 @@ describe('SettlementsService', () => {
   let expenseRepository: jest.Mocked<Repository<Expense>>;
   let expenseSplitRepository: jest.Mocked<Repository<ExpenseSplit>>;
   let settlementRepository: jest.Mocked<Repository<Settlement>>;
+  let settlementVersionRepository: jest.Mocked<Repository<SettlementVersion>>;
 
   beforeEach(async () => {
     const mockGroupRepository = {
@@ -63,6 +65,11 @@ describe('SettlementsService', () => {
       create: jest.fn(),
     };
 
+    const mockSettlementVersionRepository = {
+      save: jest.fn((data) => Promise.resolve(data)),
+      create: jest.fn((data) => data),
+    };
+
     const mockEntityManager = {
       findOne: jest.fn(async (entityClass, options: any) => {
         if (entityClass === GroupMember) {
@@ -84,11 +91,17 @@ describe('SettlementsService', () => {
         if (entityClass === Settlement) {
           return mockSettlementRepository.create(data);
         }
+        if (entityClass === SettlementVersion) {
+          return mockSettlementVersionRepository.create(data);
+        }
         return data;
       }),
       save: jest.fn((entityClass, data) => {
         if (entityClass === Settlement) {
           return mockSettlementRepository.save(data);
+        }
+        if (entityClass === SettlementVersion) {
+          return mockSettlementVersionRepository.save(data);
         }
         return data;
       }),
@@ -122,6 +135,10 @@ describe('SettlementsService', () => {
           provide: getRepositoryToken(AuditLog),
           useValue: mockAuditLogRepository,
         },
+        {
+          provide: getRepositoryToken(SettlementVersion),
+          useValue: mockSettlementVersionRepository,
+        },
         { provide: DataSource, useValue: mockDataSource },
       ],
     }).compile();
@@ -132,6 +149,9 @@ describe('SettlementsService', () => {
     expenseRepository = module.get(getRepositoryToken(Expense));
     expenseSplitRepository = module.get(getRepositoryToken(ExpenseSplit));
     settlementRepository = module.get(getRepositoryToken(Settlement));
+    settlementVersionRepository = module.get(
+      getRepositoryToken(SettlementVersion),
+    );
   });
 
   it('should be defined', () => {
@@ -378,10 +398,11 @@ describe('SettlementsService', () => {
       groupMemberRepository.findOne.mockResolvedValueOnce(mockRecipient);
 
       settlementRepository.create.mockImplementation((data) => data as any);
-      settlementRepository.save.mockResolvedValueOnce({
+      settlementRepository.save.mockImplementationOnce(async (data) => ({
+        ...data,
         id: 'settlement-id',
-        ...mockCaller.user,
-      } as any);
+        version: 1,
+      }) as any);
 
       const result = await service.proposeSettlement('caller-id', 'group-id', {
         toUserId: 'recipient-id',
@@ -397,6 +418,14 @@ describe('SettlementsService', () => {
           note: 'lunch',
         }),
       );
+      expect(settlementVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'proposed',
+          settlement: expect.any(Object),
+          snapshot: expect.objectContaining({ currency: 'USD' }),
+        }),
+      );
+      expect(settlementVersionRepository.save).toHaveBeenCalledTimes(1);
       expect(result).toBeDefined();
     });
   });
@@ -535,6 +564,14 @@ describe('SettlementsService', () => {
 
       expect(mockSettlement.status).toBe('confirmed');
       expect(mockSettlement.settledOn).toBe('2026-06-10');
+      expect(settlementVersionRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'confirmed',
+          settlement: mockSettlement,
+          snapshot: expect.objectContaining({ status: 'confirmed' }),
+        }),
+      );
+      expect(settlementVersionRepository.save).toHaveBeenCalledTimes(1);
       expect(result).toBeDefined();
     });
 

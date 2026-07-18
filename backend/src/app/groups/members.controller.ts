@@ -18,6 +18,8 @@ import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
 import { GroupRoles } from '../auth/decorators/group-roles.decorator';
 import { GroupsMembershipService } from './services';
 import { SuccessResponse } from '../common/response.util';
+import { ThrottleAs } from '../throttler/throttle-policy.decorator';
+import { THROTTLE_PROFILES } from '../throttler/throttle.constants';
 
 @Controller('groups/:id/members')
 @UseGuards(JwtAuthGuard, GroupRolesGuard)
@@ -28,6 +30,7 @@ export class MembersController {
 
   @Post()
   @GroupRoles('owner', 'admin')
+  @ThrottleAs(THROTTLE_PROFILES.INVITE)
   async invite(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() inviteMemberDto: InviteMemberDto,

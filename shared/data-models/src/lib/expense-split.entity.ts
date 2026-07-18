@@ -4,6 +4,8 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
+  VersionColumn,
   ManyToOne,
   Check,
 } from 'typeorm';
@@ -47,9 +49,15 @@ export class ExpenseSplit {
   @Column({ type: 'timestamptz', nullable: true })
   settledAt?: Date;
 
+  @VersionColumn()
+  version!: number;
+
   @CreateDateColumn()
   createdAt!: Date;
 
   @UpdateDateColumn()
   updatedAt!: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+  deletedAt?: Date;
 }

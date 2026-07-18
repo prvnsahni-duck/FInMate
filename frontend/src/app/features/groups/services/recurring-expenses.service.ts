@@ -14,6 +14,7 @@ import {
   mapDecryptExpense,
   mapDecryptExpenses,
 } from '../../../core/utils/crypto-operators';
+import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
 
 @Injectable({
   providedIn: 'root',
@@ -23,6 +24,7 @@ export class RecurringExpensesService {
   private store = inject(Store);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
+  private decryptor = inject(ExpenseDecryptionService);
   private baseUrl = environment.apiBaseUrl;
 
   private getSubtleCrypto(): SubtleCrypto {
@@ -52,11 +54,18 @@ export class RecurringExpensesService {
 
         if ((payload as any).groupId) {
           scope = 'group';
-          let gKey = await this.groupKeyService.getGroupDataKey((payload as any).groupId);
-          if (!gKey) {
-            gKey = await this.groupKeyService.createGroupKey((payload as any).groupId);
+          const groupId = (payload as any).groupId as string;
+          const resolved = await this.groupKeyService.getGroupKeyForEncryption(groupId);
+          if (resolved) {
+            key = resolved.key;
+            encrypted.groupKeyVersionId = resolved.versionId;
+          } else {
+            key = await this.groupKeyService.createGroupKey(groupId);
+            const mintedVersionId = this.groupKeyService.getKnownActiveVersionId(groupId);
+            if (mintedVersionId) {
+              encrypted.groupKeyVersionId = mintedVersionId;
+            }
           }
-          key = gKey;
         }
 
         encrypted.encryptionScope = scope;
@@ -89,7 +98,7 @@ export class RecurringExpensesService {
       .get<any>(`${this.baseUrl}/recurring-expenses`, { params })
       .pipe(
         map((res) => res.data || []),
-        mapDecryptExpenses(this.store, this.encryptionService, this.groupKeyService),
+        mapDecryptExpenses(this.decryptor),
       );
   }
 
@@ -102,7 +111,7 @@ export class RecurringExpensesService {
         ),
       ),
       map((res) => res.data),
-      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
+      mapDecryptExpense(this.decryptor),
     );
   }
 
@@ -118,7 +127,7 @@ export class RecurringExpensesService {
         ),
       ),
       map((res) => res.data),
-      mapDecryptExpense(this.store, this.encryptionService, this.groupKeyService),
+      mapDecryptExpense(this.decryptor),
     );
   }
 
