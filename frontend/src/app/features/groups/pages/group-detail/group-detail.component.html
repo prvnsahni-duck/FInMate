@@ -628,7 +628,11 @@
               </div>
             }
 
-            @if (expenses().length === 0) {
+            @if (isLoadingExpenses() && expenses().length === 0) {
+              <div class="flex items-center justify-center py-16">
+                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+              </div>
+            } @else if (expenses().length === 0) {
               <div class="text-center py-16 bg-surface/30 rounded-3xl border border-border/5 p-8 flex flex-col items-center justify-center">
                 <svg class="w-12 h-12 text-muted/40 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m-9 1V4a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
@@ -645,7 +649,7 @@
                 }
               </div>
             } @else {
-              <div class="space-y-4">
+              <div class="space-y-4" [class.opacity-40]="isLoadingExpenses()" [class.pointer-events-none]="isLoadingExpenses()">
                 @for (expense of expenses(); track expense.id) {
                   <div
                     [attr.data-expense-id]="expense.id"

@@ -206,6 +206,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   isExportDropdownOpen = signal<boolean>(false);
   isFilterBottomSheetOpen = signal<boolean>(false);
   showSkeleton = signal<boolean>(false);
+  isLoadingExpenses = signal<boolean>(false);
   isOffline = signal<boolean>(typeof window !== 'undefined' ? !navigator.onLine : false);
   private skeletonTimeoutId?: any;
   membersError = signal<boolean>(false);
@@ -339,7 +340,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
 
       const groupId = this.group()?.id;
       if (groupId && isFilterChanged) {
-        this.fetchExpenses(groupId);
+        this.currentPage.set(1);
+        this.fetchExpenses(groupId, true);
       }
 
       this.scrollToActiveTab();
@@ -495,6 +497,11 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
+    const groupId = this.group()?.id;
+    if (groupId) {
+      this.currentPage.set(1);
+      this.fetchExpenses(groupId, true);
+    }
   }
 
   resetFilters() {
@@ -627,8 +634,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  fetchExpenses(groupId: string) {
-    this.startLoading();
+  fetchExpenses(groupId: string, silent = false) {
+    if (silent) {
+      this.isLoadingExpenses.set(true);
+    } else {
+      this.startLoading();
+    }
     let start = this.filterStartDate();
     let end = this.filterEndDate();
     const g = this.group();
@@ -692,6 +703,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           });
           this.expenses.set(mappedExpenses);
           this.totalExpenses.set(res.meta?.totalItems || 0);
+          this.isLoadingExpenses.set(false);
           this.stopLoading();
           this.ledgerError.set(false);
           // Hand the freshly-fetched list to the coordinator for
@@ -699,6 +711,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.startDecryption();
         },
         error: () => {
+          this.isLoadingExpenses.set(false);
           this.stopLoading();
           this.ledgerError.set(true);
         },
@@ -909,7 +922,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.currentPage.update((val) => val + delta);
     const g = this.group();
     if (g?.id) {
-      this.fetchExpenses(g.id);
+      this.fetchExpenses(g.id, true);
     }
   }
 
