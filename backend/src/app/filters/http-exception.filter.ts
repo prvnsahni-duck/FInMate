@@ -303,7 +303,9 @@ export class HttpExceptionFilter implements ExceptionFilter {
             remaining: throttleCtx.remaining ?? 'N/A',
           }),
         );
-      } catch {}
+      } catch {
+        // audit logging is best-effort — never let it break the error response
+      }
     }
 
     response.status(statusCode).send(errorPayload);

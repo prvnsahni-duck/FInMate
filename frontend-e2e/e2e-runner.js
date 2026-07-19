@@ -66,10 +66,14 @@ function spawnCmd(cmd, args, env) {
       // kill frontend and backend
       try {
         frontend.kill();
-      } catch (e) {}
+      } catch (_e) {
+        // process may already be gone — ignore
+      }
       try {
         backend.kill();
-      } catch (e) {}
+      } catch (_e) {
+        // process may already be gone — ignore
+      }
       process.exit(code);
     });
   } catch (err) {
