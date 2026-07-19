@@ -36,6 +36,11 @@ export class GroupKeyVersion {
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   rotatedByUser?: User;
 
-  @Column({ name: 'rotation_reason', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'rotation_reason',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   rotationReason?: string;
 }

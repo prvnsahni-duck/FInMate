@@ -63,6 +63,9 @@ export class AppController {
       });
     }
 
-    return new SuccessResponse('Health status checked successfully', healthData);
+    return new SuccessResponse(
+      'Health status checked successfully',
+      healthData,
+    );
   }
 }

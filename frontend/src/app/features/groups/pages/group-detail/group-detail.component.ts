@@ -22,7 +22,10 @@ import { ConfirmModalComponent } from '../../../../shared/components/confirm-mod
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { DropdownComponent, DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
+import {
+  DropdownComponent,
+  DropdownOption,
+} from '../../../../shared/components/dropdown/dropdown.component';
 import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
@@ -207,7 +210,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   isFilterBottomSheetOpen = signal<boolean>(false);
   showSkeleton = signal<boolean>(false);
   isLoadingExpenses = signal<boolean>(false);
-  isOffline = signal<boolean>(typeof window !== 'undefined' ? !navigator.onLine : false);
+  isOffline = signal<boolean>(
+    typeof window !== 'undefined' ? !navigator.onLine : false,
+  );
   private skeletonTimeoutId?: any;
   membersError = signal<boolean>(false);
   balancesError = signal<boolean>(false);
@@ -301,84 +306,98 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.closeMonthSelected.set(this.getCurrentMonthString());
 
     // Subscribe to query parameters to sync tab and filters
-    this.route.queryParams.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((qParams) => {
-      const tab = qParams['tab'] || 'ledger';
-      if (['ledger', 'analytics', 'history', 'trash', 'settings', 'recurring'].includes(tab)) {
-        this.activeTab.set(tab as any);
-        
-        // Load settings or recurring data if target tab is active
-        if (tab === 'settings') {
-          const g = this.group();
-          if (g) {
-            this.editGroupName = g.name;
-            this.editGroupDescription = g.description || '';
-            this.editGroupVisibility = g.visibility || 'private';
-            this.editGroupCurrency = g.currency || 'USD';
-            this.editGroupCarryForward = g.carryForwardEnabled || false;
-            this.loadContributionsForMonth();
-          }
-        } else if (tab === 'recurring') {
-          const g = this.group();
-          if (g?.id) {
-            this.fetchRecurringExpenses(g.id);
+    this.route.queryParams
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((qParams) => {
+        const tab = qParams['tab'] || 'ledger';
+        if (
+          [
+            'ledger',
+            'analytics',
+            'history',
+            'trash',
+            'settings',
+            'recurring',
+          ].includes(tab)
+        ) {
+          this.activeTab.set(tab as any);
+
+          // Load settings or recurring data if target tab is active
+          if (tab === 'settings') {
+            const g = this.group();
+            if (g) {
+              this.editGroupName = g.name;
+              this.editGroupDescription = g.description || '';
+              this.editGroupVisibility = g.visibility || 'private';
+              this.editGroupCurrency = g.currency || 'USD';
+              this.editGroupCarryForward = g.carryForwardEnabled || false;
+              this.loadContributionsForMonth();
+            }
+          } else if (tab === 'recurring') {
+            const g = this.group();
+            if (g?.id) {
+              this.fetchRecurringExpenses(g.id);
+            }
           }
         }
-      }
 
-      const category = qParams['category'] || '';
-      const start = qParams['start'] || '';
-      const end = qParams['end'] || '';
+        const category = qParams['category'] || '';
+        const start = qParams['start'] || '';
+        const end = qParams['end'] || '';
 
-      const isFilterChanged =
-        this.filterCategory() !== category ||
-        this.filterStartDate() !== start ||
-        this.filterEndDate() !== end;
+        const isFilterChanged =
+          this.filterCategory() !== category ||
+          this.filterStartDate() !== start ||
+          this.filterEndDate() !== end;
 
-      this.filterCategory.set(category);
-      this.filterStartDate.set(start);
-      this.filterEndDate.set(end);
+        this.filterCategory.set(category);
+        this.filterStartDate.set(start);
+        this.filterEndDate.set(end);
 
-      const groupId = this.group()?.id;
-      if (groupId && isFilterChanged) {
-        this.currentPage.set(1);
-        this.fetchExpenses(groupId, true);
-      }
+        const groupId = this.group()?.id;
+        if (groupId && isFilterChanged) {
+          this.currentPage.set(1);
+          this.fetchExpenses(groupId, true);
+        }
 
-      this.scrollToActiveTab();
-      this.checkScrollCues();
-    });
+        this.scrollToActiveTab();
+        this.checkScrollCues();
+      });
 
-    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      const groupId = params.get('id');
-      if (groupId) {
-        this.startLoading();
-        this.currentPage.set(1);
+    this.route.paramMap
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((params) => {
+        const groupId = params.get('id');
+        if (groupId) {
+          this.startLoading();
+          this.currentPage.set(1);
 
-        // Prefill filters from URL before initial fetch
-        const initialCategory = this.route.snapshot.queryParams['category'] || '';
-        const initialStart = this.route.snapshot.queryParams['start'] || '';
-        const initialEnd = this.route.snapshot.queryParams['end'] || '';
-        this.filterCategory.set(initialCategory);
-        this.filterStartDate.set(initialStart);
-        this.filterEndDate.set(initialEnd);
+          // Prefill filters from URL before initial fetch
+          const initialCategory =
+            this.route.snapshot.queryParams['category'] || '';
+          const initialStart = this.route.snapshot.queryParams['start'] || '';
+          const initialEnd = this.route.snapshot.queryParams['end'] || '';
+          this.filterCategory.set(initialCategory);
+          this.filterStartDate.set(initialStart);
+          this.filterEndDate.set(initialEnd);
 
-        this.groupsService.getGroup(groupId).subscribe({
-          next: (res) => {
-            this.group.set(res);
-            this.fetchExpenses(groupId);
-            this.fetchMembers(groupId);
-            this.fetchBalances(groupId);
-            this.fetchHistoryLogs(groupId);
-            this.fetchDeletedExpenses(groupId);
-            this.fetchRecurringExpenses(groupId);
-            if (res.groupType === 'household') {
-              this.fetchCarryForward(groupId);
-            }
-          },
-          error: () => this.stopLoading(),
-        });
-      }
-    });
+          this.groupsService.getGroup(groupId).subscribe({
+            next: (res) => {
+              this.group.set(res);
+              this.fetchExpenses(groupId);
+              this.fetchMembers(groupId);
+              this.fetchBalances(groupId);
+              this.fetchHistoryLogs(groupId);
+              this.fetchDeletedExpenses(groupId);
+              this.fetchRecurringExpenses(groupId);
+              if (res.groupType === 'household') {
+                this.fetchCarryForward(groupId);
+              }
+            },
+            error: () => this.stopLoading(),
+          });
+        }
+      });
   }
 
   /**
@@ -387,8 +406,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
    * decryption coordinator which owns the decrypt → retry → success lifecycle.
    */
   async initializeGroupKeysAndSelfHeal(groupId: string) {
-    const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
-    const masterKey = await this.encryptionService.loadKeyFromSession(email || undefined);
+    const email = this.store.selectSnapshot(
+      (state: any) => state.auth?.user?.email,
+    );
+    const masterKey = await this.encryptionService.loadKeyFromSession(
+      email || undefined,
+    );
     this.isMasterKeyLoaded.set(!!masterKey);
 
     const role = this.getCallerRole();
@@ -440,7 +463,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
 
   scrollToActiveTab() {
     setTimeout(() => {
-      const activeEl = this.tabBarContainer?.nativeElement?.querySelector('.tab-active');
+      const activeEl =
+        this.tabBarContainer?.nativeElement?.querySelector('.tab-active');
       if (activeEl) {
         activeEl.scrollIntoView({
           behavior: 'smooth',
@@ -456,7 +480,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     if (!el) return;
     requestAnimationFrame(() => {
       this.showLeftScrollCue.set(el.scrollLeft > 5);
-      this.showRightScrollCue.set(el.scrollLeft < el.scrollWidth - el.clientWidth - 5);
+      this.showRightScrollCue.set(
+        el.scrollLeft < el.scrollWidth - el.clientWidth - 5,
+      );
     });
   }
 
@@ -527,7 +553,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       }, 100);
     } else {
       setTimeout(() => {
-        const firstEl = document.querySelector('#filterCategoryMobile button') as HTMLElement;
+        const firstEl = document.querySelector(
+          '#filterCategoryMobile button',
+        ) as HTMLElement;
         firstEl?.focus();
       }, 150);
     }
@@ -544,7 +572,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       if (!modalEl) return;
 
       const focusableEls = modalEl.querySelectorAll(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       if (focusableEls.length === 0) return;
       const firstEl = focusableEls[0] as HTMLElement;
@@ -582,7 +610,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   async unlockVault(password: string) {
     if (!password) return;
     try {
-      const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
+      const email = this.store.selectSnapshot(
+        (state: any) => state.auth?.user?.email,
+      );
       if (!email) throw new Error('User email not found');
 
       await this.encryptionService.deriveAndStoreKey(password, email);
@@ -784,7 +814,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         next: (res) => {
           this.carryForwardBalances.set(res || []);
         },
-        error: (err) => console.error('Failed to fetch carry-forward data', err),
+        error: (err) =>
+          console.error('Failed to fetch carry-forward data', err),
       });
   }
 
@@ -917,7 +948,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-
   changePage(delta: number) {
     this.currentPage.update((val) => val + delta);
     const g = this.group();
@@ -943,17 +973,32 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           throw new Error(classifyDecryptionError({ keyStatus }).message);
         }
 
-        const fileKey = await this.encryptionService.unwrapKey(file.encryptedFileKey, scopeKey);
-        const decryptedName = await this.encryptionService.decrypt(file.encryptedOriginalName, fileKey);
+        const fileKey = await this.encryptionService.unwrapKey(
+          file.encryptedFileKey,
+          scopeKey,
+        );
+        const decryptedName = await this.encryptionService.decrypt(
+          file.encryptedOriginalName,
+          fileKey,
+        );
 
-        const encryptedBytes = localStorage.getItem(`sim_storage:${file.storageKey}`);
+        const encryptedBytes = localStorage.getItem(
+          `sim_storage:${file.storageKey}`,
+        );
         if (!encryptedBytes) {
-          throw new Error('Attachment file data not found in simulation storage');
+          throw new Error(
+            'Attachment file data not found in simulation storage',
+          );
         }
 
-        const decryptedBytes = await this.encryptionService.decryptBytes(encryptedBytes, fileKey);
+        const decryptedBytes = await this.encryptionService.decryptBytes(
+          encryptedBytes,
+          fileKey,
+        );
 
-        const blob = new Blob([decryptedBytes], { type: file.mimeType || 'application/octet-stream' });
+        const blob = new Blob([decryptedBytes], {
+          type: file.mimeType || 'application/octet-stream',
+        });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -967,9 +1012,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         alert('Failed to decrypt attachment: ' + (err.message || err));
       }
     } else {
-      alert(
-        `Downloading attachment (Legacy): ${file.originalName}`,
-      );
+      alert(`Downloading attachment (Legacy): ${file.originalName}`);
       const blob = new Blob(
         [`Decrypted content of: ${file.originalName} (${file.storageKey})`],
         { type: 'text/plain' },

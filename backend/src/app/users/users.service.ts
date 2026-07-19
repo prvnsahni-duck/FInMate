@@ -170,7 +170,10 @@ export class UsersService {
     return this.userRepository.save(user);
   }
 
-  async getKeys(userId: string): Promise<{ publicWrappingKey: string | null; encryptedPrivateWrappingKey: string | null }> {
+  async getKeys(userId: string): Promise<{
+    publicWrappingKey: string | null;
+    encryptedPrivateWrappingKey: string | null;
+  }> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
@@ -193,10 +196,7 @@ export class UsersService {
     if (!identifier) return null;
     const trimmed = identifier.trim();
     return this.userRepository.findOne({
-      where: [
-        { email: trimmed },
-        { username: trimmed },
-      ],
+      where: [{ email: trimmed }, { username: trimmed }],
     });
   }
 }

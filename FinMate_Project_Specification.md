@@ -477,6 +477,7 @@ Role-Based Access Control (RBAC) in FinMate is applied at the group level. A use
 To enforce a Zero-Knowledge Architecture, user data containing transactional details, personal notes, and goal titles is encrypted client-side before submission. The backend server acts as a blind sync engine for these fields. Other fields needed for database querying, sorting, or settlements are stored in plaintext or server-side encrypted.
 
 #### 🔐 Client-Side Encryption Key Boundaries
+
 - **User Data Key (UDK)**: Used to encrypt personal-scope data (personal expenses, personal notes, goals, and user secrets). It is derived from the user's password using PBKDF2 (AES-256-GCM).
 - **Group Key**: Each group owns a dedicated AES-256-GCM symmetric key. All collaborative data (group expenses, group notes, group attachments) is encrypted using this Group Key. Shared data is never encrypted using a personal UDK.
 - **Key Cache & Refresh Behavior (Current Release)**:
@@ -497,7 +498,9 @@ To enforce a Zero-Knowledge Architecture, user data containing transactional det
   - Offline mode restores wrapped keys from IndexedDB, allowing offline decryption.
 
 #### 📊 Personal Dashboard Aggregation Rules
+
 To avoid duplicate encrypted records and prevent synchronization overhead, the personal dashboard is built as follows:
+
 - **Only One Record**: Every expense exists as a single record in the database.
 - **Backend Aggregation**: The backend joins `expense_splits` with `expenses` to fetch the user's relevant shares. It aggregates:
   $$\text{Personal Expenses} + \text{User's Share from Group Expenses}$$

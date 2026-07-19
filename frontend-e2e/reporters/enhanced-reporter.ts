@@ -4,8 +4,11 @@ class EnhancedReporter implements Reporter {
   onTestEnd(test: TestCase, result: TestResult) {
     if (result.status === 'passed') return;
 
-    const error = result.error?.message ?? 'No Playwright error message was provided.';
-    const apiHint = error.match(/(GET|POST|PUT|PATCH|DELETE)\s+\S+\s+returned\s+\d+/)?.[0];
+    const error =
+      result.error?.message ?? 'No Playwright error message was provided.';
+    const apiHint = error.match(
+      /(GET|POST|PUT|PATCH|DELETE)\s+\S+\s+returned\s+\d+/,
+    )?.[0];
     const suggestion = apiHint
       ? 'API completed with an unexpected response. Check attached network.json before inspecting selectors.'
       : error.includes('Timeout')

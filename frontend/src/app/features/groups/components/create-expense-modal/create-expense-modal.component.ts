@@ -367,7 +367,12 @@ export class CreateExpenseModalComponent implements OnChanges {
     this.closeModalEvent.emit();
   }
 
-  filesToEncrypt: Array<{ name: string; type: string; size: number; arrayBuffer: ArrayBuffer }> = [];
+  filesToEncrypt: Array<{
+    name: string;
+    type: string;
+    size: number;
+    arrayBuffer: ArrayBuffer;
+  }> = [];
 
   async onSubmit() {
     if (!this.groupId && !this.splitWithFriend) {
@@ -414,7 +419,9 @@ export class CreateExpenseModalComponent implements OnChanges {
 
       try {
         const user = this.getCurrentUserId();
-        const email = this.store.selectSnapshot((state: any) => state.auth?.user?.email);
+        const email = this.store.selectSnapshot(
+          (state: any) => state.auth?.user?.email,
+        );
         let scopeKey: CryptoKey | null = null;
         let scope: 'personal' | 'group' | 'direct_shared' = 'personal';
 
@@ -426,7 +433,7 @@ export class CreateExpenseModalComponent implements OnChanges {
           }
         } else {
           const otherParticipants = splits.filter(
-            (s) => s.participantUserId && s.participantUserId !== user
+            (s) => s.participantUserId && s.participantUserId !== user,
           );
           if (otherParticipants.length > 0) {
             scope = 'direct_shared';
@@ -441,7 +448,9 @@ export class CreateExpenseModalComponent implements OnChanges {
         }
 
         if (!scopeKey) {
-          throw new Error('Encryption key not loaded/derived. Please try again.');
+          throw new Error(
+            'Encryption key not loaded/derived. Please try again.',
+          );
         }
 
         // Encrypt new attachments
@@ -458,9 +467,18 @@ export class CreateExpenseModalComponent implements OnChanges {
 
         for (const fileObj of this.filesToEncrypt) {
           const fileKey = await this.encryptionService.generateDataKey();
-          const encryptedBytes = await this.encryptionService.encryptBytes(fileObj.arrayBuffer, fileKey);
-          const encryptedName = await this.encryptionService.encrypt(fileObj.name, fileKey);
-          const wrappedFileKey = await this.encryptionService.wrapKey(fileKey, scopeKey);
+          const encryptedBytes = await this.encryptionService.encryptBytes(
+            fileObj.arrayBuffer,
+            fileKey,
+          );
+          const encryptedName = await this.encryptionService.encrypt(
+            fileObj.name,
+            fileKey,
+          );
+          const wrappedFileKey = await this.encryptionService.wrapKey(
+            fileKey,
+            scopeKey,
+          );
 
           const randomUuid = Math.random().toString(36).substring(2, 15);
           const storageKey = `receipts/${randomUuid}.enc`;
@@ -477,17 +495,21 @@ export class CreateExpenseModalComponent implements OnChanges {
 
         const wrappedContentKeys = [];
         if (scope === 'direct_shared' && scopeKey) {
-          const masterKey = await this.encryptionService.loadKeyFromSession(email);
+          const masterKey =
+            await this.encryptionService.loadKeyFromSession(email);
           const currentUserId = user;
 
-          const wrappedSelf = await this.encryptionService.wrapKey(scopeKey, masterKey!);
+          const wrappedSelf = await this.encryptionService.wrapKey(
+            scopeKey,
+            masterKey!,
+          );
           wrappedContentKeys.push({
             userId: currentUserId!,
             wrappedKey: wrappedSelf,
           });
 
           const otherParticipants = splits.filter(
-            (s) => s.participantUserId && s.participantUserId !== user
+            (s) => s.participantUserId && s.participantUserId !== user,
           );
           for (const split of otherParticipants) {
             const participantId = split.participantUserId!;
@@ -499,7 +521,10 @@ export class CreateExpenseModalComponent implements OnChanges {
               );
               const pubKeyStr = pubKeyRes?.data?.publicWrappingKey;
               if (pubKeyStr) {
-                const subtle = typeof window !== 'undefined' ? window.crypto.subtle : (globalThis as any).crypto.subtle;
+                const subtle =
+                  typeof window !== 'undefined'
+                    ? window.crypto.subtle
+                    : (globalThis as any).crypto.subtle;
                 const pubKey = await subtle.importKey(
                   'jwk',
                   JSON.parse(pubKeyStr),
@@ -507,14 +532,20 @@ export class CreateExpenseModalComponent implements OnChanges {
                   true,
                   ['wrapKey'],
                 );
-                const wrappedFriendKey = await this.encryptionService.wrapKey(scopeKey, pubKey);
+                const wrappedFriendKey = await this.encryptionService.wrapKey(
+                  scopeKey,
+                  pubKey,
+                );
                 wrappedContentKeys.push({
                   userId: participantId,
                   wrappedKey: wrappedFriendKey,
                 });
               }
             } catch (e) {
-              console.error(`Failed to wrap content key for participant ${participantId}`, e);
+              console.error(
+                `Failed to wrap content key for participant ${participantId}`,
+                e,
+              );
             }
           }
         }
@@ -530,8 +561,12 @@ export class CreateExpenseModalComponent implements OnChanges {
           groupId: this.groupId ?? undefined,
           splits,
           encryptionScope: scope,
-          wrappedContentKeys: wrappedContentKeys.length > 0 ? wrappedContentKeys : undefined,
-          encryptedAttachments: [...existingAttachments, ...encryptedAttachments],
+          wrappedContentKeys:
+            wrappedContentKeys.length > 0 ? wrappedContentKeys : undefined,
+          encryptedAttachments: [
+            ...existingAttachments,
+            ...encryptedAttachments,
+          ],
         };
 
         const request$ = this.expense
@@ -555,7 +590,8 @@ export class CreateExpenseModalComponent implements OnChanges {
         });
       } catch (err: any) {
         this.isSubmitting = false;
-        this.errorMessage = err?.message || 'Failed to encrypt and save expense.';
+        this.errorMessage =
+          err?.message || 'Failed to encrypt and save expense.';
       }
     }
   }
@@ -589,7 +625,9 @@ export class CreateExpenseModalComponent implements OnChanges {
   removeAttachment(index: number) {
     const fileItem = this.attachedFiles[index];
     if (fileItem && fileItem.key.startsWith('pending:')) {
-      const encryptIndex = this.filesToEncrypt.findIndex((f) => f.name === fileItem.name);
+      const encryptIndex = this.filesToEncrypt.findIndex(
+        (f) => f.name === fileItem.name,
+      );
       if (encryptIndex !== -1) {
         this.filesToEncrypt.splice(encryptIndex, 1);
       }

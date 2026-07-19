@@ -7,12 +7,14 @@ FinMate uses a Zero-Knowledge (ZK) encryption system to ensure that all personal
 ## Key Types & Flows
 
 ### Flow A: Personal Encryption (Symmetric)
+
 - **Target**: Personal expenses (not part of any group).
 - **Key**: User's master key, derived client-side from their password and email via PBKDF2.
 - **Wrapping**: Content keys are wrapped symmetrically using the user's master key and stored on the server.
 - **Decryption**: Direct symmetric unwrap using the active session key.
 
 ### Flow B: Direct Invitation (Asymmetric - Canonical Flow)
+
 - **Target**: Registered users invited to a group.
 - **Key**: Group symmetric key (AES-256-GCM), wrapped using the recipient's public wrapping key (RSA-OAEP 2048-bit).
 - **RSA Key Bootstrapping**: A dedicated `CryptoBootstrapService` runs automatically when the app initializes or whenever a user logs in. It ensures that every registered user has an active RSA public/private keypair and registers the public key on the server.
@@ -27,6 +29,7 @@ FinMate uses a Zero-Knowledge (ZK) encryption system to ensure that all personal
   - The recipient re-wraps the group key symmetrically using their master key, posts this symmetric version to `/groups/:groupId/keys`, and caches the raw group key in IndexedDB.
 
 ### Flow C: Link Invitation (Temporary Invite Key - TIK - Legacy Compatibility)
+
 - **Target**: Unregistered users invited via a secure link where public wrapping keys cannot be resolved.
 - **Key**: Group symmetric key (AES-256-GCM), wrapped with a one-time Temporary Invite Key (TIK, AES-GCM 256-bit).
 - **Wrapping**:
@@ -36,7 +39,7 @@ FinMate uses a Zero-Knowledge (ZK) encryption system to ensure that all personal
   - The recipient clicks the link. The browser extracts the TIK from the hash fragment, joins the group, and receives the TIK-wrapped group key.
   - The browser decrypts the group key using the TIK.
   - The browser re-wraps the group key symmetrically with the user's master key, uploads the self-wrapped symmetric key to `/groups/:groupId/keys`, and stores the key in IndexedDB.
-*Note: This flow is kept for backwards compatibility only. Standard key sharing is done via Flow B (RSA-OAEP).*
+    _Note: This flow is kept for backwards compatibility only. Standard key sharing is done via Flow B (RSA-OAEP)._
 
 ---
 
@@ -81,6 +84,7 @@ To provide high performance, offline functionality, and seamless decryption acro
 ## Recovery & Self-Healing
 
 To keep keys updated and handle cases where members are invited while offline or before their public keys are generated:
+
 1. **Self-Healing on Admin Load**:
    Whenever an owner or admin of a group loads the Group Detail page, the application automatically runs a background task (`checkAndProvisionMissingKeys`):
    - Queries the backend for members who lack a wrapped group key.
@@ -93,12 +97,14 @@ To keep keys updated and handle cases where members are invited while offline or
 ## Troubleshooting Guide
 
 ### Issue: Banners show "Encryption key missing for this group"
+
 - **Cause**: The group key has not been wrapped for your account yet (common if you were added to the group while the admin was offline).
 - **Solution**:
   1. Ask the group owner or any admin to log in and open the Group Detail page.
   2. Once they do, click the **Check for Key** button on your warning banner to synchronize.
 
 ### Issue: Expenses show "Expense unavailable" with a lock icon
+
 - **Cause**: Decryption failed. This happens if the local group key is missing, or if the expense was encrypted with a different key version that you don't possess.
 - **Solution**:
   1. Verify your password by unlocking the vault if prompted.

@@ -50,7 +50,9 @@ import { THROTTLE_PROFILES } from './throttler/throttle.constants';
           envNode === 'test' ||
           config.get('THROTTLE_SKIP') === 'true' ||
           process.env.THROTTLE_SKIP === 'true' ||
-          String(process.env.NX_TASK_TARGET || process.env.NX_TASK_ID || '').includes('e2e') ||
+          String(
+            process.env.NX_TASK_TARGET || process.env.NX_TASK_ID || '',
+          ).includes('e2e') ||
           typeof process.env.PLAYWRIGHT_WORKER_INDEX !== 'undefined' ||
           process.env.PLAYWRIGHT_TEST === '1' ||
           process.env.E2E === 'true';
@@ -146,7 +148,8 @@ import { THROTTLE_PROFILES } from './throttler/throttle.constants';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
         const sslEnabled = configService.get<string>('DB_SSL') === 'true';
-        const sslRejectUnauthorized = configService.get<string>('DB_SSL_REJECT_UNAUTHORIZED') !== 'false';
+        const sslRejectUnauthorized =
+          configService.get<string>('DB_SSL_REJECT_UNAUTHORIZED') !== 'false';
         const ssl = sslEnabled
           ? { rejectUnauthorized: sslRejectUnauthorized }
           : undefined;

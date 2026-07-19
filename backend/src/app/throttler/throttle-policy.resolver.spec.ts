@@ -58,12 +58,16 @@ describe('ThrottlePolicyResolver', () => {
 
     it('should return "forgotPassword" when handler has @ThrottlePolicy(FORGOT_PASSWORD)', () => {
       const ctx = createMockContext(THROTTLE_PROFILES.FORGOT_PASSWORD);
-      expect(resolver.resolvePolicy(ctx)).toBe(THROTTLE_PROFILES.FORGOT_PASSWORD);
+      expect(resolver.resolvePolicy(ctx)).toBe(
+        THROTTLE_PROFILES.FORGOT_PASSWORD,
+      );
     });
 
     it('should return "resetPassword" when handler has @ThrottlePolicy(RESET_PASSWORD)', () => {
       const ctx = createMockContext(THROTTLE_PROFILES.RESET_PASSWORD);
-      expect(resolver.resolvePolicy(ctx)).toBe(THROTTLE_PROFILES.RESET_PASSWORD);
+      expect(resolver.resolvePolicy(ctx)).toBe(
+        THROTTLE_PROFILES.RESET_PASSWORD,
+      );
     });
 
     it('should return "otp" when handler has @ThrottlePolicy(OTP)', () => {
@@ -92,12 +96,18 @@ describe('ThrottlePolicyResolver', () => {
     });
 
     it('should prefer method-level metadata over class-level', () => {
-      const ctx = createMockContext(THROTTLE_PROFILES.OTP, THROTTLE_PROFILES.LOGIN);
+      const ctx = createMockContext(
+        THROTTLE_PROFILES.OTP,
+        THROTTLE_PROFILES.LOGIN,
+      );
       expect(resolver.resolvePolicy(ctx)).toBe(THROTTLE_PROFILES.OTP);
     });
 
     it('should return "default" when class has metadata but method overrides to default', () => {
-      const ctx = createMockContext(THROTTLE_PROFILES.DEFAULT, THROTTLE_PROFILES.LOGIN);
+      const ctx = createMockContext(
+        THROTTLE_PROFILES.DEFAULT,
+        THROTTLE_PROFILES.LOGIN,
+      );
       expect(resolver.resolvePolicy(ctx)).toBe(THROTTLE_PROFILES.DEFAULT);
     });
   });

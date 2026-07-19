@@ -5,7 +5,8 @@ import { ZkKeyVaultService, ZK_DB_NAME } from './zk-key-vault.service';
 import 'fake-indexeddb/auto';
 
 if (typeof globalThis.structuredClone === 'undefined') {
-  (globalThis as any).structuredClone = (val: any) => JSON.parse(JSON.stringify(val));
+  (globalThis as any).structuredClone = (val: any) =>
+    JSON.parse(JSON.stringify(val));
 }
 
 describe('ZkKeyVaultService', () => {
@@ -15,7 +16,10 @@ describe('ZkKeyVaultService', () => {
     TestBed.configureTestingModule({
       providers: [
         ZkKeyVaultService,
-        { provide: ZK_DB_NAME, useValue: 'finmate_zk_vault_spec_' + Math.random() }
+        {
+          provide: ZK_DB_NAME,
+          useValue: 'finmate_zk_vault_spec_' + Math.random(),
+        },
       ],
     });
     service = TestBed.inject(ZkKeyVaultService);
@@ -36,7 +40,10 @@ describe('ZkKeyVaultService', () => {
   describe('store and load key round-trip', () => {
     it('should store a value and load it back', async () => {
       // Use a plain object as a stand-in since Node.js lacks SubtleCrypto
-      const mockKey = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
+      const mockKey = {
+        type: 'secret',
+        algorithm: { name: 'AES-GCM' },
+      } as unknown as CryptoKey;
 
       await service.storeKey('test@example.com', mockKey);
       const loaded = await service.loadKey('test@example.com');
@@ -48,7 +55,10 @@ describe('ZkKeyVaultService', () => {
     });
 
     it('should normalize email to lowercase', async () => {
-      const mockKey = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
+      const mockKey = {
+        type: 'secret',
+        algorithm: { name: 'AES-GCM' },
+      } as unknown as CryptoKey;
 
       await service.storeKey('Test@Example.COM', mockKey);
       const loaded = await service.loadKey('test@example.com');
@@ -64,7 +74,10 @@ describe('ZkKeyVaultService', () => {
     });
 
     it('should fall back to in-memory key if IndexedDB cannot open', async () => {
-      const mockKey = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
+      const mockKey = {
+        type: 'secret',
+        algorithm: { name: 'AES-GCM' },
+      } as unknown as CryptoKey;
       await service.storeKey('fallback@example.com', mockKey);
 
       const openVaultSpy = jest
@@ -80,7 +93,10 @@ describe('ZkKeyVaultService', () => {
 
   describe('deleteKey', () => {
     it('should delete a stored key', async () => {
-      const mockKey = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
+      const mockKey = {
+        type: 'secret',
+        algorithm: { name: 'AES-GCM' },
+      } as unknown as CryptoKey;
 
       await service.storeKey('delete@example.com', mockKey);
       await service.deleteKey('delete@example.com');
@@ -98,8 +114,14 @@ describe('ZkKeyVaultService', () => {
 
   describe('clearAll', () => {
     it('should remove all stored keys', async () => {
-      const mockKey1 = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
-      const mockKey2 = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
+      const mockKey1 = {
+        type: 'secret',
+        algorithm: { name: 'AES-GCM' },
+      } as unknown as CryptoKey;
+      const mockKey2 = {
+        type: 'secret',
+        algorithm: { name: 'AES-GCM' },
+      } as unknown as CryptoKey;
 
       await service.storeKey('user1@example.com', mockKey1);
       await service.storeKey('user2@example.com', mockKey2);
@@ -114,13 +136,18 @@ describe('ZkKeyVaultService', () => {
     });
 
     it('should clear fallback keys even if IndexedDB clear fails', async () => {
-      const mockKey = { type: 'secret', algorithm: { name: 'AES-GCM' } } as unknown as CryptoKey;
+      const mockKey = {
+        type: 'secret',
+        algorithm: { name: 'AES-GCM' },
+      } as unknown as CryptoKey;
 
       const openVaultSpy = jest
         .spyOn(service as any, 'openVault')
         .mockRejectedValue(new Error('IndexedDB unavailable'));
 
-      await expect(service.storeKey('clear-fallback@example.com', mockKey)).resolves.toBe(false);
+      await expect(
+        service.storeKey('clear-fallback@example.com', mockKey),
+      ).resolves.toBe(false);
       await expect(service.clearAll()).rejects.toThrow('IndexedDB unavailable');
       const loaded = await service.loadKey('clear-fallback@example.com');
 

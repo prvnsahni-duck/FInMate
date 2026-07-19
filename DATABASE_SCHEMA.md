@@ -52,20 +52,20 @@ erDiagram
 - **Purpose**: Core user identity records.
 - **Columns**:
 
-| Column Name     | Type           | Nullable | Default              | Constraints                             |
-| :-------------- | :------------- | :------: | :------------------- | :-------------------------------------- |
-| `id`            | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                             |
-| `email`         | `varchar(255)` |    No    |                      | Unique                                  |
-| `username`      | `varchar(50)`  |   Yes    | `NULL`               | Unique                                  |
-| `phone_number`  | `varchar(20)`  |   Yes    | `NULL`               | Unique                                  |
-| `password_hash` | `varchar(255)` |    No    |                      |                                         |
-| `display_name`  | `varchar(120)` |   Yes    | `NULL`               |                                         |
-| `status`        | `enum`         |    No    | `'active'`           | Values: `active`, `disabled`, `invited` |
-| `last_login_at`               | `timestamptz`  |   Yes    | `NULL`               |                                         |
-| `public_wrapping_key`         | `text`         |   Yes    | `NULL`               | User public wrapping key (RSA-OAEP)     |
-| `encrypted_private_wrapping_key`| `text`        |   Yes    | `NULL`               | User private wrapping key, master wrapped|
-| `created_at`                  | `timestamptz`  |    No    | `NOW()`              |                                         |
-| `updated_at`                  | `timestamptz`  |    No    | `NOW()`              |                                         |
+| Column Name                      | Type           | Nullable | Default              | Constraints                               |
+| :------------------------------- | :------------- | :------: | :------------------- | :---------------------------------------- |
+| `id`                             | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                               |
+| `email`                          | `varchar(255)` |    No    |                      | Unique                                    |
+| `username`                       | `varchar(50)`  |   Yes    | `NULL`               | Unique                                    |
+| `phone_number`                   | `varchar(20)`  |   Yes    | `NULL`               | Unique                                    |
+| `password_hash`                  | `varchar(255)` |    No    |                      |                                           |
+| `display_name`                   | `varchar(120)` |   Yes    | `NULL`               |                                           |
+| `status`                         | `enum`         |    No    | `'active'`           | Values: `active`, `disabled`, `invited`   |
+| `last_login_at`                  | `timestamptz`  |   Yes    | `NULL`               |                                           |
+| `public_wrapping_key`            | `text`         |   Yes    | `NULL`               | User public wrapping key (RSA-OAEP)       |
+| `encrypted_private_wrapping_key` | `text`         |   Yes    | `NULL`               | User private wrapping key, master wrapped |
+| `created_at`                     | `timestamptz`  |    No    | `NOW()`              |                                           |
+| `updated_at`                     | `timestamptz`  |    No    | `NOW()`              |                                           |
 
 ### 2. `profiles`
 
@@ -88,17 +88,17 @@ erDiagram
 - **Purpose**: Immutable key-version history for each group key lifecycle.
 - **Columns**:
 
-| Column Name          | Type           | Nullable | Default              | Constraints                                               |
-| :------------------- | :------------- | :------: | :------------------- | :-------------------------------------------------------- |
-| `id`                 | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                                               |
-| `group_id`           | `uuid`         |    No    |                      | Foreign Key -> `groups(id)`, Cascade on Delete            |
-| `version`            | `integer`      |    No    |                      | Unique within group `(group_id, version)`                 |
-| `algorithm`          | `varchar(64)`  |    No    | `AES-256-GCM`        |                                                          |
-| `status`             | `varchar(20)`  |    No    | `ACTIVE`             | Values: `ACTIVE`, `SUPERSEDED`, `REVOKED`                 |
-| `created_at`         | `timestamptz`  |    No    | `NOW()`              |                                                          |
-| `rotated_at`         | `timestamptz`  |   Yes    | `NULL`               |                                                          |
-| `rotated_by_user_id` | `uuid`         |   Yes    | `NULL`               | Foreign Key -> `users(id)`, Set Null on Delete            |
-| `rotation_reason`    | `varchar(255)` |   Yes    | `NULL`               |                                                          |
+| Column Name          | Type           | Nullable | Default              | Constraints                                                |
+| :------------------- | :------------- | :------: | :------------------- | :--------------------------------------------------------- |
+| `id`                 | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                                                |
+| `group_id`           | `uuid`         |    No    |                      | Foreign Key -> `groups(id)`, Cascade on Delete             |
+| `version`            | `integer`      |    No    |                      | Unique within group `(group_id, version)`                  |
+| `algorithm`          | `varchar(64)`  |    No    | `AES-256-GCM`        |                                                            |
+| `status`             | `varchar(20)`  |    No    | `ACTIVE`             | Values: `ACTIVE`, `SUPERSEDED`, `REVOKED`                  |
+| `created_at`         | `timestamptz`  |    No    | `NOW()`              |                                                            |
+| `rotated_at`         | `timestamptz`  |   Yes    | `NULL`               |                                                            |
+| `rotated_by_user_id` | `uuid`         |   Yes    | `NULL`               | Foreign Key -> `users(id)`, Set Null on Delete             |
+| `rotation_reason`    | `varchar(255)` |   Yes    | `NULL`               |                                                            |
 | **Partial Unique**   |                |          |                      | At most one ACTIVE row per group `(group_id where ACTIVE)` |
 
 ### 2c. `member_wrapped_group_keys`
@@ -106,17 +106,17 @@ erDiagram
 - **Purpose**: Member wrapped-key records for a specific group key version.
 - **Columns**:
 
-| Column Name              | Type           | Nullable | Default              | Constraints                                                      |
-| :----------------------- | :------------- | :------: | :------------------- | :--------------------------------------------------------------- |
-| `id`                     | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                                                      |
-| `group_key_version_id`   | `uuid`         |    No    |                      | Foreign Key -> `group_key_versions(id)`, Cascade on Delete       |
-| `group_id`               | `uuid`         |    No    |                      | Foreign Key -> `groups(id)`, Cascade on Delete                   |
-| `user_id`                | `uuid`         |    No    |                      | Foreign Key -> `users(id)`, Cascade on Delete                    |
-| `wrapped_group_key`      | `text`         |    No    |                      | Wrapped Group Key ciphertext                                     |
-| `wrapping_algorithm`     | `varchar(64)`  |   Yes    | `NULL`               |                                                                  |
-| `public_key_fingerprint` | `varchar(255)` |   Yes    | `NULL`               |                                                                  |
-| `created_at`             | `timestamptz`  |    No    | `NOW()`              |                                                                  |
-| **Unique**               |                |          |                      | Unique combination `(group_key_version_id, user_id)`             |
+| Column Name              | Type           | Nullable | Default              | Constraints                                                |
+| :----------------------- | :------------- | :------: | :------------------- | :--------------------------------------------------------- |
+| `id`                     | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                                                |
+| `group_key_version_id`   | `uuid`         |    No    |                      | Foreign Key -> `group_key_versions(id)`, Cascade on Delete |
+| `group_id`               | `uuid`         |    No    |                      | Foreign Key -> `groups(id)`, Cascade on Delete             |
+| `user_id`                | `uuid`         |    No    |                      | Foreign Key -> `users(id)`, Cascade on Delete              |
+| `wrapped_group_key`      | `text`         |    No    |                      | Wrapped Group Key ciphertext                               |
+| `wrapping_algorithm`     | `varchar(64)`  |   Yes    | `NULL`               |                                                            |
+| `public_key_fingerprint` | `varchar(255)` |   Yes    | `NULL`               |                                                            |
+| `created_at`             | `timestamptz`  |    No    | `NOW()`              |                                                            |
+| **Unique**               |                |          |                      | Unique combination `(group_key_version_id, user_id)`       |
 
 - **Compatibility Note**:
   - `encrypted_group_keys` remains as a legacy compatibility table during transition, but active key provisioning now uses `group_key_versions` + `member_wrapped_group_keys`.
@@ -183,26 +183,26 @@ erDiagram
 - **Purpose**: Financial transactional headers.
 - **Columns**:
 
-| Column Name        | Type           | Nullable | Default              | Constraints                                     |
-| :----------------- | :------------- | :------: | :------------------- | :---------------------------------------------- |
-| `id`               | `uuid`         |    No    | `uuid_generate_v4()` | Primary Key                                     |
-| `title`            | `text`         |    No    |                      | Client-Side Encrypted (base64 string)           |
-| `description`      | `text`         |   Yes    | `NULL`               | Client-Side Encrypted                           |
-| `amount_total`     | `decimal(12,2)`|    No    |                      |                                                 |
-| `currency`         | `char(3)`      |    No    |                      |                                                 |
-| `category`         | `varchar(64)`  |    No    |                      |                                                 |
-| `paid_by_user_id`  | `uuid`         |    No    |                      | Foreign Key -> `users(id)`                      |
-| `owner_user_id`    | `uuid`         |    No    |                      | Foreign Key -> `users(id)`                      |
-| `group_id`         | `uuid`         |   Yes    | `NULL`               | Foreign Key -> `groups(id)` (Null for personal) |
-| `group_key_version_id` | `uuid`      |   Yes    | `NULL`               | Foreign Key -> `group_key_versions(id)`         |
-| `expense_date`     | `date`         |    No    |                      |                                                 |
-| `status`           | `varchar(20)`  |    No    | `'posted'`           | Values: `draft`, `posted`, `void`               |
-| `ledger_month`     | `char(7)`      |   Yes    | `NULL`               | Format: `YYYY-MM` (Household groups only)       |
-| `is_carry_forward` | `boolean`      |    No    | `false`              | System rollover record flag                     |
-| `version`          | `integer`      |    No    | `1`                  | For Optimistic Concurrency Control              |
-| `created_at`       | `timestamptz`  |    No    | `NOW()`              |                                                 |
-| `updated_at`       | `timestamptz`  |    No    | `NOW()`              |                                                 |
-| `deleted_at`       | `timestamptz`  |   Yes    | `NULL`               | Soft delete support                             |
+| Column Name            | Type            | Nullable | Default              | Constraints                                     |
+| :--------------------- | :-------------- | :------: | :------------------- | :---------------------------------------------- |
+| `id`                   | `uuid`          |    No    | `uuid_generate_v4()` | Primary Key                                     |
+| `title`                | `text`          |    No    |                      | Client-Side Encrypted (base64 string)           |
+| `description`          | `text`          |   Yes    | `NULL`               | Client-Side Encrypted                           |
+| `amount_total`         | `decimal(12,2)` |    No    |                      |                                                 |
+| `currency`             | `char(3)`       |    No    |                      |                                                 |
+| `category`             | `varchar(64)`   |    No    |                      |                                                 |
+| `paid_by_user_id`      | `uuid`          |    No    |                      | Foreign Key -> `users(id)`                      |
+| `owner_user_id`        | `uuid`          |    No    |                      | Foreign Key -> `users(id)`                      |
+| `group_id`             | `uuid`          |   Yes    | `NULL`               | Foreign Key -> `groups(id)` (Null for personal) |
+| `group_key_version_id` | `uuid`          |   Yes    | `NULL`               | Foreign Key -> `group_key_versions(id)`         |
+| `expense_date`         | `date`          |    No    |                      |                                                 |
+| `status`               | `varchar(20)`   |    No    | `'posted'`           | Values: `draft`, `posted`, `void`               |
+| `ledger_month`         | `char(7)`       |   Yes    | `NULL`               | Format: `YYYY-MM` (Household groups only)       |
+| `is_carry_forward`     | `boolean`       |    No    | `false`              | System rollover record flag                     |
+| `version`              | `integer`       |    No    | `1`                  | For Optimistic Concurrency Control              |
+| `created_at`           | `timestamptz`   |    No    | `NOW()`              |                                                 |
+| `updated_at`           | `timestamptz`   |    No    | `NOW()`              |                                                 |
+| `deleted_at`           | `timestamptz`   |   Yes    | `NULL`               | Soft delete support                             |
 
 ### 7. `expense_splits`
 

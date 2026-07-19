@@ -139,7 +139,9 @@ describe('GroupDetailComponent', () => {
       getGroupDataKey: jest.fn().mockResolvedValue({}),
       createGroupKey: jest.fn().mockResolvedValue({}),
       createAndStoreGroupKey: jest.fn().mockResolvedValue({}),
-      resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: {} }),
+      resolveGroupKey: jest
+        .fn()
+        .mockResolvedValue({ status: 'ready', key: {} }),
       checkAndProvisionMissingKeys: jest.fn().mockResolvedValue({}),
       invalidateGroupKey: jest.fn(),
       // Provide Signal-compatible objects used by the component/template
@@ -286,7 +288,9 @@ describe('GroupDetailComponent', () => {
   });
 
   it('should call initializeGroupKeysAndSelfHeal on members load', () => {
-    const selfHealSpy = jest.spyOn(component, 'initializeGroupKeysAndSelfHeal').mockResolvedValue();
+    const selfHealSpy = jest
+      .spyOn(component, 'initializeGroupKeysAndSelfHeal')
+      .mockResolvedValue();
     fixture.detectChanges(); // ngOnInit -> fetchMembers
     expect(selfHealSpy).toHaveBeenCalledWith('group-1');
   });

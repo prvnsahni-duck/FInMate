@@ -1,4 +1,11 @@
-import { Component, input, output, inject, signal, DestroyRef } from '@angular/core';
+import {
+  Component,
+  input,
+  output,
+  inject,
+  signal,
+  DestroyRef,
+} from '@angular/core';
 import { NgClass } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -11,7 +18,10 @@ import {
   DropdownComponent,
   DropdownOption,
 } from '../../../../shared/components/dropdown/dropdown.component';
-import { ClientEncryptionService, arrayBufferToBase64 } from '../../../../core/services/encryption.service';
+import {
+  ClientEncryptionService,
+  arrayBufferToBase64,
+} from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
 import { environment } from '../../../../../environments/environment';
 
@@ -248,7 +258,9 @@ export class GroupMembersComponent {
     this.inviteSuccess = '';
 
     try {
-      const groupKey = await this.groupKeyService.getGroupDataKey(this.groupId());
+      const groupKey = await this.groupKeyService.getGroupDataKey(
+        this.groupId(),
+      );
       if (!groupKey) {
         throw new Error('Group key not available. Please unlock your vault.');
       }
@@ -269,9 +281,11 @@ export class GroupMembersComponent {
           let lookupData: any = null;
           try {
             const lookupRes = await firstValueFrom(
-              this.http.get<{ data: { userId: string; publicWrappingKey: string | null } }>(
-                `${environment.apiBaseUrl}/users/lookup?identifier=${encodeURIComponent(invite.identifier)}`
-              )
+              this.http.get<{
+                data: { userId: string; publicWrappingKey: string | null };
+              }>(
+                `${environment.apiBaseUrl}/users/lookup?identifier=${encodeURIComponent(invite.identifier)}`,
+              ),
             );
             lookupData = lookupRes.data;
           } catch {
@@ -288,18 +302,27 @@ export class GroupMembersComponent {
               true,
               ['wrapKey'],
             );
-            wrappedGroupKey = await this.encryptionService.wrapKey(groupKey, publicKey);
+            wrappedGroupKey = await this.encryptionService.wrapKey(
+              groupKey,
+              publicKey,
+            );
             wrappingMethod = 'RSA-OAEP';
           } else {
             // Flow C: User is unregistered or doesn't have public wrapping key
             // Generate TIK (AES-GCM 256-bit)
             const tik = await this.encryptionService.generateDataKey();
-            wrappedGroupKey = await this.encryptionService.wrapKey(groupKey, tik);
+            wrappedGroupKey = await this.encryptionService.wrapKey(
+              groupKey,
+              tik,
+            );
             wrappingMethod = 'AES-KW';
 
             const rawTik = await subtle.exportKey('raw', tik);
             const tikBase64 = arrayBufferToBase64(rawTik);
-            tikUrlSafe = tikBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+            tikUrlSafe = tikBase64
+              .replace(/\+/g, '-')
+              .replace(/\//g, '_')
+              .replace(/=+$/, '');
           }
 
           // 2. Send invitation
@@ -311,16 +334,18 @@ export class GroupMembersComponent {
               wrappedGroupKey,
               wrappingMethod,
               inviteKeyHash: tikUrlSafe,
-            })
+            }),
           );
 
           // 3. If TIK was used, save invite URL with TIK hash
           if (tikUrlSafe && inviteRes.inviteToken) {
             const host = window.location.origin;
-            (invite as any).joinUrl = `${host}/groups/join/${inviteRes.inviteToken}#${tikUrlSafe}`;
+            (invite as any).joinUrl =
+              `${host}/groups/join/${inviteRes.inviteToken}#${tikUrlSafe}`;
           } else if (inviteRes.inviteToken) {
             const host = window.location.origin;
-            (invite as any).joinUrl = `${host}/groups/join/${inviteRes.inviteToken}`;
+            (invite as any).joinUrl =
+              `${host}/groups/join/${inviteRes.inviteToken}`;
           }
 
           results.push(inviteRes);
@@ -328,7 +353,8 @@ export class GroupMembersComponent {
           failed.push({
             error: true,
             invite,
-            message: err.error?.message || err.message || 'Failed to send invite.',
+            message:
+              err.error?.message || err.message || 'Failed to send invite.',
           });
         }
       }
@@ -391,7 +417,9 @@ export class GroupMembersComponent {
       }
 
       // 1. Resolve Group Key
-      const groupKey = await this.groupKeyService.getGroupDataKey(this.groupId());
+      const groupKey = await this.groupKeyService.getGroupDataKey(
+        this.groupId(),
+      );
       if (!groupKey) {
         throw new Error('Group key not available. Please unlock your vault.');
       }
@@ -405,14 +433,17 @@ export class GroupMembersComponent {
       // 4. Export TIK raw bytes to put in URL
       const rawTik = await subtle.exportKey('raw', tik);
       const tikBase64 = arrayBufferToBase64(rawTik);
-      const tikUrlSafe = tikBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      const tikUrlSafe = tikBase64
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/, '');
 
       // 5. Post to API to create invite and store wrapped key
       const response = await firstValueFrom(
         this.http.post<{ data: { inviteToken: string } }>(
           `${environment.apiBaseUrl}/groups/${this.groupId()}/invites`,
-          { wrappedGroupKey: wrappedGk }
-        )
+          { wrappedGroupKey: wrappedGk },
+        ),
       );
 
       const inviteToken = response.data.inviteToken;
@@ -460,8 +491,13 @@ export class GroupMembersComponent {
 
   getWhatsAppShareUrl(phoneNumber: string, displayName: string): string {
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
-    const staged = this.justInvitedPhoneContacts.find((c) => c.identifier === phoneNumber);
-    const joinUrl = (staged as any)?.joinUrl || this.joinUrl || `${window.location.origin}/groups/join/${this.inviteToken()}`;
+    const staged = this.justInvitedPhoneContacts.find(
+      (c) => c.identifier === phoneNumber,
+    );
+    const joinUrl =
+      (staged as any)?.joinUrl ||
+      this.joinUrl ||
+      `${window.location.origin}/groups/join/${this.inviteToken()}`;
     const text = `Hey ${displayName}! I've invited you to join our group "${this.groupName()}" on FinMate. Use this link to join and track split expenses: ${joinUrl}`;
 
     if (cleanPhone) {
@@ -471,8 +507,13 @@ export class GroupMembersComponent {
   }
 
   getSmsShareUrl(phoneNumber: string, displayName: string): string {
-    const staged = this.justInvitedPhoneContacts.find((c) => c.identifier === phoneNumber);
-    const joinUrl = (staged as any)?.joinUrl || this.joinUrl || `${window.location.origin}/groups/join/${this.inviteToken()}`;
+    const staged = this.justInvitedPhoneContacts.find(
+      (c) => c.identifier === phoneNumber,
+    );
+    const joinUrl =
+      (staged as any)?.joinUrl ||
+      this.joinUrl ||
+      `${window.location.origin}/groups/join/${this.inviteToken()}`;
     const text = `Hey ${displayName}! I've invited you to join our group "${this.groupName()}" on FinMate. Join here: ${joinUrl}`;
     return `sms:${phoneNumber}?body=${encodeURIComponent(text)}`;
   }

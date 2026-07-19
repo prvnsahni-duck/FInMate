@@ -130,18 +130,34 @@ export class AddExpenseVersionHistory1719400000000
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_receipt_versions_expense_created";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_receipt_versions_attachment_created";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_receipt_versions_expense_created";`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_receipt_versions_attachment_created";`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "receipt_versions";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_attachment_versions_expense_created";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_attachment_versions_attachment_created";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_attachment_versions_expense_created";`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_attachment_versions_attachment_created";`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "attachment_versions";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_settlement_versions_settlement_version";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_settlement_versions_settlement_version";`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "settlement_versions";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_expense_split_versions_split_version";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_expense_split_versions_expense_created";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_expense_split_versions_split_version";`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_expense_split_versions_expense_created";`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "expense_split_versions";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_expense_versions_expense_version";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_expense_versions_expense_version";`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "expense_versions";`);
   }
 }

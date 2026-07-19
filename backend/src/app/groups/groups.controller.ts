@@ -118,7 +118,10 @@ export class GroupsController {
     const result = await this.groupsMembershipService.getPendingInvitations(
       req.user.id,
     );
-    return new SuccessResponse('Pending invitations retrieved successfully', result);
+    return new SuccessResponse(
+      'Pending invitations retrieved successfully',
+      result,
+    );
   }
 
   @Post(':id/invites')
@@ -322,7 +325,11 @@ export class GroupsController {
     @Body() body: ProvisionGroupKeysDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    await this.groupsMembershipService.provisionGroupKeys(req.user.id, id, body.keys);
+    await this.groupsMembershipService.provisionGroupKeys(
+      req.user.id,
+      id,
+      body.keys,
+    );
     return new SuccessResponse('Group keys provisioned successfully', null);
   }
 
@@ -381,10 +388,8 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: any,
   ) {
-    const missingUserIds = await this.groupsMembershipService.getMissingGroupKeys(
-      req.user.id,
-      id,
-    );
+    const missingUserIds =
+      await this.groupsMembershipService.getMissingGroupKeys(req.user.id, id);
 
     return new SuccessResponse('Missing keys retrieved', missingUserIds);
   }

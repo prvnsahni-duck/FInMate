@@ -124,7 +124,10 @@ export class AuthState {
   }
 
   @Action(SetPersistenceWarning)
-  setPersistenceWarning(ctx: StateContext<AuthStateModel>, action: SetPersistenceWarning) {
+  setPersistenceWarning(
+    ctx: StateContext<AuthStateModel>,
+    action: SetPersistenceWarning,
+  ) {
     ctx.patchState({
       persistenceWarning: action.payload,
     });

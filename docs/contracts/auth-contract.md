@@ -23,7 +23,7 @@ Source: [auth/](../../backend/src/app/auth/) · Audit: [auth-audit.md](../audits
 
 ## Public APIs
 
-- `auth.controller.ts`: register, login, refresh, logout, 2fa/*. (Password change/reset/verify — NOT yet implemented, see AUTH-002/NOTIF-002.)
+- `auth.controller.ts`: register, login, refresh, logout, 2fa/\*. (Password change/reset/verify — NOT yet implemented, see AUTH-002/NOTIF-002.)
 
 ## Dependencies
 

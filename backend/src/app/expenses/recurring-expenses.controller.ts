@@ -111,7 +111,11 @@ export class RecurringExpensesController {
     if (expectedSecret && cronSecret !== expectedSecret) {
       throw new UnauthorizedException('Invalid cron secret');
     }
-    if (!expectedSecret && (process.env.NODE_ENV === 'production' || process.env.APP_ENV === 'production')) {
+    if (
+      !expectedSecret &&
+      (process.env.NODE_ENV === 'production' ||
+        process.env.APP_ENV === 'production')
+    ) {
       throw new UnauthorizedException(
         'Manual triggers are disabled in production without CRON_SECRET configured',
       );

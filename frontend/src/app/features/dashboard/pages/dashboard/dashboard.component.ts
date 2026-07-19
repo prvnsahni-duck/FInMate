@@ -14,9 +14,7 @@ import { ExpensesUiStore } from '../../../groups/services/expenses-ui.store';
 import { PendingInvitationResponse, Profile } from '@finmate/data-models';
 import { GroupExpense } from '../../../groups/pages/group-detail/group-detail.component';
 import { AiService } from '../../services/ai.service';
-import {
-  DropdownOption,
-} from '../../../../shared/components/dropdown/dropdown.component';
+import { DropdownOption } from '../../../../shared/components/dropdown/dropdown.component';
 import { DashboardHomeComponent } from '../../components/dashboard-home/dashboard-home.component';
 import { DashboardAnalyticsComponent } from '../../components/dashboard-analytics/dashboard-analytics.component';
 import { DashboardGoalsComponent } from '../../components/dashboard-goals/dashboard-goals.component';
@@ -151,17 +149,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.expensesService
       .getExpenses('personal', { page: 1, limit: 25 })
       .subscribe({
-      next: (res) => {
-        this.personalExpenses = (res.data as GroupExpense[]) || [];
-        // Personal balance is simply the sum of all personal expenses logged
-        this.totalBalance = this.personalExpenses.reduce(
-          (sum, e) => sum + Number(e.amountTotal),
-          0,
-        );
-        this.isLoading = false;
-      },
-      error: () => (this.isLoading = false),
-    });
+        next: (res) => {
+          this.personalExpenses = (res.data as GroupExpense[]) || [];
+          // Personal balance is simply the sum of all personal expenses logged
+          this.totalBalance = this.personalExpenses.reduce(
+            (sum, e) => sum + Number(e.amountTotal),
+            0,
+          );
+          this.isLoading = false;
+        },
+        error: () => (this.isLoading = false),
+      });
 
     // 2. Fetch monthly summary for personal analytics
     this.expensesService.getMonthlyAnalytics('personal').subscribe({
@@ -198,7 +196,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
         const serverOptIn = (res as any).user?.aiOptIn;
         if (typeof serverOptIn === 'boolean') {
           this.aiOptIn = serverOptIn;
-          localStorage.setItem('finmate_ai_opt_in', serverOptIn ? 'true' : 'false');
+          localStorage.setItem(
+            'finmate_ai_opt_in',
+            serverOptIn ? 'true' : 'false',
+          );
         }
         this.recalculatePercentages();
       },

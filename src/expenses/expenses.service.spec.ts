@@ -20,18 +20,24 @@ describe('ExpensesService', () => {
   } as any;
 
   const mockRepo = {
-    save: jest.fn().mockImplementation((e) => Promise.resolve({ ...e, id: 'exp-uuid' })),
+    save: jest
+      .fn()
+      .mockImplementation((e) => Promise.resolve({ ...e, id: 'exp-uuid' })),
     find: jest.fn().mockResolvedValue([mockExpense]),
-    findOne: jest.fn().mockImplementation((id) =>
-      Promise.resolve(id ? { ...mockExpense, id } : null)
-    ),
+    findOne: jest
+      .fn()
+      .mockImplementation((id) =>
+        Promise.resolve(id ? { ...mockExpense, id } : null),
+      ),
     softDelete: jest.fn().mockResolvedValue({ affected: 1 }),
     restore: jest.fn().mockResolvedValue({ affected: 1 }),
   } as any;
 
   const mockEncryption = {
     encrypt: jest.fn().mockImplementation((v) => `enc(${v})`),
-    decrypt: jest.fn().mockImplementation((v) => v.replace(/^enc\((.*)\)$/, '$1')),
+    decrypt: jest
+      .fn()
+      .mockImplementation((v) => v.replace(/^enc\((.*)\)$/, '$1')),
   } as any;
 
   beforeEach(async () => {

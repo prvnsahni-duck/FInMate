@@ -308,17 +308,17 @@ cp .env.example .env
 
 Then fill in your local values. Key variables:
 
-| Variable             | Required | Description                             |
-| -------------------- | -------- | --------------------------------------- |
-| `DATABASE_URL`       | ✅       | PostgreSQL connection string            |
-| `DB_SSL`             | ❌       | Enable database SSL connection (`true`/`false`) |
-| `DB_SSL_REJECT_UNAUTHORIZED` | ❌ | Enforce valid SSL cert (`true`/`false`) |
-| `REDIS_URL`          | ✅       | Redis connection string                 |
-| `JWT_SECRET`         | ✅       | JWT signing secret                      |
-| `JWT_REFRESH_SECRET` | ✅       | Refresh token secret                    |
-| `ENCRYPTION_KEY`     | ✅       | AES-256 encryption key                  |
-| `FRONTEND_URL`       | ✅       | Frontend origin for CORS + invite links |
-| `THROTTLE_LIMIT_*`   | ❌       | Customized rate limits for auth & APIs  |
+| Variable                     | Required | Description                                     |
+| ---------------------------- | -------- | ----------------------------------------------- |
+| `DATABASE_URL`               | ✅       | PostgreSQL connection string                    |
+| `DB_SSL`                     | ❌       | Enable database SSL connection (`true`/`false`) |
+| `DB_SSL_REJECT_UNAUTHORIZED` | ❌       | Enforce valid SSL cert (`true`/`false`)         |
+| `REDIS_URL`                  | ✅       | Redis connection string                         |
+| `JWT_SECRET`                 | ✅       | JWT signing secret                              |
+| `JWT_REFRESH_SECRET`         | ✅       | Refresh token secret                            |
+| `ENCRYPTION_KEY`             | ✅       | AES-256 encryption key                          |
+| `FRONTEND_URL`               | ✅       | Frontend origin for CORS + invite links         |
+| `THROTTLE_LIMIT_*`           | ❌       | Customized rate limits for auth & APIs          |
 
 ## Mobile & PWA
 
@@ -347,15 +347,16 @@ FinMate implements a zero-knowledge (ZK) client-side encryption design to guaran
 
 ### Key Storage & Lifecycle
 
-* **Primary Storage:** The derived master `CryptoKey` and unwrapped group data keys are stored in the browser's **IndexedDB** vault as `extractable: false` keys using the browser's native **Structured Clone** mechanism. This ensures that:
-  * The raw key material is never exposed to the JavaScript context.
-  * Keys survive page refreshes and browser restarts.
-* **In-Memory Fallback:** If IndexedDB is blocked, full, or unavailable (e.g., in Safari Private Browsing mode, under extremely low space, or in customized WebViews), FinMate falls back to an **in-memory key cache** (`fallbackMap`).
+- **Primary Storage:** The derived master `CryptoKey` and unwrapped group data keys are stored in the browser's **IndexedDB** vault as `extractable: false` keys using the browser's native **Structured Clone** mechanism. This ensures that:
+  - The raw key material is never exposed to the JavaScript context.
+  - Keys survive page refreshes and browser restarts.
+- **In-Memory Fallback:** If IndexedDB is blocked, full, or unavailable (e.g., in Safari Private Browsing mode, under extremely low space, or in customized WebViews), FinMate falls back to an **in-memory key cache** (`fallbackMap`).
 
 ### Persistence Failure Consequences
 
 If IndexedDB persistence is unavailable:
-* **Encryption Continues Working:** The master key is held in memory; encrypt/decrypt operations function normally for the current browser session.
-* **Authentication Succeeds:** The login flow does not block or fail due to IndexedDB persistence failures.
-* **Refresh/Browser Close Requires Re-Login:** Since the keys reside only in memory, reloading or closing the tab clears the keys. The user will need to sign in again to re-derive the master key.
-* **Zero-Knowledge Intact:** No plaintext data is ever sent to the server. Security guarantees remain fully preserved.
+
+- **Encryption Continues Working:** The master key is held in memory; encrypt/decrypt operations function normally for the current browser session.
+- **Authentication Succeeds:** The login flow does not block or fail due to IndexedDB persistence failures.
+- **Refresh/Browser Close Requires Re-Login:** Since the keys reside only in memory, reloading or closing the tab clears the keys. The user will need to sign in again to re-derive the master key.
+- **Zero-Knowledge Intact:** No plaintext data is ever sent to the server. Security guarantees remain fully preserved.

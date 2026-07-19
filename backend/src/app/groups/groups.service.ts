@@ -67,7 +67,11 @@ export class GroupsService {
     groupId: string,
   ): Promise<GroupMember> {
     const member = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+      where: {
+        group: { id: groupId },
+        user: { id: userId },
+        joinStatus: 'active',
+      },
       relations: ['user', 'group'],
     });
     if (!member) {
@@ -819,7 +823,9 @@ export class GroupsService {
       } else {
         if (dto.joinStatus === 'removed') {
           if (callerMember.joinStatus !== 'active') {
-            throw new ForbiddenException('You must accept the invitation first');
+            throw new ForbiddenException(
+              'You must accept the invitation first',
+            );
           }
           if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
             throw new ForbiddenException(
@@ -1060,7 +1066,10 @@ export class GroupsService {
 
       const group = invite.group;
       const members = await this.groupMemberRepository.find({
-        where: { group: { id: group.id }, joinStatus: In(['active', 'invited']) },
+        where: {
+          group: { id: group.id },
+          joinStatus: In(['active', 'invited']),
+        },
         relations: ['user'],
       });
 
@@ -1232,13 +1241,24 @@ export class GroupsService {
     dto: { wrappedGroupKey?: string },
   ) {
     const callerMember = await this.groupMemberRepository.findOne({
-      where: { group: { id: groupId }, user: { id: userId }, joinStatus: 'active' },
+      where: {
+        group: { id: groupId },
+        user: { id: userId },
+        joinStatus: 'active',
+      },
     });
-    if (!callerMember || (callerMember.role !== 'owner' && callerMember.role !== 'admin')) {
-      throw new ForbiddenException('Only owners and admins can create invite links');
+    if (
+      !callerMember ||
+      (callerMember.role !== 'owner' && callerMember.role !== 'admin')
+    ) {
+      throw new ForbiddenException(
+        'Only owners and admins can create invite links',
+      );
     }
 
-    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
     if (!group) {
       throw new NotFoundException('Group not found');
     }
@@ -1282,13 +1302,18 @@ export class GroupsService {
     const canProvisionOthers =
       callerMember.role === 'owner' || callerMember.role === 'admin';
 
-    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
     if (!group) {
       throw new NotFoundException('Group not found');
     }
 
     await this.dataSource.transaction(async (manager) => {
-      const activeVersion = await this.ensureActiveGroupKeyVersion(group, manager);
+      const activeVersion = await this.ensureActiveGroupKeyVersion(
+        group,
+        manager,
+      );
 
       for (const entry of keys) {
         const isSelfProvision = entry.userId === userId;
@@ -1309,12 +1334,14 @@ export class GroupsService {
           continue;
         }
 
-        const existing = await manager.getRepository(MemberWrappedGroupKey).findOne({
-          where: {
-            groupKeyVersion: { id: activeVersion.id },
-            user: { id: entry.userId },
-          },
-        });
+        const existing = await manager
+          .getRepository(MemberWrappedGroupKey)
+          .findOne({
+            where: {
+              groupKeyVersion: { id: activeVersion.id },
+              user: { id: entry.userId },
+            },
+          });
 
         if (!existing) {
           await manager.getRepository(MemberWrappedGroupKey).save(
@@ -1381,7 +1408,10 @@ export class GroupsService {
     };
   }
 
-  async getMissingGroupKeys(userId: string, groupId: string): Promise<string[]> {
+  async getMissingGroupKeys(
+    userId: string,
+    groupId: string,
+  ): Promise<string[]> {
     const callerMember = await this.getActiveMembership(userId, groupId);
     if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
       throw new ForbiddenException(
@@ -1402,7 +1432,9 @@ export class GroupsService {
         })
       : [];
 
-    const existingUserIds = new Set(existingKeys.map((k) => k.user?.id).filter(Boolean));
+    const existingUserIds = new Set(
+      existingKeys.map((k) => k.user?.id).filter(Boolean),
+    );
     return members
       .map((m) => m.user?.id)
       .filter((uid): uid is string => !!uid && !existingUserIds.has(uid));
@@ -1412,22 +1444,34 @@ export class GroupsService {
     userId: string,
     groupId: string,
     dto: RotateGroupKeyDto,
-  ): Promise<{ groupId: string; groupKeyVersionId: string; groupKeyVersion: number; status: 'ACTIVE' }> {
+  ): Promise<{
+    groupId: string;
+    groupKeyVersionId: string;
+    groupKeyVersion: number;
+    status: 'ACTIVE';
+  }> {
     const callerMember = await this.getActiveMembership(userId, groupId);
     if (callerMember.role !== 'owner' && callerMember.role !== 'admin') {
-      throw new ForbiddenException('Only owners and admins can rotate group keys');
+      throw new ForbiddenException(
+        'Only owners and admins can rotate group keys',
+      );
     }
     if (!dto.keys || dto.keys.length === 0) {
       throw new BadRequestException('keys must be a non-empty array');
     }
 
-    const group = await this.groupRepository.findOne({ where: { id: groupId } });
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
     if (!group) {
       throw new NotFoundException('Group not found');
     }
 
     const rotated = await this.dataSource.transaction(async (manager) => {
-      const existingActive = await this.getActiveGroupKeyVersion(groupId, manager);
+      const existingActive = await this.getActiveGroupKeyVersion(
+        groupId,
+        manager,
+      );
       if (existingActive) {
         existingActive.status = 'SUPERSEDED';
         existingActive.rotatedAt = new Date();
@@ -1605,50 +1649,60 @@ export class GroupsService {
       });
     }
 
-    return this.dataSource.transaction(async (manager) => {
-      const savedContributions: GroupMemberContribution[] = [];
+    return this.dataSource
+      .transaction(async (manager) => {
+        const savedContributions: GroupMemberContribution[] = [];
 
-      for (const contributionInput of dto.contributions) {
-        const member = await manager.getRepository(GroupMember).findOne({
-          where: { id: contributionInput.memberId, group: { id: groupId } },
-        });
-        if (!member) {
-          throw new BadRequestException(
-            `Member ID ${contributionInput.memberId} does not belong to this group`,
+        for (const contributionInput of dto.contributions) {
+          const member = await manager.getRepository(GroupMember).findOne({
+            where: { id: contributionInput.memberId, group: { id: groupId } },
+          });
+          if (!member) {
+            throw new BadRequestException(
+              `Member ID ${contributionInput.memberId} does not belong to this group`,
+            );
+          }
+
+          let contribution = await manager
+            .getRepository(GroupMemberContribution)
+            .findOne({
+              where: {
+                groupMember: { id: member.id },
+                ledgerMonth: dto.ledgerMonth,
+              },
+            });
+
+          if (contribution) {
+            contribution.percentage = contributionInput.percentage;
+          } else {
+            contribution = manager
+              .getRepository(GroupMemberContribution)
+              .create({
+                groupMember: member,
+                ledgerMonth: dto.ledgerMonth,
+                percentage: contributionInput.percentage,
+              });
+          }
+
+          savedContributions.push(
+            await manager.save(GroupMemberContribution, contribution),
           );
         }
 
-        let contribution = await manager
-          .getRepository(GroupMemberContribution)
-          .findOne({
-            where: {
-              groupMember: { id: member.id },
-              ledgerMonth: dto.ledgerMonth,
-            },
-          });
-
-        if (contribution) {
-          contribution.percentage = contributionInput.percentage;
-        } else {
-          contribution = manager.getRepository(GroupMemberContribution).create({
-            groupMember: member,
+        return savedContributions;
+      })
+      .then((result) => {
+        this.auditAsUser(
+          userId,
+          'group.contributions_updated',
+          groupId,
+          groupId,
+          {
             ledgerMonth: dto.ledgerMonth,
-            percentage: contributionInput.percentage,
-          });
-        }
-
-        savedContributions.push(
-          await manager.save(GroupMemberContribution, contribution),
+          },
         );
-      }
-
-      return savedContributions;
-    }).then((result) => {
-      this.auditAsUser(userId, 'group.contributions_updated', groupId, groupId, {
-        ledgerMonth: dto.ledgerMonth,
+        return result;
       });
-      return result;
-    });
   }
 
   /**

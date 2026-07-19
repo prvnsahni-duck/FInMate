@@ -7,9 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * for envelope encryption key wrapping. Adds `encryption_scope` to expenses
  * and `encrypted_file_key` / `encrypted_original_name` to attachments.
  */
-export class AddEnvelopeEncryption1718800000000
-  implements MigrationInterface
-{
+export class AddEnvelopeEncryption1718800000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ── encrypted_group_keys ────────────────────────────────────────────
     await queryRunner.query(`

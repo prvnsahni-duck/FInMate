@@ -24,18 +24,18 @@ Planning Baseline v2  (Documentation Freeze Candidate)
 
 ## What this baseline contains
 
-| Layer | Artifact | State |
-|-------|----------|-------|
-| System map | [architecture-inventory.md](architecture-inventory.md) | Complete (12 module entries + cross-cutting) |
-| Backlog | [gap-tracker.md](gap-tracker.md) | 44 gaps + 6 roadmap-only; provisional; IDs frozen |
-| Execution plan | [implementation-roadmap-pre-adr.md](implementation-roadmap-pre-adr.md) | Dependency map, graph, classification, duplicate table, 6 phases, risk review |
-| Contracts | [contracts/](../contracts/) | 10 module contracts with "Must NEVER" boundaries |
-| Rules of record | [frozen-decisions.md](../frozen-decisions.md), [coding-rules.md](../coding-rules.md) | Provisional (superseded by ADRs on import) |
-| Navigation | [file-map.md](../file-map.md), [adr-map.md](adr-map.md), [module-checklist.md](../module-checklist.md) | Complete |
-| Verification | [testing-matrix.md](../testing-matrix.md) | 17 flows + 12 architectural-guarantee tests |
-| Reuse | [prompts.md](../prompts.md) | Audit / Implement / Review / Test |
-| Evidence | [audits/](../audits/) | 10 audit reports (file:line evidence) |
-| Canonical (pending) | [adr/](adr/), [canonical-sources.md](canonical-sources.md) | 18 placeholder slots, reconciliation protocol |
+| Layer               | Artifact                                                                                               | State                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| System map          | [architecture-inventory.md](architecture-inventory.md)                                                 | Complete (12 module entries + cross-cutting)                                  |
+| Backlog             | [gap-tracker.md](gap-tracker.md)                                                                       | 44 gaps + 6 roadmap-only; provisional; IDs frozen                             |
+| Execution plan      | [implementation-roadmap-pre-adr.md](implementation-roadmap-pre-adr.md)                                 | Dependency map, graph, classification, duplicate table, 6 phases, risk review |
+| Contracts           | [contracts/](../contracts/)                                                                            | 10 module contracts with "Must NEVER" boundaries                              |
+| Rules of record     | [frozen-decisions.md](../frozen-decisions.md), [coding-rules.md](../coding-rules.md)                   | Provisional (superseded by ADRs on import)                                    |
+| Navigation          | [file-map.md](../file-map.md), [adr-map.md](adr-map.md), [module-checklist.md](../module-checklist.md) | Complete                                                                      |
+| Verification        | [testing-matrix.md](../testing-matrix.md)                                                              | 17 flows + 12 architectural-guarantee tests                                   |
+| Reuse               | [prompts.md](../prompts.md)                                                                            | Audit / Implement / Review / Test                                             |
+| Evidence            | [audits/](../audits/)                                                                                  | 10 audit reports (file:line evidence)                                         |
+| Canonical (pending) | [adr/](adr/), [canonical-sources.md](canonical-sources.md)                                             | 18 placeholder slots, reconciliation protocol                                 |
 
 ## Validation result (2026-07-16 freeze pass)
 

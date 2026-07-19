@@ -1,18 +1,21 @@
 # FinMate P1 Group Key Versioning Plan (Approved Option 2)
 
 ## Context
+
 Implement approved Option 2 architecture for group key versioning and member wrapped keys as separate lifecycle models.
 
 ## Approved Decisions
+
 1. Use separate tables:
-	- `group_key_versions`
-	- `member_wrapped_group_keys`
+   - `group_key_versions`
+   - `member_wrapped_group_keys`
 2. Keep historical versions immutable.
 3. Rotation always creates a new version.
 4. Exactly one `ACTIVE` key version per group.
 5. Every encrypted group resource should reference the key version used.
 
 ## Scope
+
 - Add new entities and migration for Option 2 schema.
 - Wire group key APIs to version-aware persistence and retrieval.
 - Add rotation endpoint with owner/admin authorization.
@@ -23,6 +26,7 @@ Implement approved Option 2 architecture for group key versioning and member wra
 - Update progress log and run architecture drift checklist.
 
 ## Files (Planned)
+
 - shared/data-models/src/lib/group-key-version.entity.ts
 - shared/data-models/src/lib/member-wrapped-group-key.entity.ts
 - shared/data-models/src/lib/group-invite.entity.ts
@@ -47,12 +51,14 @@ Implement approved Option 2 architecture for group key versioning and member wra
 - FinMate_Project_Specification.md
 
 ## Verification Plan
+
 - Static diagnostics on changed files.
 - Request targeted tests for groups and expenses key lifecycle paths.
 - Validate API contract consistency and migration model references.
 - Confirm architecture drift checklist PASS.
 
 ## Rollback Plan
+
 - Keep new schema additive and non-destructive.
 - Preserve legacy `encrypted_group_keys` table/readability during transition.
 - Revert service/controller to previous key path if critical regressions occur.

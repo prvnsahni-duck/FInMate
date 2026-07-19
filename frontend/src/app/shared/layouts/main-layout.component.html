@@ -1,50 +1,67 @@
-<div class="min-h-screen bg-finmate-bg text-secondary transition-colors duration-300 flex flex-col lg:flex-row">
+<div
+  class="min-h-screen bg-finmate-bg text-secondary transition-colors duration-300 flex flex-col lg:flex-row"
+>
   <!-- Mobile & Tablet Header Top Bar (Hidden on Desktop) -->
   <header
-    class="lg:hidden flex items-center justify-between p-4 bg-finmate-card dark:bg-finmate-card/50 dark:backdrop-blur-md sticky top-0 z-40 border-b border-border/10 w-full">
-    <div class="font-extrabold text-xl bg-gradient-neon text-transparent bg-clip-text">
+    class="lg:hidden flex items-center justify-between p-4 bg-finmate-card dark:bg-finmate-card/50 dark:backdrop-blur-md sticky top-0 z-40 border-b border-border/10 w-full"
+  >
+    <div
+      class="font-extrabold text-xl bg-gradient-neon text-transparent bg-clip-text"
+    >
       {{ appName }}
     </div>
     <!-- Quick Theme Toggle on Mobile/Tablet Top Bar -->
-<div class="flex items-center p-1 bg-surface rounded-xl border border-border/10">
-  <button
-    (click)="setTheme('light')"
-    [ngClass]="{
-      'bg-finmate-card shadow-sm text-primary': themeState() === 'light',
-      'text-muted': themeState() !== 'light'
-    }"
-    class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
-  >
-    <app-icon [path]="sunIconPath" className="w-4 h-4"></app-icon>
-  </button>
+    <div
+      class="flex items-center p-1 bg-surface rounded-xl border border-border/10"
+    >
+      <button
+        (click)="setTheme('light')"
+        [ngClass]="{
+          'bg-finmate-card shadow-sm text-primary': themeState() === 'light',
+          'text-muted': themeState() !== 'light',
+        }"
+        class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+      >
+        <app-icon [path]="sunIconPath" className="w-4 h-4"></app-icon>
+      </button>
 
-  <button
-    (click)="setTheme('dark')"
-    [ngClass]="{
-      'bg-surface-alt shadow-sm text-secondary': themeState() === 'dark',
-      'text-muted': themeState() !== 'dark'
-    }"
-    class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
-  >
-    <app-icon [path]="moonIconPath" className="w-4 h-4"></app-icon>
-  </button>
-</div>
+      <button
+        (click)="setTheme('dark')"
+        [ngClass]="{
+          'bg-surface-alt shadow-sm text-secondary': themeState() === 'dark',
+          'text-muted': themeState() !== 'dark',
+        }"
+        class="p-1 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center cursor-pointer"
+      >
+        <app-icon [path]="moonIconPath" className="w-4 h-4"></app-icon>
+      </button>
+    </div>
   </header>
 
   <!-- Desktop Sidebar (Hidden on Mobile & Tablet) -->
   <aside
-    class="hidden lg:flex flex-col w-64 bg-finmate-card dark:bg-finmate-card/50 dark:backdrop-blur-md border-r border-border/10 h-screen sticky top-0 z-40">
+    class="hidden lg:flex flex-col w-64 bg-finmate-card dark:bg-finmate-card/50 dark:backdrop-blur-md border-r border-border/10 h-screen sticky top-0 z-40"
+  >
     <div class="p-6 flex flex-col h-full">
-      <div class="font-extrabold text-3xl bg-gradient-neon text-transparent bg-clip-text tracking-tight mb-10">
+      <div
+        class="font-extrabold text-3xl bg-gradient-neon text-transparent bg-clip-text tracking-tight mb-10"
+      >
         {{ appName }}
       </div>
 
       <!-- Sidebar Navigation Links -->
       <nav class="space-y-2 flex-1">
         @for (item of navItems; track item.label) {
-          <a [routerLink]="item.path" (click)="selectTab(item)"
-             [class]="activeTab() === item.label ? 'bg-primary text-white font-semibold shadow-md shadow-primary/20' : 'hover:bg-surface text-muted'"
-             class="flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer">
+          <a
+            [routerLink]="item.path"
+            (click)="selectTab(item)"
+            [class]="
+              activeTab() === item.label
+                ? 'bg-primary text-white font-semibold shadow-md shadow-primary/20'
+                : 'hover:bg-surface text-muted'
+            "
+            class="flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all cursor-pointer"
+          >
             <app-icon [path]="item.icon" className="w-5 h-5"></app-icon>
             <span>{{ item.label }}</span>
           </a>
@@ -54,28 +71,38 @@
       <!-- Sidebar Footer -->
       <div class="mt-auto space-y-4">
         <!-- Sidebar Log Expense capsule button -->
-        <button (click)="openExpenseModal()"
-          class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 w-full py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-2 text-sm font-bold tracking-tight cursor-pointer">
+        <button
+          (click)="openExpenseModal()"
+          class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 w-full py-3.5 px-4 rounded-2xl flex items-center justify-center space-x-2 text-sm font-bold tracking-tight cursor-pointer"
+        >
           <span>+ Log Expense</span>
         </button>
 
         <!-- Sidebar Theme Switcher -->
-        <div class="flex items-center justify-between p-1 bg-surface rounded-2xl border border-border/10">
-          <button (click)="setTheme('light')"
+        <div
+          class="flex items-center justify-between p-1 bg-surface rounded-2xl border border-border/10"
+        >
+          <button
+            (click)="setTheme('light')"
             [class.bg-finmate-card]="themeState() === 'light'"
             [class.shadow-sm]="themeState() === 'light'"
             [class.text-primary]="themeState() === 'light'"
             [class.text-muted]="themeState() !== 'light'"
-            class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer">
-            <app-icon [path]="sunIconPath" className="w-4 h-4 mr-1"></app-icon> <span>Light</span>
+            class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer"
+          >
+            <app-icon [path]="sunIconPath" className="w-4 h-4 mr-1"></app-icon>
+            <span>Light</span>
           </button>
-          <button (click)="setTheme('dark')"
+          <button
+            (click)="setTheme('dark')"
             [class.bg-surface-alt]="themeState() === 'dark'"
             [class.shadow-sm]="themeState() === 'dark'"
             [class.text-secondary]="themeState() === 'dark'"
             [class.text-muted]="themeState() !== 'dark'"
-            class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer">
-            <app-icon [path]="moonIconPath" className="w-4 h-4 mr-1"></app-icon> <span>Dark</span>
+            class="flex-1 py-2 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer"
+          >
+            <app-icon [path]="moonIconPath" className="w-4 h-4 mr-1"></app-icon>
+            <span>Dark</span>
           </button>
         </div>
       </div>
@@ -86,29 +113,51 @@
   <main class="flex-1 p-4 md:p-8 overflow-y-auto pb-24 md:pb-28 lg:pb-8">
     <!-- Decorative Blob -->
     <div
-      class="fixed top-0 right-0 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[150px] pointer-events-none -z-10">
-    </div>
+      class="fixed top-0 right-0 w-[600px] h-[600px] rounded-full bg-primary/5 blur-[150px] pointer-events-none -z-10"
+    ></div>
     <div class="max-w-5xl mx-auto">
       @if (persistenceWarning()) {
-        <div class="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-sm flex items-start justify-between gap-3 shadow-lg shadow-amber-500/5 animate-fade-in">
+        <div
+          class="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 text-sm flex items-start justify-between gap-3 shadow-lg shadow-amber-500/5 animate-fade-in"
+        >
           <div class="flex gap-2.5">
-            <app-icon path="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" className="w-5 h-5 flex-shrink-0 mt-0.5"></app-icon>
+            <app-icon
+              path="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              className="w-5 h-5 flex-shrink-0 mt-0.5"
+            ></app-icon>
             <span>{{ persistenceWarning() }}</span>
           </div>
-          <button (click)="dismissWarning()" class="text-amber-600/70 hover:text-amber-600 dark:text-amber-400/70 dark:hover:text-amber-400 transition-colors cursor-pointer">
-            <app-icon path="M6 18L18 6M6 6l12 12" className="w-4 h-4"></app-icon>
+          <button
+            (click)="dismissWarning()"
+            class="text-amber-600/70 hover:text-amber-600 dark:text-amber-400/70 dark:hover:text-amber-400 transition-colors cursor-pointer"
+          >
+            <app-icon
+              path="M6 18L18 6M6 6l12 12"
+              className="w-4 h-4"
+            ></app-icon>
           </button>
         </div>
       }
 
       @if (rateLimitError()) {
-        <div class="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/25 text-red-600 dark:text-red-400 text-sm flex items-start justify-between gap-3 shadow-lg shadow-red-500/5 animate-fade-in">
+        <div
+          class="mb-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/25 text-red-600 dark:text-red-400 text-sm flex items-start justify-between gap-3 shadow-lg shadow-red-500/5 animate-fade-in"
+        >
           <div class="flex gap-2.5">
-            <app-icon path="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" className="w-5 h-5 flex-shrink-0 mt-0.5"></app-icon>
+            <app-icon
+              path="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              className="w-5 h-5 flex-shrink-0 mt-0.5"
+            ></app-icon>
             <span>{{ rateLimitError() }}</span>
           </div>
-          <button (click)="rateLimitError.set(null)" class="text-red-600/70 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 transition-colors cursor-pointer">
-            <app-icon path="M6 18L18 6M6 6l12 12" className="w-4 h-4"></app-icon>
+          <button
+            (click)="rateLimitError.set(null)"
+            class="text-red-600/70 hover:text-red-600 dark:text-red-400/70 dark:hover:text-red-400 transition-colors cursor-pointer"
+          >
+            <app-icon
+              path="M6 18L18 6M6 6l12 12"
+              className="w-4 h-4"
+            ></app-icon>
           </button>
         </div>
       }
@@ -118,11 +167,17 @@
 
   <!-- Mobile Bottom Nav (Standard full-width bottom bar, shown ONLY on Mobile < md) -->
   <nav
-    class="md:hidden fixed bottom-0 w-full bg-finmate-card dark:bg-finmate-card/90 dark:backdrop-blur-xl border-t border-border/10 z-50 flex justify-around p-2 pb-safe">
+    class="md:hidden fixed bottom-0 w-full bg-finmate-card dark:bg-finmate-card/90 dark:backdrop-blur-xl border-t border-border/10 z-50 flex justify-around p-2 pb-safe"
+  >
     @for (item of navItems; track item.label) {
-      <a [routerLink]="item.path" (click)="selectTab(item)"
-         [class]="activeTab() === item.label ? 'text-primary font-bold' : 'text-muted'"
-         class="flex flex-col items-center p-2 px-3 transition-all cursor-pointer">
+      <a
+        [routerLink]="item.path"
+        (click)="selectTab(item)"
+        [class]="
+          activeTab() === item.label ? 'text-primary font-bold' : 'text-muted'
+        "
+        class="flex flex-col items-center p-2 px-3 transition-all cursor-pointer"
+      >
         <app-icon [path]="item.icon" className="w-5 h-5 mb-0.5"></app-icon>
         <span class="text-[10px] font-semibold">{{ item.mobileLabel }}</span>
       </a>
@@ -131,13 +186,23 @@
 
   <!-- Tablet Bottom Nav (Floating Dock capsule, shown ONLY on Tablet md to lg/xl) -->
   <nav
-    class="hidden md:flex lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-finmate-card/95 dark:bg-finmate-card/95 backdrop-blur-xl border border-border/10 z-50 justify-around p-1.5 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/35">
+    class="hidden md:flex lg:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[92%] max-w-md bg-finmate-card/95 dark:bg-finmate-card/95 backdrop-blur-xl border border-border/10 z-50 justify-around p-1.5 rounded-2xl shadow-2xl shadow-black/10 dark:shadow-black/35"
+  >
     @for (item of navItems; track item.label) {
-      <a [routerLink]="item.path" (click)="selectTab(item)"
-         [class]="activeTab() === item.label ? 'text-white bg-primary font-bold shadow-md shadow-primary/20' : 'text-muted hover:bg-surface'"
-         class="flex flex-col items-center p-2 px-3.5 rounded-xl transition-all cursor-pointer min-w-[56px]">
+      <a
+        [routerLink]="item.path"
+        (click)="selectTab(item)"
+        [class]="
+          activeTab() === item.label
+            ? 'text-white bg-primary font-bold shadow-md shadow-primary/20'
+            : 'text-muted hover:bg-surface'
+        "
+        class="flex flex-col items-center p-2 px-3.5 rounded-xl transition-all cursor-pointer min-w-[56px]"
+      >
         <app-icon [path]="item.icon" className="w-5 h-5 mb-0.5"></app-icon>
-        <span class="text-[9px] font-semibold tracking-tight">{{ item.mobileLabel }}</span>
+        <span class="text-[9px] font-semibold tracking-tight">{{
+          item.mobileLabel
+        }}</span>
       </a>
     }
   </nav>

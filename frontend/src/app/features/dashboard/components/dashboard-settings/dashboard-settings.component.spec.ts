@@ -44,8 +44,11 @@ describe('DashboardSettingsComponent', () => {
     fixture.detectChanges();
     const emitSpy = jest.spyOn(component.saveIncomeEvent, 'emit');
 
-    const saveBtn = Array.from(fixture.nativeElement.querySelectorAll('button'))
-      .find(btn => (btn as HTMLButtonElement).textContent?.includes('Save Configuration')) as HTMLButtonElement;
+    const saveBtn = Array.from(
+      fixture.nativeElement.querySelectorAll('button'),
+    ).find((btn) =>
+      (btn as HTMLButtonElement).textContent?.includes('Save Configuration'),
+    ) as HTMLButtonElement;
     saveBtn.click();
 
     expect(emitSpy).toHaveBeenCalled();

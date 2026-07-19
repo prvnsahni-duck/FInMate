@@ -245,7 +245,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // If this is a rate-limit response, provide user-friendly message and headers
     if (statusCode === HttpStatus.TOO_MANY_REQUESTS) {
       // Override the framework exception message — never expose "ThrottlerException: Too Many Requests"
-      errorPayload.message = 'Too many requests. Please wait a few seconds and try again.';
+      errorPayload.message =
+        'Too many requests. Please wait a few seconds and try again.';
 
       const throttleCtx = request.throttleContext || {};
       const retryAfterSec = throttleCtx.retryAfter || 60;
@@ -257,7 +258,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
           response.setHeader('X-RateLimit-Limit', String(throttleCtx.limit));
         }
         if (typeof throttleCtx.remaining !== 'undefined') {
-          response.setHeader('X-RateLimit-Remaining', String(throttleCtx.remaining));
+          response.setHeader(
+            'X-RateLimit-Remaining',
+            String(throttleCtx.remaining),
+          );
         }
       } catch (e) {
         // ignore header set errors
@@ -270,9 +274,19 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const timestamp = new Date().toISOString();
         const method = request.method;
         const url = request.url;
-        const userId = request.user?.id || request.user?.userId || throttleCtx.userId || 'anonymous';
-        const ip = request.ip || request.headers['x-forwarded-for'] || request.socket?.remoteAddress || null;
-        const responseTime = request.startTime ? `${Date.now() - request.startTime}ms` : 'N/A';
+        const userId =
+          request.user?.id ||
+          request.user?.userId ||
+          throttleCtx.userId ||
+          'anonymous';
+        const ip =
+          request.ip ||
+          request.headers['x-forwarded-for'] ||
+          request.socket?.remoteAddress ||
+          null;
+        const responseTime = request.startTime
+          ? `${Date.now() - request.startTime}ms`
+          : 'N/A';
 
         this.logger.warn(
           JSON.stringify({
@@ -293,7 +307,5 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     response.status(statusCode).send(errorPayload);
-
   }
 }
-

@@ -47,7 +47,11 @@ export class User {
   publicWrappingKey?: string;
 
   /** The user's private RSA-OAEP wrapping key, encrypted with their master key. */
-  @Column({ name: 'encrypted_private_wrapping_key', type: 'text', nullable: true })
+  @Column({
+    name: 'encrypted_private_wrapping_key',
+    type: 'text',
+    nullable: true,
+  })
   encryptedPrivateWrappingKey?: string;
 
   @CreateDateColumn()

@@ -16,9 +16,7 @@ describe('DashboardAnalyticsComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [DashboardAnalyticsComponent],
-      providers: [
-        { provide: ExpensesService, useValue: mockExpensesService },
-      ],
+      providers: [{ provide: ExpensesService, useValue: mockExpensesService }],
       schemas: [NO_ERRORS_SCHEMA],
     }).compileComponents();
 

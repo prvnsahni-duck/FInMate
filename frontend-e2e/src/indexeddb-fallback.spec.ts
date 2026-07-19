@@ -28,19 +28,32 @@ test.describe('IndexedDB Fallback Flow', () => {
     });
   });
 
-  test('logs in with a storage warning, creates encrypted data, and requires re-login after refresh', async ({ page, auth, expenses }) => {
+  test('logs in with a storage warning, creates encrypted data, and requires re-login after refresh', async ({
+    page,
+    auth,
+    expenses,
+  }) => {
     const warnings: string[] = [];
-    page.on('console', msg => {
+    page.on('console', (msg) => {
       if (msg.type() === 'warning') warnings.push(msg.text());
     });
 
     await auth.register(page, user);
     await auth.login(page, user);
 
-    await expect(page.getByText('Secure key persistence is unavailable')).toBeVisible({ timeout: 10000 });
-    expect(warnings.some(warning => warning.includes('IndexedDB persistence unavailable'))).toBe(true);
+    await expect(
+      page.getByText('Secure key persistence is unavailable'),
+    ).toBeVisible({ timeout: 10000 });
+    expect(
+      warnings.some((warning) =>
+        warning.includes('IndexedDB persistence unavailable'),
+      ),
+    ).toBe(true);
 
-    const expense = await expenses.create(page, { title: 'Fallback Expense', amount: '12.99' });
+    const expense = await expenses.create(page, {
+      title: 'Fallback Expense',
+      amount: '12.99',
+    });
     await expense.expectVisible();
 
     await page.reload();

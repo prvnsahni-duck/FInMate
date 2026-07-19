@@ -81,7 +81,8 @@ export class UsersController {
 
   @Post('me/keys')
   async saveKeys(
-    @Body() body: { publicWrappingKey: string; encryptedPrivateWrappingKey: string },
+    @Body()
+    body: { publicWrappingKey: string; encryptedPrivateWrappingKey: string },
     @Req() req: any,
   ) {
     const result = await this.usersService.saveKeys(

@@ -7,7 +7,7 @@
       </div>
       <div class="h-10 bg-surface rounded-2xl w-32 animate-pulse"></div>
     </div>
-    
+
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
       <div class="lg:col-span-2 space-y-6">
         <div class="h-12 bg-surface rounded-2xl w-full animate-pulse"></div>
@@ -24,17 +24,41 @@
 @if (!showSkeleton() && group()) {
   <div>
     @if (isOffline()) {
-      <div class="bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 rounded-3xl p-4 mb-6 flex items-center space-x-3 shadow-lg animate-fade-in">
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829M12 12a1 1 0 110-2 1 1 0 010 2z"></path>
+      <div
+        class="bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 rounded-3xl p-4 mb-6 flex items-center space-x-3 shadow-lg animate-fade-in"
+      >
+        <svg
+          class="w-5 h-5 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829M12 12a1 1 0 110-2 1 1 0 010 2z"
+          ></path>
         </svg>
         <div class="text-xs font-bold">Offline - Showing cached data.</div>
       </div>
     }
     @if (rateLimitError()) {
-      <div class="bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 rounded-3xl p-6 mb-6 flex items-center space-x-3 shadow-lg">
-        <svg class="w-6 h-6 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      <div
+        class="bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 rounded-3xl p-6 mb-6 flex items-center space-x-3 shadow-lg"
+      >
+        <svg
+          class="w-6 h-6 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          ></path>
         </svg>
         <div>
           <h4 class="font-bold text-sm">Rate Limit Exceeded</h4>
@@ -44,23 +68,57 @@
     }
 
     @if (showKeysWaitingBanner() || showKeysPermanentBanner()) {
-      <div class="bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-3xl p-6 mb-6 flex items-start space-x-3 shadow-lg">
-        <svg class="w-6 h-6 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+      <div
+        class="bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-3xl p-6 mb-6 flex items-start space-x-3 shadow-lg"
+      >
+        <svg
+          class="w-6 h-6 shrink-0 mt-0.5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          ></path>
         </svg>
         <div class="w-full">
           @if (showKeysWaitingBanner()) {
             <h4 class="font-bold text-sm">Waiting for group encryption keys</h4>
-            <p class="text-xs opacity-90 font-medium">Some expenses can't be shown yet because your group key hasn't been provisioned. Ask the group creator or an admin to open this group page while you're online — the affected expenses will appear automatically once your key arrives.</p>
+            <p class="text-xs opacity-90 font-medium">
+              Some expenses can't be shown yet because your group key hasn't
+              been provisioned. Ask the group creator or an admin to open this
+              group page while you're online — the affected expenses will appear
+              automatically once your key arrives.
+            </p>
           } @else {
             <h4 class="font-bold text-sm">Some expenses can't be decrypted</h4>
-            <p class="text-xs opacity-90 font-medium">One or more expenses can't be decrypted because the required encryption key is unavailable or you no longer have access to them.</p>
+            <p class="text-xs opacity-90 font-medium">
+              One or more expenses can't be decrypted because the required
+              encryption key is unavailable or you no longer have access to
+              them.
+            </p>
           }
 
           @if (!isMasterKeyLoaded()) {
-            <div class="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 max-w-md">
-              <input #passInput type="password" placeholder="Enter password to unlock vault" (keyup.enter)="unlockVault(passInput.value)" class="bg-white/10 text-white rounded-xl px-3 py-1.5 text-xs outline-none border border-white/20 focus:border-white/40 placeholder-white/50 w-full" />
-              <button (click)="unlockVault(passInput.value)" class="bg-amber-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs hover:bg-amber-700 transition shrink-0">Unlock Vault</button>
+            <div
+              class="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 max-w-md"
+            >
+              <input
+                #passInput
+                type="password"
+                placeholder="Enter password to unlock vault"
+                (keyup.enter)="unlockVault(passInput.value)"
+                class="bg-white/10 text-white rounded-xl px-3 py-1.5 text-xs outline-none border border-white/20 focus:border-white/40 placeholder-white/50 w-full"
+              />
+              <button
+                (click)="unlockVault(passInput.value)"
+                class="bg-amber-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs hover:bg-amber-700 transition shrink-0"
+              >
+                Unlock Vault
+              </button>
             </div>
           }
         </div>
@@ -329,51 +387,77 @@
       <!-- Main Panel: Ledger / History / Trash -->
       <div class="lg:col-span-2 space-y-8">
         <!-- Sticky Tabs Navigation Wrapper -->
-        <div class="sticky top-[64px] lg:top-0 z-30 bg-finmate-bg/95 backdrop-blur-md py-2 transition-all duration-200">
+        <div
+          class="sticky top-[64px] lg:top-0 z-30 bg-finmate-bg/95 backdrop-blur-md py-2 transition-all duration-200"
+        >
           <div class="relative w-full overflow-hidden">
             <!-- Fade overlays for horizontal scroll cues -->
-            <div class="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-finmate-bg via-finmate-bg/60 to-transparent pointer-events-none z-10 opacity-0 transition-opacity duration-200" [class.opacity-100]="showLeftScrollCue()"></div>
-            <div class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-finmate-bg via-finmate-bg/60 to-transparent pointer-events-none z-10 opacity-0 transition-opacity duration-200" [class.opacity-100]="showRightScrollCue()"></div>
-            
+            <div
+              class="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-finmate-bg via-finmate-bg/60 to-transparent pointer-events-none z-10 opacity-0 transition-opacity duration-200"
+              [class.opacity-100]="showLeftScrollCue()"
+            ></div>
+            <div
+              class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-finmate-bg via-finmate-bg/60 to-transparent pointer-events-none z-10 opacity-0 transition-opacity duration-200"
+              [class.opacity-100]="showRightScrollCue()"
+            ></div>
+
             <div #tabBarContainer (scroll)="onTabBarScroll()" class="tab-bar">
               <button
-                (click)="setTab('ledger')" data-testid="group-tab-ledger"
-                [class]="activeTab() === 'ledger' ? 'tab-active' : 'tab-inactive'"
+                (click)="setTab('ledger')"
+                data-testid="group-tab-ledger"
+                [class]="
+                  activeTab() === 'ledger' ? 'tab-active' : 'tab-inactive'
+                "
                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center cursor-pointer"
               >
                 Ledger
               </button>
               <button
-                (click)="setTab('analytics')" data-testid="group-tab-analytics"
-                [class]="activeTab() === 'analytics' ? 'tab-active' : 'tab-inactive'"
+                (click)="setTab('analytics')"
+                data-testid="group-tab-analytics"
+                [class]="
+                  activeTab() === 'analytics' ? 'tab-active' : 'tab-inactive'
+                "
                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center cursor-pointer"
               >
                 Analytics
               </button>
               <button
-                (click)="setTab('history')" data-testid="group-tab-history"
-                [class]="activeTab() === 'history' ? 'tab-active' : 'tab-inactive'"
+                (click)="setTab('history')"
+                data-testid="group-tab-history"
+                [class]="
+                  activeTab() === 'history' ? 'tab-active' : 'tab-inactive'
+                "
                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center cursor-pointer"
               >
                 History
               </button>
               <button
-                (click)="setTab('trash')" data-testid="group-tab-trash"
-                [class]="activeTab() === 'trash' ? 'tab-active' : 'tab-inactive'"
+                (click)="setTab('trash')"
+                data-testid="group-tab-trash"
+                [class]="
+                  activeTab() === 'trash' ? 'tab-active' : 'tab-inactive'
+                "
                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center cursor-pointer"
               >
                 Trash
               </button>
               <button
-                (click)="setTab('settings')" data-testid="group-tab-settings"
-                [class]="activeTab() === 'settings' ? 'tab-active' : 'tab-inactive'"
+                (click)="setTab('settings')"
+                data-testid="group-tab-settings"
+                [class]="
+                  activeTab() === 'settings' ? 'tab-active' : 'tab-inactive'
+                "
                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center cursor-pointer"
               >
                 Settings
               </button>
               <button
-                (click)="setTab('recurring')" data-testid="group-tab-recurring"
-                [class]="activeTab() === 'recurring' ? 'tab-active' : 'tab-inactive'"
+                (click)="setTab('recurring')"
+                data-testid="group-tab-recurring"
+                [class]="
+                  activeTab() === 'recurring' ? 'tab-active' : 'tab-inactive'
+                "
                 class="px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 md:flex-1 text-center cursor-pointer"
               >
                 Recurring
@@ -453,24 +537,45 @@
                   class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted flex items-center space-x-1 cursor-pointer"
                 >
                   <span>Export</span>
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  <svg
+                    class="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M19 9l-7 7-7-7"
+                    ></path>
                   </svg>
                 </button>
 
                 @if (isExportDropdownOpen()) {
                   <!-- Backdrop to dismiss dropdown -->
-                  <div (click)="isExportDropdownOpen.set(false)" (keydown.escape)="isExportDropdownOpen.set(false)" role="presentation" class="fixed inset-0 z-40 bg-transparent"></div>
-                  
-                  <div class="absolute right-0 mt-2 w-32 bg-finmate-card dark:bg-finmate-card border border-border/10 rounded-xl shadow-xl z-50 p-1 py-1.5 animate-fade-in">
+                  <div
+                    (click)="isExportDropdownOpen.set(false)"
+                    (keydown.escape)="isExportDropdownOpen.set(false)"
+                    role="presentation"
+                    class="fixed inset-0 z-40 bg-transparent"
+                  ></div>
+
+                  <div
+                    class="absolute right-0 mt-2 w-32 bg-finmate-card dark:bg-finmate-card border border-border/10 rounded-xl shadow-xl z-50 p-1 py-1.5 animate-fade-in"
+                  >
                     <button
-                      (click)="exportLedger('csv'); isExportDropdownOpen.set(false)"
+                      (click)="
+                        exportLedger('csv'); isExportDropdownOpen.set(false)
+                      "
                       class="w-full text-left text-xs font-bold text-secondary hover:bg-surface p-2 px-3 rounded-lg transition cursor-pointer"
                     >
                       Export CSV
                     </button>
                     <button
-                      (click)="exportLedger('xlsx'); isExportDropdownOpen.set(false)"
+                      (click)="
+                        exportLedger('xlsx'); isExportDropdownOpen.set(false)
+                      "
                       class="w-full text-left text-xs font-bold text-secondary hover:bg-surface p-2 px-3 rounded-lg transition cursor-pointer"
                     >
                       Export Excel
@@ -482,23 +587,42 @@
 
             <!-- Filters Toggle / Info Row (Visible only on Mobile, hides on Desktop) -->
             @if (group()!.groupType !== 'household') {
-              <div class="flex sm:hidden items-center justify-between bg-surface p-3 rounded-2xl border border-border/10 mb-4">
+              <div
+                class="flex sm:hidden items-center justify-between bg-surface p-3 rounded-2xl border border-border/10 mb-4"
+              >
                 <button
                   #filterBtn
                   (click)="setFilterBottomSheet(true)"
                   class="flex items-center space-x-2 text-xs font-bold text-secondary bg-surface-alt hover:brightness-110 px-3.5 py-2 rounded-xl transition cursor-pointer"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+                  <svg
+                    class="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                    ></path>
                   </svg>
                   <span>Filter Ledger</span>
-                  @if (filterCategory() || filterStartDate() || filterEndDate()) {
-                    <span class="w-2 h-2 rounded-full bg-primary ring-2 ring-surface"></span>
+                  @if (
+                    filterCategory() || filterStartDate() || filterEndDate()
+                  ) {
+                    <span
+                      class="w-2 h-2 rounded-full bg-primary ring-2 ring-surface"
+                    ></span>
                   }
                 </button>
-                
+
                 @if (filterCategory() || filterStartDate() || filterEndDate()) {
-                  <button (click)="resetFilters()" class="text-xs font-bold text-muted hover:text-primary transition cursor-pointer">
+                  <button
+                    (click)="resetFilters()"
+                    class="text-xs font-bold text-muted hover:text-primary transition cursor-pointer"
+                  >
                     Reset
                   </button>
                 }
@@ -511,7 +635,9 @@
                 class="hidden sm:grid sticky top-[64px] lg:top-0 z-30 bg-surface/95 backdrop-blur-md p-4 mb-6 rounded-2xl border border-border/10 grid-cols-4 gap-4"
               >
                 <div>
-                  <label class="text-label" for="filterCategory">Category</label>
+                  <label class="text-label" for="filterCategory"
+                    >Category</label
+                  >
                   <app-dropdown
                     [ngModel]="filterCategory()"
                     (ngModelChange)="filterCategory.set($event); applyFilters()"
@@ -520,7 +646,9 @@
                   ></app-dropdown>
                 </div>
                 <div>
-                  <label for="filterStartDate" class="text-label">Start Date</label>
+                  <label for="filterStartDate" class="text-label"
+                    >Start Date</label
+                  >
                   <input
                     id="filterStartDate"
                     type="date"
@@ -554,61 +682,108 @@
 
             <!-- Mobile Filters Bottom Sheet -->
             @if (isFilterBottomSheetOpen()) {
-              <div (keydown)="onBottomSheetKeyDown($event)" tabindex="-1" role="dialog" aria-modal="true" aria-label="Filter options" class="fixed inset-0 z-[100] flex items-end justify-center select-none animate-fade-in">
+              <div
+                (keydown)="onBottomSheetKeyDown($event)"
+                tabindex="-1"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Filter options"
+                class="fixed inset-0 z-[100] flex items-end justify-center select-none animate-fade-in"
+              >
                 <!-- Backdrop -->
-                <div (click)="setFilterBottomSheet(false)" (keydown.escape)="setFilterBottomSheet(false)" role="presentation" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"></div>
-                
+                <div
+                  (click)="setFilterBottomSheet(false)"
+                  (keydown.escape)="setFilterBottomSheet(false)"
+                  role="presentation"
+                  class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+                ></div>
+
                 <!-- Content Panel -->
-                <div class="relative w-full max-w-lg bg-finmate-card dark:bg-finmate-card/90 rounded-t-3xl shadow-2xl p-6 border-t border-border/10 transform transition-transform duration-300 translate-y-0 select-text flex flex-col max-h-[85vh] overflow-y-auto">
-                  
+                <div
+                  class="relative w-full max-w-lg bg-finmate-card dark:bg-finmate-card/90 rounded-t-3xl shadow-2xl p-6 border-t border-border/10 transform transition-transform duration-300 translate-y-0 select-text flex flex-col max-h-[85vh] overflow-y-auto"
+                >
                   <!-- Drag Handle indicator -->
-                  <div (click)="setFilterBottomSheet(false)" (keydown.escape)="setFilterBottomSheet(false)" role="button" tabindex="0" aria-label="Close filter panel" class="mx-auto w-12 h-1.5 bg-muted/20 rounded-full mb-6 cursor-pointer hover:bg-muted/40 transition-colors"></div>
-                  
+                  <div
+                    (click)="setFilterBottomSheet(false)"
+                    (keydown.escape)="setFilterBottomSheet(false)"
+                    role="button"
+                    tabindex="0"
+                    aria-label="Close filter panel"
+                    class="mx-auto w-12 h-1.5 bg-muted/20 rounded-full mb-6 cursor-pointer hover:bg-muted/40 transition-colors"
+                  ></div>
+
                   <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-lg font-bold text-primary">Filter Ledger</h3>
-                    <button (click)="setFilterBottomSheet(false)" class="text-muted hover:text-primary transition cursor-pointer">
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    <h3 class="text-lg font-bold text-primary">
+                      Filter Ledger
+                    </h3>
+                    <button
+                      (click)="setFilterBottomSheet(false)"
+                      class="text-muted hover:text-primary transition cursor-pointer"
+                    >
+                      <svg
+                        class="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M6 18L18 6M6 6l12 12"
+                        ></path>
                       </svg>
                     </button>
                   </div>
-                  
+
                   <!-- Form Fields -->
                   <div class="space-y-6 flex-1">
                     <div>
-                      <label class="text-label" for="filterCategoryMobile">Category</label>
+                      <label class="text-label" for="filterCategoryMobile"
+                        >Category</label
+                      >
                       <app-dropdown
                         id="filterCategoryMobile"
                         [ngModel]="filterCategory()"
-                        (ngModelChange)="filterCategory.set($event); applyFilters()"
+                        (ngModelChange)="
+                          filterCategory.set($event); applyFilters()
+                        "
                         [options]="filterCategoryOptions"
                         size="md"
                       ></app-dropdown>
                     </div>
-                    
+
                     <div>
-                      <label for="filterStartDateMobile" class="text-label">Start Date</label>
+                      <label for="filterStartDateMobile" class="text-label"
+                        >Start Date</label
+                      >
                       <input
                         id="filterStartDateMobile"
                         type="date"
                         [ngModel]="filterStartDate()"
-                        (ngModelChange)="filterStartDate.set($event); applyFilters()"
+                        (ngModelChange)="
+                          filterStartDate.set($event); applyFilters()
+                        "
                         class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
-                    
+
                     <div>
-                      <label for="filterEndDateMobile" class="text-label">End Date</label>
+                      <label for="filterEndDateMobile" class="text-label"
+                        >End Date</label
+                      >
                       <input
                         id="filterEndDateMobile"
                         type="date"
                         [ngModel]="filterEndDate()"
-                        (ngModelChange)="filterEndDate.set($event); applyFilters()"
+                        (ngModelChange)="
+                          filterEndDate.set($event); applyFilters()
+                        "
                         class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
                       />
                     </div>
                   </div>
-                  
+
                   <!-- Action Buttons -->
                   <div class="mt-8 pt-4 border-t border-border/5 flex gap-3">
                     <button
@@ -630,15 +805,33 @@
 
             @if (isLoadingExpenses() && expenses().length === 0) {
               <div class="flex items-center justify-center py-16">
-                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                <div
+                  class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"
+                ></div>
               </div>
             } @else if (expenses().length === 0) {
-              <div class="text-center py-16 bg-surface/30 rounded-3xl border border-border/5 p-8 flex flex-col items-center justify-center">
-                <svg class="w-12 h-12 text-muted/40 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m-9 1V4a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+              <div
+                class="text-center py-16 bg-surface/30 rounded-3xl border border-border/5 p-8 flex flex-col items-center justify-center"
+              >
+                <svg
+                  class="w-12 h-12 text-muted/40 mb-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.5"
+                    d="M9 13h6m-3-3v6m-9 1V4a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                  ></path>
                 </svg>
-                <h3 class="font-bold text-base text-primary mb-1">No expenses found</h3>
-                <p class="text-muted text-xs max-w-xs mx-auto mb-6 text-center">No expenses match your active category or date range filters.</p>
+                <h3 class="font-bold text-base text-primary mb-1">
+                  No expenses found
+                </h3>
+                <p class="text-muted text-xs max-w-xs mx-auto mb-6 text-center">
+                  No expenses match your active category or date range filters.
+                </p>
                 @if (filterCategory() || filterStartDate() || filterEndDate()) {
                   <button
                     (click)="resetFilters()"
@@ -649,7 +842,11 @@
                 }
               </div>
             } @else {
-              <div class="space-y-4" [class.opacity-40]="isLoadingExpenses()" [class.pointer-events-none]="isLoadingExpenses()">
+              <div
+                class="space-y-4"
+                [class.opacity-40]="isLoadingExpenses()"
+                [class.pointer-events-none]="isLoadingExpenses()"
+              >
                 @for (expense of expenses(); track expense.id) {
                   <div
                     [attr.data-expense-id]="expense.id"
@@ -660,7 +857,9 @@
                       <div class="flex items-center space-x-4">
                         <button
                           (click)="toggleExpenseExpand(expense.id)"
-                          [attr.data-testid]="'expense-expand-button-' + expense.id"
+                          [attr.data-testid]="
+                            'expense-expand-button-' + expense.id
+                          "
                           class="p-1 rounded hover:bg-secondary/15 text-secondary transition-colors"
                           [title]="'View Splits'"
                         >
@@ -784,27 +983,67 @@
                           }
                         </div>
                         <div>
-                          <h4 class="font-bold flex items-center gap-2" data-testid="expense-title">
-                            @if (!$any(expense).decryption || $any(expense).decryption.state === 'success') {
+                          <h4
+                            class="font-bold flex items-center gap-2"
+                            data-testid="expense-title"
+                          >
+                            @if (
+                              !$any(expense).decryption ||
+                              $any(expense).decryption.state === 'success'
+                            ) {
                               {{ expense.title }}
-                            } @else if ($any(expense).decryption.category === 'temporary' || $any(expense).decryption.category === 'recoverable') {
+                            } @else if (
+                              $any(expense).decryption.category ===
+                                'temporary' ||
+                              $any(expense).decryption.category ===
+                                'recoverable'
+                            ) {
                               <span
                                 class="inline-flex items-center gap-1.5 text-sm font-medium italic text-slate-400 dark:text-slate-500"
-                                [attr.data-decryption-state]="$any(expense).decryption.state"
+                                [attr.data-decryption-state]="
+                                  $any(expense).decryption.state
+                                "
                               >
-                                <svg class="w-3.5 h-3.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24">
-                                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                <svg
+                                  class="w-3.5 h-3.5 animate-spin shrink-0"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <circle
+                                    class="opacity-25"
+                                    cx="12"
+                                    cy="12"
+                                    r="10"
+                                    stroke="currentColor"
+                                    stroke-width="4"
+                                  ></circle>
+                                  <path
+                                    class="opacity-75"
+                                    fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                                  ></path>
                                 </svg>
                                 {{ $any(expense).decryption.message }}
                               </span>
                             } @else {
                               <span
                                 class="inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 dark:text-slate-500"
-                                [attr.data-decryption-state]="$any(expense).decryption.state"
+                                [attr.data-decryption-state]="
+                                  $any(expense).decryption.state
+                                "
                               >
-                                <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                <svg
+                                  class="w-3.5 h-3.5 shrink-0"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                  ></path>
                                 </svg>
                                 {{ $any(expense).decryption.message }}
                               </span>
@@ -866,8 +1105,11 @@
                               expense.ownerUserId === currentUserId() ||
                               expense.paidByUserId === currentUserId())
                           ) {
-                            <button data-action="edit"
-                              [attr.data-testid]="'expense-edit-button-' + expense.id"
+                            <button
+                              data-action="edit"
+                              [attr.data-testid]="
+                                'expense-edit-button-' + expense.id
+                              "
                               (click)="openExpenseModal(expense)"
                               class="p-2 text-muted hover:text-primary hover:bg-surface rounded-xl transition-all"
                             >
@@ -885,8 +1127,11 @@
                                 ></path>
                               </svg>
                             </button>
-                            <button data-action="delete"
-                              [attr.data-testid]="'expense-delete-button-' + expense.id"
+                            <button
+                              data-action="delete"
+                              [attr.data-testid]="
+                                'expense-delete-button-' + expense.id
+                              "
                               (click)="confirmDeleteExpense(expense.id)"
                               class="p-2 text-muted hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
                             >
@@ -1005,9 +1250,7 @@
                 >
                   Previous
                 </button>
-                <span
-                  class="text-xs text-muted font-medium"
-                >
+                <span class="text-xs text-muted font-medium">
                   Page {{ currentPage() }} of {{ totalPages() }}
                 </span>
                 <button
@@ -1085,8 +1328,7 @@
               >
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label for="editGroupName"
-                      class="text-label"
+                    <label for="editGroupName" class="text-label"
                       >Group Name</label
                     >
                     <input
@@ -1115,7 +1357,8 @@
                 </div>
 
                 <div>
-                  <label for="editGroupDescription"
+                  <label
+                    for="editGroupDescription"
                     class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1"
                     >Description</label
                   >
@@ -1156,8 +1399,7 @@
                       <div
                         class="w-10 h-6 bg-surface-alt rounded-full peer peer-focus:ring-2 peer-focus:ring-primary/50 peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:border-border/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"
                       ></div>
-                      <span
-                        class="ml-3 text-sm font-semibold text-secondary"
+                      <span class="ml-3 text-sm font-semibold text-secondary"
                         >Enable Carry-Forward Roll-overs</span
                       >
                     </label>
@@ -1231,8 +1473,7 @@
                   </div>
 
                   <div class="flex items-center space-x-2">
-                    <label for="contributionMonth"
-                      class="text-label"
+                    <label for="contributionMonth" class="text-label"
                       >Month</label
                     >
                     <input
@@ -1294,20 +1535,17 @@
                         ) {
                           <div class="flex items-center justify-between gap-4">
                             <div class="flex flex-col">
-                              <span
-                                class="text-sm font-bold text-secondary"
-                                >{{ contrib.displayName }}</span
-                              >
-                              <span
-                                class="text-xs text-muted capitalize"
-                                >{{ contrib.role }}</span
-                              >
+                              <span class="text-sm font-bold text-secondary">{{
+                                contrib.displayName
+                              }}</span>
+                              <span class="text-xs text-muted capitalize">{{
+                                contrib.role
+                              }}</span>
                             </div>
                             <div class="flex items-center space-x-2">
-                              <span
-                                class="text-xs font-bold text-muted"
-                                >{{ group()!.currency }}</span
-                              >
+                              <span class="text-xs font-bold text-muted">{{
+                                group()!.currency
+                              }}</span>
                               <input
                                 type="number"
                                 min="0"
@@ -1331,9 +1569,7 @@
                         <span class="font-bold text-muted"
                           >Total Contribution Target:</span
                         >
-                        <span
-                          class="text-secondary font-extrabold"
-                        >
+                        <span class="text-secondary font-extrabold">
                           {{
                             getContributionsAmountSum()
                               | currency: group()!.currency
@@ -1511,15 +1747,12 @@
                   month.
                 </p>
 
-                <div
-                  class="bg-surface border border-border/10 rounded-2xl p-6"
-                >
+                <div class="bg-surface border border-border/10 rounded-2xl p-6">
                   <div
                     class="flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
                     <div class="flex items-center space-x-3">
-                      <label for="closeMonthInput"
-                        class="text-label"
+                      <label for="closeMonthInput" class="text-label"
                         >Billing Month to Lock</label
                       >
                       <input
@@ -1596,7 +1829,7 @@
               </p>
 
               <div
-                  class="space-y-4 bg-surface border border-border/10 rounded-2xl p-4"
+                class="space-y-4 bg-surface border border-border/10 rounded-2xl p-4"
               >
                 @for (member of members(); track member.id) {
                   <div
@@ -1619,9 +1852,7 @@
                         >
                           {{ member.user.displayName || member.user.email }}
                         </h4>
-                        <p
-                          class="text-[10px] text-muted capitalize"
-                        >
+                        <p class="text-[10px] text-muted capitalize">
                           {{ member.joinStatus }}
                         </p>
                       </div>
@@ -1744,9 +1975,7 @@
                           {{ template.status }}
                         </span>
                       </div>
-                      <p
-                        class="text-xs text-muted mt-1"
-                      >
+                      <p class="text-xs text-muted mt-1">
                         {{ template.description || 'No description' }}
                       </p>
                       <div
@@ -1769,18 +1998,17 @@
                     <div
                       class="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 pt-3 md:pt-0 border-border/5"
                     >
-                      <span
-                        class="text-lg font-black text-secondary"
-                        >{{
-                          template.amountTotal | currency: template.currency
-                        }}</span
-                      >
+                      <span class="text-lg font-black text-secondary">{{
+                        template.amountTotal | currency: template.currency
+                      }}</span>
 
                       @if (!isViewer()) {
                         <div class="flex items-center gap-2">
                           <button
                             (click)="toggleRecurringExpenseStatus(template)"
-                            [attr.data-testid]="'recurring-toggle-button-' + template.id"
+                            [attr.data-testid]="
+                              'recurring-toggle-button-' + template.id
+                            "
                             [title]="
                               template.status === 'active' ? 'Pause' : 'Resume'
                             "
@@ -1824,7 +2052,9 @@
                           </button>
                           <button
                             (click)="openRecurringExpenseForm(template)"
-                            [attr.data-testid]="'recurring-edit-button-' + template.id"
+                            [attr.data-testid]="
+                              'recurring-edit-button-' + template.id
+                            "
                             title="Edit"
                             class="p-2 bg-surface hover:bg-surface-alt rounded-xl transition-all text-muted"
                           >
@@ -1844,7 +2074,9 @@
                           </button>
                           <button
                             (click)="deleteRecurringExpense(template.id)"
-                            [attr.data-testid]="'recurring-delete-button-' + template.id"
+                            [attr.data-testid]="
+                              'recurring-delete-button-' + template.id
+                            "
                             title="Delete"
                             class="p-2 bg-surface hover:bg-surface-alt rounded-xl transition-all text-red-500"
                           >
@@ -1876,9 +2108,14 @@
       <!-- Sidebar (Balances & Members) -->
       <div class="space-y-8">
         @if (balancesError()) {
-          <div class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg">
+          <div
+            class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg"
+          >
             <p class="text-xs font-bold mb-3">Failed to load balances</p>
-            <button (click)="fetchBalances(group()!.id)" class="py-1.5 px-4 bg-error hover:brightness-110 text-white text-xs font-bold rounded-xl transition cursor-pointer">
+            <button
+              (click)="fetchBalances(group()!.id)"
+              class="py-1.5 px-4 bg-error hover:brightness-110 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+            >
               Retry
             </button>
           </div>
@@ -1892,9 +2129,14 @@
         }
 
         @if (membersError()) {
-          <div class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg">
+          <div
+            class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg"
+          >
             <p class="text-xs font-bold mb-3">Failed to load members</p>
-            <button (click)="fetchMembers(group()!.id)" class="py-1.5 px-4 bg-error hover:brightness-110 text-white text-xs font-bold rounded-xl transition cursor-pointer">
+            <button
+              (click)="fetchMembers(group()!.id)"
+              class="py-1.5 px-4 bg-error hover:brightness-110 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+            >
               Retry
             </button>
           </div>
@@ -1968,5 +2210,3 @@
     </div>
   </div>
 }
-
-

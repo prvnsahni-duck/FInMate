@@ -5,27 +5,27 @@ Start here; the daily-driver docs are the inventory, gap tracker, and contracts.
 
 ## Daily drivers
 
-| Doc | Use it to… |
-|-----|------------|
-| [architecture/architecture-inventory.md](architecture/architecture-inventory.md) | One-page system map: modules, owners, source files, contracts. Reference it in audit prompts. |
-| [architecture/gap-tracker.md](architecture/gap-tracker.md) | **Single source of truth** for architecture-vs-code gaps. Every gap has a stable ID (say "Implement GRP-001"). Provisional until ADR reconciliation. |
-| [architecture/implementation-roadmap-pre-adr.md](architecture/implementation-roadmap-pre-adr.md) | **Provisional execution plan**: dependency mapping, dependency graph, classification, duplicate detection, phased roadmap, risk review. |
-| [architecture/canonical-sources.md](architecture/canonical-sources.md) | What becomes canonical once ADRs are imported; the reconciliation protocol; provisional vs. final sources. |
-| [architecture/planning-baseline-v2.md](architecture/planning-baseline-v2.md) | **Documentation Freeze Candidate** snapshot: the full planning state + validation result. |
-| [architecture/adr/](architecture/adr/) | Placeholder slots ADR-000…015 + Non-Goals + Architecture Principles (pending import — no invented content). |
-| [contracts/](contracts/) | Per-module boundary contracts: responsibilities, inputs/outputs, and **Must NEVER**. |
-| [prompts.md](prompts.md) | The four standard prompts (Audit / Implement / Review / Test). |
+| Doc                                                                                              | Use it to…                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [architecture/architecture-inventory.md](architecture/architecture-inventory.md)                 | One-page system map: modules, owners, source files, contracts. Reference it in audit prompts.                                                        |
+| [architecture/gap-tracker.md](architecture/gap-tracker.md)                                       | **Single source of truth** for architecture-vs-code gaps. Every gap has a stable ID (say "Implement GRP-001"). Provisional until ADR reconciliation. |
+| [architecture/implementation-roadmap-pre-adr.md](architecture/implementation-roadmap-pre-adr.md) | **Provisional execution plan**: dependency mapping, dependency graph, classification, duplicate detection, phased roadmap, risk review.              |
+| [architecture/canonical-sources.md](architecture/canonical-sources.md)                           | What becomes canonical once ADRs are imported; the reconciliation protocol; provisional vs. final sources.                                           |
+| [architecture/planning-baseline-v2.md](architecture/planning-baseline-v2.md)                     | **Documentation Freeze Candidate** snapshot: the full planning state + validation result.                                                            |
+| [architecture/adr/](architecture/adr/)                                                           | Placeholder slots ADR-000…015 + Non-Goals + Architecture Principles (pending import — no invented content).                                          |
+| [contracts/](contracts/)                                                                         | Per-module boundary contracts: responsibilities, inputs/outputs, and **Must NEVER**.                                                                 |
+| [prompts.md](prompts.md)                                                                         | The four standard prompts (Audit / Implement / Review / Test).                                                                                       |
 
 ## Governance / rules
 
-| Doc | Purpose |
-|-----|---------|
-| [frozen-decisions.md](frozen-decisions.md) | Settled decisions. Don't re-propose alternatives without an ADR. |
-| [coding-rules.md](coding-rules.md) | Non-negotiable implementation rules that encode the invariants. |
-| [file-map.md](file-map.md) | What each key file is for and what must NOT go in it. |
-| [module-checklist.md](module-checklist.md) | Per-module ☑/⚠/☐ status. |
-| [architecture/adr-map.md](architecture/adr-map.md) | Decision → affected files, so a task reads only what it needs. |
-| [testing-matrix.md](testing-matrix.md) | Which test dimensions each flow needs + architectural-guarantee tests. |
+| Doc                                                | Purpose                                                                |
+| -------------------------------------------------- | ---------------------------------------------------------------------- |
+| [frozen-decisions.md](frozen-decisions.md)         | Settled decisions. Don't re-propose alternatives without an ADR.       |
+| [coding-rules.md](coding-rules.md)                 | Non-negotiable implementation rules that encode the invariants.        |
+| [file-map.md](file-map.md)                         | What each key file is for and what must NOT go in it.                  |
+| [module-checklist.md](module-checklist.md)         | Per-module ☑/⚠/☐ status.                                             |
+| [architecture/adr-map.md](architecture/adr-map.md) | Decision → affected files, so a task reads only what it needs.         |
+| [testing-matrix.md](testing-matrix.md)             | Which test dimensions each flow needs + architectural-guarantee tests. |
 
 ## Audits (2026-07-16 sweep)
 

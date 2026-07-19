@@ -52,8 +52,7 @@ export const DECRYPTION_MESSAGES = {
     'Unable to decrypt this expense because the required encryption key is unavailable.',
   corrupted: 'This expense cannot currently be decrypted.',
   session: 'Waiting for your secure session…',
-  unexpected:
-    'This expense could not be decrypted due to an unexpected error.',
+  unexpected: 'This expense could not be decrypted due to an unexpected error.',
 } as const;
 
 /** Factory helpers keep state + category + message consistent in one place. */

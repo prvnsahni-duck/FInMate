@@ -31,7 +31,9 @@ describe('GroupsService', () => {
   let groupMemberRepository: jest.Mocked<Repository<GroupMember>>;
   let groupInviteRepository: jest.Mocked<Repository<GroupInvite>>;
   let groupKeyVersionRepository: jest.Mocked<Repository<GroupKeyVersion>>;
-  let memberWrappedGroupKeyRepository: jest.Mocked<Repository<MemberWrappedGroupKey>>;
+  let memberWrappedGroupKeyRepository: jest.Mocked<
+    Repository<MemberWrappedGroupKey>
+  >;
   let userRepository: any;
   let dataSource: jest.Mocked<DataSource>;
 
@@ -817,7 +819,8 @@ describe('GroupsService', () => {
         cb({
           getRepository: (entity: unknown) => {
             if (entity === GroupKeyVersion) return managerGroupKeyVersionRepo;
-            if (entity === MemberWrappedGroupKey) return managerMemberWrappedRepo;
+            if (entity === MemberWrappedGroupKey)
+              return managerMemberWrappedRepo;
             if (entity === GroupMember) return managerGroupMemberRepo;
             return null;
           },
@@ -884,7 +887,8 @@ describe('GroupsService', () => {
           getRepository: (entity: unknown) => {
             if (entity === GroupKeyVersion) return managerGroupKeyVersionRepo;
             if (entity === GroupMember) return managerGroupMemberRepo;
-            if (entity === MemberWrappedGroupKey) return managerMemberWrappedRepo;
+            if (entity === MemberWrappedGroupKey)
+              return managerMemberWrappedRepo;
             return null;
           },
         }),

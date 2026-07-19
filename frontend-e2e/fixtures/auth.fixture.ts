@@ -9,5 +9,3 @@ export const test = base.extend<AuthFixture>({
 });
 
 export { expect } from '@playwright/test';
-
-

@@ -28,10 +28,18 @@ export class RecurringExpensesService {
   private baseUrl = environment.apiBaseUrl;
 
   private getSubtleCrypto(): SubtleCrypto {
-    if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    if (
+      typeof window !== 'undefined' &&
+      window.crypto &&
+      window.crypto.subtle
+    ) {
       return window.crypto.subtle;
     }
-    if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.subtle) {
+    if (
+      typeof globalThis !== 'undefined' &&
+      globalThis.crypto &&
+      globalThis.crypto.subtle
+    ) {
       return globalThis.crypto.subtle;
     }
     throw new Error('Web Cryptography API is not available');
@@ -40,9 +48,7 @@ export class RecurringExpensesService {
   private async encryptPayload(
     payload: CreateRecurringExpenseDto | UpdateRecurringExpenseDto,
   ): Promise<any> {
-    const user = this.store.selectSnapshot(
-      (state: any) => state.auth?.user,
-    );
+    const user = this.store.selectSnapshot((state: any) => state.auth?.user);
     const email = user?.email;
     if (email) {
       const masterKey = await this.encryptionService.loadKeyFromSession(email);
@@ -55,13 +61,15 @@ export class RecurringExpensesService {
         if ((payload as any).groupId) {
           scope = 'group';
           const groupId = (payload as any).groupId as string;
-          const resolved = await this.groupKeyService.getGroupKeyForEncryption(groupId);
+          const resolved =
+            await this.groupKeyService.getGroupKeyForEncryption(groupId);
           if (resolved) {
             key = resolved.key;
             encrypted.groupKeyVersionId = resolved.versionId;
           } else {
             key = await this.groupKeyService.createGroupKey(groupId);
-            const mintedVersionId = this.groupKeyService.getKnownActiveVersionId(groupId);
+            const mintedVersionId =
+              this.groupKeyService.getKnownActiveVersionId(groupId);
             if (mintedVersionId) {
               encrypted.groupKeyVersionId = mintedVersionId;
             }

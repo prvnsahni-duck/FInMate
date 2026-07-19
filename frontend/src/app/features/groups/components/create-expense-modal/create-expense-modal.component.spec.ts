@@ -42,7 +42,9 @@ describe('CreateExpenseModalComponent', () => {
     mockGroupKeyService = {
       getGroupDataKey: jest.fn().mockResolvedValue(mockCryptoKey),
       createGroupKey: jest.fn().mockResolvedValue(mockCryptoKey),
-      resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: mockCryptoKey }),
+      resolveGroupKey: jest
+        .fn()
+        .mockResolvedValue({ status: 'ready', key: mockCryptoKey }),
       createAndStoreGroupKey: jest.fn().mockResolvedValue(mockCryptoKey),
       rateLimitError: jest.fn().mockReturnValue(null),
     };
@@ -72,8 +74,7 @@ describe('CreateExpenseModalComponent', () => {
         { provide: Store, useValue: mockStore },
         { provide: ClientEncryptionService, useValue: mockEncryptionService },
       ],
-    })
-      .compileComponents();
+    }).compileComponents();
 
     fixture = TestBed.createComponent(CreateExpenseModalComponent);
     component = fixture.componentInstance;
@@ -101,7 +102,10 @@ describe('CreateExpenseModalComponent', () => {
     it('should enforce title maxLength of 160', () => {
       const titleControl = component.expenseForm.get('title');
       titleControl?.setValue('a'.repeat(161));
-      expect(titleControl?.hasError('maxLength') || titleControl?.hasError('maxlength')).toBeTruthy();
+      expect(
+        titleControl?.hasError('maxLength') ||
+          titleControl?.hasError('maxlength'),
+      ).toBeTruthy();
     });
 
     it('should require amountTotal', () => {
@@ -396,7 +400,11 @@ describe('CreateExpenseModalComponent', () => {
     });
 
     it('should add friend to split and clear search', () => {
-      const friend = { id: 'u2', displayName: 'Jane', email: 'jane@example.com' };
+      const friend = {
+        id: 'u2',
+        displayName: 'Jane',
+        email: 'jane@example.com',
+      };
 
       component.addFriendToSplit(friend);
 
@@ -407,7 +415,11 @@ describe('CreateExpenseModalComponent', () => {
     });
 
     it('should remove friend from split', () => {
-      component.resolvedFriends.set('u2', { id: 'u2', displayName: 'Jane', email: '' });
+      component.resolvedFriends.set('u2', {
+        id: 'u2',
+        displayName: 'Jane',
+        email: '',
+      });
       component.selectedUserIds.add('u2');
 
       component.removeFriendFromSplit('u2');

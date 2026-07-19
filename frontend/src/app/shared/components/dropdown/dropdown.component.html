@@ -1,6 +1,8 @@
 <div class="relative w-full" [class]="styleClass" [attr.id]="id">
   @if (label) {
-    <div class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300">
+    <div
+      class="block text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
+    >
       {{ label }}
     </div>
   }
@@ -44,7 +46,12 @@
       stroke="currentColor"
       viewBox="0 0 24 24"
     >
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M19 9l-7 7-7-7"
+      />
     </svg>
   </button>
 
@@ -65,20 +72,41 @@
           [class.bg-surface]="idx === focusedIndex"
         >
           <div class="flex items-center justify-between w-full">
-            <span class="truncate flex items-center gap-2 text-secondary" [class.text-sm]="size === 'md'" [class.text-xs]="size === 'sm'" [class.font-bold]="option.value === value()">
+            <span
+              class="truncate flex items-center gap-2 text-secondary"
+              [class.text-sm]="size === 'md'"
+              [class.text-xs]="size === 'sm'"
+              [class.font-bold]="option.value === value()"
+            >
               @if (option.icon) {
                 <span class="flex-shrink-0" [innerHTML]="option.icon"></span>
               }
               <span>{{ option.label }}</span>
             </span>
             @if (option.value === value()) {
-              <svg class="text-primary flex-shrink-0" [class.w-4]="size === 'md'" [class.h-4]="size === 'md'" [class.w-3.5]="size === 'sm'" [class.h-3.5]="size === 'sm'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+              <svg
+                class="text-primary flex-shrink-0"
+                [class.w-4]="size === 'md'"
+                [class.h-4]="size === 'md'"
+                [class.w-3.5]="size === 'sm'"
+                [class.h-3.5]="size === 'sm'"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2.5"
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             }
           </div>
           @if (option.description) {
-            <span class="text-[11px] text-muted mt-0.5 truncate">{{ option.description }}</span>
+            <span class="text-[11px] text-muted mt-0.5 truncate">{{
+              option.description
+            }}</span>
           }
         </button>
       } @empty {

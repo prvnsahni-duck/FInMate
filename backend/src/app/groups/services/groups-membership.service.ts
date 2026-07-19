@@ -85,7 +85,10 @@ export class GroupsMembershipService {
     return this.groupsService.getMyGroupKey(userId, groupId, versionId);
   }
 
-  async getMissingGroupKeys(userId: string, groupId: string): Promise<string[]> {
+  async getMissingGroupKeys(
+    userId: string,
+    groupId: string,
+  ): Promise<string[]> {
     return this.groupsService.getMissingGroupKeys(userId, groupId);
   }
 
@@ -93,7 +96,11 @@ export class GroupsMembershipService {
     return this.groupsService.listGroupKeyVersions(userId, groupId);
   }
 
-  async rotateGroupKey(userId: string, groupId: string, dto: RotateGroupKeyDto) {
+  async rotateGroupKey(
+    userId: string,
+    groupId: string,
+    dto: RotateGroupKeyDto,
+  ) {
     return this.groupsService.rotateGroupKey(userId, groupId, dto);
   }
 }

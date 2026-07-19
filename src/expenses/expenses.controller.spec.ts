@@ -8,7 +8,9 @@ import { Expense } from './entities/expense.entity';
 describe('ExpensesController', () => {
   let controller: ExpensesController;
   const mockExpenseService = {
-    createExpense: jest.fn().mockResolvedValue({ id: 'uuid', title: 'Lunch', amount: 12.5 }),
+    createExpense: jest
+      .fn()
+      .mockResolvedValue({ id: 'uuid', title: 'Lunch', amount: 12.5 }),
     updateExpense: jest.fn().mockResolvedValue({}),
     getExpenses: jest.fn().mockResolvedValue([]),
     restoreExpense: jest.fn().mockResolvedValue({}),

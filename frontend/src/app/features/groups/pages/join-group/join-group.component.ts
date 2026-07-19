@@ -7,7 +7,10 @@ import { Store } from '@ngxs/store';
 import { firstValueFrom } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../../../environments/environment';
-import { ClientEncryptionService, base64ToArrayBuffer } from '../../../../core/services/encryption.service';
+import {
+  ClientEncryptionService,
+  base64ToArrayBuffer,
+} from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
 
 @Component({
@@ -63,7 +66,9 @@ export class JoinGroupComponent implements OnInit {
 
     try {
       // 1. Send join request to backend
-      const res: any = await firstValueFrom(this.groupsService.joinGroup(this.inviteToken));
+      const res: any = await firstValueFrom(
+        this.groupsService.joinGroup(this.inviteToken),
+      );
       const groupId = res.groupId;
       const wrappedGroupKey = res.wrappedGroupKey;
 
@@ -73,7 +78,8 @@ export class JoinGroupComponent implements OnInit {
 
       if (wrappedGroupKey) {
         let groupKey: CryptoKey;
-        const subtle = window.crypto.subtle || (globalThis as any).crypto?.subtle;
+        const subtle =
+          window.crypto.subtle || (globalThis as any).crypto?.subtle;
         if (!subtle) {
           throw new Error('Web Cryptography API is not available');
         }
@@ -94,30 +100,54 @@ export class JoinGroupComponent implements OnInit {
               rawTik,
               { name: 'AES-GCM' },
               false,
-              ['decrypt']
+              ['decrypt'],
             );
 
             // Decrypt group key using TIK to get raw key bytes
-            groupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, tik, true);
+            groupKey = await this.encryptionService.unwrapKey(
+              wrappedGroupKey,
+              tik,
+              true,
+            );
           } else {
             // Flow B asymmetric invitation decryption flow
-            const { privateKey } = await this.groupKeyService.getMyAsymmetricKeys();
-            groupKey = await this.encryptionService.unwrapKey(wrappedGroupKey, privateKey, true);
+            const { privateKey } =
+              await this.groupKeyService.getMyAsymmetricKeys();
+            groupKey = await this.encryptionService.unwrapKey(
+              wrappedGroupKey,
+              privateKey,
+              true,
+            );
           }
 
           // Resolve user's derived master key
-          const user = this.store.selectSnapshot((state: any) => state.auth?.user);
+          const user = this.store.selectSnapshot(
+            (state: any) => state.auth?.user,
+          );
           if (user && user.email) {
-            const masterKey = await this.encryptionService.loadKeyFromSession(user.email);
+            const masterKey = await this.encryptionService.loadKeyFromSession(
+              user.email,
+            );
             if (masterKey) {
               // Wrap group key with master key for self
-              const wrappedGkForSelf = await this.encryptionService.wrapKey(groupKey, masterKey);
+              const wrappedGkForSelf = await this.encryptionService.wrapKey(
+                groupKey,
+                masterKey,
+              );
 
               // Save wrapped key to server
               await firstValueFrom(
-                this.http.post(`${environment.apiBaseUrl}/groups/${groupId}/keys`, {
-                  keys: [{ userId: user.userId ?? user.id, wrappedKey: wrappedGkForSelf }],
-                })
+                this.http.post(
+                  `${environment.apiBaseUrl}/groups/${groupId}/keys`,
+                  {
+                    keys: [
+                      {
+                        userId: user.userId ?? user.id,
+                        wrappedKey: wrappedGkForSelf,
+                      },
+                    ],
+                  },
+                ),
               );
 
               // Warm the cache through GroupKeyService so the key is stored under
@@ -128,7 +158,9 @@ export class JoinGroupComponent implements OnInit {
           }
         } catch (e: any) {
           console.error('Failed to decrypt group key on joining:', e);
-          throw new Error("Unable to access this group's encryption key. Please try refreshing your group key or contact the group owner.");
+          throw new Error(
+            "Unable to access this group's encryption key. Please try refreshing your group key or contact the group owner.",
+          );
         }
       }
 
@@ -140,7 +172,10 @@ export class JoinGroupComponent implements OnInit {
       }
     } catch (err: any) {
       this.isJoining = false;
-      this.errorMessage = err.error?.message || err.message || 'Failed to join group. Please try again.';
+      this.errorMessage =
+        err.error?.message ||
+        err.message ||
+        'Failed to join group. Please try again.';
     }
   }
 

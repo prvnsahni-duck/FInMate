@@ -14,17 +14,17 @@ Each throttle profile has its own rate limit and TTL, and is isolated so that on
 
 ## Profiles
 
-| Profile         | Limit | TTL     | Env Override                 | Purpose                         |
-| --------------- | ----- | ------- | ---------------------------- | ------------------------------- |
-| `default`       | 100   | 60 sec  | `THROTTLE_LIMIT_DEFAULT`     | Normal authenticated API calls  |
-| `login`         | 5     | 60 sec  | `THROTTLE_LIMIT_LOGIN`       | Login endpoint                  |
-| `register`      | 5     | 60 sec  | `THROTTLE_LIMIT_REGISTER`    | Registration endpoint           |
-| `forgotPassword`| 3     | 60 sec  | `THROTTLE_LIMIT_FORGOT`      | Forgot password (reserved)      |
-| `resetPassword` | 3     | 60 sec  | `THROTTLE_LIMIT_RESET`       | Reset password (reserved)       |
-| `otp`           | 5     | 60 sec  | `THROTTLE_LIMIT_OTP`         | 2FA verification/disable        |
-| `refresh`       | 15    | 60 sec  | `THROTTLE_LIMIT_REFRESH`     | Token refresh                   |
-| `import`        | 10    | 60 sec  | `THROTTLE_LIMIT_IMPORT`      | Data import                     |
-| `export`        | 20    | 60 sec  | `THROTTLE_LIMIT_EXPORT`      | Data export                     |
+| Profile          | Limit | TTL    | Env Override              | Purpose                        |
+| ---------------- | ----- | ------ | ------------------------- | ------------------------------ |
+| `default`        | 100   | 60 sec | `THROTTLE_LIMIT_DEFAULT`  | Normal authenticated API calls |
+| `login`          | 5     | 60 sec | `THROTTLE_LIMIT_LOGIN`    | Login endpoint                 |
+| `register`       | 5     | 60 sec | `THROTTLE_LIMIT_REGISTER` | Registration endpoint          |
+| `forgotPassword` | 3     | 60 sec | `THROTTLE_LIMIT_FORGOT`   | Forgot password (reserved)     |
+| `resetPassword`  | 3     | 60 sec | `THROTTLE_LIMIT_RESET`    | Reset password (reserved)      |
+| `otp`            | 5     | 60 sec | `THROTTLE_LIMIT_OTP`      | 2FA verification/disable       |
+| `refresh`        | 15    | 60 sec | `THROTTLE_LIMIT_REFRESH`  | Token refresh                  |
+| `import`         | 10    | 60 sec | `THROTTLE_LIMIT_IMPORT`   | Data import                    |
+| `export`         | 20    | 60 sec | `THROTTLE_LIMIT_EXPORT`   | Data export                    |
 
 Profile names are centralized in `backend/src/app/throttler/throttle.constants.ts` as the `THROTTLE_PROFILES` constant.
 
@@ -58,15 +58,15 @@ Controller
 
 ### Key Components
 
-| Component                  | File                                              | Responsibility                                    |
-| -------------------------- | ------------------------------------------------- | ------------------------------------------------- |
-| `THROTTLE_PROFILES`        | `throttler/throttle.constants.ts`                 | Centralized profile name constants                |
-| `@ThrottleAs()`            | `throttler/throttle-policy.decorator.ts`           | Single public decorator for assigning profiles    |
-| `ThrottlePolicyResolver`   | `throttler/throttle-policy.resolver.ts`            | Reads our own metadata to resolve active profile  |
-| `ThrottlerConfigModule`    | `throttler/throttler-config.module.ts`             | Global module exporting the resolver              |
-| `UserThrottlerGuard`       | `guards/user-throttler.guard.ts`                   | User-ID-based key generation + throttleContext    |
-| `ConditionalThrottleGuard` | `guards/conditional-throttle.guard.ts`              | E2E/test bypass                                   |
-| `ThrottlerRedisStorage`    | `throttler/throttler-redis.storage.ts`              | Redis-backed counter storage                      |
+| Component                  | File                                     | Responsibility                                   |
+| -------------------------- | ---------------------------------------- | ------------------------------------------------ |
+| `THROTTLE_PROFILES`        | `throttler/throttle.constants.ts`        | Centralized profile name constants               |
+| `@ThrottleAs()`            | `throttler/throttle-policy.decorator.ts` | Single public decorator for assigning profiles   |
+| `ThrottlePolicyResolver`   | `throttler/throttle-policy.resolver.ts`  | Reads our own metadata to resolve active profile |
+| `ThrottlerConfigModule`    | `throttler/throttler-config.module.ts`   | Global module exporting the resolver             |
+| `UserThrottlerGuard`       | `guards/user-throttler.guard.ts`         | User-ID-based key generation + throttleContext   |
+| `ConditionalThrottleGuard` | `guards/conditional-throttle.guard.ts`   | E2E/test bypass                                  |
+| `ThrottlerRedisStorage`    | `throttler/throttler-redis.storage.ts`   | Redis-backed counter storage                     |
 
 ---
 
@@ -96,6 +96,7 @@ Follow this checklist:
 1. **Add to `THROTTLE_PROFILES`** in `backend/src/app/throttler/throttle.constants.ts`
 
 2. **Add a throttler entry** in `backend/src/app/app.module.ts`:
+
    ```typescript
    {
      name: THROTTLE_PROFILES.NEW_PROFILE,
@@ -130,6 +131,7 @@ req.throttleContext = {
 ```
 
 This context is used by:
+
 - **`HttpExceptionFilter`** — to format 429 responses with user-friendly messages and headers
 - **`LoggingInterceptor`** — to log the authenticated user ID consistently
 
@@ -149,6 +151,7 @@ This context is used by:
 ```
 
 Response headers:
+
 - `Retry-After: 60`
 - `X-RateLimit-Limit: 100`
 - `X-RateLimit-Remaining: 0`
@@ -158,6 +161,7 @@ Response headers:
 ## Key Generation
 
 Rate limits are tracked per user, not per IP. The `UserThrottlerGuard` extracts the user ID from:
+
 1. `req.user.id` (if JwtAuthGuard has already run)
 2. JWT bearer token payload (manual parse fallback)
 3. Falls back to IP address for anonymous requests
@@ -173,6 +177,7 @@ npx nx test backend --testPathPattern="throttl"
 ```
 
 Test coverage:
+
 - **`throttle-policy.resolver.spec.ts`** — Unit tests for profile resolution
 - **`user-throttler.guard.spec.ts`** — Guard key generation and throttleContext
 - **`throttler-integration.spec.ts`** — End-to-end profile isolation with counter verification

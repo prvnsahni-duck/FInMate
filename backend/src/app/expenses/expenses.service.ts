@@ -367,14 +367,19 @@ export class ExpensesService {
     if (scope === 'direct_shared') {
       throw new BadRequestException({
         errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
-        message: 'Shared expenses must belong to a group and use group encryption scope',
+        message:
+          'Shared expenses must belong to a group and use group encryption scope',
       });
     }
 
-    if (scope === 'personal' && this.getDirectParticipantIds(dto, userId).length > 1) {
+    if (
+      scope === 'personal' &&
+      this.getDirectParticipantIds(dto, userId).length > 1
+    ) {
       throw new BadRequestException({
         errorCode: 'EXP_ENCRYPTION_SCOPE_MISMATCH',
-        message: 'Shared expenses must belong to a group and use group encryption scope',
+        message:
+          'Shared expenses must belong to a group and use group encryption scope',
       });
     }
   }
@@ -1203,7 +1208,8 @@ export class ExpensesService {
             })
           : [];
       const replacedAttachments =
-        dto.encryptedAttachments !== undefined || dto.attachmentKeys !== undefined
+        dto.encryptedAttachments !== undefined ||
+        dto.attachmentKeys !== undefined
           ? await manager.getRepository(Attachment).find({
               where: { expense: { id: expense.id } },
               relations: ['uploaderUser', 'groupKeyVersion'],
@@ -1270,7 +1276,10 @@ export class ExpensesService {
         );
       }
 
-      if (expense.encryptionScope === 'direct_shared' && dto.wrappedContentKeys) {
+      if (
+        expense.encryptionScope === 'direct_shared' &&
+        dto.wrappedContentKeys
+      ) {
         await manager
           .getRepository(EncryptedExpenseKey)
           .delete({ expense: { id: expense.id } as Partial<Expense> });
@@ -1355,7 +1364,12 @@ export class ExpensesService {
         );
       }
 
-      await this.recordExpenseVersion(manager, savedExpense, 'updated', actorUser);
+      await this.recordExpenseVersion(
+        manager,
+        savedExpense,
+        'updated',
+        actorUser,
+      );
 
       return manager.getRepository(Expense).findOne({
         where: { id: expense.id },
@@ -1526,7 +1540,9 @@ export class ExpensesService {
       await manager.getRepository(Expense).restore({ id: expense.id });
       expense.status = 'posted';
       expense.deletedAt = undefined;
-      const restoredExpense = await manager.getRepository(Expense).save(expense);
+      const restoredExpense = await manager
+        .getRepository(Expense)
+        .save(expense);
       await this.recordExpenseVersion(
         manager,
         restoredExpense,

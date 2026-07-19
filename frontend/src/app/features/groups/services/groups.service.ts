@@ -100,7 +100,7 @@ export class GroupsService {
                 if (!val) return '';
                 if (!key) {
                   console.warn(
-                    `[History Decrypt] Missing group key for log ${log.id}, field '${field}'. Ciphertext: "${val}"`
+                    `[History Decrypt] Missing group key for log ${log.id}, field '${field}'. Ciphertext: "${val}"`,
                   );
                   return DECRYPTION_FAILED_PLACEHOLDER;
                 }
@@ -109,21 +109,30 @@ export class GroupsService {
                 } catch (err: any) {
                   console.error(
                     `[History Decrypt] Decryption failed for log ${log.id}, field '${field}'. ` +
-                    `Ciphertext: "${val}". Error: ${err?.message || err}`,
-                    err
+                      `Ciphertext: "${val}". Error: ${err?.message || err}`,
+                    err,
                   );
                   return DECRYPTION_FAILED_PLACEHOLDER;
                 }
               };
 
               if (log.metadata.title) {
-                decryptedMetadata.title = await decryptField('title', log.metadata.title);
+                decryptedMetadata.title = await decryptField(
+                  'title',
+                  log.metadata.title,
+                );
               }
               if (log.metadata.newTitle) {
-                decryptedMetadata.newTitle = await decryptField('newTitle', log.metadata.newTitle);
+                decryptedMetadata.newTitle = await decryptField(
+                  'newTitle',
+                  log.metadata.newTitle,
+                );
               }
               if (log.metadata.previousTitle) {
-                decryptedMetadata.previousTitle = await decryptField('previousTitle', log.metadata.previousTitle);
+                decryptedMetadata.previousTitle = await decryptField(
+                  'previousTitle',
+                  log.metadata.previousTitle,
+                );
               }
 
               return { ...log, metadata: decryptedMetadata };
@@ -140,9 +149,9 @@ export class GroupsService {
    */
   getDeletedExpenses(groupId: string): Observable<{ data: Expense[] }> {
     return this.http
-      .get<{ data: Expense[] }>(
-        `${this.baseUrl}/groups/${groupId}/expenses/deleted`,
-      )
+      .get<{
+        data: Expense[];
+      }>(`${this.baseUrl}/groups/${groupId}/expenses/deleted`)
       .pipe(
         // Decrypt trashed expenses through the same central pipeline as the
         // ledger so titles render (and get contextual states) instead of

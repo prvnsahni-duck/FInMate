@@ -34,7 +34,10 @@ describe('Throttler Profile Isolation (Integration)', () => {
     return executedProfiles;
   }
 
-  function createContext(handlerMeta?: string, classMeta?: string): ExecutionContext {
+  function createContext(
+    handlerMeta?: string,
+    classMeta?: string,
+  ): ExecutionContext {
     const handler = function routeHandler() {};
     const classRef = class Controller {};
 
@@ -123,9 +126,15 @@ describe('Throttler Profile Isolation (Integration)', () => {
       const patchCtx = createContext();
       const deleteCtx = createContext();
 
-      expect(simulateThrottlerLoop(postCtx)).toEqual([THROTTLE_PROFILES.DEFAULT]);
-      expect(simulateThrottlerLoop(patchCtx)).toEqual([THROTTLE_PROFILES.DEFAULT]);
-      expect(simulateThrottlerLoop(deleteCtx)).toEqual([THROTTLE_PROFILES.DEFAULT]);
+      expect(simulateThrottlerLoop(postCtx)).toEqual([
+        THROTTLE_PROFILES.DEFAULT,
+      ]);
+      expect(simulateThrottlerLoop(patchCtx)).toEqual([
+        THROTTLE_PROFILES.DEFAULT,
+      ]);
+      expect(simulateThrottlerLoop(deleteCtx)).toEqual([
+        THROTTLE_PROFILES.DEFAULT,
+      ]);
 
       expect(redisCounters[THROTTLE_PROFILES.DEFAULT]).toBe(3);
       expect(redisCounters[THROTTLE_PROFILES.FORGOT_PASSWORD]).toBeUndefined();

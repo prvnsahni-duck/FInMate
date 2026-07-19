@@ -386,14 +386,9 @@ export class ClientEncryptionService {
   async wrapKey(dataKey: CryptoKey, wrappingKey: CryptoKey): Promise<string> {
     const subtle = this.getSubtleCrypto();
     if (wrappingKey.type === 'public') {
-      const wrappedBuffer = await subtle.wrapKey(
-        'raw',
-        dataKey,
-        wrappingKey,
-        {
-          name: 'RSA-OAEP',
-        },
-      );
+      const wrappedBuffer = await subtle.wrapKey('raw', dataKey, wrappingKey, {
+        name: 'RSA-OAEP',
+      });
       return arrayBufferToBase64(wrappedBuffer);
     }
 
@@ -530,7 +525,10 @@ export class ClientEncryptionService {
   /**
    * Decrypts encrypted bytes in format `iv_base64:ciphertext_base64` using a CryptoKey.
    */
-  async decryptBytes(encryptedStr: string, key: CryptoKey): Promise<ArrayBuffer> {
+  async decryptBytes(
+    encryptedStr: string,
+    key: CryptoKey,
+  ): Promise<ArrayBuffer> {
     if (!encryptedStr) {
       return new ArrayBuffer(0);
     }

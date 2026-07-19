@@ -30,6 +30,3 @@ export class SubmitButtonComponent {
   @Input() styleClass =
     'w-full py-3 px-4 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed';
 }
-
-
-

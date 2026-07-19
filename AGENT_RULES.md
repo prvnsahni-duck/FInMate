@@ -718,6 +718,7 @@ Do not continue with opportunistic improvements unless explicitly requested.
 - Never delete or rename files without approval.
 - Never make architecture changes without approval.
 - Never fix unrelated issues unless explicitly requested.
+
 # Architecture Governance Rules
 
 This project follows an Architecture-First approach.
@@ -749,6 +750,7 @@ If architecture changes:
 - Update implementation plan.
 - Update progress log.
 - Verify no documentation drift remains.
+
 # Architecture Drift Prevention
 
 Before completing any task verify:

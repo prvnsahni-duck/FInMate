@@ -398,11 +398,14 @@ describe('SettlementsService', () => {
       groupMemberRepository.findOne.mockResolvedValueOnce(mockRecipient);
 
       settlementRepository.create.mockImplementation((data) => data as any);
-      settlementRepository.save.mockImplementationOnce(async (data) => ({
-        ...data,
-        id: 'settlement-id',
-        version: 1,
-      }) as any);
+      settlementRepository.save.mockImplementationOnce(
+        async (data) =>
+          ({
+            ...data,
+            id: 'settlement-id',
+            version: 1,
+          }) as any,
+      );
 
       const result = await service.proposeSettlement('caller-id', 'group-id', {
         toUserId: 'recipient-id',

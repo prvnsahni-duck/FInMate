@@ -29,13 +29,17 @@ describe('DecryptPipe', () => {
 
   it('should decrypt ciphertext and return the plaintext', async () => {
     const result = await pipe.transform('someCiphertext');
-    expect(mockEncryptionService.loadKeyFromSession).toHaveBeenCalledWith('test@example.com');
+    expect(mockEncryptionService.loadKeyFromSession).toHaveBeenCalledWith(
+      'test@example.com',
+    );
     expect(mockEncryptionService.decrypt).toHaveBeenCalled();
     expect(result).toBe('decrypted text');
   });
 
   it('should return placeholder when decryption fails', async () => {
-    mockEncryptionService.decrypt.mockRejectedValue(new Error('decryption error'));
+    mockEncryptionService.decrypt.mockRejectedValue(
+      new Error('decryption error'),
+    );
     const result = await pipe.transform('badCiphertext');
     expect(result).toBe('••••••••••');
   });
