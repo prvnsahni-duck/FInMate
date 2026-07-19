@@ -1911,6 +1911,95 @@
                 }
               </div>
             </div>
+
+            <!-- ── Danger Zone (owner only) ────────────────────────────── -->
+            @if (isOwner()) {
+              <div class="border-t border-error/20 pt-8 mt-8">
+                <div class="rounded-2xl border border-error/30 bg-error/5 p-6">
+                  <h3 class="text-base font-bold text-error mb-1">Danger Zone</h3>
+                  <p class="text-xs text-muted mb-4">
+                    Deleting this group will archive it permanently. No financial
+                    history will be removed. The group will become read-only.
+                  </p>
+                  <button
+                    type="button"
+                    (click)="openArchiveDialog()"
+                    class="py-2 px-5 bg-error/10 hover:bg-error/20 text-error border border-error/30 rounded-xl font-semibold text-sm transition-all"
+                  >
+                    Delete Group
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- Archive Confirmation Dialog -->
+        @if (isArchiveDialogOpen()) {
+          <div
+            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            (click)="closeArchiveDialog()"
+          >
+            <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+            <div
+              class="relative z-10 bg-finmate-card border border-border/20 rounded-2xl shadow-2xl w-full max-w-md p-6"
+              (click)="$event.stopPropagation()"
+            >
+              <h2 class="text-lg font-bold text-error mb-2">Delete Group</h2>
+              <p class="text-sm text-secondary mb-1">
+                Deleting this group will archive it.
+                <strong>No financial history will be removed.</strong>
+                The group will become read-only and can no longer be used.
+              </p>
+              <p class="text-sm text-secondary mb-4">
+                To confirm, type the group name:
+                <strong>{{ group()?.name }}</strong>
+              </p>
+
+              <div class="space-y-3">
+                <input
+                  type="text"
+                  [ngModel]="archiveConfirmName()"
+                  (ngModelChange)="archiveConfirmName.set($event)"
+                  placeholder="Type the group name to confirm"
+                  class="w-full px-4 py-2 bg-finmate-base border border-border/20 rounded-xl text-sm focus:outline-none focus:border-error/50"
+                />
+
+                <textarea
+                  [ngModel]="archiveReason()"
+                  (ngModelChange)="archiveReason.set($event)"
+                  placeholder="Reason (optional)"
+                  rows="2"
+                  class="w-full px-4 py-2 bg-finmate-base border border-border/20 rounded-xl text-sm focus:outline-none focus:border-border/40 resize-none"
+                ></textarea>
+
+                @if (archiveError()) {
+                  <p class="text-xs text-error">{{ archiveError() }}</p>
+                }
+
+                <div class="flex gap-3 justify-end pt-1">
+                  <button
+                    type="button"
+                    (click)="closeArchiveDialog()"
+                    class="py-2 px-5 text-sm font-medium border border-border/20 rounded-xl hover:bg-surface/50 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    (click)="confirmArchiveGroup()"
+                    [disabled]="!archiveNameMatches() || isArchiving()"
+                    class="py-2 px-5 text-sm font-semibold bg-error text-white rounded-xl disabled:opacity-40 hover:bg-error/90 transition-all"
+                  >
+                    @if (isArchiving()) {
+                      <span>Deleting...</span>
+                    } @else {
+                      <span>Delete Group</span>
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         }
 

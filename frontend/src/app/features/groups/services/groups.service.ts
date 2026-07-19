@@ -186,6 +186,16 @@ export class GroupsService {
   }
 
   /**
+   * Archive (soft-delete) a group. Exposed to users as "Delete Group".
+   * Only the group owner may call this.
+   */
+  archiveGroup(groupId: string, reason?: string): Observable<Group> {
+    return this.http.delete<Group>(`${this.baseUrl}/groups/${groupId}`, {
+      body: reason ? { reason } : {},
+    });
+  }
+
+  /**
    * Regenerate invite token for a group.
    */
   regenerateInviteToken(groupId: string): Observable<Group> {

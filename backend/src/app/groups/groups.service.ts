@@ -1706,6 +1706,90 @@ export class GroupsService {
   }
 
   /**
+   * Archives a group (user-facing: "Delete Group").
+   *
+   * Only the group owner may archive. Inside a single transaction:
+   *  - sets group.isArchived = true and clears the invite token
+   *  - expires all pending GroupInvite rows for the group
+   *
+   * Active memberships are intentionally left as-is so members retain
+   * read access to historical expenses, settlements, and versions.
+   * Write access is already blocked globally via checkGroupWriteAccess().
+   */
+  async archiveGroup(
+    userId: string,
+    groupId: string,
+    reason?: string,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<Group> {
+    const membership = await this.groupMemberRepository
+      .createQueryBuilder('member')
+      .where('member.group_id = :groupId', { groupId })
+      .andWhere('member.user_id = :userId', { userId })
+      .andWhere('member.joinStatus = :status', { status: 'active' })
+      .getOne();
+
+    if (!membership) {
+      throw new ForbiddenException('You do not have access to this group');
+    }
+    if (membership.role !== 'owner') {
+      throw new ForbiddenException('Only the group owner can delete a group');
+    }
+
+    const group = await this.groupRepository.findOne({
+      where: { id: groupId },
+    });
+    if (!group) {
+      throw new NotFoundException('Group not found');
+    }
+    if (group.isArchived) {
+      throw new ConflictException({
+        errorCode: 'RES_ALREADY_ARCHIVED',
+        message: 'Group is already archived',
+      });
+    }
+
+    const archivedGroup = await this.dataSource.transaction(async (manager) => {
+      // Mark the group archived and revoke the standing invite link
+      group.isArchived = true;
+      group.inviteToken = null as unknown as string;
+      const saved = await manager.save(Group, group);
+
+      // Expire all pending invites so they can no longer be accepted
+      await manager
+        .getRepository(GroupInvite)
+        .createQueryBuilder()
+        .update(GroupInvite)
+        .set({ status: 'expired' })
+        .where('group_id = :groupId', { groupId })
+        .andWhere('status = :status', { status: 'pending' })
+        .execute();
+
+      return saved;
+    });
+
+    const actorUser = await this.dataSource
+      .getRepository(User)
+      .findOne({ where: { id: userId } });
+    if (actorUser) {
+      void this.writeAuditLog({
+        actorUser,
+        action: 'group.archived',
+        entityId: archivedGroup.id,
+        groupId: archivedGroup.id,
+        metadata: {
+          name: archivedGroup.name,
+          ...(reason ? { reason } : {}),
+        },
+        ip: context?.ip,
+        userAgent: context?.userAgent,
+      });
+    }
+
+    return archivedGroup;
+  }
+
+  /**
    * Lists every key version of a group (any status). Metadata only — no key
    * material. Lets clients and provisioning UIs enumerate versions instead of
    * discovering them one expense stamp at a time.

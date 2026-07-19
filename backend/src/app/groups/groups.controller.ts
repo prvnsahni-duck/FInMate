@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Query,
   Param,
@@ -173,6 +174,37 @@ export class GroupsController {
       context,
     );
     return new SuccessResponse('Group updated successfully', result);
+  }
+
+  /**
+   * Archive (soft-delete) a group. Exposed to users as "Delete Group".
+   * Restricted to the group owner only — admins, editors, and viewers are rejected.
+   */
+  @Delete(':id')
+  async archive(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { reason?: string },
+    @Req()
+    req: Request & {
+      user: { id: string };
+      ip?: string;
+      socket: { remoteAddress?: string };
+    },
+  ) {
+    const context = {
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.groupsCrudService.archiveGroup(
+      req.user.id,
+      id,
+      body?.reason,
+      context,
+    );
+    return new SuccessResponse('Group deleted successfully', result);
   }
 
   @Post(':id/invite-link/regenerate')

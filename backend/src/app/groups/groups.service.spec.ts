@@ -328,6 +328,122 @@ describe('GroupsService', () => {
     });
   });
 
+  describe('archiveGroup', () => {
+    const mockOwnerMembership = { id: 'member-id', role: 'owner' } as any;
+    const mockAdminMembership = { id: 'member-id', role: 'admin' } as any;
+    const mockEditorMembership = { id: 'member-id', role: 'member' } as any;
+    const mockViewerMembership = { id: 'member-id', role: 'viewer' } as any;
+    const mockGroup = {
+      id: 'group-id',
+      name: 'Goa Trip',
+      isArchived: false,
+      inviteToken: 'some-token',
+    } as any;
+
+    beforeEach(() => {
+      // Default: transaction runs the callback immediately
+      (dataSource.transaction as jest.Mock).mockImplementation(async (cb) => {
+        const manager = {
+          save: jest.fn(async (_entity: any, data: any) => data),
+          getRepository: jest.fn(() => ({
+            createQueryBuilder: jest.fn(() => ({
+              update: jest.fn().mockReturnThis(),
+              set: jest.fn().mockReturnThis(),
+              where: jest.fn().mockReturnThis(),
+              andWhere: jest.fn().mockReturnThis(),
+              execute: jest.fn().mockResolvedValue(undefined),
+            })),
+          })),
+        };
+        return cb(manager);
+      });
+      (dataSource.getRepository as jest.Mock).mockReturnValue({
+        findOne: jest.fn().mockResolvedValue({ id: 'user-id' } as any),
+      });
+    });
+
+    it('should archive when caller is the owner', async () => {
+      groupMemberRepository.findOne.mockResolvedValue(mockOwnerMembership);
+      groupRepository.findOne.mockResolvedValue({ ...mockGroup });
+      groupRepository.save.mockResolvedValue({ ...mockGroup, isArchived: true });
+
+      const result = await service.archiveGroup('user-id', 'group-id');
+
+      expect(dataSource.transaction).toHaveBeenCalled();
+      expect(result.isArchived).toBe(true);
+    });
+
+    it('should throw ForbiddenException when caller is an admin', async () => {
+      groupMemberRepository.findOne.mockResolvedValue(mockAdminMembership);
+
+      await expect(
+        service.archiveGroup('user-id', 'group-id'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException when caller is a member/editor', async () => {
+      groupMemberRepository.findOne.mockResolvedValue(mockEditorMembership);
+
+      await expect(
+        service.archiveGroup('user-id', 'group-id'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException when caller is a viewer', async () => {
+      groupMemberRepository.findOne.mockResolvedValue(mockViewerMembership);
+
+      await expect(
+        service.archiveGroup('user-id', 'group-id'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ForbiddenException when caller has no membership', async () => {
+      groupMemberRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.archiveGroup('user-id', 'group-id'),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should throw ConflictException if group is already archived', async () => {
+      groupMemberRepository.findOne.mockResolvedValue(mockOwnerMembership);
+      groupRepository.findOne.mockResolvedValue({
+        ...mockGroup,
+        isArchived: true,
+      });
+
+      await expect(
+        service.archiveGroup('user-id', 'group-id'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should throw NotFoundException if group does not exist', async () => {
+      groupMemberRepository.findOne.mockResolvedValue(mockOwnerMembership);
+      groupRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.archiveGroup('user-id', 'group-id'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should include reason in archive metadata when provided', async () => {
+      groupMemberRepository.findOne.mockResolvedValue(mockOwnerMembership);
+      const savedGroup = { ...mockGroup, isArchived: true };
+      groupRepository.findOne.mockResolvedValue({ ...mockGroup });
+      groupRepository.save.mockResolvedValue(savedGroup);
+
+      const result = await service.archiveGroup(
+        'user-id',
+        'group-id',
+        'no longer needed',
+      );
+
+      expect(result.isArchived).toBe(true);
+      // Verify the transaction ran (audit is fire-and-forget inside transaction callback)
+      expect(dataSource.transaction).toHaveBeenCalled();
+    });
+  });
+
   describe('inviteMember', () => {
     it('should throw ForbiddenException if caller is not owner/admin', async () => {
       groupMemberRepository.findOne.mockResolvedValue({

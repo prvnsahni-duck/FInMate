@@ -45,4 +45,13 @@ export class GroupsCrudService {
   async regenerateInviteToken(userId: string, groupId: string): Promise<Group> {
     return this.groupsService.regenerateInviteToken(userId, groupId);
   }
+
+  async archiveGroup(
+    userId: string,
+    groupId: string,
+    reason?: string,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<Group> {
+    return this.groupsService.archiveGroup(userId, groupId, reason, context);
+  }
 }

@@ -297,6 +297,25 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return member?.role === 'owner' || member?.role === 'admin';
   });
 
+  isOwner = computed(() => {
+    const userId = this.currentUserId();
+    if (!userId) return false;
+    const member = this.members().find((m) => m.user?.id === userId);
+    return member?.role === 'owner';
+  });
+
+  // Archive (Delete Group) dialog state
+  isArchiveDialogOpen = signal<boolean>(false);
+  archiveConfirmName = signal<string>('');
+  archiveReason = signal<string>('');
+  isArchiving = signal<boolean>(false);
+  archiveError = signal<string>('');
+
+  archiveNameMatches = computed(() => {
+    const g = this.group();
+    return g ? this.archiveConfirmName().trim() === g.name.trim() : false;
+  });
+
   totalPages = computed(() => {
     return Math.ceil(this.totalExpenses() / this.pageSize()) || 1;
   });
@@ -1155,6 +1174,43 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.isSavingSettings = false;
           this.settingsError =
             err.error?.message || 'Failed to update group settings.';
+        },
+      });
+  }
+
+  openArchiveDialog() {
+    this.archiveConfirmName.set('');
+    this.archiveReason.set('');
+    this.archiveError.set('');
+    this.isArchiveDialogOpen.set(true);
+  }
+
+  closeArchiveDialog() {
+    this.isArchiveDialogOpen.set(false);
+    this.archiveConfirmName.set('');
+    this.archiveReason.set('');
+    this.archiveError.set('');
+  }
+
+  confirmArchiveGroup() {
+    const g = this.group();
+    if (!g || !this.archiveNameMatches()) return;
+    this.isArchiving.set(true);
+    this.archiveError.set('');
+
+    this.groupsService
+      .archiveGroup(g.id, this.archiveReason() || undefined)
+      .subscribe({
+        next: () => {
+          this.isArchiving.set(false);
+          this.closeArchiveDialog();
+          this.router.navigate(['/groups']);
+        },
+        error: (err) => {
+          this.isArchiving.set(false);
+          this.archiveError.set(
+            err.error?.message || 'Failed to delete group. Please try again.',
+          );
         },
       });
   }

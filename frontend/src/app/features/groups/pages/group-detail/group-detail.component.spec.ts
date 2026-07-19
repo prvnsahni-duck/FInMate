@@ -294,4 +294,98 @@ describe('GroupDetailComponent', () => {
     fixture.detectChanges(); // ngOnInit -> fetchMembers
     expect(selfHealSpy).toHaveBeenCalledWith('group-1');
   });
+
+  describe('archiveGroup (Delete Group)', () => {
+    beforeEach(() => {
+      fixture.detectChanges();
+      // Ensure owner is current user
+      jest.spyOn(component, 'getCurrentUserId').mockReturnValue('user-owner');
+    });
+
+    it('isOwner() returns true when current user is the owner', () => {
+      expect(component.isOwner()).toBe(true);
+    });
+
+    it('isOwner() returns false when current user is an admin', () => {
+      jest.spyOn(component, 'getCurrentUserId').mockReturnValue('user-admin');
+      component.currentUserId.set('user-admin');
+      expect(component.isOwner()).toBe(false);
+    });
+
+    it('openArchiveDialog() resets state and opens the dialog', () => {
+      component.archiveConfirmName.set('stale');
+      component.archiveReason.set('old reason');
+      component.archiveError.set('old error');
+
+      component.openArchiveDialog();
+
+      expect(component.isArchiveDialogOpen()).toBe(true);
+      expect(component.archiveConfirmName()).toBe('');
+      expect(component.archiveReason()).toBe('');
+      expect(component.archiveError()).toBe('');
+    });
+
+    it('closeArchiveDialog() closes and resets state', () => {
+      component.isArchiveDialogOpen.set(true);
+      component.archiveConfirmName.set('some name');
+
+      component.closeArchiveDialog();
+
+      expect(component.isArchiveDialogOpen()).toBe(false);
+      expect(component.archiveConfirmName()).toBe('');
+    });
+
+    it('archiveNameMatches() is false when typed name does not match group name', () => {
+      component.archiveConfirmName.set('Wrong Name');
+      expect(component.archiveNameMatches()).toBe(false);
+    });
+
+    it('archiveNameMatches() is true when typed name exactly matches group name', () => {
+      component.archiveConfirmName.set(mockGroup.name);
+      expect(component.archiveNameMatches()).toBe(true);
+    });
+
+    it('confirmArchiveGroup() does nothing if names do not match', () => {
+      (mockGroupsService as any).archiveGroup = jest.fn().mockReturnValue(of({}));
+      component.archiveConfirmName.set('wrong');
+
+      component.confirmArchiveGroup();
+
+      expect((mockGroupsService as any).archiveGroup).not.toHaveBeenCalled();
+    });
+
+    it('confirmArchiveGroup() calls archiveGroup and navigates to /groups on success', () => {
+      const archivedGroup = { ...mockGroup, isArchived: true };
+      (mockGroupsService as any).archiveGroup = jest
+        .fn()
+        .mockReturnValue(of(archivedGroup));
+      component.archiveConfirmName.set(mockGroup.name);
+      component.archiveReason.set('no longer needed');
+
+      const routerSpy = jest
+        .spyOn(component['router'], 'navigate')
+        .mockResolvedValue(true);
+
+      component.confirmArchiveGroup();
+
+      expect((mockGroupsService as any).archiveGroup).toHaveBeenCalledWith(
+        mockGroup.id,
+        'no longer needed',
+      );
+      expect(routerSpy).toHaveBeenCalledWith(['/groups']);
+    });
+
+    it('confirmArchiveGroup() sets archiveError on failure', () => {
+      const { throwError } = require('rxjs');
+      (mockGroupsService as any).archiveGroup = jest
+        .fn()
+        .mockReturnValue(throwError(() => ({ error: { message: 'Server error' } })));
+      component.archiveConfirmName.set(mockGroup.name);
+
+      component.confirmArchiveGroup();
+
+      expect(component.archiveError()).toBe('Server error');
+      expect(component.isArchiving()).toBe(false);
+    });
+  });
 });
