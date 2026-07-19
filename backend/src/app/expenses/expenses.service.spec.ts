@@ -1196,4 +1196,125 @@ describe('ExpensesService', () => {
       });
     });
   });
+
+  // ── listMyExpenses ────────────────────────────────────────────────────────
+
+  describe('listMyExpenses', () => {
+    const makeQb = (rows: any[]) => ({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      innerJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue(rows),
+    });
+
+    it('returns personal expenses with expenseType PERSONAL', async () => {
+      const personalExp = {
+        id: 'p-1',
+        title: 'enc:Groceries',
+        amountTotal: 200,
+        category: 'Food & Drinks',
+        expenseDate: '2026-07-01',
+        currency: 'USD',
+        status: 'posted',
+        encryptionScope: 'personal',
+        group: null,
+        paidByUser: { id: 'user-1', displayName: 'Alice', email: 'alice@e.com' },
+      };
+      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([personalExp]));
+      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+
+      const result = await service.listMyExpenses('user-1', 1, 20);
+
+      expect(result.data).toHaveLength(1);
+      expect((result.data[0] as any).expenseType).toBe('PERSONAL');
+      expect((result.data[0] as any).myShare).toBe(200);
+      expect((result.data[0] as any).groupId).toBeNull();
+    });
+
+    it('returns group shares with expenseType GROUP_SHARE and myShare = amountOwed', async () => {
+      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+      const groupExp = {
+        id: 'g-1',
+        title: 'enc:Dinner',
+        amountTotal: 900,
+        category: 'Food & Drinks',
+        expenseDate: '2026-07-02',
+        currency: 'USD',
+        status: 'posted',
+        encryptionScope: 'group',
+        group: { id: 'grp-1', name: 'House' },
+        paidByUser: { id: 'user-2', displayName: 'Bob', email: 'bob@e.com' },
+      };
+      const split = { id: 'sp-1', amountOwed: 300, isSettled: false, expense: groupExp };
+      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([split]));
+
+      const result = await service.listMyExpenses('user-1', 1, 20);
+
+      expect(result.data).toHaveLength(1);
+      expect((result.data[0] as any).expenseType).toBe('GROUP_SHARE');
+      expect((result.data[0] as any).myShare).toBe(300);
+      expect((result.data[0] as any).groupId).toBe('grp-1');
+      expect((result.data[0] as any).groupName).toBe('House');
+    });
+
+    it('does not duplicate an expense that appears as both personal and a split', async () => {
+      const exp = {
+        id: 'shared-1',
+        title: 'enc:Shared',
+        amountTotal: 100,
+        category: 'Food & Drinks',
+        expenseDate: '2026-07-01',
+        currency: 'USD',
+        status: 'posted',
+        encryptionScope: 'personal',
+        group: null,
+        paidByUser: { id: 'user-1', displayName: 'Alice', email: 'alice@e.com' },
+      };
+      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([exp]));
+      // Same expense also shows up in splits
+      const split = { id: 'sp-x', amountOwed: 50, isSettled: false, expense: exp };
+      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([split]));
+
+      const result = await service.listMyExpenses('user-1', 1, 20);
+
+      // Only one item — the personal record wins (seen set)
+      expect(result.data).toHaveLength(1);
+      expect((result.data[0] as any).expenseType).toBe('PERSONAL');
+    });
+
+    it('returns only non-participants excluded — returns empty for non-participant', async () => {
+      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+
+      const result = await service.listMyExpenses('non-member', 1, 20);
+
+      expect(result.data).toHaveLength(0);
+      expect(result.meta.totalItems).toBe(0);
+    });
+
+    it('paginates correctly', async () => {
+      const exps = Array.from({ length: 5 }, (_, i) => ({
+        id: `p-${i}`,
+        amountTotal: 10 * (i + 1),
+        category: 'Other',
+        expenseDate: `2026-07-0${i + 1}`,
+        currency: 'USD',
+        status: 'posted',
+        encryptionScope: 'personal',
+        group: null,
+        paidByUser: { id: 'user-1' },
+      }));
+      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb(exps));
+      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+
+      const page1 = await service.listMyExpenses('user-1', 1, 3);
+      const page2 = await service.listMyExpenses('user-1', 2, 3);
+
+      expect(page1.data).toHaveLength(3);
+      expect(page2.data).toHaveLength(2);
+      expect(page1.meta.totalItems).toBe(5);
+    });
+  });
 });

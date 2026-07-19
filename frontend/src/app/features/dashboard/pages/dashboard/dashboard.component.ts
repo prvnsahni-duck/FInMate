@@ -79,6 +79,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   monthlyExpenses = 0;
   activeGroupsCount = 0;
   personalExpenses: GroupExpense[] = [];
+  myExpenses: any[] = []; // personal + group shares
+  expenseViewFilter: 'all' | 'personal' | 'group_share' = 'all';
   get isExpenseModalOpen(): boolean {
     return this.expensesUiStore.showCreateExpenseModal();
   }
@@ -146,15 +148,24 @@ export class DashboardComponent implements OnInit, OnDestroy {
   fetchData() {
     this.isLoading = true;
 
-    // 1. Fetch personal expenses
+    // 1. Fetch personal + group-share expenses (unified list)
     this.expensesService
-      .getExpenses('personal', { page: 1, limit: 25 })
+      .getMyExpenses({ page: 1, limit: 50 })
       .subscribe({
         next: (res) => {
-          this.personalExpenses = (res.data as GroupExpense[]) || [];
-          // Personal balance is simply the sum of all personal expenses logged
-          this.totalBalance = this.personalExpenses.reduce(
-            (sum, e) => sum + Number(e.amountTotal),
+          const items: any[] = Array.isArray(res.data)
+            ? res.data
+            : Array.isArray(res.data?.data)
+              ? res.data.data
+              : [];
+          this.myExpenses = items;
+          // Keep personalExpenses for backwards compat with existing templates
+          this.personalExpenses = items.filter(
+            (e) => e.expenseType === 'PERSONAL' || !e.expenseType,
+          ) as GroupExpense[];
+          // Total balance = sum of myShare across all items
+          this.totalBalance = items.reduce(
+            (sum, e) => sum + Number(e.myShare ?? e.amountTotal),
             0,
           );
           this.isLoading = false;
@@ -162,16 +173,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
         error: () => (this.isLoading = false),
       });
 
-    // 2. Fetch monthly summary for personal analytics
-    this.expensesService.getMonthlyAnalytics('personal').subscribe({
-      next: (res) => {
-        const currentMonthStr = new Date().toISOString().slice(0, 7);
-        const currentMonthData = res.find((r) => r.month === currentMonthStr);
-        this.monthlyExpenses = currentMonthData ? currentMonthData.total : 0;
+    // 2. Combined monthly total (personal + group shares)
+    this.expensesService.getCombinedMonthlyTotal().subscribe({
+      next: (total) => {
+        this.monthlyExpenses = total;
         this.recalculatePercentages();
       },
       error: () => {
-        console.error('Failed to fetch monthly analytics');
+        // Fallback to personal-only if combined endpoint fails
+        this.expensesService.getMonthlyAnalytics('personal').subscribe({
+          next: (res) => {
+            const currentMonthStr = new Date().toISOString().slice(0, 7);
+            const currentMonthData = res.find((r) => r.month === currentMonthStr);
+            this.monthlyExpenses = currentMonthData ? currentMonthData.total : 0;
+            this.recalculatePercentages();
+          },
+        });
       },
     });
 
@@ -293,6 +310,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
           alert(err.error?.message || 'Failed to update profile settings.');
         },
       });
+  }
+
+  get filteredMyExpenses(): any[] {
+    if (this.expenseViewFilter === 'personal') {
+      return this.myExpenses.filter((e) => e.expenseType === 'PERSONAL' || !e.expenseType);
+    }
+    if (this.expenseViewFilter === 'group_share') {
+      return this.myExpenses.filter((e) => e.expenseType === 'GROUP_SHARE');
+    }
+    return this.myExpenses;
+  }
+
+  setExpenseViewFilter(filter: 'all' | 'personal' | 'group_share'): void {
+    this.expenseViewFilter = filter;
+  }
+
+  openGroupExpense(event: { groupId: string; expenseId: string }): void {
+    this.router.navigate(['/groups', event.groupId], {
+      queryParams: { highlight: event.expenseId },
+    });
   }
 
   handleProfileUpdated(res: any): void {

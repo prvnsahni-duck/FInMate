@@ -123,6 +123,29 @@ export class ExpensesController {
     return new SuccessResponse('Expense restored successfully', result);
   }
 
+  // ─── My Expenses (personal + group shares) ───────────────────────────────
+
+  /**
+   * Returns the calling user's personal expenses PLUS their share of group
+   * expenses (via ExpenseSplit), with `myShare` and `expenseType` on each row.
+   * Totals on the dashboard must use `myShare`, not `amountTotal`.
+   */
+  @Get('me')
+  async listMine(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Req() req?: Request & { user: { id: string } },
+  ) {
+    const pageNum = page ? Math.max(1, parseInt(page, 10)) : 1;
+    const limitNum = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 25;
+    const result = await this.expensesCrudService.listMyExpenses(
+      req!.user.id,
+      pageNum,
+      limitNum,
+    );
+    return new SuccessResponse('My expenses retrieved successfully', result);
+  }
+
   // ─── Analytics ────────────────────────────────────────────────────────────
 
   /** Monthly expense totals for a given year. */
