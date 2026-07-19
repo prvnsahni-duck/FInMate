@@ -23,20 +23,102 @@ fi
 
 echo "Using base branch reference for affected files: $DEFAULT_BRANCH"
 
+# ── 1. Secret scan ────────────────────────────────────────────────────────────
+echo ""
+echo "Scanning for hardcoded secrets..."
+SECRET_HITS=$(git diff "$DEFAULT_BRANCH" HEAD -- '*.ts' '*.js' '*.json' '*.env' \
+  | grep '^+' \
+  | grep -ivE '^\+\+\+' \
+  | grep -iE '(secret|password|encryption_key|private_key|api_key|jwt_secret)\s*[:=]\s*["\x27][^$\{\(]' \
+  || true)
+if [ -n "$SECRET_HITS" ]; then
+  echo ""
+  echo "ERROR: Possible hardcoded secret detected in diff:"
+  echo "$SECRET_HITS"
+  echo "Remove secrets and use environment variables instead."
+  exit 1
+fi
+echo "No hardcoded secrets found."
+
+# ── 2. ZK / @IsCiphertext guard ───────────────────────────────────────────────
+echo ""
+echo "Checking @IsCiphertext compliance on changed DTOs..."
+CHANGED_DTOS=$(git diff --name-only "$DEFAULT_BRANCH" HEAD -- 'backend/src/**/*.dto.ts' 'backend/src/**/dto/*.ts' || true)
+if [ -n "$CHANGED_DTOS" ]; then
+  for dto_file in $CHANGED_DTOS; do
+    if [ -f "$dto_file" ]; then
+      # Check if file adds a ZK string field without @IsCiphertext above it
+      MISSING=$(awk '
+        /^[[:space:]]*@IsCiphertext/ { has_cipher = 1; next }
+        /^[[:space:]]*(title|description|note|filename|encryptedOriginalName|encryptedFileKey|goal)[A-Za-z]*[!?]?:[[:space:]]*string/ {
+          if (!has_cipher) print FILENAME ":" NR ": ZK field missing @IsCiphertext: " $0
+          has_cipher = 0
+          next
+        }
+        /^[[:space:]]*@/ { has_cipher = 0 }
+      ' "$dto_file" || true)
+      if [ -n "$MISSING" ]; then
+        echo ""
+        echo "ERROR: ZK field without @IsCiphertext decorator:"
+        echo "$MISSING"
+        echo "Add @IsCiphertext to all ZK string fields in DTOs (coding rule #3)."
+        exit 1
+      fi
+    fi
+  done
+fi
+echo "@IsCiphertext compliance OK."
+
+# ── 3. Migration index integrity ──────────────────────────────────────────────
+echo ""
+echo "Checking migration index registration..."
+NEW_MIGRATIONS=$(git diff --name-only "$DEFAULT_BRANCH" HEAD -- 'backend/src/migrations/[0-9]*.ts' || true)
+if [ -n "$NEW_MIGRATIONS" ]; then
+  for mig_file in $NEW_MIGRATIONS; do
+    if [ -f "$mig_file" ]; then
+      CLASS=$(grep -o 'export class [A-Za-z0-9]*' "$mig_file" | awk '{print $3}' | head -1)
+      if [ -n "$CLASS" ]; then
+        if ! grep -q "$CLASS" backend/src/migrations/index.ts 2>/dev/null; then
+          echo ""
+          echo "ERROR: Migration class '$CLASS' in $mig_file is not registered in backend/src/migrations/index.ts"
+          echo "Add it to the migrations index so it runs in production."
+          exit 1
+        fi
+      fi
+    fi
+  done
+fi
+echo "Migration index OK."
+
+# ── 4. Format check ───────────────────────────────────────────────────────────
+echo ""
 echo "Checking formatting..."
 npx nx format:check
 
+# ── 5. TypeScript type-check ──────────────────────────────────────────────────
+echo ""
+echo "Running type-check..."
+npx nx affected -t typecheck --base=$DEFAULT_BRANCH --head=HEAD
+
+# ── 6. Lint ───────────────────────────────────────────────────────────────────
 echo ""
 echo "Running lint..."
 npx nx affected -t lint --base=$DEFAULT_BRANCH --head=HEAD
 
+# ── 7. Unit tests ─────────────────────────────────────────────────────────────
 echo ""
 echo "Running unit tests..."
 npx nx affected -t test --base=$DEFAULT_BRANCH --head=HEAD
 
+# ── 8. Production build ───────────────────────────────────────────────────────
 echo ""
 echo "Running production builds..."
 npx nx affected -t build --base=$DEFAULT_BRANCH --head=HEAD
+
+# ── 9. Critical CVE audit ─────────────────────────────────────────────────────
+echo ""
+echo "Auditing for critical CVEs..."
+npm audit --audit-level=critical --omit=dev
 
 echo ""
 echo "======================================="
