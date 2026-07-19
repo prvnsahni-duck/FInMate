@@ -34,7 +34,9 @@ export class WrappedKeyEntryDto {
 
   @IsString({ message: 'wrappedKey must be a string' })
   @IsNotEmpty({ message: 'wrappedKey is required' })
-  @MinLength(32, { message: 'wrappedKey is too short to be a valid wrapped key' })
+  @MinLength(32, {
+    message: 'wrappedKey is too short to be a valid wrapped key',
+  })
   @MaxLength(1024, { message: 'wrappedKey exceeds the maximum allowed length' })
   wrappedKey!: string;
 

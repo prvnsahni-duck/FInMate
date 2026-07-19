@@ -7,6 +7,7 @@
 > organizes them into an execution plan. **Do not implement any gap until its governing ADR is imported.**
 
 Contents:
+
 1. [Scope & inputs](#1-scope--inputs)
 2. [Dependency mapping (per gap)](#2-dependency-mapping-per-gap)
 3. [Implementation dependency graph](#3-implementation-dependency-graph)
@@ -34,72 +35,72 @@ Columns: **Sch** = DB schema/migration impact · **API** = API contract impact �
 
 ### Encryption / Key Management
 
-| Gap | Modules | Key files | Services | Sch | API | Enc | Sync | Mig | Complexity | Depends on |
-|-----|---------|-----------|----------|:---:|:---:|:---:|:----:|:---:|:----------:|-----------|
-| ENC-001 | Encryption | `encryption/encryption.service.ts`; env validation | Encryption, boot | – | – | ✔ | – | No | S | none (do first) |
-| ENC-002 | Encryption, Groups | `groups.controller.ts`, `groups.service.ts` (getMyGroupKey); FE `group-key.service.ts` | Groups-crud, key serving | – | ✔ (add `?versionId`) | ✔ | – | No | M | ENC-001 |
-| ENC-003 | Encryption, Users | `users.service.ts`; docs | Users | – | – | ✔ | – | Maybe (if scheme change) | S | ENC-001; decision (doc vs remove) |
-| ENC-004 | Encryption | FE `encryption.service.ts`, `group-key.service.ts` | Crypto engine (client) | – | – | ✔ | – | No | M | ENC-001 |
-| ENC-005 | Encryption, Groups | `groups.service.ts` (provision/rotate), `dto/group-key.dto.ts` | Key provisioning | Maybe (persist algo) | – | ✔ | – | Maybe | S | ENC-002 |
+| Gap     | Modules            | Key files                                                                              | Services                 |         Sch          |          API          | Enc | Sync |           Mig            | Complexity | Depends on                        |
+| ------- | ------------------ | -------------------------------------------------------------------------------------- | ------------------------ | :------------------: | :-------------------: | :-: | :--: | :----------------------: | :--------: | --------------------------------- |
+| ENC-001 | Encryption         | `encryption/encryption.service.ts`; env validation                                     | Encryption, boot         |          –           |           –           | ✔  |  –   |            No            |     S      | none (do first)                   |
+| ENC-002 | Encryption, Groups | `groups.controller.ts`, `groups.service.ts` (getMyGroupKey); FE `group-key.service.ts` | Groups-crud, key serving |          –           | ✔ (add `?versionId`) | ✔  |  –   |            No            |     M      | ENC-001                           |
+| ENC-003 | Encryption, Users  | `users.service.ts`; docs                                                               | Users                    |          –           |           –           | ✔  |  –   | Maybe (if scheme change) |     S      | ENC-001; decision (doc vs remove) |
+| ENC-004 | Encryption         | FE `encryption.service.ts`, `group-key.service.ts`                                     | Crypto engine (client)   |          –           |           –           | ✔  |  –   |            No            |     M      | ENC-001                           |
+| ENC-005 | Encryption, Groups | `groups.service.ts` (provision/rotate), `dto/group-key.dto.ts`                         | Key provisioning         | Maybe (persist algo) |           –           | ✔  |  –   |          Maybe           |     S      | ENC-002                           |
 
 ### Groups
 
-| Gap | Modules | Key files | Services | Sch | API | Enc | Sync | Mig | Complexity | Depends on |
-|-----|---------|-----------|----------|:---:|:---:|:---:|:----:|:---:|:----------:|-----------|
-| GRP-001 | Groups | `groups.service.ts` (updateMember), `members.controller.ts`, `group-roles.guard.ts` | Membership | – | – | – | – | No | S–M | none (security, do early) |
-| GRP-002 | Groups | `groups.service.ts` (rotate/provision/invite/regenerate/contrib), `groups-audit.service.ts` | Audit | – | – | – | – | No | M | none |
-| GRP-003 | Groups | `group-roles.decorator.ts`, `members.controller.ts`, guard | Membership authz | – | – | – | – | No | S | GRP-001 (same authz surface) |
-| GRP-004 | Groups | `groups.service.ts` (invites), `group.entity.ts`, `invite.controller.ts` | Invites | Maybe (token expiry col) | ✔ (revoke endpoint) | – | – | Maybe | M | none |
-| GRP-005 | Groups, Encryption | `groups.service.ts` (removeMember), key rotation | Membership + key rotation | – | – | ✔ | – | No | L | ENC-002 (needs working versioned re-key) |
-| GRP-006 | Groups | `group.entity.ts`, `dto/group.dto.ts`, migration, docs | Groups-crud | ✔ (if built) | ✔ | – | – | Yes (if built) | S (doc) / M (feature) | ADR decision (build vs doc-only) |
-| GRP-007 | Groups, Encryption | `groups.service.ts` (getHistoryLogs), audit metadata, FE `groups.service.ts` | Audit + history | Maybe | – | ✔ | – | Maybe | M | ENC-002; EXP-002/003 (version-stamped metadata) |
+| Gap     | Modules            | Key files                                                                                   | Services                  |           Sch            |         API          | Enc | Sync |      Mig       |      Complexity       | Depends on                                      |
+| ------- | ------------------ | ------------------------------------------------------------------------------------------- | ------------------------- | :----------------------: | :------------------: | :-: | :--: | :------------: | :-------------------: | ----------------------------------------------- |
+| GRP-001 | Groups             | `groups.service.ts` (updateMember), `members.controller.ts`, `group-roles.guard.ts`         | Membership                |            –             |          –           |  –  |  –   |       No       |          S–M          | none (security, do early)                       |
+| GRP-002 | Groups             | `groups.service.ts` (rotate/provision/invite/regenerate/contrib), `groups-audit.service.ts` | Audit                     |            –             |          –           |  –  |  –   |       No       |           M           | none                                            |
+| GRP-003 | Groups             | `group-roles.decorator.ts`, `members.controller.ts`, guard                                  | Membership authz          |            –             |          –           |  –  |  –   |       No       |           S           | GRP-001 (same authz surface)                    |
+| GRP-004 | Groups             | `groups.service.ts` (invites), `group.entity.ts`, `invite.controller.ts`                    | Invites                   | Maybe (token expiry col) | ✔ (revoke endpoint) |  –  |  –   |     Maybe      |           M           | none                                            |
+| GRP-005 | Groups, Encryption | `groups.service.ts` (removeMember), key rotation                                            | Membership + key rotation |            –             |          –           | ✔  |  –   |       No       |           L           | ENC-002 (needs working versioned re-key)        |
+| GRP-006 | Groups             | `group.entity.ts`, `dto/group.dto.ts`, migration, docs                                      | Groups-crud               |      ✔ (if built)       |          ✔          |  –  |  –   | Yes (if built) | S (doc) / M (feature) | ADR decision (build vs doc-only)                |
+| GRP-007 | Groups, Encryption | `groups.service.ts` (getHistoryLogs), audit metadata, FE `groups.service.ts`                | Audit + history           |          Maybe           |          –           | ✔  |  –   |     Maybe      |           M           | ENC-002; EXP-002/003 (version-stamped metadata) |
 
 ### Expense / Settlements
 
-| Gap | Modules | Key files | Services | Sch | API | Enc | Sync | Mig | Complexity | Depends on |
-|-----|---------|-----------|----------|:---:|:---:|:---:|:----:|:---:|:----------:|-----------|
-| EXP-001 | Expense, Settlements | `expenses.service.ts` (updateExpense/persistSplits), `expense-split.entity.ts` | Expenses-crud | Maybe (adjustment model) | ✔ (edit semantics) | – | ✔ (version) | Maybe | L | EXP-004, EXP-005 |
-| EXP-002 | Expense, Encryption | `recurring-expense.entity.ts`, migration, scheduler | Recurring | ✔ (add `groupKeyVersionId`) | – | ✔ | – | Yes | M | ENC-002 |
-| EXP-003 | Expense, Encryption | `expenses.service.ts` (updateExpense) | Expenses-crud | – | – | ✔ | – | No | M | ENC-002; EXP-002 |
-| EXP-004 | Expense | `expense-split.entity.ts`, `expenses.service.ts` (updateExpense) | Expenses-crud | ✔ (add `deletedAt` to splits) | – | – | – | Yes | M | none (do before EXP-001) |
-| EXP-005 | Expense | `expense-split.entity.ts`, split writes, delete/restore | Expenses-crud | ✔ (add `@VersionColumn`) | – | – | ✔ | Yes | M | EXP-004 (same entity change) |
-| EXP-006 | Expense | `expenses.service.ts` (restore grace calc) | Expenses-crud | – | – | – | – | No | S | ADR decision (code vs doc) |
-| EXP-007 | Expense | `recurring-expenses.service.ts`, scheduler | Recurring | – | – | – | – | No | S | none |
-| EXP-008 | Expense, Settlements | `dto/settlement.dto.ts`, `settlements.service.ts` | Settlements | – | ✔ (validation) | ✔ | – | No | S | none |
-| EXP-009 | Expense, Encryption | `expenses.service.ts` (validate), DTOs, FE | Expenses-crud | – | Maybe | ✔ | – | No | S (remove) / L (enable) | ADR decision (remove vs implement `direct_shared`) |
+| Gap     | Modules              | Key files                                                                      | Services      |              Sch               |         API         | Enc |     Sync     |  Mig  |       Complexity        | Depends on                                         |
+| ------- | -------------------- | ------------------------------------------------------------------------------ | ------------- | :----------------------------: | :-----------------: | :-: | :----------: | :---: | :---------------------: | -------------------------------------------------- |
+| EXP-001 | Expense, Settlements | `expenses.service.ts` (updateExpense/persistSplits), `expense-split.entity.ts` | Expenses-crud |    Maybe (adjustment model)    | ✔ (edit semantics) |  –  | ✔ (version) | Maybe |            L            | EXP-004, EXP-005                                   |
+| EXP-002 | Expense, Encryption  | `recurring-expense.entity.ts`, migration, scheduler                            | Recurring     |  ✔ (add `groupKeyVersionId`)  |          –          | ✔  |      –       |  Yes  |            M            | ENC-002                                            |
+| EXP-003 | Expense, Encryption  | `expenses.service.ts` (updateExpense)                                          | Expenses-crud |               –                |          –          | ✔  |      –       |  No   |            M            | ENC-002; EXP-002                                   |
+| EXP-004 | Expense              | `expense-split.entity.ts`, `expenses.service.ts` (updateExpense)               | Expenses-crud | ✔ (add `deletedAt` to splits) |          –          |  –  |      –       |  Yes  |            M            | none (do before EXP-001)                           |
+| EXP-005 | Expense              | `expense-split.entity.ts`, split writes, delete/restore                        | Expenses-crud |   ✔ (add `@VersionColumn`)    |          –          |  –  |      ✔      |  Yes  |            M            | EXP-004 (same entity change)                       |
+| EXP-006 | Expense              | `expenses.service.ts` (restore grace calc)                                     | Expenses-crud |               –                |          –          |  –  |      –       |  No   |            S            | ADR decision (code vs doc)                         |
+| EXP-007 | Expense              | `recurring-expenses.service.ts`, scheduler                                     | Recurring     |               –                |          –          |  –  |      –       |  No   |            S            | none                                               |
+| EXP-008 | Expense, Settlements | `dto/settlement.dto.ts`, `settlements.service.ts`                              | Settlements   |               –                |   ✔ (validation)   | ✔  |      –       |  No   |            S            | none                                               |
+| EXP-009 | Expense, Encryption  | `expenses.service.ts` (validate), DTOs, FE                                     | Expenses-crud |               –                |        Maybe        | ✔  |      –       |  No   | S (remove) / L (enable) | ADR decision (remove vs implement `direct_shared`) |
 
 ### Authentication / Users
 
-| Gap | Modules | Key files | Services | Sch | API | Enc | Sync | Mig | Complexity | Depends on |
-|-----|---------|-----------|----------|:---:|:---:|:---:|:----:|:---:|:----------:|-----------|
-| AUTH-001 | Auth | `auth.service.ts`, `auth.controller.ts`, FE `jwt.interceptor.ts`, `auth.service.ts` | Auth + FE | – | ✔ (cookie transport) | – | – | No | L | ADR decision (cookie vs body); coordinated FE+BE |
-| AUTH-002 | Auth, Users, Email, Encryption | `auth.controller.ts`, `auth.service.ts`, `email.service.ts`, `users.service.ts` (UDK re-wrap) | Auth, Email, Users | Maybe (reset tokens) | ✔ (3 endpoints) | ✔ (UDK re-wrap) | – | Maybe | XL | NOTIF-002; email working; ENC model |
-| AUTH-003 | Auth | `auth.service.ts`, `jwt.strategy.ts` | Auth | – | – | – | – | No | S | none |
-| AUTH-004 | Auth | `main.ts` (CORS) | boot | – | – | – | – | No | S | none |
-| AUTH-005 | Auth, Infra | `main.ts` (trust proxy, Swagger) | boot | – | – | – | – | No | S | none |
-| AUTH-006 | Auth | `auth.service.ts` (login failure) | Auth audit | – | – | – | – | No | S | none |
-| AUTH-007 | Auth, Users | `users.service.ts` (saveKeys), `totp.util.ts` | Users, Auth | – | ✔ (re-auth) | ✔ | – | No | M | AUTH-002 (interacts with password/UDK flow) |
-| PF-001 | Personal Finance, Users | `users.controller.ts`, `users.service.ts` | Users | Maybe (anonymize) | ✔ (`DELETE /users/me`) | – | – | Maybe | L | ADR decision (PII scope, ledger retention) |
-| PF-002 | Personal Finance, Encryption | `goal.entity.ts`, `dto/goal.dto.ts`, FE goals | Goals (new) | ✔ (if built) | ✔ | ✔ | – | Yes (if built) | L | Goals feature (RM-03) or crypto-only fix |
+| Gap      | Modules                        | Key files                                                                                     | Services           |         Sch          |           API           |       Enc        | Sync |      Mig       | Complexity | Depends on                                       |
+| -------- | ------------------------------ | --------------------------------------------------------------------------------------------- | ------------------ | :------------------: | :---------------------: | :--------------: | :--: | :------------: | :--------: | ------------------------------------------------ |
+| AUTH-001 | Auth                           | `auth.service.ts`, `auth.controller.ts`, FE `jwt.interceptor.ts`, `auth.service.ts`           | Auth + FE          |          –           |  ✔ (cookie transport)  |        –         |  –   |       No       |     L      | ADR decision (cookie vs body); coordinated FE+BE |
+| AUTH-002 | Auth, Users, Email, Encryption | `auth.controller.ts`, `auth.service.ts`, `email.service.ts`, `users.service.ts` (UDK re-wrap) | Auth, Email, Users | Maybe (reset tokens) |    ✔ (3 endpoints)     | ✔ (UDK re-wrap) |  –   |     Maybe      |     XL     | NOTIF-002; email working; ENC model              |
+| AUTH-003 | Auth                           | `auth.service.ts`, `jwt.strategy.ts`                                                          | Auth               |          –           |            –            |        –         |  –   |       No       |     S      | none                                             |
+| AUTH-004 | Auth                           | `main.ts` (CORS)                                                                              | boot               |          –           |            –            |        –         |  –   |       No       |     S      | none                                             |
+| AUTH-005 | Auth, Infra                    | `main.ts` (trust proxy, Swagger)                                                              | boot               |          –           |            –            |        –         |  –   |       No       |     S      | none                                             |
+| AUTH-006 | Auth                           | `auth.service.ts` (login failure)                                                             | Auth audit         |          –           |            –            |        –         |  –   |       No       |     S      | none                                             |
+| AUTH-007 | Auth, Users                    | `users.service.ts` (saveKeys), `totp.util.ts`                                                 | Users, Auth        |          –           |      ✔ (re-auth)       |        ✔        |  –   |       No       |     M      | AUTH-002 (interacts with password/UDK flow)      |
+| PF-001   | Personal Finance, Users        | `users.controller.ts`, `users.service.ts`                                                     | Users              |  Maybe (anonymize)   | ✔ (`DELETE /users/me`) |        –         |  –   |     Maybe      |     L      | ADR decision (PII scope, ledger retention)       |
+| PF-002   | Personal Finance, Encryption   | `goal.entity.ts`, `dto/goal.dto.ts`, FE goals                                                 | Goals (new)        |    ✔ (if built)     |           ✔            |        ✔        |  –   | Yes (if built) |     L      | Goals feature (RM-03) or crypto-only fix         |
 
 ### Sync / Search / Attachments / Notifications / AI
 
-| Gap | Modules | Key files | Services | Sch | API | Enc | Sync | Mig | Complexity | Depends on |
-|-----|---------|-----------|----------|:---:|:---:|:---:|:----:|:---:|:----------:|-----------|
-| SYNC-001 | Sync/Frontend | `angular.json`, `ngsw-config.json` (new), manifest, `app.config.ts` | FE build | – | – | – | ✔ | No | L | none (infra) |
-| SYNC-002 | Sync/Frontend | FE outbox service (new), interceptors, IndexedDB | FE | – | Maybe | ✔ (offline keys) | ✔ | No | XL | SYNC-001; ENC-004 (offline keys); EXP-005 (conflict on replay) |
-| SYNC-003 | Sync/Frontend | `group-detail.component.ts/html` | FE | – | – | – | – | No | S | SYNC-002 (fix copy when real) |
-| SRCH-001 | Search/Expense | `expenses.service.ts` (listExpenses pagination) | Expenses-access | – | ✔ (cursor semantics) | – | – | No | M | EXP-004/005 (touches same query paths) |
-| SRCH-002 | Search/Infra | `expenses.service.ts` analytics, Redis | Analytics, Redis | – | – | – | – | No | M | none (perf) |
-| ATT-001 | Attachments | storage adapter (new), FE upload, backend endpoints | Attachments (new) | Maybe | ✔ (upload/download) | ✔ | – | Maybe | XL | ENC-002 (key version on files); ATT-002 |
-| ATT-002 | Attachments, Encryption | `expenses.service.ts` (legacy attachmentKeys), DTOs | Expenses-crud | – | ✔ (deprecate legacy) | ✔ | – | No | M | ENC-002 |
-| NOTIF-001 | Notifications, Infra | `members.controller.ts`, `groups.controller.ts`, `throttle.constants.ts` | Throttler | – | – | – | – | No | S | none (add throttle profile) |
-| NOTIF-002 | Notifications, Auth | `email.service.ts`, `auth.controller.ts` | Email, Auth | Maybe | ✔ | – | – | Maybe | M | part of AUTH-002 |
-| NOTIF-003 | Notifications/Infra | new WS gateway, FE socket client | new module | – | ✔ | – | ✔ | No | XL | none (new feature) |
-| NOTIF-004 | Notifications | notification entity (new), endpoints, FE center | new module | ✔ | ✔ | – | – | Yes | L | none (new feature) |
-| AI-001 | AI, Users | `ai.controller.ts`, `ai.service.ts`, `user.entity.ts`, migration, FE | AI, Users | ✔ (add `ai_opt_in`) | ✔ (guard) | – | – | Yes | M | none (security) |
-| AI-002 | AI | `ai.controller.ts`, `ai.service.ts` | AI | – | ✔ (constrain model/system) | – | – | No | M | AI-001 |
-| AI-003 | AI, Infra | `ai.controller.ts`, `throttle.constants.ts` | Throttler | – | – | – | – | No | S | AI-001 |
+| Gap       | Modules                 | Key files                                                                | Services          |         Sch          |             API             |        Enc        | Sync |  Mig  | Complexity | Depends on                                                     |
+| --------- | ----------------------- | ------------------------------------------------------------------------ | ----------------- | :------------------: | :-------------------------: | :---------------: | :--: | :---: | :--------: | -------------------------------------------------------------- |
+| SYNC-001  | Sync/Frontend           | `angular.json`, `ngsw-config.json` (new), manifest, `app.config.ts`      | FE build          |          –           |              –              |         –         |  ✔  |  No   |     L      | none (infra)                                                   |
+| SYNC-002  | Sync/Frontend           | FE outbox service (new), interceptors, IndexedDB                         | FE                |          –           |            Maybe            | ✔ (offline keys) |  ✔  |  No   |     XL     | SYNC-001; ENC-004 (offline keys); EXP-005 (conflict on replay) |
+| SYNC-003  | Sync/Frontend           | `group-detail.component.ts/html`                                         | FE                |          –           |              –              |         –         |  –   |  No   |     S      | SYNC-002 (fix copy when real)                                  |
+| SRCH-001  | Search/Expense          | `expenses.service.ts` (listExpenses pagination)                          | Expenses-access   |          –           |    ✔ (cursor semantics)    |         –         |  –   |  No   |     M      | EXP-004/005 (touches same query paths)                         |
+| SRCH-002  | Search/Infra            | `expenses.service.ts` analytics, Redis                                   | Analytics, Redis  |          –           |              –              |         –         |  –   |  No   |     M      | none (perf)                                                    |
+| ATT-001   | Attachments             | storage adapter (new), FE upload, backend endpoints                      | Attachments (new) |        Maybe         |    ✔ (upload/download)     |        ✔         |  –   | Maybe |     XL     | ENC-002 (key version on files); ATT-002                        |
+| ATT-002   | Attachments, Encryption | `expenses.service.ts` (legacy attachmentKeys), DTOs                      | Expenses-crud     |          –           |    ✔ (deprecate legacy)    |        ✔         |  –   |  No   |     M      | ENC-002                                                        |
+| NOTIF-001 | Notifications, Infra    | `members.controller.ts`, `groups.controller.ts`, `throttle.constants.ts` | Throttler         |          –           |              –              |         –         |  –   |  No   |     S      | none (add throttle profile)                                    |
+| NOTIF-002 | Notifications, Auth     | `email.service.ts`, `auth.controller.ts`                                 | Email, Auth       |        Maybe         |             ✔              |         –         |  –   | Maybe |     M      | part of AUTH-002                                               |
+| NOTIF-003 | Notifications/Infra     | new WS gateway, FE socket client                                         | new module        |          –           |             ✔              |         –         |  ✔  |  No   |     XL     | none (new feature)                                             |
+| NOTIF-004 | Notifications           | notification entity (new), endpoints, FE center                          | new module        |          ✔          |             ✔              |         –         |  –   |  Yes  |     L      | none (new feature)                                             |
+| AI-001    | AI, Users               | `ai.controller.ts`, `ai.service.ts`, `user.entity.ts`, migration, FE     | AI, Users         | ✔ (add `ai_opt_in`) |         ✔ (guard)          |         –         |  –   |  Yes  |     M      | none (security)                                                |
+| AI-002    | AI                      | `ai.controller.ts`, `ai.service.ts`                                      | AI                |          –           | ✔ (constrain model/system) |         –         |  –   |  No   |     M      | AI-001                                                         |
+| AI-003    | AI, Infra               | `ai.controller.ts`, `throttle.constants.ts`                              | Throttler         |          –           |              –              |         –         |  –   |  No   |     S      | AI-001                                                         |
 
 ---
 
@@ -144,12 +145,12 @@ AUTH-002  (password change/reset + UDK re-wrap)  ── needs email (NOTIF-002) 
 AI-001 → AI-002 → AI-003  (opt-in gate, then guards, then throttle)  ── last; no core dep
 ```
 
-**Standalone security/infra items** (no upstream dependency — can be done anytime, ideally early because they are cheap and high-value): GRP-001, GRP-002, GRP-003, NOTIF-001, AUTH-003, AUTH-004, AUTH-005, AUTH-006, EXP-007, EXP-008, AI-001 (AI-001 has no core dependency and is a Critical, so it is pulled forward despite AI sitting last in the *feature* order).
+**Standalone security/infra items** (no upstream dependency — can be done anytime, ideally early because they are cheap and high-value): GRP-001, GRP-002, GRP-003, NOTIF-001, AUTH-003, AUTH-004, AUTH-005, AUTH-006, EXP-007, EXP-008, AI-001 (AI-001 has no core dependency and is a Critical, so it is pulled forward despite AI sitting last in the _feature_ order).
 
 ### Why each dependency exists
 
 - **ENC-001 first:** if the server key can silently fall back to a public constant, every downstream crypto assertion (2FA at rest, avatar) is unsound. Fail-closed is a precondition, not a feature.
-- **ENC-002 is the linchpin:** the backend currently ignores `?versionId=` and always serves the ACTIVE key. Until it can serve the *correct historical version*, any fix that "stamps the right key version" (EXP-002/003, ATT files, GRP-007 history) has nothing to resolve against, and real rotation (GRP-005) would make historical data undecryptable. Everything version-correctness-related sits behind it.
+- **ENC-002 is the linchpin:** the backend currently ignores `?versionId=` and always serves the ACTIVE key. Until it can serve the _correct historical version_, any fix that "stamps the right key version" (EXP-002/003, ATT files, GRP-007 history) has nothing to resolve against, and real rotation (GRP-005) would make historical data undecryptable. Everything version-correctness-related sits behind it.
 - **EXP-004 before EXP-005 before EXP-001:** they touch the same entity and migration. You need soft-deletable, individually-versioned splits before you can represent a settlement adjustment instead of a destructive rewrite.
 - **SYNC-001 before SYNC-002:** an offline mutation queue is pointless if the app can't even load offline. The PWA shell is the substrate.
 - **SYNC-002 needs EXP-005 + ENC-004:** replaying queued edits reconciles via per-record versions (EXP-005) and requires keys available offline in a safe (non-extractable) form (ENC-004).
@@ -162,16 +163,17 @@ AI-001 → AI-002 → AI-003  (opt-in gate, then guards, then throttle)  ── 
 
 Every gap classified into exactly one bucket. **IDs unchanged, nothing merged or removed.**
 
-| Class | Gaps |
-|-------|------|
-| **Architecture** | ENC-002, ENC-004, ENC-005, EXP-002, EXP-003, EXP-004, EXP-005, EXP-001, GRP-005, GRP-007, SYNC-002, SRCH-001, ATT-002, ATT-001, EXP-009 |
-| **Security** | GRP-001, AI-001, ENC-001, AUTH-001, AUTH-003, AUTH-005, AUTH-006, AUTH-007, GRP-003, NOTIF-001, AI-002, EXP-008, EXP-007 |
-| **Product** | AUTH-002, PF-001, PF-002, GRP-004, NOTIF-002, NOTIF-004, GRP-006 |
-| **Infrastructure** | SYNC-001, AI-003, SRCH-002, AUTH-004, GRP-002, NOTIF-003 |
-| **Documentation** | ENC-003, EXP-006, SYNC-003 (+ the 4 doc-drift items: refresh-token transport, offline-first claims, offline key restoration labeling, trip type) |
-| **Enhancement** | (roadmap-only) RM-01 blind index, RM-02 OCR, RM-03 goals CRUD, RM-04 notes CRUD, RM-05 offline/PWA feature set, RM-06 push/BullMQ |
+| Class              | Gaps                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Architecture**   | ENC-002, ENC-004, ENC-005, EXP-002, EXP-003, EXP-004, EXP-005, EXP-001, GRP-005, GRP-007, SYNC-002, SRCH-001, ATT-002, ATT-001, EXP-009          |
+| **Security**       | GRP-001, AI-001, ENC-001, AUTH-001, AUTH-003, AUTH-005, AUTH-006, AUTH-007, GRP-003, NOTIF-001, AI-002, EXP-008, EXP-007                         |
+| **Product**        | AUTH-002, PF-001, PF-002, GRP-004, NOTIF-002, NOTIF-004, GRP-006                                                                                 |
+| **Infrastructure** | SYNC-001, AI-003, SRCH-002, AUTH-004, GRP-002, NOTIF-003                                                                                         |
+| **Documentation**  | ENC-003, EXP-006, SYNC-003 (+ the 4 doc-drift items: refresh-token transport, offline-first claims, offline key restoration labeling, trip type) |
+| **Enhancement**    | (roadmap-only) RM-01 blind index, RM-02 OCR, RM-03 goals CRUD, RM-04 notes CRUD, RM-05 offline/PWA feature set, RM-06 push/BullMQ                |
 
 Notes on borderline calls:
+
 - **EXP-006** (restore grace window) and **ENC-003** (avatar scope) and **SYNC-003** (banner copy) are classified Documentation because the likely resolution is "state the real behavior," pending an ADR that may instead mandate a code change — flagged for reconciliation.
 - **GRP-006** (trip type) is Product because it's a feature decision, though its cheapest resolution is a doc fix.
 - **EXP-009** (dead `direct_shared`) is Architecture because it's latent design surface; resolution (remove vs implement) is an ADR decision.
@@ -182,20 +184,20 @@ Notes on borderline calls:
 
 Gaps that are **symptoms of, or absorbed by, another gap**. These should not be scheduled as independent line items — fixing the parent resolves or de-risks them.
 
-| Dependent gap | Parent / absorbing gap | Relationship |
-|---------------|------------------------|--------------|
-| EXP-003 | EXP-002 + ENC-002 | Same root: expenses must carry & resolve the correct group key version. Fix the version-stamping model once; both are facets. |
-| EXP-005 | EXP-004 | Same entity + same migration (`expense_splits`). One schema change adds both `deletedAt` and `@VersionColumn`. |
-| EXP-001 | EXP-004 + EXP-005 | Cannot build a non-destructive settled-edit/adjustment without soft-deletable, versioned splits. Dependent, not independent. |
-| GRP-003 | GRP-001 | Same authorization surface (member routes + `GroupRoles`). Fixing role authz touches the same decorator/guard; do together. |
-| GRP-005 | ENC-002 | Re-keying on leave is meaningless until versioned key serving works. Dependent. |
-| GRP-007 | ENC-002 (+ EXP-002/003) | History decrypt-at-correct-version needs versioned key serving and version-stamped audit metadata. |
-| ATT-002 | ENC-002 | Legacy plaintext attachment path is retired as part of the versioned-key attachment model. |
-| SYNC-003 | SYNC-002 | The "showing cached data" banner is only truthful once a real offline cache/queue exists. Don't fix copy in isolation. |
-| NOTIF-002 | AUTH-002 | The dead verification/reset email templates come alive as part of the password/verify flow. Same work item. |
-| AI-002, AI-003 | AI-001 | Both build on the opt-in gate + AI controller hardening. Sequence within one AI work batch. |
-| AUTH-007 | AUTH-002 | `saveKeys` re-auth is part of defining the password/UDK-rewrap security model. |
-| ENC-005 | ENC-002 | Wrapping-algorithm metadata is fixed while reworking the key provisioning/serving path. |
+| Dependent gap  | Parent / absorbing gap  | Relationship                                                                                                                  |
+| -------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| EXP-003        | EXP-002 + ENC-002       | Same root: expenses must carry & resolve the correct group key version. Fix the version-stamping model once; both are facets. |
+| EXP-005        | EXP-004                 | Same entity + same migration (`expense_splits`). One schema change adds both `deletedAt` and `@VersionColumn`.                |
+| EXP-001        | EXP-004 + EXP-005       | Cannot build a non-destructive settled-edit/adjustment without soft-deletable, versioned splits. Dependent, not independent.  |
+| GRP-003        | GRP-001                 | Same authorization surface (member routes + `GroupRoles`). Fixing role authz touches the same decorator/guard; do together.   |
+| GRP-005        | ENC-002                 | Re-keying on leave is meaningless until versioned key serving works. Dependent.                                               |
+| GRP-007        | ENC-002 (+ EXP-002/003) | History decrypt-at-correct-version needs versioned key serving and version-stamped audit metadata.                            |
+| ATT-002        | ENC-002                 | Legacy plaintext attachment path is retired as part of the versioned-key attachment model.                                    |
+| SYNC-003       | SYNC-002                | The "showing cached data" banner is only truthful once a real offline cache/queue exists. Don't fix copy in isolation.        |
+| NOTIF-002      | AUTH-002                | The dead verification/reset email templates come alive as part of the password/verify flow. Same work item.                   |
+| AI-002, AI-003 | AI-001                  | Both build on the opt-in gate + AI controller hardening. Sequence within one AI work batch.                                   |
+| AUTH-007       | AUTH-002                | `saveKeys` re-auth is part of defining the password/UDK-rewrap security model.                                                |
+| ENC-005        | ENC-002                 | Wrapping-algorithm metadata is fixed while reworking the key provisioning/serving path.                                       |
 
 **Net effect:** ~12 of the 44 gaps are dependents. Independent "root" work items number ~32, and the true critical-path roots are **ENC-001 → ENC-002 → EXP-004/005 → EXP-001 → SYNC-001 → SYNC-002**.
 
@@ -207,74 +209,74 @@ Phases follow the dependency graph. Within a phase, items are independent unless
 
 ### Phase 1 — Foundational security, encryption & key management
 
-| Gap | Reason for priority | Files likely affected | Risk | Mig | Effort | Blocking deps |
-|-----|--------------------|-----------------------|------|:---:|:------:|---------------|
-| ENC-001 | Fail-closed server key; precondition for all crypto | `encryption.service.ts`, env validation | Low | No | S | none |
-| GRP-001 | Critical privilege escalation (validated) | `groups.service.ts`, `members.controller.ts`, `group-roles.guard.ts` | Med | No | S–M | none |
-| GRP-003 | Same authz surface as GRP-001 | `group-roles.decorator.ts`, `members.controller.ts` | Low | No | S | GRP-001 |
-| AI-001 | Critical: opt-in unenforced (validated); self-contained | `ai.controller.ts`, `ai.service.ts`, `user.entity.ts` + migration | Med | Yes | M | none |
-| NOTIF-001 | Email-bomb / enumeration vector; cheap | `members.controller.ts`, `groups.controller.ts`, `throttle.constants.ts` | Low | No | S | none |
-| AUTH-003/004/005/006 | Cheap auth hardening, no core deps | `auth.service.ts`, `jwt.strategy.ts`, `main.ts` | Low | No | S each | none |
-| ENC-002 | **Linchpin**: versioned key serving unblocks Phase 2 | `groups.controller.ts`, `groups.service.ts`, FE `group-key.service.ts` | High | No | M | ENC-001 |
-| ENC-004 | Offline-safe (non-extractable) keys; needed by SYNC-002 later | FE `encryption.service.ts`, `group-key.service.ts` | Med | No | M | ENC-001 |
-| ENC-005 | Fix wrapping-algo metadata while in the key path | `groups.service.ts`, `dto/group-key.dto.ts` | Low | Maybe | S | ENC-002 |
+| Gap                  | Reason for priority                                           | Files likely affected                                                    | Risk |  Mig  | Effort | Blocking deps |
+| -------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------ | ---- | :---: | :----: | ------------- |
+| ENC-001              | Fail-closed server key; precondition for all crypto           | `encryption.service.ts`, env validation                                  | Low  |  No   |   S    | none          |
+| GRP-001              | Critical privilege escalation (validated)                     | `groups.service.ts`, `members.controller.ts`, `group-roles.guard.ts`     | Med  |  No   |  S–M   | none          |
+| GRP-003              | Same authz surface as GRP-001                                 | `group-roles.decorator.ts`, `members.controller.ts`                      | Low  |  No   |   S    | GRP-001       |
+| AI-001               | Critical: opt-in unenforced (validated); self-contained       | `ai.controller.ts`, `ai.service.ts`, `user.entity.ts` + migration        | Med  |  Yes  |   M    | none          |
+| NOTIF-001            | Email-bomb / enumeration vector; cheap                        | `members.controller.ts`, `groups.controller.ts`, `throttle.constants.ts` | Low  |  No   |   S    | none          |
+| AUTH-003/004/005/006 | Cheap auth hardening, no core deps                            | `auth.service.ts`, `jwt.strategy.ts`, `main.ts`                          | Low  |  No   | S each | none          |
+| ENC-002              | **Linchpin**: versioned key serving unblocks Phase 2          | `groups.controller.ts`, `groups.service.ts`, FE `group-key.service.ts`   | High |  No   |   M    | ENC-001       |
+| ENC-004              | Offline-safe (non-extractable) keys; needed by SYNC-002 later | FE `encryption.service.ts`, `group-key.service.ts`                       | Med  |  No   |   M    | ENC-001       |
+| ENC-005              | Fix wrapping-algo metadata while in the key path              | `groups.service.ts`, `dto/group-key.dto.ts`                              | Low  | Maybe |   S    | ENC-002       |
 
 ### Phase 2 — Expense domain, ExpenseShare & settlements
 
-| Gap | Reason | Files | Risk | Mig | Effort | Blocking deps |
-|-----|--------|-------|------|:---:|:------:|---------------|
-| EXP-004 | Split soft-delete; preserves ledger history | `expense-split.entity.ts`, `expenses.service.ts` + migration | Med | Yes | M | none (post-ENC) |
-| EXP-005 | Split version column; same migration as EXP-004 | `expense-split.entity.ts`, split writes, delete/restore | Med | Yes | M | EXP-004 |
-| EXP-002 | Recurring template key version | `recurring-expense.entity.ts` + migration, scheduler | Med | Yes | M | ENC-002 |
-| EXP-003 | Refresh key version on update | `expenses.service.ts` (updateExpense) | Med | No | M | ENC-002, EXP-002 |
-| EXP-001 | Settled-edit adjustments (no silent history mutation) | `expenses.service.ts`, `expense-split.entity.ts` | High | Maybe | L | EXP-004, EXP-005 |
-| EXP-007 | Recurring currency validation | `recurring-expenses.service.ts` | Low | No | S | none |
-| EXP-008 | Settlement note ciphertext validation | `dto/settlement.dto.ts`, `settlements.service.ts` | Low | No | S | none |
-| EXP-009 | Resolve dead `direct_shared` (remove or implement) | `expenses.service.ts`, DTOs, FE | Med | No | S/L | ADR decision |
-| GRP-002 | Audit coverage for key/invite/contrib actions | `groups.service.ts`, `groups-audit.service.ts` | Low | No | M | none |
+| Gap     | Reason                                                | Files                                                        | Risk |  Mig  | Effort | Blocking deps    |
+| ------- | ----------------------------------------------------- | ------------------------------------------------------------ | ---- | :---: | :----: | ---------------- |
+| EXP-004 | Split soft-delete; preserves ledger history           | `expense-split.entity.ts`, `expenses.service.ts` + migration | Med  |  Yes  |   M    | none (post-ENC)  |
+| EXP-005 | Split version column; same migration as EXP-004       | `expense-split.entity.ts`, split writes, delete/restore      | Med  |  Yes  |   M    | EXP-004          |
+| EXP-002 | Recurring template key version                        | `recurring-expense.entity.ts` + migration, scheduler         | Med  |  Yes  |   M    | ENC-002          |
+| EXP-003 | Refresh key version on update                         | `expenses.service.ts` (updateExpense)                        | Med  |  No   |   M    | ENC-002, EXP-002 |
+| EXP-001 | Settled-edit adjustments (no silent history mutation) | `expenses.service.ts`, `expense-split.entity.ts`             | High | Maybe |   L    | EXP-004, EXP-005 |
+| EXP-007 | Recurring currency validation                         | `recurring-expenses.service.ts`                              | Low  |  No   |   S    | none             |
+| EXP-008 | Settlement note ciphertext validation                 | `dto/settlement.dto.ts`, `settlements.service.ts`            | Low  |  No   |   S    | none             |
+| EXP-009 | Resolve dead `direct_shared` (remove or implement)    | `expenses.service.ts`, DTOs, FE                              | Med  |  No   |  S/L   | ADR decision     |
+| GRP-002 | Audit coverage for key/invite/contrib actions         | `groups.service.ts`, `groups-audit.service.ts`               | Low  |  No   |   M    | none             |
 
 ### Phase 3 — Sync, projection & search
 
-| Gap | Reason | Files | Risk | Mig | Effort | Blocking deps |
-|-----|--------|-------|------|:---:|:------:|---------------|
-| SYNC-001 | PWA/service-worker shell (offline substrate) | `angular.json`, `ngsw-config.json`(new), manifest | Med | No | L | none |
-| SYNC-002 | Offline mutation queue / outbox | FE outbox(new), interceptors, IndexedDB | High | No | XL | SYNC-001, ENC-004, EXP-005 |
-| SYNC-003 | Truthful offline banner | `group-detail.component.*` | Low | No | S | SYNC-002 |
-| SRCH-001 | Cursor pagination correctness | `expenses.service.ts` (listExpenses) | Med | No | M | EXP-004/005 |
-| SRCH-002 | Redis aggregation cache (perf) | `expenses.service.ts` analytics, Redis | Low | No | M | none |
-| GRP-007 | History decrypt at correct version | `groups.service.ts`, audit metadata, FE | Med | Maybe | M | ENC-002, EXP-002/003 |
-| GRP-005 | Rotate keys on member leave (needs versioned re-key) | `groups.service.ts` (removeMember), key rotation | Med | No | L | ENC-002 |
+| Gap      | Reason                                               | Files                                             | Risk |  Mig  | Effort | Blocking deps              |
+| -------- | ---------------------------------------------------- | ------------------------------------------------- | ---- | :---: | :----: | -------------------------- |
+| SYNC-001 | PWA/service-worker shell (offline substrate)         | `angular.json`, `ngsw-config.json`(new), manifest | Med  |  No   |   L    | none                       |
+| SYNC-002 | Offline mutation queue / outbox                      | FE outbox(new), interceptors, IndexedDB           | High |  No   |   XL   | SYNC-001, ENC-004, EXP-005 |
+| SYNC-003 | Truthful offline banner                              | `group-detail.component.*`                        | Low  |  No   |   S    | SYNC-002                   |
+| SRCH-001 | Cursor pagination correctness                        | `expenses.service.ts` (listExpenses)              | Med  |  No   |   M    | EXP-004/005                |
+| SRCH-002 | Redis aggregation cache (perf)                       | `expenses.service.ts` analytics, Redis            | Low  |  No   |   M    | none                       |
+| GRP-007  | History decrypt at correct version                   | `groups.service.ts`, audit metadata, FE           | Med  | Maybe |   M    | ENC-002, EXP-002/003       |
+| GRP-005  | Rotate keys on member leave (needs versioned re-key) | `groups.service.ts` (removeMember), key rotation  | Med  |  No   |   L    | ENC-002                    |
 
 ### Phase 4 — Attachments, personal finance & reports
 
-| Gap | Reason | Files | Risk | Mig | Effort | Blocking deps |
-|-----|--------|-------|------|:---:|:------:|---------------|
-| ATT-001 | Real ZK attachment storage backend | storage adapter(new), FE upload, endpoints | High | Maybe | XL | ENC-002, ATT-002 |
-| ATT-002 | Retire legacy plaintext attachment path | `expenses.service.ts`, DTOs | Med | No | M | ENC-002 |
-| PF-002 | Goal title encryption (crypto fix) / goals feature | `goal.entity.ts`, `dto/goal.dto.ts`, FE | Med | Yes(if built) | L | Goals feature decision |
-| PF-001 | Account deletion (PII-only) | `users.controller.ts`, `users.service.ts` | High | Maybe | L | ADR decision (PII scope) |
+| Gap     | Reason                                             | Files                                      | Risk |      Mig      | Effort | Blocking deps            |
+| ------- | -------------------------------------------------- | ------------------------------------------ | ---- | :-----------: | :----: | ------------------------ |
+| ATT-001 | Real ZK attachment storage backend                 | storage adapter(new), FE upload, endpoints | High |     Maybe     |   XL   | ENC-002, ATT-002         |
+| ATT-002 | Retire legacy plaintext attachment path            | `expenses.service.ts`, DTOs                | Med  |      No       |   M    | ENC-002                  |
+| PF-002  | Goal title encryption (crypto fix) / goals feature | `goal.entity.ts`, `dto/goal.dto.ts`, FE    | Med  | Yes(if built) |   L    | Goals feature decision   |
+| PF-001  | Account deletion (PII-only)                        | `users.controller.ts`, `users.service.ts`  | High |     Maybe     |   L    | ADR decision (PII scope) |
 
 ### Phase 5 — Authentication improvements & account lifecycle
 
-| Gap | Reason | Files | Risk | Mig | Effort | Blocking deps |
-|-----|--------|-------|------|:---:|:------:|---------------|
-| AUTH-001 | Refresh-token transport (cookie vs body) | `auth.service.ts`, `auth.controller.ts`, FE interceptor | High | No | L | ADR decision |
-| AUTH-002 | Password change/reset + UDK re-wrap | `auth.*`, `email.service.ts`, `users.service.ts` | High | Maybe | XL | NOTIF-002, email, ENC model |
-| NOTIF-002 | Activate verify/reset email templates | `email.service.ts`, `auth.controller.ts` | Med | Maybe | M | (part of AUTH-002) |
-| AUTH-007 | `saveKeys` re-auth + constant-time TOTP | `users.service.ts`, `totp.util.ts` | Med | No | M | AUTH-002 |
+| Gap       | Reason                                   | Files                                                   | Risk |  Mig  | Effort | Blocking deps               |
+| --------- | ---------------------------------------- | ------------------------------------------------------- | ---- | :---: | :----: | --------------------------- |
+| AUTH-001  | Refresh-token transport (cookie vs body) | `auth.service.ts`, `auth.controller.ts`, FE interceptor | High |  No   |   L    | ADR decision                |
+| AUTH-002  | Password change/reset + UDK re-wrap      | `auth.*`, `email.service.ts`, `users.service.ts`        | High | Maybe |   XL   | NOTIF-002, email, ENC model |
+| NOTIF-002 | Activate verify/reset email templates    | `email.service.ts`, `auth.controller.ts`                | Med  | Maybe |   M    | (part of AUTH-002)          |
+| AUTH-007  | `saveKeys` re-auth + constant-time TOTP  | `users.service.ts`, `totp.util.ts`                      | Med  |  No   |   M    | AUTH-002                    |
 
 ### Phase 6 — AI & enhancements
 
-| Gap | Reason | Files | Risk | Mig | Effort | Blocking deps |
-|-----|--------|-------|------|:---:|:------:|---------------|
-| AI-002 | Constrain model/systemInstruction; ZK-content guard | `ai.controller.ts`, `ai.service.ts` | Med | No | M | AI-001 |
-| AI-003 | Dedicated AI throttle / cost cap | `ai.controller.ts`, `throttle.constants.ts` | Low | No | S | AI-001 |
-| GRP-004 | Invite revocation + token expiry | `groups.service.ts`, `group.entity.ts`, `invite.controller.ts` | Med | Maybe | M | none |
-| NOTIF-003 | WebSocket real-time push (new) | new WS gateway, FE client | Med | No | XL | none |
-| NOTIF-004 | In-app notification center (new) | notification entity(new), endpoints, FE | Med | Yes | L | none |
-| GRP-006 | trip type (doc or feature) | `group.entity.ts`, DTO, docs | Low | Maybe | S/M | ADR decision |
-| ENC-003 / EXP-006 / SYNC-003 | Documentation reconciliations | respective docs/code | Low | No | S each | ADR decision |
-| RM-01…RM-06 | Roadmap features (not gaps) | — | — | — | — | product decision |
+| Gap                          | Reason                                              | Files                                                          | Risk |  Mig  | Effort | Blocking deps    |
+| ---------------------------- | --------------------------------------------------- | -------------------------------------------------------------- | ---- | :---: | :----: | ---------------- |
+| AI-002                       | Constrain model/systemInstruction; ZK-content guard | `ai.controller.ts`, `ai.service.ts`                            | Med  |  No   |   M    | AI-001           |
+| AI-003                       | Dedicated AI throttle / cost cap                    | `ai.controller.ts`, `throttle.constants.ts`                    | Low  |  No   |   S    | AI-001           |
+| GRP-004                      | Invite revocation + token expiry                    | `groups.service.ts`, `group.entity.ts`, `invite.controller.ts` | Med  | Maybe |   M    | none             |
+| NOTIF-003                    | WebSocket real-time push (new)                      | new WS gateway, FE client                                      | Med  |  No   |   XL   | none             |
+| NOTIF-004                    | In-app notification center (new)                    | notification entity(new), endpoints, FE                        | Med  |  Yes  |   L    | none             |
+| GRP-006                      | trip type (doc or feature)                          | `group.entity.ts`, DTO, docs                                   | Low  | Maybe |  S/M   | ADR decision     |
+| ENC-003 / EXP-006 / SYNC-003 | Documentation reconciliations                       | respective docs/code                                           | Low  |  No   | S each | ADR decision     |
+| RM-01…RM-06                  | Roadmap features (not gaps)                         | —                                                              | —    |   —   |   —    | product decision |
 
 ---
 
@@ -301,7 +303,7 @@ Phases follow the dependency graph. Within a phase, items are independent unless
 3. **Offline sync** (replay/merge bugs can duplicate or drop mutations).
 4. **Auth token transport** (AUTH-001 cookie migration can lock users out or break refresh across FE/BE).
 
-### Areas requiring integration tests *before* implementation
+### Areas requiring integration tests _before_ implementation
 
 Write/confirm these harnesses first (they map to `docs/testing-matrix.md` guarantee tests):
 
@@ -313,8 +315,8 @@ Write/confirm these harnesses first (they map to `docs/testing-matrix.md` guaran
 - **Auth refresh lifecycle** — rotation/revocation survive the transport change (guards AUTH-001).
 - **AI opt-in gate** — `POST /ai/proxy` is rejected without a persisted opt-in (guards AI-001).
 
-**Recommendation:** land the integration harnesses for key round-trip, rotation, and split invariants *before* starting Phase 2, because those three cover the highest-regression surfaces and currently have no dedicated coverage.
+**Recommendation:** land the integration harnesses for key round-trip, rotation, and split invariants _before_ starting Phase 2, because those three cover the highest-regression surfaces and currently have no dedicated coverage.
 
 ---
 
-*End of provisional roadmap. Reconcile against ADRs before execution — see [canonical-sources.md](canonical-sources.md).*
+_End of provisional roadmap. Reconcile against ADRs before execution — see [canonical-sources.md](canonical-sources.md)._

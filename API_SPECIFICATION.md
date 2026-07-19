@@ -135,9 +135,7 @@ For any error responses (HTTP status code >= 400), the backend returns:
 
 ```json
 {
-  "keys": [
-    { "userId": "user-uuid", "wrappedKey": "iv_base64:ciphertext_base64" }
-  ]
+  "keys": [{ "userId": "user-uuid", "wrappedKey": "iv_base64:ciphertext_base64" }]
 }
 ```
 
@@ -174,9 +172,7 @@ For any error responses (HTTP status code >= 400), the backend returns:
 ```json
 {
   "reason": "member-device-compromised",
-  "keys": [
-    { "userId": "user-uuid", "wrappedKey": "iv_base64:ciphertext_base64" }
-  ]
+  "keys": [{ "userId": "user-uuid", "wrappedKey": "iv_base64:ciphertext_base64" }]
 }
 ```
 

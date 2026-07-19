@@ -28,10 +28,20 @@ export class MemberWrappedGroupKey {
   @Column({ name: 'wrapped_group_key', type: 'text' })
   wrappedGroupKey!: string;
 
-  @Column({ name: 'wrapping_algorithm', type: 'varchar', length: 64, nullable: true })
+  @Column({
+    name: 'wrapping_algorithm',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
   wrappingAlgorithm?: string;
 
-  @Column({ name: 'public_key_fingerprint', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'public_key_fingerprint',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   publicKeyFingerprint?: string;
 
   @CreateDateColumn({ name: 'created_at' })

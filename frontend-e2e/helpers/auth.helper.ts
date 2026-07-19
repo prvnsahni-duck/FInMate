@@ -7,7 +7,14 @@ import { waitForPageApi } from '../utils/api';
 import { waitForUrlContains } from '../utils/waits';
 
 export const auth = {
-  async register(page: Page, { displayName, email, password }: { displayName: string; email: string; password: string }) {
+  async register(
+    page: Page,
+    {
+      displayName,
+      email,
+      password,
+    }: { displayName: string; email: string; password: string },
+  ) {
     await page.goto('/auth/register');
     const register = new RegisterPage(page);
     await expect(register.form).toBeVisible();
@@ -25,11 +32,16 @@ export const auth = {
     });
 
     if (!body) {
-      throw new Error(`Registration returned ${response.status()} without a readable body.`);
+      throw new Error(
+        `Registration returned ${response.status()} without a readable body.`,
+      );
     }
   },
 
-  async login(page: Page, { email, password }: { email: string; password: string }) {
+  async login(
+    page: Page,
+    { email, password }: { email: string; password: string },
+  ) {
     await page.goto('/auth/login');
     const login = new LoginPage(page);
     await expect(login.form).toBeVisible();
@@ -44,11 +56,21 @@ export const auth = {
       action: () => login.signIn.click(),
     });
 
-    const token = typeof body === 'object' && body ? body.accessToken || body.token || body.data?.accessToken : null;
-    const storage = await page.evaluate(() => ({ local: { ...localStorage }, session: { ...sessionStorage } }));
-    const storageHasToken = JSON.stringify(storage).toLowerCase().includes('token');
+    const token =
+      typeof body === 'object' && body
+        ? body.accessToken || body.token || body.data?.accessToken
+        : null;
+    const storage = await page.evaluate(() => ({
+      local: { ...localStorage },
+      session: { ...sessionStorage },
+    }));
+    const storageHasToken = JSON.stringify(storage)
+      .toLowerCase()
+      .includes('token');
     if (!token && !storageHasToken) {
-      throw new Error(`Login succeeded but no token was found in response or browser storage. Response: ${JSON.stringify(body)}`);
+      throw new Error(
+        `Login succeeded but no token was found in response or browser storage. Response: ${JSON.stringify(body)}`,
+      );
     }
 
     await waitForUrlContains(page, '/dashboard');
@@ -63,4 +85,3 @@ export const auth = {
 };
 
 export default auth;
-

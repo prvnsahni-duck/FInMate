@@ -18,13 +18,17 @@ describe('GroupsService', () => {
 
   beforeEach(() => {
     encryptionServiceSpy = {
-      decrypt: jest.fn().mockImplementation((val) => Promise.resolve(`decrypted:${val}`)),
+      decrypt: jest
+        .fn()
+        .mockImplementation((val) => Promise.resolve(`decrypted:${val}`)),
     };
     groupKeyServiceSpy = {
       getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
     };
     storeMock = {
-      selectSnapshot: jest.fn().mockReturnValue({ email: 'test@finmate.local', userId: 'user-1' }),
+      selectSnapshot: jest
+        .fn()
+        .mockReturnValue({ email: 'test@finmate.local', userId: 'user-1' }),
     };
 
     TestBed.configureTestingModule({
@@ -37,8 +41,12 @@ describe('GroupsService', () => {
         {
           provide: ExpenseDecryptionService,
           useValue: {
-            decryptExpenses: jest.fn().mockImplementation((expenses) => Promise.resolve(expenses)),
-            decryptExpense: jest.fn().mockImplementation((expense) => Promise.resolve(expense)),
+            decryptExpenses: jest
+              .fn()
+              .mockImplementation((expenses) => Promise.resolve(expenses)),
+            decryptExpense: jest
+              .fn()
+              .mockImplementation((expense) => Promise.resolve(expense)),
           },
         },
       ],
@@ -130,7 +138,9 @@ describe('GroupsService', () => {
       service.getHistoryLogs('group-1').subscribe((res) => {
         expect(res.data[0].metadata.title).toBe('decrypted:enc-title');
         expect(res.data[0].metadata.newTitle).toBe('decrypted:enc-new-title');
-        expect(res.data[0].metadata.previousTitle).toBe('decrypted:enc-prev-title');
+        expect(res.data[0].metadata.previousTitle).toBe(
+          'decrypted:enc-prev-title',
+        );
         done();
       });
 
@@ -147,9 +157,7 @@ describe('GroupsService', () => {
         done();
       });
 
-      const req = httpMock.expectOne(
-        '/api/groups/group-1/expenses/deleted',
-      );
+      const req = httpMock.expectOne('/api/groups/group-1/expenses/deleted');
       expect(req.request.method).toBe('GET');
       req.flush({ data: [] });
     });
@@ -267,7 +275,9 @@ describe('GroupsService', () => {
     it('should save contribution percentages', (done) => {
       const payload = { month: '2026-06', contributions: [] };
 
-      service.updateContributions('group-1', payload as any).subscribe(() => done());
+      service
+        .updateContributions('group-1', payload as any)
+        .subscribe(() => done());
 
       const req = httpMock.expectOne('/api/groups/group-1/contributions');
       expect(req.request.method).toBe('POST');
@@ -307,7 +317,9 @@ describe('GroupsService', () => {
     it('should update a member role', (done) => {
       const payload = { role: 'admin' };
 
-      service.updateMember('group-1', 'member-1', payload).subscribe(() => done());
+      service
+        .updateMember('group-1', 'member-1', payload)
+        .subscribe(() => done());
 
       const req = httpMock.expectOne('/api/groups/group-1/members/member-1');
       expect(req.request.method).toBe('PATCH');

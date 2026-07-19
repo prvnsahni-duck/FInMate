@@ -6,25 +6,25 @@ This page defines what will become the **canonical source of truth** for FinMate
 
 Once provided by the project owner, the following documents become the authoritative references. Every gap, audit, and implementation decision will be reconciled against them. They live as **placeholders** today under [`adr/`](adr/) — reserved slots, no invented content:
 
-| Canonical document | Placeholder | Status |
-|--------------------|-------------|--------|
-| ADR-000 | [adr/ADR-000.md](adr/ADR-000.md) | ⏳ Pending import |
-| ADR-001 | [adr/ADR-001.md](adr/ADR-001.md) | ⏳ Pending import |
-| ADR-002 | [adr/ADR-002.md](adr/ADR-002.md) | ⏳ Pending import |
-| ADR-003 | [adr/ADR-003.md](adr/ADR-003.md) | ⏳ Pending import |
-| ADR-004 | [adr/ADR-004.md](adr/ADR-004.md) | ⏳ Pending import |
-| ADR-005 | [adr/ADR-005.md](adr/ADR-005.md) | ⏳ Pending import |
-| ADR-006 | [adr/ADR-006.md](adr/ADR-006.md) | ⏳ Pending import |
-| ADR-007 | [adr/ADR-007.md](adr/ADR-007.md) | ⏳ Pending import |
-| ADR-008 | [adr/ADR-008.md](adr/ADR-008.md) | ⏳ Pending import |
-| ADR-009 | [adr/ADR-009.md](adr/ADR-009.md) | ⏳ Pending import |
-| ADR-010 | [adr/ADR-010.md](adr/ADR-010.md) | ⏳ Pending import |
-| ADR-011 | [adr/ADR-011.md](adr/ADR-011.md) | ⏳ Pending import |
-| ADR-012 | [adr/ADR-012.md](adr/ADR-012.md) | ⏳ Pending import |
-| ADR-013 | [adr/ADR-013.md](adr/ADR-013.md) | ⏳ Pending import |
-| ADR-014 | [adr/ADR-014.md](adr/ADR-014.md) | ⏳ Pending import |
-| ADR-015 | [adr/ADR-015.md](adr/ADR-015.md) | ⏳ Pending import |
-| Non-Goals | [adr/NON-GOALS.md](adr/NON-GOALS.md) | ⏳ Pending import |
+| Canonical document      | Placeholder                                                      | Status            |
+| ----------------------- | ---------------------------------------------------------------- | ----------------- |
+| ADR-000                 | [adr/ADR-000.md](adr/ADR-000.md)                                 | ⏳ Pending import |
+| ADR-001                 | [adr/ADR-001.md](adr/ADR-001.md)                                 | ⏳ Pending import |
+| ADR-002                 | [adr/ADR-002.md](adr/ADR-002.md)                                 | ⏳ Pending import |
+| ADR-003                 | [adr/ADR-003.md](adr/ADR-003.md)                                 | ⏳ Pending import |
+| ADR-004                 | [adr/ADR-004.md](adr/ADR-004.md)                                 | ⏳ Pending import |
+| ADR-005                 | [adr/ADR-005.md](adr/ADR-005.md)                                 | ⏳ Pending import |
+| ADR-006                 | [adr/ADR-006.md](adr/ADR-006.md)                                 | ⏳ Pending import |
+| ADR-007                 | [adr/ADR-007.md](adr/ADR-007.md)                                 | ⏳ Pending import |
+| ADR-008                 | [adr/ADR-008.md](adr/ADR-008.md)                                 | ⏳ Pending import |
+| ADR-009                 | [adr/ADR-009.md](adr/ADR-009.md)                                 | ⏳ Pending import |
+| ADR-010                 | [adr/ADR-010.md](adr/ADR-010.md)                                 | ⏳ Pending import |
+| ADR-011                 | [adr/ADR-011.md](adr/ADR-011.md)                                 | ⏳ Pending import |
+| ADR-012                 | [adr/ADR-012.md](adr/ADR-012.md)                                 | ⏳ Pending import |
+| ADR-013                 | [adr/ADR-013.md](adr/ADR-013.md)                                 | ⏳ Pending import |
+| ADR-014                 | [adr/ADR-014.md](adr/ADR-014.md)                                 | ⏳ Pending import |
+| ADR-015                 | [adr/ADR-015.md](adr/ADR-015.md)                                 | ⏳ Pending import |
+| Non-Goals               | [adr/NON-GOALS.md](adr/NON-GOALS.md)                             | ⏳ Pending import |
 | Architecture Principles | [adr/ARCHITECTURE-PRINCIPLES.md](adr/ARCHITECTURE-PRINCIPLES.md) | ⏳ Pending import |
 
 ## Provisional sources (in force until import)

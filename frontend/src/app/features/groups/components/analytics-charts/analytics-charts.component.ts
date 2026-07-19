@@ -101,15 +101,15 @@ export class AnalyticsChartsComponent implements OnInit, OnChanges {
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-      next: ({ categories, monthly }) => {
-        this.processCategoriesData(categories);
-        this.processMonthlyData(monthly);
-        this.isLoading = false;
-      },
-      error: () => {
-        this.isLoading = false;
-      },
-    });
+        next: ({ categories, monthly }) => {
+          this.processCategoriesData(categories);
+          this.processMonthlyData(monthly);
+          this.isLoading = false;
+        },
+        error: () => {
+          this.isLoading = false;
+        },
+      });
   }
 
   private processCategoriesData(data: CategoryData[]) {

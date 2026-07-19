@@ -5,7 +5,12 @@
   </p>
 </div>
 
-<form data-testid="login-form" [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="space-y-6">
+<form
+  data-testid="login-form"
+  [formGroup]="loginForm"
+  (ngSubmit)="onSubmit()"
+  class="space-y-6"
+>
   @if (errorMessage) {
     <div
       class="p-3 bg-red-100/10 text-red-500 border border-red-500/50 rounded-xl text-sm"
@@ -19,7 +24,8 @@
       >Email address</label
     >
     <input
-      id="loginEmail" data-testid="login-email-input"
+      id="loginEmail"
+      data-testid="login-email-input"
       type="email"
       formControlName="email"
       class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all placeholder-slate-400"
@@ -32,7 +38,8 @@
       >Password</label
     >
     <input
-      id="loginPassword" data-testid="login-password-input"
+      id="loginPassword"
+      data-testid="login-password-input"
       type="password"
       formControlName="password"
       class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all placeholder-slate-400"
@@ -57,10 +64,9 @@
     >Don't have an account?
   </span>
   <a
-    routerLink="/auth/register" data-testid="register-link"
+    routerLink="/auth/register"
+    data-testid="register-link"
     class="text-finmate-neon2 font-semibold hover:underline"
     >Sign up</a
   >
 </div>
-
-

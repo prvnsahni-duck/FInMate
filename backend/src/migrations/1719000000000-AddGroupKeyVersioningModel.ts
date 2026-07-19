@@ -230,7 +230,9 @@ export class AddGroupKeyVersioningModel1719000000000
       `ALTER TABLE "attachments" DROP COLUMN IF EXISTS "group_key_version_id";`,
     );
 
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_notes_group_key_version_id";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_notes_group_key_version_id";`,
+    );
     await queryRunner.query(
       `ALTER TABLE "notes" DROP CONSTRAINT IF EXISTS "FK_notes_group_key_version";`,
     );
@@ -261,7 +263,9 @@ export class AddGroupKeyVersioningModel1719000000000
     await queryRunner.query(
       `DROP INDEX IF EXISTS "IDX_member_wrapped_group_keys_group_id";`,
     );
-    await queryRunner.query(`DROP TABLE IF EXISTS "member_wrapped_group_keys";`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS "member_wrapped_group_keys";`,
+    );
 
     await queryRunner.query(
       `DROP INDEX IF EXISTS "UQ_group_key_versions_one_active_per_group";`,

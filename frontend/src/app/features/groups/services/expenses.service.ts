@@ -53,13 +53,15 @@ export class ExpensesService {
       if ((payload as any).groupId) {
         scope = 'group';
         const groupId = (payload as any).groupId as string;
-        const resolved = await this.groupKeyService.getGroupKeyForEncryption(groupId);
+        const resolved =
+          await this.groupKeyService.getGroupKeyForEncryption(groupId);
         if (resolved) {
           key = resolved.key;
           encrypted.groupKeyVersionId = resolved.versionId;
         } else {
           key = await this.groupKeyService.createGroupKey(groupId);
-          const mintedVersionId = this.groupKeyService.getKnownActiveVersionId(groupId);
+          const mintedVersionId =
+            this.groupKeyService.getKnownActiveVersionId(groupId);
           if (mintedVersionId) {
             encrypted.groupKeyVersionId = mintedVersionId;
           }
@@ -68,7 +70,7 @@ export class ExpensesService {
         const currentUserId = user?.userId;
         const splits = payload.splits || [];
         const otherParticipants = splits.filter(
-          (s) => s.participantUserId && s.participantUserId !== currentUserId
+          (s) => s.participantUserId && s.participantUserId !== currentUserId,
         );
 
         if (otherParticipants.length > 0) {
@@ -134,7 +136,10 @@ export class ExpensesService {
       .get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params })
       .pipe(
         mergeMap(async (res) => {
-          const payload = res.data as Expense[] | { data?: Expense[] } | undefined;
+          const payload = res.data as
+            | Expense[]
+            | { data?: Expense[] }
+            | undefined;
           const expenses = Array.isArray(payload)
             ? payload
             : Array.isArray(payload?.data)

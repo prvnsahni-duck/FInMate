@@ -83,7 +83,7 @@ export class MainLayoutComponent {
   private store = inject(Store);
 
   persistenceWarning = toSignal(
-    this.store.select(AuthState.getPersistenceWarning)
+    this.store.select(AuthState.getPersistenceWarning),
   );
 
   rateLimitError = signal<string | null>(null);
@@ -108,7 +108,8 @@ export class MainLayoutComponent {
         const detail = event.detail as AppHttpErrorEventDetail;
         if (detail.status === 429) {
           this.rateLimitError.set(
-            detail.message || 'Too many requests. Please slow down and try again later.',
+            detail.message ||
+              'Too many requests. Please slow down and try again later.',
           );
           setTimeout(() => this.rateLimitError.set(null), 7000);
         }

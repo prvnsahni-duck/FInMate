@@ -134,21 +134,25 @@ Modern personal finance applications suffer from three critical pain points:
 ## 🔒 Zero-Knowledge & Security Specifications
 
 ### Encryption Boundaries
+
 - **Personal Data**: Encrypted with a User Data Key (UDK) derived from the user's password. The UDK encrypts personal expenses, notes, and saving goals.
 - **Shared Data**: Encrypted using a dedicated Group Key (AES-GCM 256-bit). Each group has exactly one Group Key, which is shared among all active members. Shared data (group expenses, group notes, group attachments) is never encrypted using a personal key.
 - **Backend Visibility**: The backend never decrypts ciphertexts. All names, titles, descriptions, and notes remain encrypted at all times on the server.
 - **Plaintext Data**: Currency, category, total amounts, and split calculation parameters remain plaintext `DECIMAL` to enable backend calculations, reporting, and split settlements.
 
 ### Personal Dashboard Aggregation
+
 - **No Duplicate Records**: Group expenses are never duplicated or synchronized into a user's personal ledger.
 - **Unified Aggregation**: The backend joins `expense_splits` with `expenses` to fetch the user's relevant shares. The frontend resolves the corresponding Group Key to decrypt the details on the fly.
 
 ### Refresh & Key Cache Architecture
+
 - **Temporary Key Cache (Current Release)**: A secure temporary key cache (using memory and IndexedDB) stores the wrapped User Data Key and wrapped Group Keys to prevent password prompts on refresh. This cache is cleared on logout or session expiration.
 - **Future Architecture (Biometrics/PIN)**: The temporary cache will be replaced in future releases with an Encrypted IndexedDB Key Vault supporting WebAuthn, Device Trust, and Biometric/PIN unlock.
 - **Offline Mode**: Decrypted keys are cached securely to enable offline record decryption.
 
 ### Key Lifecycle Operations
+
 - **Group Membership**: When inviting a new user, the existing Group Key is wrapped using the new member's public key. No new group keys are generated on join. If a member leaves, their historical decryption permissions are preserved for the period they were authorized.
 - **Group Key Versioning (Option 2)**:
   - Group key lifecycle is versioned using immutable `group_key_versions` history.

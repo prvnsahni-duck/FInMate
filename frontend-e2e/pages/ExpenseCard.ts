@@ -7,12 +7,19 @@ export type ExpensePatch = { title?: string; amount?: string };
 export default class ExpenseCard {
   readonly card: Locator;
 
-  constructor(private readonly page: Page, readonly id: string | null, readonly title: string) {
+  constructor(
+    private readonly page: Page,
+    readonly id: string | null,
+    readonly title: string,
+  ) {
     this.card = this.resolveCard();
   }
 
   async expectVisible() {
-    await expect(this.card.getByTestId(testIds.expense.title)).toContainText(this.title, { timeout: 15000 });
+    await expect(this.card.getByTestId(testIds.expense.title)).toContainText(
+      this.title,
+      { timeout: 15000 },
+    );
   }
 
   async expectDeleted() {
@@ -20,7 +27,10 @@ export default class ExpenseCard {
   }
 
   async expectAmount(amount: string | RegExp) {
-    await expect(this.card.getByTestId(testIds.expense.amount)).toContainText(amount, { timeout: 15000 });
+    await expect(this.card.getByTestId(testIds.expense.amount)).toContainText(
+      amount,
+      { timeout: 15000 },
+    );
   }
 
   async edit(patch: ExpensePatch) {
@@ -32,8 +42,14 @@ export default class ExpenseCard {
       failureMessage: `Expense edit failed for ${this.title}`,
       action: async () => {
         await this.card.getByTestId(`expense-edit-button-${this.id}`).click();
-        if (patch.title) await this.page.getByTestId(testIds.expense.titleInput).fill(patch.title);
-        if (patch.amount) await this.page.getByTestId(testIds.expense.amountInput).fill(patch.amount);
+        if (patch.title)
+          await this.page
+            .getByTestId(testIds.expense.titleInput)
+            .fill(patch.title);
+        if (patch.amount)
+          await this.page
+            .getByTestId(testIds.expense.amountInput)
+            .fill(patch.amount);
         await this.page.getByTestId(testIds.expense.saveButton).click();
       },
     });
@@ -63,11 +79,16 @@ export default class ExpenseCard {
 
   private resolveCard() {
     if (this.id) {
-      return this.page.getByTestId(testIds.expense.card).filter({ has: this.page.getByTestId(`expense-edit-button-${this.id}`) }).first();
+      return this.page
+        .getByTestId(testIds.expense.card)
+        .filter({
+          has: this.page.getByTestId(`expense-edit-button-${this.id}`),
+        })
+        .first();
     }
-    return this.page.getByTestId(testIds.expense.card).filter({ hasText: this.title }).first();
+    return this.page
+      .getByTestId(testIds.expense.card)
+      .filter({ hasText: this.title })
+      .first();
   }
 }
-
-
-

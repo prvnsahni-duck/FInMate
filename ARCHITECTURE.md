@@ -89,9 +89,11 @@ sequenceDiagram
 ### Zero-Knowledge Key Lifecycle
 
 Primary storage:
+
 - IndexedDB (CryptoKey via Structured Clone)
 
 Fallback:
+
 - In-memory CryptoKey
 
 If IndexedDB persistence is unavailable:
@@ -107,6 +109,7 @@ If IndexedDB persistence is unavailable:
 To make key distribution seamless without requiring the group owner to be online or manually approve new keys, the system supports automatic provisioning:
 
 #### Flow A: Invite Links & QR Codes (TIK Symmetric Wrapping)
+
 A Temporary Invite Key (TIK) is generated on the creator's device and appended to the invite link hash fragment (never sent to the backend). The Group Key is encrypted with the TIK and uploaded as `wrappedGroupKey` in the invite table, associated with the currently ACTIVE `group_key_versions` row.
 
 ```mermaid
@@ -137,9 +140,11 @@ sequenceDiagram
 ```
 
 #### Flow B: Lookup Direct Invites (Asymmetric PWK Wrapping)
+
 When User A invites User B directly via email/username lookup, User A's browser resolves User B's Public Wrapping Key (`public_wrapping_key`) immediately, encrypts the currently ACTIVE Group Key, and uploads it.
 
 #### Flow C: Group Key Rotation (Versioned)
+
 Group key rotation uses immutable version history. Rotating creates a new ACTIVE key version and marks the previous ACTIVE version as SUPERSEDED.
 
 ```mermaid
@@ -170,7 +175,7 @@ sequenceDiagram
     Inviter->>Inviter: Encrypt Group Key (GK) with PWK_B -> Wrapped_GK_B
     Inviter->>API: POST /groups/:id/invites (userId=UserB, Wrapped_GK_B)
     API->>DB: Save Wrapped_GK_B directly
-    
+
     Note over Invitee: Log in / Open Dashboard
     Invitee->>API: POST /groups/accept-invite/:inviteId
     API->>DB: UPDATE group_members status to 'active'
@@ -182,6 +187,7 @@ sequenceDiagram
 ### Personal Dashboard Aggregation
 
 To avoid duplicate encrypted records and prevent synchronization overhead, the application handles personal dashboard aggregation as follows:
+
 - **Only One Record**: Every expense exists as a single record in the database.
 - **Backend Aggregation**: The backend joins `expense_splits` with `expenses` to fetch the user's relevant shares. It aggregates:
   $$\text{Personal Expenses} + \text{User's Share from Group Expenses}$$
@@ -397,17 +403,17 @@ FinMate uses a three-tier hybrid reactivity structure:
 
 All backend environment variables are documented in `.env.example`. Key variables:
 
-| Variable             | Required | Description                             |
-| -------------------- | -------- | --------------------------------------- |
-| `DATABASE_URL`       | ✅       | PostgreSQL connection string            |
-| `REDIS_URL`          | ✅       | Redis connection string                 |
-| `JWT_SECRET`         | ✅       | JWT signing secret                      |
-| `JWT_REFRESH_SECRET` | ✅       | Refresh token secret                    |
-| `ENCRYPTION_KEY`     | ✅       | AES-256 server-side encryption key      |
-| `FRONTEND_URL`       | ✅       | Frontend origin (CORS + invite links)   |
-| `CORS_ORIGINS`       | ❌       | Comma-separated additional CORS origins |
+| Variable             | Required | Description                                                           |
+| -------------------- | -------- | --------------------------------------------------------------------- |
+| `DATABASE_URL`       | ✅       | PostgreSQL connection string                                          |
+| `REDIS_URL`          | ✅       | Redis connection string                                               |
+| `JWT_SECRET`         | ✅       | JWT signing secret                                                    |
+| `JWT_REFRESH_SECRET` | ✅       | Refresh token secret                                                  |
+| `ENCRYPTION_KEY`     | ✅       | AES-256 server-side encryption key                                    |
+| `FRONTEND_URL`       | ✅       | Frontend origin (CORS + invite links)                                 |
+| `CORS_ORIGINS`       | ❌       | Comma-separated additional CORS origins                               |
 | `RATE_LIMIT_ENABLED` | ❌       | Master switch for API throttling (default: `true`; validated at boot) |
-| `PORT`               | ❌       | Server port (default: 3000)             |
+| `PORT`               | ❌       | Server port (default: 3000)                                           |
 
 ---
 

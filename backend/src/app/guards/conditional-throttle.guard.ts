@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ConfigService } from '@nestjs/config';
 
@@ -15,7 +20,8 @@ export class ConditionalThrottleGuard implements CanActivate {
     const appEnv = (process.env.APP_ENV || '').toLowerCase();
     const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
     const throttleSkip = (process.env.THROTTLE_SKIP || '').toLowerCase();
-    const automatedEnv = appEnv === 'e2e' || nodeEnv === 'e2e' || nodeEnv === 'test';
+    const automatedEnv =
+      appEnv === 'e2e' || nodeEnv === 'e2e' || nodeEnv === 'test';
     const skip = throttleSkip === 'true';
     const result = automatedEnv || skip;
     logger.debug(
@@ -26,7 +32,10 @@ export class ConditionalThrottleGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     try {
-      const rateLimitEnabled = this.configService.get<boolean>('RATE_LIMIT_ENABLED', true);
+      const rateLimitEnabled = this.configService.get<boolean>(
+        'RATE_LIMIT_ENABLED',
+        true,
+      );
       if (!rateLimitEnabled) {
         return true;
       }
@@ -39,4 +48,3 @@ export class ConditionalThrottleGuard implements CanActivate {
     }
   }
 }
-

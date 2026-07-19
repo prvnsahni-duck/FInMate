@@ -20,7 +20,12 @@ export class GroupInvite {
   @Column({ name: 'invite_token', type: 'uuid', unique: true })
   inviteToken!: string;
 
-  @Column({ name: 'invited_email', type: 'varchar', length: 255, nullable: true })
+  @Column({
+    name: 'invited_email',
+    type: 'varchar',
+    length: 255,
+    nullable: true,
+  })
   invitedEmail?: string;
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })

@@ -85,14 +85,19 @@ export class ExpenseDecryptionService {
     // Preserve ciphertext exactly once, so repeated passes are idempotent.
     const cipherTitle = expense.encryptedTitle ?? (expense.title as string);
     const cipherDescription =
-      expense.encryptedDescription ?? (expense.description as string | undefined);
+      expense.encryptedDescription ??
+      (expense.description as string | undefined);
 
     const scope = expense.encryptionScope || 'personal';
     const { key, keyStatus } = await this.resolveKey(expense, user, email);
 
     if (!key) {
       return this.fail(
-        { ...expense, encryptedTitle: cipherTitle, encryptedDescription: cipherDescription },
+        {
+          ...expense,
+          encryptedTitle: cipherTitle,
+          encryptedDescription: cipherDescription,
+        },
         { keyStatus, scope, expenseId: expense.id, groupId: expense.groupId },
         keyStatus ?? 'error',
       );
@@ -114,22 +119,36 @@ export class ExpenseDecryptionService {
       } as T;
     } catch (decryptError) {
       return this.fail(
-        { ...expense, encryptedTitle: cipherTitle, encryptedDescription: cipherDescription },
-        { keyStatus: 'ready', decryptError, scope, expenseId: expense.id, groupId: expense.groupId },
+        {
+          ...expense,
+          encryptedTitle: cipherTitle,
+          encryptedDescription: cipherDescription,
+        },
+        {
+          keyStatus: 'ready',
+          decryptError,
+          scope,
+          expenseId: expense.id,
+          groupId: expense.groupId,
+        },
         'decrypt_error',
       );
     }
   }
 
   /** Decrypt a list, yielding to the browser between batches to avoid jank. */
-  async decryptExpenses<T extends DecryptableExpense>(expenses: T[]): Promise<T[]> {
+  async decryptExpenses<T extends DecryptableExpense>(
+    expenses: T[],
+  ): Promise<T[]> {
     if (!expenses || expenses.length === 0) {
       return expenses;
     }
     const out: T[] = [];
     for (let i = 0; i < expenses.length; i += DECRYPTION_BATCH_SIZE) {
       const batch = expenses.slice(i, i + DECRYPTION_BATCH_SIZE);
-      const decrypted = await Promise.all(batch.map((e) => this.decryptExpense(e)));
+      const decrypted = await Promise.all(
+        batch.map((e) => this.decryptExpense(e)),
+      );
       out.push(...decrypted);
       if (i + DECRYPTION_BATCH_SIZE < expenses.length) {
         await yieldToBrowser();
@@ -184,7 +203,10 @@ export class ExpenseDecryptionService {
         return { key: null, keyStatus: 'no_session' };
       }
       try {
-        const key = await this.encryption.unwrapKey(myWrapped.wrappedKey, masterKey);
+        const key = await this.encryption.unwrapKey(
+          myWrapped.wrappedKey,
+          masterKey,
+        );
         return { key, keyStatus: 'ready' };
       } catch (e) {
         logDecryptionFailure('direct_shared_unwrap_failed', {
@@ -219,6 +241,11 @@ export class ExpenseDecryptionService {
     });
     // Fallback display value: any template that just renders `title` still
     // shows a meaningful message rather than ciphertext or a blank.
-    return { ...expense, title: meta.message, description: '', decryption: meta } as T;
+    return {
+      ...expense,
+      title: meta.message,
+      description: '',
+      decryption: meta,
+    } as T;
   }
 }

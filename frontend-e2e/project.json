@@ -21,10 +21,8 @@
       "configurations": {
         "production": {},
         "development": {}
-      },
-
-    }
-    ,
+      }
+    },
     "playwright": {
       "executor": "@nx/playwright:playwright",
       "options": {

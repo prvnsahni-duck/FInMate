@@ -33,9 +33,19 @@ describe('DashboardHomeComponent', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       providers: [
-        { provide: Store, useValue: { selectSnapshot: jest.fn().mockReturnValue({ email: 'test@example.com' }) } },
+        {
+          provide: Store,
+          useValue: {
+            selectSnapshot: jest
+              .fn()
+              .mockReturnValue({ email: 'test@example.com' }),
+          },
+        },
         { provide: NGXS_OPTIONS, useValue: {} },
-        { provide: ZK_DB_NAME, useValue: 'finmate_zk_vault_test_' + Math.random() },
+        {
+          provide: ZK_DB_NAME,
+          useValue: 'finmate_zk_vault_test_' + Math.random(),
+        },
         ZkKeyVaultService,
       ],
       schemas: [NO_ERRORS_SCHEMA],
@@ -73,8 +83,11 @@ describe('DashboardHomeComponent', () => {
     fixture.detectChanges();
     const emitSpy = jest.spyOn(component.openExpenseModalEvent, 'emit');
 
-    const logExpenseBtn = Array.from(fixture.nativeElement.querySelectorAll('button'))
-      .find(btn => (btn as HTMLButtonElement).textContent?.includes('Log Expense')) as HTMLButtonElement;
+    const logExpenseBtn = Array.from(
+      fixture.nativeElement.querySelectorAll('button'),
+    ).find((btn) =>
+      (btn as HTMLButtonElement).textContent?.includes('Log Expense'),
+    ) as HTMLButtonElement;
     logExpenseBtn.click();
 
     expect(emitSpy).toHaveBeenCalledWith({});
@@ -85,8 +98,11 @@ describe('DashboardHomeComponent', () => {
     const emitSpy = jest.spyOn(component.acceptInvitationEvent, 'emit');
 
     // Find the accept button specifically by text
-    const acceptBtn = Array.from(fixture.nativeElement.querySelectorAll('button'))
-      .find(btn => (btn as HTMLButtonElement).textContent?.trim() === 'Accept') as HTMLButtonElement;
+    const acceptBtn = Array.from(
+      fixture.nativeElement.querySelectorAll('button'),
+    ).find(
+      (btn) => (btn as HTMLButtonElement).textContent?.trim() === 'Accept',
+    ) as HTMLButtonElement;
     expect(acceptBtn).toBeTruthy();
     expect(acceptBtn.textContent?.trim()).toBe('Accept');
 

@@ -14,4 +14,3 @@ export { AddUserAiOptIn1719100000000 } from './1719100000000-AddUserAiOptIn';
 export { AddRecurringExpenseKeyVersion1719200000000 } from './1719200000000-AddRecurringExpenseKeyVersion';
 export { AddExpenseSplitVersionAndSoftDelete1719300000000 } from './1719300000000-AddExpenseSplitVersionAndSoftDelete';
 export { AddExpenseVersionHistory1719400000000 } from './1719400000000-AddExpenseVersionHistory';
-

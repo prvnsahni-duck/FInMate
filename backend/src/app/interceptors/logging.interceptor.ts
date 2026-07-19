@@ -37,15 +37,28 @@ export class LoggingInterceptor implements NestInterceptor {
     const timestamp = new Date().toISOString();
     const method = req.method;
     const url = req.originalUrl || req.url;
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || null;
-    const responseTime = req.startTime ? `${Date.now() - req.startTime}ms` : 'N/A';
-    const status = error ? (error.status || error.statusCode || 500) : res.statusCode;
-    const userId = req?.user?.id || req?.user?.userId || req?.throttleContext?.userId || 'anonymous';
+    const ip =
+      req.ip ||
+      req.headers['x-forwarded-for'] ||
+      req.socket?.remoteAddress ||
+      null;
+    const responseTime = req.startTime
+      ? `${Date.now() - req.startTime}ms`
+      : 'N/A';
+    const status = error
+      ? error.status || error.statusCode || 500
+      : res.statusCode;
+    const userId =
+      req?.user?.id ||
+      req?.user?.userId ||
+      req?.throttleContext?.userId ||
+      'anonymous';
 
     const throttleCtx = req?.throttleContext || {};
     const throttleKey = throttleCtx.throttleKey || ip;
     const limit = throttleCtx.limit !== undefined ? throttleCtx.limit : 'N/A';
-    const remaining = throttleCtx.remaining !== undefined ? throttleCtx.remaining : 'N/A';
+    const remaining =
+      throttleCtx.remaining !== undefined ? throttleCtx.remaining : 'N/A';
 
     const logMessage = JSON.stringify({
       timestamp,

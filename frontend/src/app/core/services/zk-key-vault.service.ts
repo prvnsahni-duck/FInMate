@@ -81,7 +81,9 @@ export class ZkKeyVaultService {
     try {
       db = await this.openVault();
     } catch (error) {
-      console.warn('IndexedDB persistence unavailable. Falling back to memory-only key cache.');
+      console.warn(
+        'IndexedDB persistence unavailable. Falling back to memory-only key cache.',
+      );
       ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
       return false;
     }
@@ -98,13 +100,17 @@ export class ZkKeyVaultService {
         };
         request.onerror = () => {
           logError('Failed to store key in ZK vault', request.error);
-          console.warn('IndexedDB persistence unavailable. Falling back to memory-only key cache.');
+          console.warn(
+            'IndexedDB persistence unavailable. Falling back to memory-only key cache.',
+          );
           ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
           resolve(false);
         };
       } catch (error) {
         logError('Synchronous error putting key in ZK vault', error);
-        console.warn('IndexedDB persistence unavailable. Falling back to memory-only key cache.');
+        console.warn(
+          'IndexedDB persistence unavailable. Falling back to memory-only key cache.',
+        );
         ZkKeyVaultService.fallbackMap.set(normalizedEmail, key);
         resolve(false);
       }
@@ -119,7 +125,8 @@ export class ZkKeyVaultService {
     const normalizedEmail = email.toLowerCase();
 
     if (!this.dbPromise) {
-      const fallbackKey = ZkKeyVaultService.fallbackMap.get(normalizedEmail) ?? null;
+      const fallbackKey =
+        ZkKeyVaultService.fallbackMap.get(normalizedEmail) ?? null;
       if (fallbackKey) {
         return fallbackKey;
       }
@@ -150,7 +157,9 @@ export class ZkKeyVaultService {
           resolve(result as CryptoKey);
         } else if (ZkKeyVaultService.fallbackMap.has(normalizedEmail)) {
           // Return from fallback map if IndexedDB returned null
-          resolve(ZkKeyVaultService.fallbackMap.get(normalizedEmail) as CryptoKey);
+          resolve(
+            ZkKeyVaultService.fallbackMap.get(normalizedEmail) as CryptoKey,
+          );
         } else {
           resolve(null);
         }
@@ -159,7 +168,9 @@ export class ZkKeyVaultService {
         logError('Failed to load key from ZK vault', request.error);
         // Attempt fallback map on error
         if (ZkKeyVaultService.fallbackMap.has(normalizedEmail)) {
-          resolve(ZkKeyVaultService.fallbackMap.get(normalizedEmail) as CryptoKey);
+          resolve(
+            ZkKeyVaultService.fallbackMap.get(normalizedEmail) as CryptoKey,
+          );
         } else {
           reject(request.error);
         }
@@ -239,7 +250,10 @@ export class ZkKeyVaultService {
   }
 
   /** Stores a user's private wrapping key in the vault under private_wrapping_key:${email} */
-  async storePrivateWrappingKey(email: string, key: CryptoKey): Promise<boolean> {
+  async storePrivateWrappingKey(
+    email: string,
+    key: CryptoKey,
+  ): Promise<boolean> {
     return this.storeKey(`private_wrapping_key:${email}`, key);
   }
 

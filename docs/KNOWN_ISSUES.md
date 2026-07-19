@@ -19,13 +19,15 @@ cycle, not before a freeze.
   still carries no `groupKeyVersionId`). The agreed end-state below still
   stands for v2.1.
 - **Direction agreed:** Option 1 (neutral phrasing). Option 3 rejected as the
-  *final* design (see status note above for the shipped interim).
+  _final_ design (see status note above for the shipped interim).
 
 ### Symptom
+
 Audit entries render the raw ciphertext instead of the title, e.g.
 `created expense "9dK…:aB3…"` instead of `created expense "Groceries"`.
 
 ### Root cause
+
 Titles are end-to-end encrypted and, by design, **the backend never decrypts
 them** (see `PROJECT_DECISIONS.md` → Security). When an expense is
 created/updated/deleted/restored, the backend stores the already-encrypted
@@ -39,7 +41,9 @@ This is the one screen displaying an expense title that does **not** go through
 the pipeline; ledger, trash, dashboard, and attachments all do.
 
 ### Why deferred
+
 Not a trivial pipeline hookup — it needs a decision:
+
 - Audit metadata does **not** carry `groupKeyVersionId`, so decrypting on the
   client can pick the wrong key version for older entries (group keys rotate),
   producing a failed/incorrect decrypt.
@@ -50,17 +54,18 @@ Touching a secondary view right before a freeze risks a regression for no
 functional gain.
 
 ### Options (to evaluate next cycle)
+
 1. ✅ **Preferred — Backend:** stop persisting titles in audit metadata; render a
    scope-neutral phrase: `updated an expense`, `deleted an expense`,
    `restored an expense`. History is an audit log, not a ledger — most financial
    apps omit item names from audit trails. Simplest; no client crypto in
    history; no encrypted blobs stored; no future migration; stable records.
 2. ⚠️ **Acceptable if titles are truly wanted — Backend:** persist enough
-   metadata to decrypt correctly *forever*, then reuse the existing pipeline
+   metadata to decrypt correctly _forever_, then reuse the existing pipeline
    (`GroupKeyService.resolveGroupKey` → `ExpenseDecryptionService`). Requires
    audit metadata to carry: `title`, `scope`, `groupId`, `groupKeyVersionId`.
    This is really an **audit data-model completion**, not a frontend fix.
-3. ❌ **Rejected — Frontend best-effort:** decrypt against the group's *active*
+3. ❌ **Rejected — Frontend best-effort:** decrypt against the group's _active_
    key only. New entries decrypt but older ones fail unpredictably after key
    rotation — inconsistent UX that is worse than a stable neutral message.
 

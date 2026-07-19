@@ -3,7 +3,20 @@ import { Page, expect } from '@playwright/test';
 import { waitForPageApi } from '../utils/api';
 
 export const recurring = {
-  async create(page: Page, { title, description, amount, startDate }: { title: string; description: string; amount: string; startDate: string }) {
+  async create(
+    page: Page,
+    {
+      title,
+      description,
+      amount,
+      startDate,
+    }: {
+      title: string;
+      description: string;
+      amount: string;
+      startDate: string;
+    },
+  ) {
     await page.getByTestId('group-tab-recurring').click();
     await page.getByTestId('recurring-create-button').click();
     await expect(page.getByTestId('recurring-form')).toBeVisible();
@@ -21,7 +34,10 @@ export const recurring = {
       action: () => page.getByTestId('recurring-submit-button').click(),
     });
 
-    const card = page.getByTestId('recurring-expense-card').filter({ hasText: title }).first();
+    const card = page
+      .getByTestId('recurring-expense-card')
+      .filter({ hasText: title })
+      .first();
     await expect(card).toBeVisible({ timeout: 15000 });
     await expect(card).toContainText(/active/i);
     return { title, body };
@@ -29,4 +45,3 @@ export const recurring = {
 };
 
 export default recurring;
-

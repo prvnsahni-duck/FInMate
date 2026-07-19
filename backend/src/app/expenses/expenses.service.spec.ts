@@ -32,9 +32,15 @@ describe('ExpensesService', () => {
   let groupMemberRepository: jest.Mocked<Repository<GroupMember>>;
   let userRepository: jest.Mocked<Repository<User>>;
   let attachmentRepository: jest.Mocked<Repository<Attachment>>;
-  let groupKeyVersionRepository: { findOne: jest.Mock; save: jest.Mock; create: jest.Mock };
+  let groupKeyVersionRepository: {
+    findOne: jest.Mock;
+    save: jest.Mock;
+    create: jest.Mock;
+  };
   let expenseVersionRepository: jest.Mocked<Repository<ExpenseVersion>>;
-  let expenseSplitVersionRepository: jest.Mocked<Repository<ExpenseSplitVersion>>;
+  let expenseSplitVersionRepository: jest.Mocked<
+    Repository<ExpenseSplitVersion>
+  >;
   let attachmentVersionRepository: jest.Mocked<Repository<AttachmentVersion>>;
   let receiptVersionRepository: jest.Mocked<Repository<ReceiptVersion>>;
 
@@ -139,7 +145,8 @@ describe('ExpensesService', () => {
         if (entity === ExpenseVersion) return mockExpenseVersionRepository;
         if (entity === ExpenseSplitVersion)
           return mockExpenseSplitVersionRepository;
-        if (entity === AttachmentVersion) return mockAttachmentVersionRepository;
+        if (entity === AttachmentVersion)
+          return mockAttachmentVersionRepository;
         if (entity === ReceiptVersion) return mockReceiptVersionRepository;
         if (entity === EncryptedExpenseKey)
           return mockEncryptedExpenseKeyRepository;

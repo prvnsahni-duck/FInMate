@@ -21,6 +21,12 @@
       "options": {
         "jestConfig": "shared/data-models/jest.config.cts"
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p shared/data-models/tsconfig.lib.json"
+      }
     }
   }
 }

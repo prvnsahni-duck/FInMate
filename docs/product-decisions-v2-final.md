@@ -14,7 +14,7 @@
 wrapped key: every `MemberWrappedGroupKey` creation path targets ACTIVE (`groups.service.ts`
 invite/provision/rotate), and `getMissingGroupKeys` audits only ACTIVE. Historical expenses carry
 their version stamp and the read path serves superseded versions (`GET keys/me?versionId=`), but
-nothing can *provision* a superseded version's wrapped key to a new member — so pre-join history
+nothing can _provision_ a superseded version's wrapped key to a new member — so pre-join history
 shows "Unable to display this item". `GET /groups/:id/keys/versions` (new) already enumerates
 versions.
 
@@ -22,11 +22,12 @@ versions.
 everything — frozen-decisions:15); the ledger's financial content (amounts, currency, dates,
 categories, splits, balances) is already server-visible plaintext by decision §3, so denying only
 titles/descriptions of old items is weak privacy with real UX cost; versioning was introduced for
-rotation bookkeeping, not access control. **Cons.** A member evicted *before* sensitive history was
+rotation bookkeeping, not access control. **Cons.** A member evicted _before_ sensitive history was
 written is unaffected either way; the only privacy loss is toward genuinely-new members — accept,
 since inviting someone into a shared ledger is itself the sharing decision.
 
 **Required backend behaviour (when freeze lifts):**
+
 1. `provisionGroupKeys` accepts an optional `groupKeyVersionId` (default: ACTIVE); validated
    group-scoped, REVOKED rejected — same rule as the expense stamp path.
 2. `getMissingGroupKeys` (or a `?allVersions=true` variant) reports missing `(userId, versionId)`
@@ -46,13 +47,14 @@ Backend: two method extensions. Frontend: extend the existing healing loop. ~2�
 Scope of history: **Expense, ExpenseSplit, Settlement, Attachment metadata, Receipt metadata.**
 
 **Current behaviour.** Edits are allowed; splits are soft-deleted and recreated with
-`isSettled:false` (soft-delete landed 2026-07-17 — the *replaced* allocation is now preserved, a
+`isSettled:false` (soft-delete landed 2026-07-17 — the _replaced_ allocation is now preserved, a
 partial history). `Expense` has an optimistic `@VersionColumn` but no snapshot of prior states;
 `Settlement` rows are separate and never mutated by expense edits; attachment metadata rows are
 replaced in place; receipts are simulated.
 
 **Recommended implementation model: copy-on-write revision tables, keyed by the existing
 `@VersionColumn`.**
+
 - One `entity_revisions` table (or per-entity `*_revisions` tables): `entity_type`, `entity_id`,
   `version`, `payload jsonb` (the row as-written, ciphertext fields stay ciphertext — ZK-safe),
   `actor_user_id`, `created_at`. Written transactionally on every create/update/soft-delete via
@@ -77,8 +79,9 @@ adjustment record on settled-split change. ~1–1.5 weeks. No architectural chan
 ## 3. Category & ExpenseDate remain plaintext — **DECIDED; internal-consistency check: PASS (with two doc actions)**
 
 **Verified consistent with:**
+
 - `frozen-decisions.md:12` — plaintext `amount_total`, `currency`, `category`, `expense_date` is
-  declared intentional (enables server-side aggregation). The decision *re-affirms* existing canon.
+  declared intentional (enables server-side aggregation). The decision _re-affirms_ existing canon.
 - Schema and indexes (`expense.entity.ts` category/date columns + composite indexes), DTO
   validation, list filters, category/monthly analytics, and the household `ledgerMonth` close cycle
   (derived server-side from `expenseDate`) — all depend on plaintext and continue to work unchanged.
@@ -89,6 +92,7 @@ adjustment record on settled-split change. ~1–1.5 weeks. No architectural chan
   enforced by `@IsCiphertext`.
 
 **Required follow-through (docs only):**
+
 1. When ADR-003 is imported, its text must record this classification — the 2026-07-17 audit briefs
    assumed the opposite (encrypted category/date, opaque CategoryUUID); at reconciliation mark
    G-CAT/G-DATE `Won't Fix (ADR-reconciled)` in the audit docs.
@@ -104,6 +108,7 @@ the password (PBKDF2); the private wrapping key and symmetric-wrapped group keys
 only with it — losing the password today means permanent loss of encrypted data.
 
 **Recommended model (v2):**
+
 - **Password change (old password known):** verify → derive new master key → client re-wraps the
   private wrapping key and every symmetric-wrapped key under the new master key → atomically swap.
   Pure engineering, no policy risk. (Frozen-decisions:34 already mandates "re-wraps the UDK, does
@@ -134,6 +139,7 @@ throttle profiles already exist (`forgotPassword`/`resetPassword`). ~1.5–2 wee
 `refreshGroupKey()` component method was never wired to a template).
 
 **Recommendation.**
+
 - A dedicated **"Security / Encryption keys"** card inside the existing Group Settings area,
   visible to owner/admin only (reuse `isOwnerOrAdmin()`), showing: current key version + created
   date (`GET keys/versions`), per-member provisioning status (`GET keys/missing`), and rotation
@@ -154,10 +160,10 @@ throttle profiles already exist (`forgotPassword`/`resetPassword`). ~1.5–2 wee
 
 ## Decision register summary
 
-| # | Item | Status | Follow-up owner |
-|---|------|--------|-----------------|
-| 1 | Historical key access | **DECIDED — Option A** (share history) | Backend + FE healing (post-freeze) |
-| 2 | Settled expense editing | **DECIDED — editing allowed + full version history**; revision-table model recommended | Backend (post-freeze) |
-| 3 | Category/ExpenseDate plaintext | **DECIDED — remain plaintext**; consistency verified | ADR-003 text + privacy disclosure |
-| 4 | Password recovery | **RECOMMENDED — Recovery-Key model** + password change | Owner ratification |
-| 5 | Rotation UI | **RECOMMENDED — Group Settings "Encryption keys" panel** | Owner ratification |
+| #   | Item                           | Status                                                                                 | Follow-up owner                    |
+| --- | ------------------------------ | -------------------------------------------------------------------------------------- | ---------------------------------- |
+| 1   | Historical key access          | **DECIDED — Option A** (share history)                                                 | Backend + FE healing (post-freeze) |
+| 2   | Settled expense editing        | **DECIDED — editing allowed + full version history**; revision-table model recommended | Backend (post-freeze)              |
+| 3   | Category/ExpenseDate plaintext | **DECIDED — remain plaintext**; consistency verified                                   | ADR-003 text + privacy disclosure  |
+| 4   | Password recovery              | **RECOMMENDED — Recovery-Key model** + password change                                 | Owner ratification                 |
+| 5   | Rotation UI                    | **RECOMMENDED — Group Settings "Encryption keys" panel**                               | Owner ratification                 |

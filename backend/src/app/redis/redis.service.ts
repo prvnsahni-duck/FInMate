@@ -172,10 +172,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       const result = await this.client.ping();
       return result === 'PONG';
     } catch (err: any) {
-      this.logger.error(
-        `Redis ping failed: ${err.message}`,
-        err.stack,
-      );
+      this.logger.error(`Redis ping failed: ${err.message}`, err.stack);
       return false;
     }
   }

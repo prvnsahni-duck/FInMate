@@ -22,12 +22,15 @@ describe('ExpensesService', () => {
   beforeEach(() => {
     const encSpy = {
       loadKeyFromSession: jest.fn().mockResolvedValue('mock-crypto-key'),
-      encrypt: jest.fn().mockImplementation((val) => Promise.resolve(`enc:${val}`)),
+      encrypt: jest
+        .fn()
+        .mockImplementation((val) => Promise.resolve(`enc:${val}`)),
       decryptExpense: jest.fn().mockImplementation((expense) =>
         Promise.resolve({
           ...expense,
           title: expense.title?.replace('enc:', '') || expense.title,
-          description: expense.description?.replace('enc:', '') || expense.description,
+          description:
+            expense.description?.replace('enc:', '') || expense.description,
         }),
       ),
     };
@@ -45,7 +48,9 @@ describe('ExpensesService', () => {
           provide: GroupKeyService,
           useValue: {
             getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
-            resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: 'mock-group-key' }),
+            resolveGroupKey: jest
+              .fn()
+              .mockResolvedValue({ status: 'ready', key: 'mock-group-key' }),
             getGroupKeyForEncryption: jest
               .fn()
               .mockResolvedValue({ key: 'mock-group-key', versionId: 'v1-id' }),
@@ -76,7 +81,11 @@ describe('ExpensesService', () => {
   describe('getExpenses', () => {
     it('should fetch and decrypt expenses', (done) => {
       const mockData = [
-        { id: 'exp-1', title: 'enc:Groceries', description: 'enc:Weekly groceries' },
+        {
+          id: 'exp-1',
+          title: 'enc:Groceries',
+          description: 'enc:Weekly groceries',
+        },
         { id: 'exp-2', title: 'enc:Rent', description: '' },
       ];
 
@@ -159,7 +168,12 @@ describe('ExpensesService', () => {
       encryptionServiceSpy.loadKeyFromSession.mockResolvedValue(null);
 
       const mockData = [
-        { id: 'exp-1', title: 'abc123:xyz789', description: 'cipher:text', encryptionScope: 'group' },
+        {
+          id: 'exp-1',
+          title: 'abc123:xyz789',
+          description: 'cipher:text',
+          encryptionScope: 'group',
+        },
       ];
 
       service.getExpenses('group-1').subscribe((res) => {
@@ -318,7 +332,6 @@ describe('ExpensesService', () => {
       );
     });
   });
-
 
   // --- deleteExpense ---
   describe('deleteExpense', () => {

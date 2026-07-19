@@ -9,5 +9,3 @@ export const test = base.extend<ExpenseFixture>({
 });
 
 export { expect } from '@playwright/test';
-
-

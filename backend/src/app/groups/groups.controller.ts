@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Query,
   Param,
@@ -118,7 +119,10 @@ export class GroupsController {
     const result = await this.groupsMembershipService.getPendingInvitations(
       req.user.id,
     );
-    return new SuccessResponse('Pending invitations retrieved successfully', result);
+    return new SuccessResponse(
+      'Pending invitations retrieved successfully',
+      result,
+    );
   }
 
   @Post(':id/invites')
@@ -170,6 +174,37 @@ export class GroupsController {
       context,
     );
     return new SuccessResponse('Group updated successfully', result);
+  }
+
+  /**
+   * Archive (soft-delete) a group. Exposed to users as "Delete Group".
+   * Restricted to the group owner only — admins, editors, and viewers are rejected.
+   */
+  @Delete(':id')
+  async archive(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { reason?: string },
+    @Req()
+    req: Request & {
+      user: { id: string };
+      ip?: string;
+      socket: { remoteAddress?: string };
+    },
+  ) {
+    const context = {
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    const result = await this.groupsCrudService.archiveGroup(
+      req.user.id,
+      id,
+      body?.reason,
+      context,
+    );
+    return new SuccessResponse('Group deleted successfully', result);
   }
 
   @Post(':id/invite-link/regenerate')
@@ -322,7 +357,11 @@ export class GroupsController {
     @Body() body: ProvisionGroupKeysDto,
     @Req() req: Request & { user: { id: string } },
   ) {
-    await this.groupsMembershipService.provisionGroupKeys(req.user.id, id, body.keys);
+    await this.groupsMembershipService.provisionGroupKeys(
+      req.user.id,
+      id,
+      body.keys,
+    );
     return new SuccessResponse('Group keys provisioned successfully', null);
   }
 
@@ -381,10 +420,8 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: any,
   ) {
-    const missingUserIds = await this.groupsMembershipService.getMissingGroupKeys(
-      req.user.id,
-      id,
-    );
+    const missingUserIds =
+      await this.groupsMembershipService.getMissingGroupKeys(req.user.id, id);
 
     return new SuccessResponse('Missing keys retrieved', missingUserIds);
   }

@@ -15,5 +15,3 @@ export const test = base.extend<GroupsFixture>({
 });
 
 export { expect } from '@playwright/test';
-
-

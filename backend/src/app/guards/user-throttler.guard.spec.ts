@@ -57,7 +57,11 @@ describe('UserThrottlerGuard', () => {
         getHandler: () => ({ name: 'testMethod' }),
       } as unknown as ExecutionContext;
 
-      const result = (guard as any).generateKey(mockContext, '127.0.0.1', 'default');
+      const result = (guard as any).generateKey(
+        mockContext,
+        '127.0.0.1',
+        'default',
+      );
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
     });
@@ -67,7 +71,8 @@ describe('UserThrottlerGuard', () => {
       // payload segment base64: eyJ1c2VySWQiOiJ1c2VyLWp3dC00NTYifQ==
       const mockReq = {
         headers: {
-          authorization: 'Bearer header.eyJ1c2VySWQiOiJ1c2VyLWp3dC00NTYifQ==.signature',
+          authorization:
+            'Bearer header.eyJ1c2VySWQiOiJ1c2VyLWp3dC00NTYifQ==.signature',
         },
       };
       const mockContext = {
@@ -78,7 +83,11 @@ describe('UserThrottlerGuard', () => {
         getHandler: () => ({ name: 'testMethod' }),
       } as unknown as ExecutionContext;
 
-      const result = (guard as any).generateKey(mockContext, '127.0.0.1', 'default');
+      const result = (guard as any).generateKey(
+        mockContext,
+        '127.0.0.1',
+        'default',
+      );
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
     });
@@ -95,7 +104,11 @@ describe('UserThrottlerGuard', () => {
         getHandler: () => ({ name: 'testMethod' }),
       } as unknown as ExecutionContext;
 
-      const result = (guard as any).generateKey(mockContext, '192.168.1.1', 'default');
+      const result = (guard as any).generateKey(
+        mockContext,
+        '192.168.1.1',
+        'default',
+      );
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
     });
@@ -113,7 +126,9 @@ describe('UserThrottlerGuard', () => {
       };
 
       // Mock getRequestResponse to return our mock req/res
-      (guard as any).getRequestResponse = jest.fn().mockReturnValue({ req, res });
+      (guard as any).getRequestResponse = jest
+        .fn()
+        .mockReturnValue({ req, res });
       (guard as any).headerPrefix = 'X-RateLimit';
       // Initialize commonOptions so handleRequest can access ignoreUserAgents etc.
       (guard as any).commonOptions = (guard as any).commonOptions || {};
@@ -160,7 +175,8 @@ describe('UserThrottlerGuard', () => {
       const { props, req } = createHandleRequestProps({
         req: {
           headers: {
-            authorization: 'Bearer header.eyJ1c2VySWQiOiJ1c2VyLWp3dC03ODkifQ==.signature',
+            authorization:
+              'Bearer header.eyJ1c2VySWQiOiJ1c2VyLWp3dC03ODkifQ==.signature',
           },
         },
       });
@@ -233,7 +249,9 @@ describe('UserThrottlerGuard', () => {
       await (guard as any).handleRequest(props);
 
       expect(req.throttleContext.retryAfter).toBe(30);
-      expect(req.throttleContext.blockedUntil).toBeGreaterThanOrEqual(beforeTime + 30000);
+      expect(req.throttleContext.blockedUntil).toBeGreaterThanOrEqual(
+        beforeTime + 30000,
+      );
       expect(req.throttleContext.remaining).toBe(0); // max(0, 5-6) = 0
     });
 

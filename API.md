@@ -881,4 +881,3 @@ graph TD
 - **Endpoint**: `DELETE /api/v1/recurring-expenses/{id}`
 - **Description**: Permanently delete a recurring template.
 - **Response Example (`200 OK`)**: Empty success response.
-

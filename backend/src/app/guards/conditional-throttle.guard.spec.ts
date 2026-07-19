@@ -83,10 +83,12 @@ describe('ConditionalThrottleGuard', () => {
     });
 
     it('should default to enabled and delegate to ThrottlerGuard if RATE_LIMIT_ENABLED is unset', async () => {
-      mockConfigService.get.mockImplementation((key: string, defaultValue?: any) => {
-        if (key === 'RATE_LIMIT_ENABLED') return defaultValue ?? true;
-        return undefined;
-      });
+      mockConfigService.get.mockImplementation(
+        (key: string, defaultValue?: any) => {
+          if (key === 'RATE_LIMIT_ENABLED') return defaultValue ?? true;
+          return undefined;
+        },
+      );
       mockThrottlerGuard.canActivate.mockResolvedValue(true);
 
       const result = await guard.canActivate(mockContext);
@@ -110,4 +112,3 @@ describe('ConditionalThrottleGuard', () => {
     });
   });
 });
-

@@ -16,56 +16,56 @@
      This helps prevent browsers (like DuckDuckGo) from forcibly inverting colors. */
   color-scheme: light;
   /* Brand */
-  --color-primary: 0 98 65;       /* #006241 - Deep Green */
-  --color-secondary: 30 30 30;    /* #1E1E1E - Dark text/foreground */
-  --color-accent: 212 160 23;     /* #D4A017 - Gold */
+  --color-primary: 0 98 65; /* #006241 - Deep Green */
+  --color-secondary: 30 30 30; /* #1E1E1E - Dark text/foreground */
+  --color-accent: 212 160 23; /* #D4A017 - Gold */
 
   /* Status */
-  --color-success: 16 185 129;    /* #10B981 */
-  --color-warning: 245 158 11;    /* #F59E0B */
-  --color-error: 239 68 68;       /* #EF4444 */
+  --color-success: 16 185 129; /* #10B981 */
+  --color-warning: 245 158 11; /* #F59E0B */
+  --color-error: 239 68 68; /* #EF4444 */
 
   /* Layout */
-  --color-bg: 242 237 230;        /* #F2EDE6 - Cream Background */
-  --color-card: 255 255 255;      /* #FFFFFF - White Card */
+  --color-bg: 242 237 230; /* #F2EDE6 - Cream Background */
+  --color-card: 255 255 255; /* #FFFFFF - White Card */
 
   /* Surfaces & Inputs (warm-toned for light) */
-  --color-surface: 247 244 240;       /* #F7F4F0 - input bg, inner panels */
-  --color-surface-alt: 237 233 227;   /* #EDE9E3 - hover on surface, deeper accent */
+  --color-surface: 247 244 240; /* #F7F4F0 - input bg, inner panels */
+  --color-surface-alt: 237 233 227; /* #EDE9E3 - hover on surface, deeper accent */
 
   /* Text */
-  --color-muted: 120 113 108;     /* #78716C - warm gray muted text */
+  --color-muted: 120 113 108; /* #78716C - warm gray muted text */
 
   /* Borders */
-  --color-border: 30 30 30;       /* same as secondary, used at low opacity */
+  --color-border: 30 30 30; /* same as secondary, used at low opacity */
 }
 
 .dark {
   /* Ensure the browser knows the page supports dark colors when `.dark` is present */
   color-scheme: dark;
   /* Brand */
-  --color-primary: 0 179 122;     /* #00B37A - Vibrant Green */
+  --color-primary: 0 179 122; /* #00B37A - Vibrant Green */
   --color-secondary: 242 237 230; /* #F2EDE6 - Light text/foreground */
-  --color-accent: 255 204 77;     /* #FFCC4D - Bright Gold */
+  --color-accent: 255 204 77; /* #FFCC4D - Bright Gold */
 
   /* Status */
-  --color-success: 52 211 153;    /* #34D399 */
-  --color-warning: 251 191 36;    /* #FBBF24 */
-  --color-error: 251 113 133;     /* #FB7185 */
+  --color-success: 52 211 153; /* #34D399 */
+  --color-warning: 251 191 36; /* #FBBF24 */
+  --color-error: 251 113 133; /* #FB7185 */
 
   /* Layout */
-  --color-bg: 18 18 18;           /* #121212 - Dark Background */
-  --color-card: 30 30 30;         /* #1E1E1E - Dark Card */
+  --color-bg: 18 18 18; /* #121212 - Dark Background */
+  --color-card: 30 30 30; /* #1E1E1E - Dark Card */
 
   /* Surfaces & Inputs */
-  --color-surface: 38 38 38;          /* #262626 - input bg, inner panels */
-  --color-surface-alt: 51 51 51;      /* #333333 - hover on surface */
+  --color-surface: 38 38 38; /* #262626 - input bg, inner panels */
+  --color-surface-alt: 51 51 51; /* #333333 - hover on surface */
 
   /* Text */
-  --color-muted: 163 163 163;     /* #A3A3A3 - muted text */
+  --color-muted: 163 163 163; /* #A3A3A3 - muted text */
 
   /* Borders */
-  --color-border: 255 255 255;    /* white, used at low opacity */
+  --color-border: 255 255 255; /* white, used at low opacity */
 }
 
 /* Global base overrides */

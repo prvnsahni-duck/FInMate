@@ -519,19 +519,9 @@ import { environment } from '../../../../environments/environment';
 import { Store } from '@ngxs/store';
 import { AuthState } from '../../../core/auth/auth.state';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
-import {
-  CategoryAnalyticsPoint,
-  CreateExpenseDto,
-  Expense,
-  GetExpensesResponse,
-  MonthlyAnalyticsPoint,
-  UpdateExpenseDto,
-} from '@finmate/data-models';
+import { CategoryAnalyticsPoint, CreateExpenseDto, Expense, GetExpensesResponse, MonthlyAnalyticsPoint, UpdateExpenseDto } from '@finmate/data-models';
 import { SESSION_EXPIRED_MESSAGE } from '../../../core/constants/crypto.constants';
-import {
-  mapDecryptExpense,
-  mapDecryptExpenses,
-} from '../../../core/utils/crypto-operators';
+import { mapDecryptExpense, mapDecryptExpenses } from '../../../core/utils/crypto-operators';
 
 @Injectable({
   providedIn: 'root',
@@ -545,9 +535,7 @@ export class ExpensesService {
   /**
    * Encrypts CreateExpenseDto or UpdateExpenseDto outgoing payloads.
    */
-  private async encryptPayload(
-    payload: CreateExpenseDto | UpdateExpenseDto,
-  ): Promise<any> {
+  private async encryptPayload(payload: CreateExpenseDto | UpdateExpenseDto): Promise<any> {
     const user = this.store.selectSnapshot(AuthState.getUser);
     const email = user?.email;
     if (email) {
@@ -559,17 +547,11 @@ export class ExpensesService {
       const encrypted = { ...payload };
 
       if (payload.title) {
-        encrypted.title = await this.encryptionService.encrypt(
-          payload.title,
-          key,
-        );
+        encrypted.title = await this.encryptionService.encrypt(payload.title, key);
       }
 
       if (payload.description) {
-        encrypted.description = await this.encryptionService.encrypt(
-          payload.description,
-          key,
-        );
+        encrypted.description = await this.encryptionService.encrypt(payload.description, key);
       }
 
       return encrypted;
@@ -608,21 +590,17 @@ export class ExpensesService {
       params = params.set('endDate', options.endDate);
     }
 
-    return this.http
-      .get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params })
-      .pipe(
-        mergeMap(async (res) => {
-          if (res.data) {
-            const decryptedData = await new Promise<Expense[]>((resolve) => {
-              mapDecryptExpenses<Expense>(this.store, this.encryptionService)(
-                from([res.data as Expense[]]),
-              ).subscribe((data) => resolve(data));
-            });
-            res.data = decryptedData;
-          }
-          return res;
-        }),
-      );
+    return this.http.get<GetExpensesResponse>(`${this.baseUrl}/expenses`, { params }).pipe(
+      mergeMap(async (res) => {
+        if (res.data) {
+          const decryptedData = await new Promise<Expense[]>((resolve) => {
+            mapDecryptExpenses<Expense>(this.store, this.encryptionService)(from([res.data as Expense[]])).subscribe((data) => resolve(data));
+          });
+          res.data = decryptedData;
+        }
+        return res;
+      }),
+    );
   }
 
   /**
@@ -630,9 +608,7 @@ export class ExpensesService {
    */
   createExpense(payload: CreateExpenseDto): Observable<Expense> {
     return from(this.encryptPayload(payload)).pipe(
-      mergeMap((encryptedPayload) =>
-        this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload),
-      ),
+      mergeMap((encryptedPayload) => this.http.post<Expense>(`${this.baseUrl}/expenses`, encryptedPayload)),
       mapDecryptExpense(this.store, this.encryptionService),
     );
   }
@@ -642,12 +618,7 @@ export class ExpensesService {
    */
   updateExpense(id: string, payload: UpdateExpenseDto): Observable<Expense> {
     return from(this.encryptPayload(payload)).pipe(
-      mergeMap((encryptedPayload) =>
-        this.http.patch<Expense>(
-          `${this.baseUrl}/expenses/${id}`,
-          encryptedPayload,
-        ),
-      ),
+      mergeMap((encryptedPayload) => this.http.patch<Expense>(`${this.baseUrl}/expenses/${id}`, encryptedPayload)),
       mapDecryptExpense(this.store, this.encryptionService),
     );
   }
@@ -663,9 +634,7 @@ export class ExpensesService {
    * Restore a deleted expense.
    */
   restoreExpense(id: string): Observable<Expense> {
-    return this.http
-      .post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {})
-      .pipe(mapDecryptExpense(this.store, this.encryptionService));
+    return this.http.post<Expense>(`${this.baseUrl}/expenses/${id}/restore`, {}).pipe(mapDecryptExpense(this.store, this.encryptionService));
   }
 
   /**
@@ -694,12 +663,9 @@ export class ExpensesService {
    * Export expenses ledger.
    */
   exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> {
-    return this.http.get(
-      `${this.baseUrl}/export/expenses?groupId=${groupId}&format=${format}`,
-      {
-        responseType: 'blob',
-      },
-    );
+    return this.http.get(`${this.baseUrl}/export/expenses?groupId=${groupId}&format=${format}`, {
+      responseType: 'blob',
+    });
   }
 
   /**
@@ -1101,7 +1067,7 @@ This section records all completed and outstanding implementation work specifica
 
 ### 📋 Next Actions / Future Scope
 
-- *No pending tasks. The module is fully implemented according to specifications.*
+- _No pending tasks. The module is fully implemented according to specifications._
 
 ### ✅ Completed Implementation Features
 

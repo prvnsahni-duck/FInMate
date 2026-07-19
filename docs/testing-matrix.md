@@ -3,25 +3,25 @@
 Which test dimensions each critical flow needs. ● = required · ○ = recommended · — = N/A.
 Architectural guarantees (bottom section) are the tests unit coverage tends to miss.
 
-| Flow | Unit | Integration | Encryption | Sync/Conflict | Multi-device | Recovery |
-|------|:----:|:-----------:|:----------:|:-------------:|:------------:|:--------:|
-| Expense create | ● | ● | ● | ○ | ○ | — |
-| Expense edit (settled splits) | ● | ● | ● | ● | ○ | ● |
-| Expense delete/restore | ● | ● | — | ○ | — | ● |
-| Split calculation (all types) | ● | ○ | — | — | — | — |
-| Recurring expense generation | ● | ● | ● | — | — | ○ |
-| Month close / carry-forward | ● | ● | — | ○ | — | ● |
-| Settlement propose/update | ● | ● | — | ● | ○ | — |
-| Group create / invite / join | ● | ● | ● | — | ● | — |
-| Role change / ownership transfer | ● | ● | — | — | — | — |
-| Group key rotation | ● | ● | ● | — | ● | ● |
-| Login / refresh / logout | ● | ● | — | — | ● | ○ |
-| 2FA enable/verify | ● | ● | ● | — | — | — |
-| Password change (UDK re-wrap) | ● | ● | ● | — | ● | ● |
-| Dashboard aggregation | ● | ● | ● | — | — | — |
-| Attachment encrypt/upload | ● | ● | ● | — | ● | ○ |
-| Import batch (transactional) | ● | ● | ○ | — | — | ● |
-| AI opt-in gate | ● | ● | — | — | ● | — |
+| Flow                             | Unit | Integration | Encryption | Sync/Conflict | Multi-device | Recovery |
+| -------------------------------- | :--: | :---------: | :--------: | :-----------: | :----------: | :------: |
+| Expense create                   |  ●   |      ●      |     ●      |       ○       |      ○       |    —     |
+| Expense edit (settled splits)    |  ●   |      ●      |     ●      |       ●       |      ○       |    ●     |
+| Expense delete/restore           |  ●   |      ●      |     —      |       ○       |      —       |    ●     |
+| Split calculation (all types)    |  ●   |      ○      |     —      |       —       |      —       |    —     |
+| Recurring expense generation     |  ●   |      ●      |     ●      |       —       |      —       |    ○     |
+| Month close / carry-forward      |  ●   |      ●      |     —      |       ○       |      —       |    ●     |
+| Settlement propose/update        |  ●   |      ●      |     —      |       ●       |      ○       |    —     |
+| Group create / invite / join     |  ●   |      ●      |     ●      |       —       |      ●       |    —     |
+| Role change / ownership transfer |  ●   |      ●      |     —      |       —       |      —       |    —     |
+| Group key rotation               |  ●   |      ●      |     ●      |       —       |      ●       |    ●     |
+| Login / refresh / logout         |  ●   |      ●      |     —      |       —       |      ●       |    ○     |
+| 2FA enable/verify                |  ●   |      ●      |     ●      |       —       |      —       |    —     |
+| Password change (UDK re-wrap)    |  ●   |      ●      |     ●      |       —       |      ●       |    ●     |
+| Dashboard aggregation            |  ●   |      ●      |     ●      |       —       |      —       |    —     |
+| Attachment encrypt/upload        |  ●   |      ●      |     ●      |       —       |      ●       |    ○     |
+| Import batch (transactional)     |  ●   |      ●      |     ○      |       —       |      —       |    ●     |
+| AI opt-in gate                   |  ●   |      ●      |     —      |       —       |      ●       |    —     |
 
 ## Architectural guarantee tests (Phase 6 — enforce invariants, not just units)
 

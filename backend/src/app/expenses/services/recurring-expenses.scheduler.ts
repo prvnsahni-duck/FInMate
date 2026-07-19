@@ -57,12 +57,15 @@ export class RecurringExpensesScheduler {
         timestamp: new Date().toISOString(),
       });
     } catch (err: any) {
-      this.logger.error({
-        event: 'scheduler_failed',
-        scheduler: 'recurring_expenses',
-        error: err.message,
-        timestamp: new Date().toISOString(),
-      }, err.stack);
+      this.logger.error(
+        {
+          event: 'scheduler_failed',
+          scheduler: 'recurring_expenses',
+          error: err.message,
+          timestamp: new Date().toISOString(),
+        },
+        err.stack,
+      );
     }
   }
 
@@ -88,13 +91,16 @@ export class RecurringExpensesScheduler {
       try {
         await this.processSingleTemplate(template, todayStr);
       } catch (err: any) {
-        this.logger.error({
-          event: 'scheduler_template_failed',
-          scheduler: 'recurring_expenses',
-          templateId: template.id,
-          error: err.message,
-          timestamp: new Date().toISOString(),
-        }, err.stack);
+        this.logger.error(
+          {
+            event: 'scheduler_template_failed',
+            scheduler: 'recurring_expenses',
+            templateId: template.id,
+            error: err.message,
+            timestamp: new Date().toISOString(),
+          },
+          err.stack,
+        );
       }
     }
   }
@@ -112,7 +118,8 @@ export class RecurringExpensesScheduler {
 
       await this.dataSource.transaction(async (manager) => {
         let groupKeyVersion: GroupKeyVersion | undefined;
-        let encryptionScope: 'personal' | 'group' | 'direct_shared' = 'personal';
+        let encryptionScope: 'personal' | 'group' | 'direct_shared' =
+          'personal';
 
         if (template.group) {
           encryptionScope = 'group';
@@ -122,21 +129,25 @@ export class RecurringExpensesScheduler {
           if (template.groupKeyVersion) {
             groupKeyVersion = template.groupKeyVersion;
           } else {
-            const activeKeyVersion = await manager.getRepository(GroupKeyVersion).findOne({
-              where: { group: { id: template.group.id }, status: 'ACTIVE' },
-              order: { version: 'DESC' },
-            });
+            const activeKeyVersion = await manager
+              .getRepository(GroupKeyVersion)
+              .findOne({
+                where: { group: { id: template.group.id }, status: 'ACTIVE' },
+                order: { version: 'DESC' },
+              });
             if (activeKeyVersion) {
               groupKeyVersion = activeKeyVersion;
             } else {
-              groupKeyVersion = await manager.getRepository(GroupKeyVersion).save(
-                manager.getRepository(GroupKeyVersion).create({
-                  group: template.group,
-                  version: 1,
-                  algorithm: 'AES-256-GCM',
-                  status: 'ACTIVE',
-                }),
-              );
+              groupKeyVersion = await manager
+                .getRepository(GroupKeyVersion)
+                .save(
+                  manager.getRepository(GroupKeyVersion).create({
+                    group: template.group,
+                    version: 1,
+                    algorithm: 'AES-256-GCM',
+                    status: 'ACTIVE',
+                  }),
+                );
             }
           }
         }

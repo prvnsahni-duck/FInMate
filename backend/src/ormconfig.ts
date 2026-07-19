@@ -35,7 +35,8 @@ if (!process.env.DATABASE_URL) {
 }
 
 const sslEnabled = process.env.DB_SSL === 'true';
-const sslRejectUnauthorized = process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
+const sslRejectUnauthorized =
+  process.env.DB_SSL_REJECT_UNAUTHORIZED !== 'false';
 const ssl = sslEnabled
   ? { rejectUnauthorized: sslRejectUnauthorized }
   : undefined;

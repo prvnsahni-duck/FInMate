@@ -5,7 +5,8 @@ import { webcrypto } from 'node:crypto';
 import 'fake-indexeddb/auto';
 
 if (typeof globalThis.structuredClone === 'undefined') {
-  (globalThis as any).structuredClone = (val: any) => JSON.parse(JSON.stringify(val));
+  (globalThis as any).structuredClone = (val: any) =>
+    JSON.parse(JSON.stringify(val));
 }
 
 // Polyfill Web Cryptography API for Jest/Node.js testing environment
@@ -35,7 +36,10 @@ describe('ClientEncryptionService', () => {
       providers: [
         ClientEncryptionService,
         ZkKeyVaultService,
-        { provide: ZK_DB_NAME, useValue: 'finmate_zk_vault_enc_spec_' + Math.random() }
+        {
+          provide: ZK_DB_NAME,
+          useValue: 'finmate_zk_vault_enc_spec_' + Math.random(),
+        },
       ],
     });
     service = TestBed.inject(ClientEncryptionService);

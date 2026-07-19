@@ -48,7 +48,10 @@ describe('AiController', () => {
       model: 'gpt-4',
     };
 
-    usersService.findById.mockResolvedValueOnce({ id: 'user-1', aiOptIn: true });
+    usersService.findById.mockResolvedValueOnce({
+      id: 'user-1',
+      aiOptIn: true,
+    });
     service.callOpenAiProxy.mockResolvedValueOnce({ text: 'Response' });
 
     const result = await controller.callOpenAiProxy(dto, req);
@@ -65,7 +68,10 @@ describe('AiController', () => {
   });
 
   it('should reject the request when the user has not opted in (AI-001)', async () => {
-    usersService.findById.mockResolvedValueOnce({ id: 'user-1', aiOptIn: false });
+    usersService.findById.mockResolvedValueOnce({
+      id: 'user-1',
+      aiOptIn: false,
+    });
 
     await expect(
       controller.callOpenAiProxy({ prompt: 'Hello AI' } as AiProxyDto, req),

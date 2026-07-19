@@ -5,7 +5,12 @@
   </p>
 </div>
 
-<form data-testid="register-form" [formGroup]="registerForm" (ngSubmit)="onSubmit()" class="space-y-4">
+<form
+  data-testid="register-form"
+  [formGroup]="registerForm"
+  (ngSubmit)="onSubmit()"
+  class="space-y-4"
+>
   @if (errorMessage) {
     <div
       class="p-3 bg-red-100/10 text-red-500 border border-red-500/50 rounded-xl text-sm"
@@ -27,7 +32,8 @@
       >Display Name</label
     >
     <input
-      id="registerDisplayName" data-testid="register-display-name-input"
+      id="registerDisplayName"
+      data-testid="register-display-name-input"
       type="text"
       formControlName="displayName"
       class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
@@ -40,7 +46,8 @@
       >Email address</label
     >
     <input
-      id="registerEmail" data-testid="register-email-input"
+      id="registerEmail"
+      data-testid="register-email-input"
       type="email"
       formControlName="email"
       class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
@@ -53,7 +60,8 @@
       >Password</label
     >
     <input
-      id="registerPassword" data-testid="register-password-input"
+      id="registerPassword"
+      data-testid="register-password-input"
       type="password"
       formControlName="password"
       class="w-full px-4 py-3 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
@@ -82,10 +90,9 @@
     >Already have an account?
   </span>
   <a
-    routerLink="/auth/login" data-testid="login-link"
+    routerLink="/auth/login"
+    data-testid="login-link"
     class="text-finmate-neon2 font-semibold hover:underline"
     >Sign in</a
   >
 </div>
-
-

@@ -1,6 +1,9 @@
 import { OperatorFunction } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
-import { ExpenseDecryptionService, DecryptableExpense } from '../services/expense-decryption.service';
+import {
+  ExpenseDecryptionService,
+  DecryptableExpense,
+} from '../services/expense-decryption.service';
 
 /**
  * RxJS operator that decrypts a single expense through the one central

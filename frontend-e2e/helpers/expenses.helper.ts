@@ -7,7 +7,10 @@ import { waitForPageApi } from '../utils/api';
 import { testIds } from '../utils/locators';
 
 export const expenses = {
-  async create(page: Page, { title, amount }: { title: string; amount: string }) {
+  async create(
+    page: Page,
+    { title, amount }: { title: string; amount: string },
+  ) {
     const dashboard = new DashboardPage(page);
     await dashboard.openExpenseDialog();
     const dialog = new ExpenseDialog(page);
@@ -21,16 +24,20 @@ export const expenses = {
       action: () => dialog.save(),
     });
 
-    const id = typeof body === 'object' && body ? body.id ?? body.data?.id ?? body.expense?.id ?? null : null;
+    const id =
+      typeof body === 'object' && body
+        ? (body.id ?? body.data?.id ?? body.expense?.id ?? null)
+        : null;
     const expense = new ExpenseCard(page, id, title);
     await expense.expectVisible();
     return expense;
   },
 
   async expectVisible(page: Page, title: string) {
-    await expect(page.getByTestId(testIds.expense.card).filter({ hasText: title })).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByTestId(testIds.expense.card).filter({ hasText: title }),
+    ).toBeVisible({ timeout: 15000 });
   },
 };
 
 export default expenses;
-

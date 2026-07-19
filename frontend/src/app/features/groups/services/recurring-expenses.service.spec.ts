@@ -37,7 +37,9 @@ describe('RecurringExpensesService', () => {
           provide: GroupKeyService,
           useValue: {
             getGroupDataKey: jest.fn().mockResolvedValue('mock-group-key'),
-            resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready', key: 'mock-group-key' }),
+            resolveGroupKey: jest
+              .fn()
+              .mockResolvedValue({ status: 'ready', key: 'mock-group-key' }),
           },
         },
         { provide: Store, useValue: storeMock },

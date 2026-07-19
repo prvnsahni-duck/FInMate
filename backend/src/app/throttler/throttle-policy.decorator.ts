@@ -27,8 +27,5 @@ function ThrottlePolicy(profile: ThrottleProfile) {
  *   async login() { ... }
  */
 export function ThrottleAs(profile: ThrottleProfile) {
-  return applyDecorators(
-    ThrottlePolicy(profile),
-    Throttle({ [profile]: {} }),
-  );
+  return applyDecorators(ThrottlePolicy(profile), Throttle({ [profile]: {} }));
 }

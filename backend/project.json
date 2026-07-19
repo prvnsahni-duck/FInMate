@@ -68,6 +68,12 @@
         "jestConfig": "backend/jest.config.cts",
         "passWithNoTests": true
       }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit -p backend/tsconfig.app.json"
+      }
     }
   }
 }
