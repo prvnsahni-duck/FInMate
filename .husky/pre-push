@@ -95,7 +95,7 @@ echo "Migration index OK."
 # ── 4. Format check ───────────────────────────────────────────────────────────
 echo ""
 echo "Checking formatting..."
-npx nx format:check
+npx nx format:check --base=$DEFAULT_BRANCH
 
 # ── 5. TypeScript type-check ──────────────────────────────────────────────────
 echo ""
