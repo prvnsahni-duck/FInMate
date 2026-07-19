@@ -365,7 +365,10 @@ describe('GroupsService', () => {
     it('should archive when caller is the owner', async () => {
       groupMemberRepository.findOne.mockResolvedValue(mockOwnerMembership);
       groupRepository.findOne.mockResolvedValue({ ...mockGroup });
-      groupRepository.save.mockResolvedValue({ ...mockGroup, isArchived: true });
+      groupRepository.save.mockResolvedValue({
+        ...mockGroup,
+        isArchived: true,
+      });
 
       const result = await service.archiveGroup('user-id', 'group-id');
 
@@ -376,33 +379,33 @@ describe('GroupsService', () => {
     it('should throw ForbiddenException when caller is an admin', async () => {
       groupMemberRepository.findOne.mockResolvedValue(mockAdminMembership);
 
-      await expect(
-        service.archiveGroup('user-id', 'group-id'),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.archiveGroup('user-id', 'group-id')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw ForbiddenException when caller is a member/editor', async () => {
       groupMemberRepository.findOne.mockResolvedValue(mockEditorMembership);
 
-      await expect(
-        service.archiveGroup('user-id', 'group-id'),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.archiveGroup('user-id', 'group-id')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw ForbiddenException when caller is a viewer', async () => {
       groupMemberRepository.findOne.mockResolvedValue(mockViewerMembership);
 
-      await expect(
-        service.archiveGroup('user-id', 'group-id'),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.archiveGroup('user-id', 'group-id')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw ForbiddenException when caller has no membership', async () => {
       groupMemberRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.archiveGroup('user-id', 'group-id'),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.archiveGroup('user-id', 'group-id')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should throw ConflictException if group is already archived', async () => {
@@ -412,18 +415,18 @@ describe('GroupsService', () => {
         isArchived: true,
       });
 
-      await expect(
-        service.archiveGroup('user-id', 'group-id'),
-      ).rejects.toThrow(ConflictException);
+      await expect(service.archiveGroup('user-id', 'group-id')).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should throw NotFoundException if group does not exist', async () => {
       groupMemberRepository.findOne.mockResolvedValue(mockOwnerMembership);
       groupRepository.findOne.mockResolvedValue(null);
 
-      await expect(
-        service.archiveGroup('user-id', 'group-id'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.archiveGroup('user-id', 'group-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should include reason in archive metadata when provided', async () => {

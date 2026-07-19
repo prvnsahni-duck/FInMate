@@ -346,7 +346,9 @@ describe('GroupDetailComponent', () => {
     });
 
     it('confirmArchiveGroup() does nothing if names do not match', () => {
-      (mockGroupsService as any).archiveGroup = jest.fn().mockReturnValue(of({}));
+      (mockGroupsService as any).archiveGroup = jest
+        .fn()
+        .mockReturnValue(of({}));
       component.archiveConfirmName.set('wrong');
 
       component.confirmArchiveGroup();
@@ -379,7 +381,9 @@ describe('GroupDetailComponent', () => {
       const { throwError } = require('rxjs');
       (mockGroupsService as any).archiveGroup = jest
         .fn()
-        .mockReturnValue(throwError(() => ({ error: { message: 'Server error' } })));
+        .mockReturnValue(
+          throwError(() => ({ error: { message: 'Server error' } })),
+        );
       component.archiveConfirmName.set(mockGroup.name);
 
       component.confirmArchiveGroup();
