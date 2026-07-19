@@ -47,15 +47,17 @@ CHANGED_DTOS=$(git diff --name-only "$DEFAULT_BRANCH" HEAD -- 'backend/src/**/*.
 if [ -n "$CHANGED_DTOS" ]; then
   for dto_file in $CHANGED_DTOS; do
     if [ -f "$dto_file" ]; then
-      # Check if file adds a ZK string field without @IsCiphertext above it
+      # Only flag class-level ZK properties (those preceded by at least one @decorator).
+      # Inline type-literal fields inside Array<{...}> have no decorators and are skipped.
       MISSING=$(awk '
-        /^[[:space:]]*@IsCiphertext/ { has_cipher = 1; next }
-        /^[[:space:]]*(title|description|note|filename|encryptedOriginalName|encryptedFileKey|goal)[A-Za-z]*[!?]?:[[:space:]]*string/ {
-          if (!has_cipher) print FILENAME ":" NR ": ZK field missing @IsCiphertext: " $0
-          has_cipher = 0
-          next
+        BEGIN { has_cipher = 0; saw_decorator = 0 }
+        /^[[:space:]]*@IsCiphertext/ { has_cipher = 1; saw_decorator = 1; next }
+        /^[[:space:]]*@[A-Za-z]/     { saw_decorator = 1; next }
+        /^[[:space:]]*(title|description|note|filename|encryptedOriginalName|encryptedFileKey|goal)[A-Za-z0-9_]*[!?]?:[[:space:]]*string/ {
+          if (saw_decorator && !has_cipher) print FILENAME ":" NR ": ZK field missing @IsCiphertext: " $0
+          has_cipher = 0; saw_decorator = 0; next
         }
-        /^[[:space:]]*@/ { has_cipher = 0 }
+        /^[[:space:]]*[a-zA-Z][A-Za-z0-9_]*[!?]?:[[:space:]]/ { has_cipher = 0; saw_decorator = 0 }
       ' "$dto_file" || true)
       if [ -n "$MISSING" ]; then
         echo ""
