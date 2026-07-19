@@ -172,5 +172,84 @@ describe('UsersService', () => {
       expect(result.profile.avatarUrl).toBe('https://example.com/new.png');
       expect(result.profile.defaultCurrency).toBe('EUR');
     });
+
+    it('should update displayName and aiOptIn on the user entity', async () => {
+      const mockUser = { id: 'user-id', displayName: '', aiOptIn: false } as any;
+      const mockProfile = { id: 'profile-id' } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      await service.updateProfile('user-id', {
+        displayName: 'Alice',
+        aiOptIn: true,
+      });
+
+      expect(mockUser.displayName).toBe('Alice');
+      expect(mockUser.aiOptIn).toBe(true);
+      expect(userRepository.save).toHaveBeenCalledWith(mockUser);
+    });
+
+    it('should update timezone and locale on the profile entity', async () => {
+      const mockUser = { id: 'user-id' } as any;
+      const mockProfile = {
+        id: 'profile-id',
+        timezone: 'Asia/Kolkata',
+        locale: 'en-IN',
+      } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      await service.updateProfile('user-id', {
+        timezone: 'America/New_York',
+        locale: 'en-US',
+      });
+
+      expect(mockProfile.timezone).toBe('America/New_York');
+      expect(mockProfile.locale).toBe('en-US');
+      expect(profileRepository.save).toHaveBeenCalledWith(mockProfile);
+    });
+
+    it('should clear avatarUrl when empty string is passed', async () => {
+      const mockUser = { id: 'user-id' } as any;
+      const mockProfile = {
+        id: 'profile-id',
+        avatarUrl: 'encrypted:old-avatar',
+      } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      await service.updateProfile('user-id', { avatarUrl: '' });
+
+      // Empty string → undefined (remove avatar)
+      expect(mockProfile.avatarUrl).toBeUndefined();
+      expect(encryptionService.encrypt).not.toHaveBeenCalled();
+    });
+
+    it('should not touch user entity when only profile fields are sent', async () => {
+      const mockUser = { id: 'user-id', displayName: 'Unchanged' } as any;
+      const mockProfile = { id: 'profile-id', timezone: 'UTC' } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      await service.updateProfile('user-id', { timezone: 'Europe/London' });
+
+      expect(userRepository.save).not.toHaveBeenCalled();
+      expect(mockProfile.timezone).toBe('Europe/London');
+    });
+
+    it('should decrypt avatarUrl on the returned profile', async () => {
+      const encryptedUrl = 'encrypted:data:image/png;base64,abc';
+      const mockUser = { id: 'user-id' } as any;
+      const mockProfile = { id: 'profile-id', avatarUrl: encryptedUrl } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+      profileRepository.save.mockResolvedValue(mockProfile);
+
+      const result = await service.updateProfile('user-id', {});
+
+      // decryptProfile mutates in-place; capture expected value from mock behaviour
+      expect(encryptionService.decrypt).toHaveBeenCalledWith(encryptedUrl);
+      expect(result.profile.avatarUrl).toBe('data:image/png;base64,abc');
+    });
   });
 });

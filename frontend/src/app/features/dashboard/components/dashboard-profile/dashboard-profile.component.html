@@ -1,31 +1,60 @@
 <div class="space-y-6">
   <div>
-    <h1
-      class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary"
-    >
-      My Space Profile
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight text-secondary">
+      My Profile
     </h1>
     <p class="text-secondary/60 mt-1 font-medium">
-      Verify login statistics, profile configurations, and data integrity.
+      Manage your personal information, avatar, and preferences.
     </p>
   </div>
 
-  <div class="card-glass p-6 space-y-6">
-    <div
-      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div class="flex items-center space-x-6">
-        <div
-          class="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center text-4xl shadow-inner shadow-primary/5"
-        >
-          👤
-        </div>
-        <div>
-          <h3 class="text-2xl font-extrabold text-secondary">{{ userName }}</h3>
-          <span
-            class="text-xs font-bold text-success bg-success/15 px-3 py-1 rounded-full uppercase tracking-wider mt-1.5 inline-block"
-            >Active Ledger User</span
+  <div class="card-glass p-6 space-y-8">
+
+    <!-- ── Avatar + Name header ────────────────────────────────────────── -->
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex items-center space-x-5">
+
+        <!-- Avatar -->
+        <div class="relative group">
+          @if (avatarPreviewUrl) {
+            <img
+              [src]="avatarPreviewUrl"
+              alt="Profile avatar"
+              class="w-20 h-20 rounded-full object-cover border-2 border-primary/30 shadow-md"
+            />
+          } @else {
+            <div class="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center justify-center text-3xl font-bold shadow-inner shadow-primary/5">
+              {{ displayInitial }}
+            </div>
+          }
+
+          <!-- Upload overlay -->
+          <label
+            for="avatar-upload"
+            class="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity"
+            title="Change photo"
           >
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </label>
+          <input
+            id="avatar-upload"
+            type="file"
+            accept="image/*"
+            class="sr-only"
+            (change)="onAvatarSelected($event)"
+          />
+        </div>
+
+        <div>
+          <h3 class="text-xl font-extrabold text-secondary">
+            {{ userDisplayName || userName }}
+          </h3>
+          <span class="text-xs font-bold text-success bg-success/15 px-3 py-1 rounded-full uppercase tracking-wider mt-1 inline-block">
+            Active
+          </span>
         </div>
       </div>
 
@@ -39,51 +68,125 @@
       </button>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-      <div
-        class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2"
-      >
-        <span
-          class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider"
-          >Email Address</span
-        >
-        <p class="text-sm font-semibold text-secondary truncate">
+    @if (avatarSizeWarning) {
+      <p class="text-xs text-error -mt-4">{{ avatarSizeWarning }}</p>
+    }
+    @if (avatarPreviewUrl && pendingAvatarDataUrl !== null) {
+      <div class="flex items-center gap-3 -mt-4">
+        <span class="text-xs text-muted">New photo selected</span>
+        <button
+          type="button"
+          (click)="removeAvatar()"
+          class="text-xs text-error hover:underline"
+        >Remove</button>
+      </div>
+    }
+    @if (avatarPreviewUrl && pendingAvatarDataUrl === null && userProfile?.avatarUrl) {
+      <div class="-mt-4">
+        <button
+          type="button"
+          (click)="removeAvatar()"
+          class="text-xs text-error hover:underline"
+        >Remove current photo</button>
+      </div>
+    }
+
+    <!-- ── Edit Form ───────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Display Name -->
+      <div class="space-y-1">
+        <label class="text-label" for="display-name-input">Display Name</label>
+        <input
+          id="display-name-input"
+          type="text"
+          [(ngModel)]="editDisplayName"
+          maxlength="120"
+          placeholder="Your display name"
+          class="input-base"
+        />
+      </div>
+
+      <!-- Email (read-only) -->
+      <div class="space-y-1">
+        <span class="text-label">Email Address</span>
+        <div class="input-base bg-surface/40 text-muted cursor-not-allowed select-all truncate">
           {{ userEmail }}
+        </div>
+        <p class="text-[11px] text-muted/70 mt-0.5">
+          Email changes are managed separately.
         </p>
       </div>
-      <div
-        class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2"
-      >
-        <span
-          class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider"
-          >Default Currency</span
+
+      <!-- Timezone -->
+      <div class="space-y-1">
+        <label class="text-label" for="timezone-select">Timezone</label>
+        <select
+          id="timezone-select"
+          [(ngModel)]="editTimezone"
+          class="input-base"
         >
-        <p class="text-sm font-semibold text-secondary">
-          {{ userProfile?.defaultCurrency || 'USD' }}
-        </p>
+          @for (tz of timezoneOptions; track tz.value) {
+            <option [value]="tz.value">{{ tz.label }}</option>
+          }
+        </select>
       </div>
-      <div
-        class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2"
-      >
-        <span
-          class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider"
-          >Expenses Tracked</span
+
+      <!-- Language / Locale -->
+      <div class="space-y-1">
+        <label class="text-label" for="locale-select">Language</label>
+        <select
+          id="locale-select"
+          [(ngModel)]="editLocale"
+          class="input-base"
         >
-        <p class="text-lg font-bold text-secondary">
-          {{ personalExpensesCount }} logged
-        </p>
+          @for (loc of localeOptions; track loc.value) {
+            <option [value]="loc.value">{{ loc.label }}</option>
+          }
+        </select>
       </div>
-      <div
-        class="bg-secondary/5 p-5 rounded-2xl border border-secondary/10 space-y-2"
+
+    </div>
+
+    <!-- ── Feedback messages ───────────────────────────────────────────── -->
+    @if (profileSaveError) {
+      <p class="text-xs text-error">{{ profileSaveError }}</p>
+    }
+    @if (profileSaveSuccess) {
+      <p class="text-xs text-success">{{ profileSaveSuccess }}</p>
+    }
+
+    <!-- ── Save button ────────────────────────────────────────────────── -->
+    <div class="flex justify-end pt-2">
+      <button
+        type="button"
+        (click)="saveProfile()"
+        [disabled]="isSavingProfile"
+        class="py-2.5 px-7 bg-gradient-neon text-white rounded-xl font-semibold shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 disabled:opacity-50 transition-all flex items-center gap-2"
       >
-        <span
-          class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider"
-          >Income Limit Ratio</span
-        >
-        <p class="text-lg font-bold text-secondary">
-          {{ incomePercentage }}% spent
-        </p>
+        @if (isSavingProfile) {
+          <span>Saving...</span>
+        } @else {
+          <span>Save Profile</span>
+        }
+      </button>
+    </div>
+
+    <!-- ── Read-only stats ─────────────────────────────────────────────── -->
+    <div class="border-t border-border/10 pt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="bg-secondary/5 p-4 rounded-2xl border border-secondary/10 space-y-1">
+        <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Default Currency</span>
+        <p class="text-sm font-semibold text-secondary">{{ userProfile?.defaultCurrency || '—' }}</p>
+      </div>
+      <div class="bg-secondary/5 p-4 rounded-2xl border border-secondary/10 space-y-1">
+        <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Expenses Tracked</span>
+        <p class="text-lg font-bold text-secondary">{{ personalExpensesCount }} logged</p>
+      </div>
+      <div class="bg-secondary/5 p-4 rounded-2xl border border-secondary/10 space-y-1">
+        <span class="text-[10px] font-extrabold uppercase text-secondary/50 tracking-wider">Income Limit Ratio</span>
+        <p class="text-lg font-bold text-secondary">{{ incomePercentage }}% spent</p>
       </div>
     </div>
+
   </div>
 </div>

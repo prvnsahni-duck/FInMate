@@ -74,6 +74,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   userName = 'User';
   userEmail = 'N/A';
+  userDisplayName = '';
   totalBalance = 0;
   monthlyExpenses = 0;
   activeGroupsCount = 0;
@@ -188,6 +189,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.authService.getMe().subscribe({
       next: (res) => {
         this.userProfile = res.profile;
+        this.userDisplayName = (res as any).user?.displayName || '';
         this.newIncome = res.profile.monthlyIncome || 0;
         this.newBudget = res.profile.monthlyBudget || 0;
         this.newCurrency = res.profile.defaultCurrency || 'USD';
@@ -291,6 +293,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
           alert(err.error?.message || 'Failed to update profile settings.');
         },
       });
+  }
+
+  handleProfileUpdated(res: any): void {
+    this.userProfile = res.profile;
+    if (res.user?.displayName !== undefined) {
+      this.userDisplayName = res.user.displayName || '';
+      this.userName = res.user.displayName || this.userName;
+    }
   }
 
   acceptInvitation(invite: PendingInvitationResponse) {

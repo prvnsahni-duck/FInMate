@@ -59,12 +59,14 @@
   @if (activeTab === 'Profile') {
     <app-dashboard-profile
       [userName]="userName"
+      [userDisplayName]="userDisplayName"
       [userEmail]="userEmail"
       [userProfile]="userProfile"
       [personalExpensesCount]="personalExpenses.length"
       [incomePercentage]="incomePercentage"
       [isLoggingOut]="isLoggingOut"
       (logoutEvent)="logout()"
+      (profileUpdated)="handleProfileUpdated($event)"
     ></app-dashboard-profile>
   }
 </div>
