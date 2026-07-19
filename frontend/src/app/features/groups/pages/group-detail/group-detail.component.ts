@@ -253,6 +253,14 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   ];
   selectedExpenseForEdit = signal<GroupExpense | null>(null);
 
+  // Expense Version History panel
+  isHistoryPanelOpen = signal<boolean>(false);
+  historyExpenseId = signal<string | null>(null);
+  historyExpenseTitle = signal<string>('');
+  expenseVersions = signal<any[]>([]);
+  isLoadingVersions = signal<boolean>(false);
+  historyLoadError = signal<string>('');
+
   // Error Banner & Cooldown State
   ledgerError = signal<boolean>(false);
   retryCooldown = signal<number>(0);
@@ -872,6 +880,32 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   closeExpenseModal() {
     this.selectedExpenseForEdit.set(null);
     this.isExpenseModalOpen.set(false);
+  }
+
+  openExpenseHistory(expense: GroupExpense) {
+    this.historyExpenseId.set(expense.id);
+    this.historyExpenseTitle.set(String(expense.title ?? ''));
+    this.expenseVersions.set([]);
+    this.historyLoadError.set('');
+    this.isLoadingVersions.set(true);
+    this.isHistoryPanelOpen.set(true);
+
+    this.expensesService.getExpenseVersionHistory(expense.id).subscribe({
+      next: (versions) => {
+        this.expenseVersions.set(versions);
+        this.isLoadingVersions.set(false);
+      },
+      error: (err) => {
+        this.historyLoadError.set(err.error?.message || 'Failed to load version history.');
+        this.isLoadingVersions.set(false);
+      },
+    });
+  }
+
+  closeExpenseHistory() {
+    this.isHistoryPanelOpen.set(false);
+    this.historyExpenseId.set(null);
+    this.expenseVersions.set([]);
   }
 
   onExpenseCreated() {

@@ -279,6 +279,21 @@ export class ExpensesService {
   }
 
   /**
+   * Returns the append-only version history for an expense.
+   * Read-only — versions carry the encrypted snapshot from the time of each action.
+   */
+  getExpenseVersionHistory(expenseId: string): Observable<any[]> {
+    return this.http
+      .get<any>(`${this.baseUrl}/expenses/${expenseId}/versions`)
+      .pipe(
+        mergeMap(async (res) => {
+          const versions: any[] = Array.isArray(res.data) ? res.data : [];
+          return versions;
+        }),
+      );
+  }
+
+  /**
    * Export expenses ledger.
    */
   exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> {

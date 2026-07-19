@@ -65,4 +65,11 @@ export class ExpensesCrudService {
   ): Promise<PaginatedResponse<Record<string, unknown>>> {
     return this.expensesService.listMyExpenses(userId, page, limit);
   }
+
+  async getExpenseVersionHistory(
+    userId: string,
+    expenseId: string,
+  ): Promise<Record<string, unknown>[]> {
+    return this.expensesService.getExpenseVersionHistory(userId, expenseId);
+  }
 }

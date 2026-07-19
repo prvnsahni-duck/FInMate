@@ -108,6 +108,24 @@ export class ExpensesController {
     return new SuccessResponse('Expense deleted successfully', {});
   }
 
+  // ─── Version History ──────────────────────────────────────────────────────
+
+  /**
+   * Returns the append-only version history for an expense.
+   * Read-only. Restore is out of v2 scope.
+   */
+  @Get(':id/versions')
+  async getVersionHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.expensesCrudService.getExpenseVersionHistory(
+      req.user.id,
+      id,
+    );
+    return new SuccessResponse('Expense version history retrieved', result);
+  }
+
   // ─── Restore ──────────────────────────────────────────────────────────────
 
   /** Restore a soft-deleted expense within the allowed restore window. */

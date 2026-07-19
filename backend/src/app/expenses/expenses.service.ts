@@ -2186,6 +2186,61 @@ export class ExpensesService {
   }
 
   /**
+   * Returns the append-only version history for a single expense.
+   * The caller must be the expense owner or an active member of the expense's group.
+   * Read-only — no mutation. Restore is out of scope for v2.
+   */
+  async getExpenseVersionHistory(
+    userId: string,
+    expenseId: string,
+  ): Promise<Record<string, unknown>[]> {
+    const expense = await this.expenseRepository.findOne({
+      where: { id: expenseId },
+      relations: ['ownerUser', 'group'],
+      withDeleted: true,
+    });
+    if (!expense) {
+      throw new NotFoundException('Expense not found');
+    }
+
+    // Authorize: owner OR active group member
+    const isOwner = expense.ownerUser?.id === userId;
+    if (!isOwner && expense.group) {
+      const membership = await this.groupMemberRepository.findOne({
+        where: {
+          group: { id: expense.group.id },
+          user: { id: userId },
+          joinStatus: 'active',
+        },
+      });
+      if (!membership) {
+        throw new ForbiddenException('You do not have access to this expense');
+      }
+    } else if (!isOwner) {
+      throw new ForbiddenException('You do not have access to this expense');
+    }
+
+    const versions = await this.dataSource
+      .getRepository(ExpenseVersion)
+      .createQueryBuilder('v')
+      .leftJoinAndSelect('v.actorUser', 'actor')
+      .where('v.expense_id = :expenseId', { expenseId })
+      .orderBy('v.createdAt', 'ASC')
+      .getMany();
+
+    return versions.map((v, i) => ({
+      id: v.id,
+      versionNumber: i + 1,
+      entityVersion: v.entityVersion,
+      action: v.action,
+      actorUserId: v.actorUser?.id ?? null,
+      actorDisplayName: v.actorUser?.displayName ?? v.actorUser?.email ?? 'System',
+      createdAt: v.createdAt,
+      snapshot: v.snapshot,
+    }));
+  }
+
+  /**
    * Returns the calling user's full expense picture:
    *  - Personal expenses (group IS NULL, owned by the user)
    *  - Group shares    (expenses where the user has an ExpenseSplit entry)
