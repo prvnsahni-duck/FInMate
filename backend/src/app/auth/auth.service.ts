@@ -325,9 +325,7 @@ export class AuthService {
    * `refresh_token:${userId}:*` keys from Redis.
    */
   async revokeAllSessions(userId: string): Promise<void> {
-    const keys = await this.redisService.scanKeys(
-      `refresh_token:${userId}:*`,
-    );
+    const keys = await this.redisService.scanKeys(`refresh_token:${userId}:*`);
     await Promise.all(keys.map((k) => this.redisService.del(k)));
   }
 

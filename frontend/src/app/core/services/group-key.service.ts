@@ -719,9 +719,7 @@ export class GroupKeyService {
    * private key JWK under it, updates the in-session master key, and returns the
    * re-wrapped ciphertext to submit to POST /auth/change-password.
    */
-  async reWrapPrivateKeyForNewPassword(
-    newPassword: string,
-  ): Promise<string> {
+  async reWrapPrivateKeyForNewPassword(newPassword: string): Promise<string> {
     const user = this.store.selectSnapshot((state: any) => state.auth?.user);
     if (!user || !user.email) {
       throw new Error('User session not found');

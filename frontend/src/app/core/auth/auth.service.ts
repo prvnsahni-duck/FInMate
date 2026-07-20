@@ -66,18 +66,14 @@ export class AuthService {
     encryptedPrivateWrappingKey: string;
     recoveryWrappedKey?: string;
   }): Observable<unknown> {
-    return this.http.post(
-      `${this.baseUrl}/change-password`,
-      payload,
-    );
+    return this.http.post(`${this.baseUrl}/change-password`, payload);
   }
 
   /** Store the client-produced recovery-wrapped key blob. */
   setRecoveryKey(recoveryWrappedKey: string): Observable<unknown> {
-    return this.http.post(
-      `${environment.apiBaseUrl}/users/me/recovery-key`,
-      { recoveryWrappedKey },
-    );
+    return this.http.post(`${environment.apiBaseUrl}/users/me/recovery-key`, {
+      recoveryWrappedKey,
+    });
   }
 
   /** Whether the current user has a recovery key configured. */

@@ -896,7 +896,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         this.isLoadingVersions.set(false);
       },
       error: (err) => {
-        this.historyLoadError.set(err.error?.message || 'Failed to load version history.');
+        this.historyLoadError.set(
+          err.error?.message || 'Failed to load version history.',
+        );
         this.isLoadingVersions.set(false);
       },
     });

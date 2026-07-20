@@ -51,8 +51,13 @@ export class DashboardHomeComponent {
   @Output() acceptInvitationEvent = new EventEmitter<any>();
   @Output() declineInvitationEvent = new EventEmitter<any>();
   @Output() confirmDeleteExpenseEvent = new EventEmitter<string>();
-  @Output() expenseViewFilterChange = new EventEmitter<'all' | 'personal' | 'group_share'>();
-  @Output() openGroupExpenseEvent = new EventEmitter<{ groupId: string; expenseId: string }>();
+  @Output() expenseViewFilterChange = new EventEmitter<
+    'all' | 'personal' | 'group_share'
+  >();
+  @Output() openGroupExpenseEvent = new EventEmitter<{
+    groupId: string;
+    expenseId: string;
+  }>();
 
   get displayExpenses(): any[] {
     return this.myExpenses.length > 0 ? this.myExpenses : this.personalExpenses;

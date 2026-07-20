@@ -149,29 +149,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.isLoading = true;
 
     // 1. Fetch personal + group-share expenses (unified list)
-    this.expensesService
-      .getMyExpenses({ page: 1, limit: 50 })
-      .subscribe({
-        next: (res) => {
-          const items: any[] = Array.isArray(res.data)
-            ? res.data
-            : Array.isArray(res.data?.data)
-              ? res.data.data
-              : [];
-          this.myExpenses = items;
-          // Keep personalExpenses for backwards compat with existing templates
-          this.personalExpenses = items.filter(
-            (e) => e.expenseType === 'PERSONAL' || !e.expenseType,
-          ) as GroupExpense[];
-          // Total balance = sum of myShare across all items
-          this.totalBalance = items.reduce(
-            (sum, e) => sum + Number(e.myShare ?? e.amountTotal),
-            0,
-          );
-          this.isLoading = false;
-        },
-        error: () => (this.isLoading = false),
-      });
+    this.expensesService.getMyExpenses({ page: 1, limit: 50 }).subscribe({
+      next: (res) => {
+        const items: any[] = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data?.data)
+            ? res.data.data
+            : [];
+        this.myExpenses = items;
+        // Keep personalExpenses for backwards compat with existing templates
+        this.personalExpenses = items.filter(
+          (e) => e.expenseType === 'PERSONAL' || !e.expenseType,
+        ) as GroupExpense[];
+        // Total balance = sum of myShare across all items
+        this.totalBalance = items.reduce(
+          (sum, e) => sum + Number(e.myShare ?? e.amountTotal),
+          0,
+        );
+        this.isLoading = false;
+      },
+      error: () => (this.isLoading = false),
+    });
 
     // 2. Combined monthly total (personal + group shares)
     this.expensesService.getCombinedMonthlyTotal().subscribe({
@@ -184,8 +182,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.expensesService.getMonthlyAnalytics('personal').subscribe({
           next: (res) => {
             const currentMonthStr = new Date().toISOString().slice(0, 7);
-            const currentMonthData = res.find((r) => r.month === currentMonthStr);
-            this.monthlyExpenses = currentMonthData ? currentMonthData.total : 0;
+            const currentMonthData = res.find(
+              (r) => r.month === currentMonthStr,
+            );
+            this.monthlyExpenses = currentMonthData
+              ? currentMonthData.total
+              : 0;
             this.recalculatePercentages();
           },
         });
@@ -314,7 +316,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   get filteredMyExpenses(): any[] {
     if (this.expenseViewFilter === 'personal') {
-      return this.myExpenses.filter((e) => e.expenseType === 'PERSONAL' || !e.expenseType);
+      return this.myExpenses.filter(
+        (e) => e.expenseType === 'PERSONAL' || !e.expenseType,
+      );
     }
     if (this.expenseViewFilter === 'group_share') {
       return this.myExpenses.filter((e) => e.expenseType === 'GROUP_SHARE');

@@ -1220,10 +1220,18 @@ describe('ExpensesService', () => {
         status: 'posted',
         encryptionScope: 'personal',
         group: null,
-        paidByUser: { id: 'user-1', displayName: 'Alice', email: 'alice@e.com' },
+        paidByUser: {
+          id: 'user-1',
+          displayName: 'Alice',
+          email: 'alice@e.com',
+        },
       };
-      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([personalExp]));
-      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([personalExp]));
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
 
       const result = await service.listMyExpenses('user-1', 1, 20);
 
@@ -1234,7 +1242,9 @@ describe('ExpensesService', () => {
     });
 
     it('returns group shares with expenseType GROUP_SHARE and myShare = amountOwed', async () => {
-      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
       const groupExp = {
         id: 'g-1',
         title: 'enc:Dinner',
@@ -1247,8 +1257,15 @@ describe('ExpensesService', () => {
         group: { id: 'grp-1', name: 'House' },
         paidByUser: { id: 'user-2', displayName: 'Bob', email: 'bob@e.com' },
       };
-      const split = { id: 'sp-1', amountOwed: 300, isSettled: false, expense: groupExp };
-      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([split]));
+      const split = {
+        id: 'sp-1',
+        amountOwed: 300,
+        isSettled: false,
+        expense: groupExp,
+      };
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([split]));
 
       const result = await service.listMyExpenses('user-1', 1, 20);
 
@@ -1270,12 +1287,25 @@ describe('ExpensesService', () => {
         status: 'posted',
         encryptionScope: 'personal',
         group: null,
-        paidByUser: { id: 'user-1', displayName: 'Alice', email: 'alice@e.com' },
+        paidByUser: {
+          id: 'user-1',
+          displayName: 'Alice',
+          email: 'alice@e.com',
+        },
       };
-      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([exp]));
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([exp]));
       // Same expense also shows up in splits
-      const split = { id: 'sp-x', amountOwed: 50, isSettled: false, expense: exp };
-      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([split]));
+      const split = {
+        id: 'sp-x',
+        amountOwed: 50,
+        isSettled: false,
+        expense: exp,
+      };
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([split]));
 
       const result = await service.listMyExpenses('user-1', 1, 20);
 
@@ -1285,8 +1315,12 @@ describe('ExpensesService', () => {
     });
 
     it('returns only non-participants excluded — returns empty for non-participant', async () => {
-      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
-      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
 
       const result = await service.listMyExpenses('non-member', 1, 20);
 
@@ -1306,8 +1340,12 @@ describe('ExpensesService', () => {
         group: null,
         paidByUser: { id: 'user-1' },
       }));
-      expenseRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb(exps));
-      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(makeQb([]));
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb(exps));
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
 
       const page1 = await service.listMyExpenses('user-1', 1, 3);
       const page2 = await service.listMyExpenses('user-1', 2, 3);

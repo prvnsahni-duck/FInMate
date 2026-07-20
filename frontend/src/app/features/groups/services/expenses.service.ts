@@ -235,29 +235,29 @@ export class ExpensesService {
    * Each item has `myShare` (user's portion) and `expenseType` (PERSONAL | GROUP_SHARE).
    * Dashboard totals must use `myShare`, never `amountTotal`.
    */
-  getMyExpenses(options: { page?: number; limit?: number } = {}): Observable<any> {
+  getMyExpenses(
+    options: { page?: number; limit?: number } = {},
+  ): Observable<any> {
     let params = new HttpParams();
     if (options.page) params = params.set('page', options.page.toString());
     if (options.limit) params = params.set('limit', options.limit.toString());
-    return this.http
-      .get<any>(`${this.baseUrl}/expenses/me`, { params })
-      .pipe(
-        mergeMap(async (res) => {
-          const items: any[] = Array.isArray(res.data)
-            ? res.data
-            : Array.isArray(res.data?.data)
-              ? res.data.data
-              : [];
-          if (items.length === 0) return res;
-          const decrypted = await this.decryptor.decryptExpenses(items);
-          if (Array.isArray(res.data)) {
-            res.data = decrypted;
-          } else if (res.data && Array.isArray(res.data.data)) {
-            res.data.data = decrypted;
-          }
-          return res;
-        }),
-      );
+    return this.http.get<any>(`${this.baseUrl}/expenses/me`, { params }).pipe(
+      mergeMap(async (res) => {
+        const items: any[] = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data?.data)
+            ? res.data.data
+            : [];
+        if (items.length === 0) return res;
+        const decrypted = await this.decryptor.decryptExpenses(items);
+        if (Array.isArray(res.data)) {
+          res.data = decrypted;
+        } else if (res.data && Array.isArray(res.data.data)) {
+          res.data.data = decrypted;
+        }
+        return res;
+      }),
+    );
   }
 
   /**
@@ -270,7 +270,9 @@ export class ExpensesService {
       .get<any>(`${this.baseUrl}/expenses/analytics/all-monthly?month=${m}`)
       .pipe(
         mergeMap(async (res) => {
-          const items: { category: string; amount: number }[] = Array.isArray(res.data)
+          const items: { category: string; amount: number }[] = Array.isArray(
+            res.data,
+          )
             ? res.data
             : [];
           return items.reduce((sum, i) => sum + Number(i.amount), 0);

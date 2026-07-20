@@ -185,7 +185,11 @@ describe('UsersService', () => {
     });
 
     it('should update displayName and aiOptIn on the user entity', async () => {
-      const mockUser = { id: 'user-id', displayName: '', aiOptIn: false } as any;
+      const mockUser = {
+        id: 'user-id',
+        displayName: '',
+        aiOptIn: false,
+      } as any;
       const mockProfile = { id: 'profile-id' } as any;
       userRepository.findOne.mockResolvedValue(mockUser);
       profileRepository.findOne.mockResolvedValue(mockProfile);
@@ -267,9 +271,9 @@ describe('UsersService', () => {
   describe('setRecoveryKey', () => {
     it('throws NotFoundException if user not found', async () => {
       userRepository.findOne.mockResolvedValue(null);
-      await expect(
-        service.setRecoveryKey('user-id', 'blob'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.setRecoveryKey('user-id', 'blob')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('stores the recovery blob and stamps createdAt', async () => {

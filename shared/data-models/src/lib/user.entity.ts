@@ -63,7 +63,11 @@ export class User {
   recoveryWrappedKey?: string;
 
   /** When the recovery key was last set/regenerated. */
-  @Column({ name: 'recovery_key_created_at', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'recovery_key_created_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
   recoveryKeyCreatedAt?: Date;
 
   @CreateDateColumn()

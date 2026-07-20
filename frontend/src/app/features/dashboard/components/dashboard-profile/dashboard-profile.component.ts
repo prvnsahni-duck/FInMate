@@ -112,8 +112,7 @@ export class DashboardProfileComponent implements OnChanges {
 
   syncEditState(): void {
     this.editDisplayName = this.userDisplayName || this.userName || '';
-    this.editTimezone =
-      this.userProfile?.timezone || 'Asia/Kolkata';
+    this.editTimezone = this.userProfile?.timezone || 'Asia/Kolkata';
     this.editLocale = this.userProfile?.locale || 'en-IN';
     this.avatarPreviewUrl = this.userProfile?.avatarUrl || null;
     this.pendingAvatarDataUrl = null;

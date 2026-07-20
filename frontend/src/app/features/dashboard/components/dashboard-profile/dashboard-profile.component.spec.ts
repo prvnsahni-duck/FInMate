@@ -30,9 +30,11 @@ describe('DashboardProfileComponent', () => {
 
   beforeEach(async () => {
     mockAuthService = {
-      updateProfile: jest.fn().mockReturnValue(
-        of({ user: { displayName: 'Alice' }, profile: mockProfile }),
-      ),
+      updateProfile: jest
+        .fn()
+        .mockReturnValue(
+          of({ user: { displayName: 'Alice' }, profile: mockProfile }),
+        ),
       changePassword: jest.fn().mockReturnValue(of({})),
       deleteAccount: jest.fn().mockReturnValue(of({})),
     };
@@ -276,7 +278,9 @@ describe('DashboardProfileComponent', () => {
 
     it('surfaces API error and does not sign out', async () => {
       mockAuthService.changePassword.mockReturnValue(
-        throwError(() => ({ error: { message: 'Current password is incorrect' } })),
+        throwError(() => ({
+          error: { message: 'Current password is incorrect' },
+        })),
       );
       await component.changePassword();
       expect(component.passwordError).toBe('Current password is incorrect');

@@ -155,7 +155,9 @@ export class ExpensesController {
     @Req() req?: Request & { user: { id: string } },
   ) {
     const pageNum = page ? Math.max(1, parseInt(page, 10)) : 1;
-    const limitNum = limit ? Math.min(100, Math.max(1, parseInt(limit, 10))) : 25;
+    const limitNum = limit
+      ? Math.min(100, Math.max(1, parseInt(limit, 10)))
+      : 25;
     const result = await this.expensesCrudService.listMyExpenses(
       req!.user.id,
       pageNum,

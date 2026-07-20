@@ -2234,7 +2234,8 @@ export class ExpensesService {
       entityVersion: v.entityVersion,
       action: v.action,
       actorUserId: v.actorUser?.id ?? null,
-      actorDisplayName: v.actorUser?.displayName ?? v.actorUser?.email ?? 'System',
+      actorDisplayName:
+        v.actorUser?.displayName ?? v.actorUser?.email ?? 'System',
       createdAt: v.createdAt,
       snapshot: v.snapshot,
     }));
@@ -2306,7 +2307,8 @@ export class ExpensesService {
         groupId: null,
         groupName: null,
         paidByUserId: exp.paidByUser?.id ?? null,
-        paidByDisplayName: exp.paidByUser?.displayName ?? exp.paidByUser?.email ?? null,
+        paidByDisplayName:
+          exp.paidByUser?.displayName ?? exp.paidByUser?.email ?? null,
         groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
         splitId: null,
         isSettled: false,
@@ -2333,7 +2335,8 @@ export class ExpensesService {
         groupId: exp.group?.id ?? null,
         groupName: exp.group?.name ?? null,
         paidByUserId: exp.paidByUser?.id ?? null,
-        paidByDisplayName: exp.paidByUser?.displayName ?? exp.paidByUser?.email ?? null,
+        paidByDisplayName:
+          exp.paidByUser?.displayName ?? exp.paidByUser?.email ?? null,
         groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
         splitId: split.id,
         isSettled: split.isSettled ?? false,
