@@ -23,6 +23,8 @@ export class DashboardHomeComponent {
   @Input() monthlyExpenses = 0;
   @Input() activeGroupsCount = 0;
   @Input() personalExpenses: any[] = [];
+  @Input() myExpenses: any[] = [];
+  @Input() expenseViewFilter: 'all' | 'personal' | 'group_share' = 'all';
   @Input() pendingInvitations: any[] = [];
   @Input() categoryAnalytics: any[] = [];
   @Input() userProfile: any = null;
@@ -49,6 +51,17 @@ export class DashboardHomeComponent {
   @Output() acceptInvitationEvent = new EventEmitter<any>();
   @Output() declineInvitationEvent = new EventEmitter<any>();
   @Output() confirmDeleteExpenseEvent = new EventEmitter<string>();
+  @Output() expenseViewFilterChange = new EventEmitter<
+    'all' | 'personal' | 'group_share'
+  >();
+  @Output() openGroupExpenseEvent = new EventEmitter<{
+    groupId: string;
+    expenseId: string;
+  }>();
+
+  get displayExpenses(): any[] {
+    return this.myExpenses.length > 0 ? this.myExpenses : this.personalExpenses;
+  }
 
   // SVG Icon Paths
   bankIconPath =

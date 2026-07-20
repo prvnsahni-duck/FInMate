@@ -54,6 +54,22 @@ export class User {
   })
   encryptedPrivateWrappingKey?: string;
 
+  /**
+   * Master-key material wrapped under a client-derived recovery key (zero-knowledge).
+   * The recovery code exists only with the user; the server stores this blob only and
+   * never sees plaintext key material. Used for the forgot-password recovery flow.
+   */
+  @Column({ name: 'recovery_wrapped_key', type: 'text', nullable: true })
+  recoveryWrappedKey?: string;
+
+  /** When the recovery key was last set/regenerated. */
+  @Column({
+    name: 'recovery_key_created_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  recoveryKeyCreatedAt?: Date;
+
   @CreateDateColumn()
   createdAt!: Date;
 

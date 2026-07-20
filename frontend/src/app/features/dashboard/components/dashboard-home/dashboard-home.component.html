@@ -162,7 +162,27 @@
 
   <!-- Recent transactions (2/3 width) -->
   <div class="lg:col-span-2 card-glass p-6 space-y-6">
-    <h2 class="text-lg font-extrabold text-secondary tracking-tight">Recent Personal Expenses</h2>
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-extrabold text-secondary tracking-tight">My Expenses</h2>
+      <!-- Filter tabs -->
+      <div class="flex gap-1 bg-surface rounded-xl p-1 text-xs font-semibold">
+        <button
+          [class]="expenseViewFilter === 'all' ? 'bg-primary text-white px-3 py-1 rounded-lg' : 'text-muted px-3 py-1 rounded-lg hover:text-secondary transition-colors'"
+          (click)="expenseViewFilterChange.emit('all')"
+          data-testid="filter-all"
+        >All</button>
+        <button
+          [class]="expenseViewFilter === 'personal' ? 'bg-primary text-white px-3 py-1 rounded-lg' : 'text-muted px-3 py-1 rounded-lg hover:text-secondary transition-colors'"
+          (click)="expenseViewFilterChange.emit('personal')"
+          data-testid="filter-personal"
+        >Personal</button>
+        <button
+          [class]="expenseViewFilter === 'group_share' ? 'bg-primary text-white px-3 py-1 rounded-lg' : 'text-muted px-3 py-1 rounded-lg hover:text-secondary transition-colors'"
+          (click)="expenseViewFilterChange.emit('group_share')"
+          data-testid="filter-group-share"
+        >Group Shares</button>
+      </div>
+    </div>
 
     @if (isLoading) {
     <div class="space-y-4">
@@ -170,31 +190,70 @@
       <div class="h-16 w-full rounded-2xl skeleton-shimmer bg-surface animate-pulse"></div>
       }
     </div>
-    } @else if (personalExpenses.length === 0) {
+    } @else if (displayExpenses.length === 0) {
     <div class="flex flex-col items-center justify-center py-12 text-center">
       <div class="w-20 h-20 bg-primary/5 rounded-full flex items-center justify-center mb-6">
         <app-icon [path]="inboxIconPath" className="w-10 h-10 text-primary"></app-icon>
       </div>
-      <p class="text-secondary font-bold text-base mb-1">Create your first expense</p>
-      <p class="text-xs text-secondary/50 max-w-xs mb-6">Aggregate and track your personal expenditures with absolute
-        zero-knowledge privacy.</p>
+      <p class="text-secondary font-bold text-base mb-1">No expenses yet</p>
+      <p class="text-xs text-secondary/50 max-w-xs mb-6">Track your personal expenses and view your share of group costs.</p>
       <button (click)="openExpenseModalEvent.emit({})"
     data-testid="dashboard-log-expense-button"
-        class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-xl text-xs font-bold shadow-md shadow-primary/20 cursor-pointer">
+        class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-xl text-xs font-bold cursor-pointer">
         Log Transaction
       </button>
     </div>
     } @else {
     <div class="space-y-4 max-h-[480px] overflow-y-auto pr-1">
-      @for (expense of personalExpenses; track expense.id) {
+      @for (expense of displayExpenses; track expense.id) {
+
+      @if (expense.expenseType === 'GROUP_SHARE') {
+      <!-- Group Share Card -->
       <div
         [attr.data-expense-id]="expense.id"
         data-testid="expense-card"
+        data-expense-type="GROUP_SHARE"
+        class="flex items-center justify-between p-4 rounded-2xl bg-secondary/5 border border-secondary/5 hover:border-primary/25 hover:bg-secondary/10 transition-all duration-300 group cursor-pointer"
+        role="button"
+        tabindex="0"
+        (click)="openGroupExpenseEvent.emit({ groupId: expense.groupId, expenseId: expense.id })"
+        (keydown.enter)="openGroupExpenseEvent.emit({ groupId: expense.groupId, expenseId: expense.id })"
+      >
+        <div class="flex items-center space-x-4">
+          <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm border border-primary/20 group-hover:scale-105 transition-all">
+            <app-icon [path]="categoryOptions.find(opt => opt.value === expense.category)?.iconPath || categoryOptions[0].iconPath" className="w-5 h-5"></app-icon>
+          </div>
+          <div>
+            <h4 class="font-extrabold text-secondary text-sm flex items-center gap-2" data-testid="expense-title">
+              <span>{{ expense.title }}</span>
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider">Group Share</span>
+            </h4>
+            <p class="text-[10px] text-muted mt-0.5 font-medium">
+              {{ expense.groupName }} · {{ expense.expenseDate | date:'mediumDate' }} ·
+              @if (expense.isSettled) {
+                <span class="text-success font-bold">Settled</span>
+              } @else {
+                <span class="text-warning font-bold">Pending</span>
+              }
+            </p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="font-extrabold text-base text-secondary tracking-tight" data-testid="expense-amount">
+            {{ expense.myShare | currency:expense.currency }}
+          </p>
+          <p class="text-[10px] text-muted">My share</p>
+        </div>
+      </div>
+      } @else {
+      <!-- Personal Expense Card -->
+      <div
+        [attr.data-expense-id]="expense.id"
+        data-testid="expense-card"
+        data-expense-type="PERSONAL"
         class="flex items-center justify-between p-4 rounded-2xl bg-secondary/5 border border-secondary/5 hover:border-primary/25 hover:bg-secondary/10 transition-all duration-300 group">
         <div class="flex items-center space-x-4">
-          <!-- Category Icon -->
-          <div
-            class="w-10 h-10 rounded-xl bg-surface flex items-center justify-center text-primary shadow-sm border border-border/10 group-hover:scale-105 transition-all">
+          <div class="w-10 h-10 rounded-xl bg-surface flex items-center justify-center text-primary shadow-sm border border-border/10 group-hover:scale-105 transition-all">
             <app-icon [path]="categoryOptions.find(option => option.value === expense.category)?.iconPath || categoryOptions[0].iconPath" className="w-5 h-5"></app-icon>
           </div>
           <div>
@@ -205,27 +264,21 @@
                 {{ expense.category }}
               </span>
             </h4>
-            <p class="text-[10px] text-muted mt-0.5 font-medium">{{ expense.expenseDate | date:'mediumDate' }}
-            </p>
+            <p class="text-[10px] text-muted mt-0.5 font-medium">{{ expense.expenseDate | date:'mediumDate' }}</p>
           </div>
         </div>
-
         <div class="flex items-center space-x-4">
-          <p class="font-extrabold text-base text-secondary tracking-tight" data-testid="expense-amount">{{ expense.amountTotal |
-            currency:expense.currency }}</p>
-          <div
-            class="flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-250">
+          <p class="font-extrabold text-base text-secondary tracking-tight" data-testid="expense-amount">{{ expense.myShare ?? expense.amountTotal | currency:expense.currency }}</p>
+          <div class="flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-250">
             <button data-action="edit" [attr.data-testid]="'expense-edit-button-' + expense.id" (click)="openExpenseModalEvent.emit({ expense })"
-              class="p-2 text-secondary/40 hover:text-primary hover:bg-secondary/15 rounded-xl transition-all cursor-pointer">
-              ✏️
-            </button>
+              class="p-2 text-secondary/40 hover:text-primary hover:bg-secondary/15 rounded-xl transition-all cursor-pointer">✏️</button>
             <button data-action="delete" [attr.data-testid]="'expense-delete-button-' + expense.id" (click)="confirmDeleteExpenseEvent.emit(expense.id)"
-              class="p-2 text-secondary/40 hover:text-error hover:bg-error/15 rounded-xl transition-all cursor-pointer">
-              🗑️
-            </button>
+              class="p-2 text-secondary/40 hover:text-error hover:bg-error/15 rounded-xl transition-all cursor-pointer">🗑️</button>
           </div>
         </div>
       </div>
+      }
+
       }
     </div>
     }

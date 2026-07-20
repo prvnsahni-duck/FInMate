@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsString,
   IsOptional,
+  IsNotEmpty,
   MaxLength,
   IsNumber,
   Min,
@@ -45,4 +46,15 @@ export class UpdateProfileDto {
   @IsBoolean({ message: 'aiOptIn must be a boolean' })
   @IsOptional()
   aiOptIn?: boolean;
+}
+
+/**
+ * Store the master-key material wrapped under a client-derived recovery key.
+ * Zero-knowledge: the server persists the blob only; the recovery code itself
+ * exists only with the user.
+ */
+export class SetRecoveryKeyDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Recovery-wrapped key blob is required' })
+  recoveryWrappedKey!: string;
 }

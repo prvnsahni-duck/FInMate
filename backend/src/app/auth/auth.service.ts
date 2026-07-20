@@ -320,6 +320,63 @@ export class AuthService {
     };
   }
 
+  /**
+   * Revokes every active refresh-token session for a user by deleting all
+   * `refresh_token:${userId}:*` keys from Redis.
+   */
+  async revokeAllSessions(userId: string): Promise<void> {
+    const keys = await this.redisService.scanKeys(`refresh_token:${userId}:*`);
+    await Promise.all(keys.map((k) => this.redisService.del(k)));
+  }
+
+  /**
+   * Change password when the current password is known.
+   * Zero-knowledge: the client re-derives the master key from the new password
+   * and re-wraps the private wrapping key (and optionally the recovery blob);
+   * the server only verifies the old password, swaps the hash, stores the
+   * re-wrapped ciphertext, and revokes all sessions so a fresh login is required.
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    encryptedPrivateWrappingKey: string,
+    recoveryWrappedKey?: string,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const isCurrentValid = await argon2.verify(
+      user.passwordHash,
+      currentPassword,
+    );
+    if (!isCurrentValid) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    user.passwordHash = await argon2.hash(newPassword);
+    user.encryptedPrivateWrappingKey = encryptedPrivateWrappingKey;
+    if (recoveryWrappedKey !== undefined) {
+      user.recoveryWrappedKey = recoveryWrappedKey;
+      user.recoveryKeyCreatedAt = new Date();
+    }
+    await this.usersService.updateUser(user);
+
+    // Force re-authentication everywhere
+    await this.revokeAllSessions(userId);
+
+    void this.writeAuditLog({
+      actorUser: user,
+      action: 'auth.password_changed',
+      entityId: user.id,
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
+  }
+
   async logout(refreshToken: string, currentUserId: string) {
     let payload: JwtPayload | null = null;
     try {

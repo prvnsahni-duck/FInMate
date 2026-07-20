@@ -231,6 +231,71 @@ export class ExpensesService {
   }
 
   /**
+   * Returns the calling user's personal expenses + group shares.
+   * Each item has `myShare` (user's portion) and `expenseType` (PERSONAL | GROUP_SHARE).
+   * Dashboard totals must use `myShare`, never `amountTotal`.
+   */
+  getMyExpenses(
+    options: { page?: number; limit?: number } = {},
+  ): Observable<any> {
+    let params = new HttpParams();
+    if (options.page) params = params.set('page', options.page.toString());
+    if (options.limit) params = params.set('limit', options.limit.toString());
+    return this.http.get<any>(`${this.baseUrl}/expenses/me`, { params }).pipe(
+      mergeMap(async (res) => {
+        const items: any[] = Array.isArray(res.data)
+          ? res.data
+          : Array.isArray(res.data?.data)
+            ? res.data.data
+            : [];
+        if (items.length === 0) return res;
+        const decrypted = await this.decryptor.decryptExpenses(items);
+        if (Array.isArray(res.data)) {
+          res.data = decrypted;
+        } else if (res.data && Array.isArray(res.data.data)) {
+          res.data.data = decrypted;
+        }
+        return res;
+      }),
+    );
+  }
+
+  /**
+   * Combined monthly total (personal expenses + myShare of group expenses).
+   * Returns total across all categories for the given month.
+   */
+  getCombinedMonthlyTotal(month?: string): Observable<number> {
+    const m = month ?? new Date().toISOString().slice(0, 7);
+    return this.http
+      .get<any>(`${this.baseUrl}/expenses/analytics/all-monthly?month=${m}`)
+      .pipe(
+        mergeMap(async (res) => {
+          const items: { category: string; amount: number }[] = Array.isArray(
+            res.data,
+          )
+            ? res.data
+            : [];
+          return items.reduce((sum, i) => sum + Number(i.amount), 0);
+        }),
+      );
+  }
+
+  /**
+   * Returns the append-only version history for an expense.
+   * Read-only — versions carry the encrypted snapshot from the time of each action.
+   */
+  getExpenseVersionHistory(expenseId: string): Observable<any[]> {
+    return this.http
+      .get<any>(`${this.baseUrl}/expenses/${expenseId}/versions`)
+      .pipe(
+        mergeMap(async (res) => {
+          const versions: any[] = Array.isArray(res.data) ? res.data : [];
+          return versions;
+        }),
+      );
+  }
+
+  /**
    * Export expenses ledger.
    */
   exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> {

@@ -63,6 +63,8 @@ describe('DashboardComponent', () => {
 
     mockExpensesService = {
       getExpenses: jest.fn().mockReturnValue(of({ data: mockExpenses })),
+      getMyExpenses: jest.fn().mockReturnValue(of({ data: mockExpenses })),
+      getCombinedMonthlyTotal: jest.fn().mockReturnValue(of(1350)),
       getMonthlyAnalytics: jest.fn().mockReturnValue(of(mockAnalytics)),
       getCategoryAnalytics: jest.fn().mockReturnValue(of([])),
       deleteExpense: jest.fn().mockReturnValue(of({})),

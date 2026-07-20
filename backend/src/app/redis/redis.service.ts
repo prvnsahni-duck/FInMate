@@ -167,6 +167,32 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Returns all keys matching a glob pattern using a non-blocking SCAN cursor.
+   * Safe for production (does not block Redis like KEYS). Used to revoke all of
+   * a user's active sessions on password change.
+   */
+  async scanKeys(pattern: string): Promise<string[]> {
+    const found: string[] = [];
+    try {
+      let cursor: any = 0;
+      do {
+        const reply: any = await this.client.scan(cursor, {
+          MATCH: pattern,
+          COUNT: 100,
+        });
+        cursor = reply.cursor;
+        found.push(...reply.keys);
+      } while (String(cursor) !== '0');
+    } catch (err: any) {
+      this.logger.error(
+        `Redis scan operation failed: ${err.message}`,
+        err.stack,
+      );
+    }
+    return found;
+  }
+
   async ping(): Promise<boolean> {
     try {
       const result = await this.client.ping();

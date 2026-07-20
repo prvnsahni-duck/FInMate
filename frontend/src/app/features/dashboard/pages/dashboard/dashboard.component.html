@@ -7,6 +7,8 @@
       [monthlyExpenses]="monthlyExpenses"
       [activeGroupsCount]="activeGroupsCount"
       [personalExpenses]="personalExpenses"
+      [myExpenses]="filteredMyExpenses"
+      [expenseViewFilter]="expenseViewFilter"
       [pendingInvitations]="pendingInvitations"
       [categoryAnalytics]="categoryAnalytics"
       [userProfile]="userProfile"
@@ -19,14 +21,14 @@
       [incomeProgressWidth]="incomeProgressWidth"
       [budgetProgressWidth]="budgetProgressWidth"
       [isBudgetExceeded]="isBudgetExceeded"
-      (openExpenseModalEvent)="
-        openExpenseModal($event.expense, $event.category)
-      "
+      (openExpenseModalEvent)="openExpenseModal($event.expense, $event.category)"
       (toggleEditIncomeEvent)="toggleEditIncome()"
       (saveIncomeEvent)="saveIncome()"
       (acceptInvitationEvent)="acceptInvitation($event)"
       (declineInvitationEvent)="declineInvitation($event)"
       (confirmDeleteExpenseEvent)="confirmDeleteExpense($event)"
+      (expenseViewFilterChange)="setExpenseViewFilter($event)"
+      (openGroupExpenseEvent)="openGroupExpense($event)"
     ></app-dashboard-home>
   }
 
@@ -59,12 +61,14 @@
   @if (activeTab === 'Profile') {
     <app-dashboard-profile
       [userName]="userName"
+      [userDisplayName]="userDisplayName"
       [userEmail]="userEmail"
       [userProfile]="userProfile"
       [personalExpensesCount]="personalExpenses.length"
       [incomePercentage]="incomePercentage"
       [isLoggingOut]="isLoggingOut"
       (logoutEvent)="logout()"
+      (profileUpdated)="handleProfileUpdated($event)"
     ></app-dashboard-profile>
   }
 </div>

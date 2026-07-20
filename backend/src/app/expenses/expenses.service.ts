@@ -2185,6 +2185,176 @@ export class ExpensesService {
     );
   }
 
+  /**
+   * Returns the append-only version history for a single expense.
+   * The caller must be the expense owner or an active member of the expense's group.
+   * Read-only — no mutation. Restore is out of scope for v2.
+   */
+  async getExpenseVersionHistory(
+    userId: string,
+    expenseId: string,
+  ): Promise<Record<string, unknown>[]> {
+    const expense = await this.expenseRepository.findOne({
+      where: { id: expenseId },
+      relations: ['ownerUser', 'group'],
+      withDeleted: true,
+    });
+    if (!expense) {
+      throw new NotFoundException('Expense not found');
+    }
+
+    // Authorize: owner OR active group member
+    const isOwner = expense.ownerUser?.id === userId;
+    if (!isOwner && expense.group) {
+      const membership = await this.groupMemberRepository.findOne({
+        where: {
+          group: { id: expense.group.id },
+          user: { id: userId },
+          joinStatus: 'active',
+        },
+      });
+      if (!membership) {
+        throw new ForbiddenException('You do not have access to this expense');
+      }
+    } else if (!isOwner) {
+      throw new ForbiddenException('You do not have access to this expense');
+    }
+
+    const versions = await this.dataSource
+      .getRepository(ExpenseVersion)
+      .createQueryBuilder('v')
+      .leftJoinAndSelect('v.actorUser', 'actor')
+      .where('v.expense_id = :expenseId', { expenseId })
+      .orderBy('v.createdAt', 'ASC')
+      .getMany();
+
+    return versions.map((v, i) => ({
+      id: v.id,
+      versionNumber: i + 1,
+      entityVersion: v.entityVersion,
+      action: v.action,
+      actorUserId: v.actorUser?.id ?? null,
+      actorDisplayName:
+        v.actorUser?.displayName ?? v.actorUser?.email ?? 'System',
+      createdAt: v.createdAt,
+      snapshot: v.snapshot,
+    }));
+  }
+
+  /**
+   * Returns the calling user's full expense picture:
+   *  - Personal expenses (group IS NULL, owned by the user)
+   *  - Group shares    (expenses where the user has an ExpenseSplit entry)
+   *
+   * No expense is duplicated. Each item carries `expenseType` and `myShare`
+   * so the UI can display the user's actual liability without showing the full
+   * group amount.
+   */
+  async listMyExpenses(
+    userId: string,
+    page: number,
+    limit: number,
+  ): Promise<PaginatedResponse<Record<string, unknown>>> {
+    const p = page > 0 ? page : 1;
+    const l = limit > 0 ? limit : 20;
+
+    // ── 1. Personal expenses ───────────────────────────────────────────────
+    const personalExpenses = await this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.ownerUser', 'ownerUser')
+      .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
+      .where('expense.group IS NULL')
+      .andWhere('ownerUser.id = :userId', { userId })
+      .andWhere('expense.deletedAt IS NULL')
+      .getMany();
+
+    // ── 2. Group shares via ExpenseSplit ────────────────────────────────────
+    const groupSplits = await this.expenseSplitRepository
+      .createQueryBuilder('split')
+      .innerJoinAndSelect('split.expense', 'expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.group', 'group')
+      .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
+      .leftJoin('split.participantGroupMember', 'groupMember')
+      .where('expense.deletedAt IS NULL')
+      .andWhere(
+        '(split.participantUserId = :userId OR groupMember.user_id = :userId)',
+        { userId },
+      )
+      .getMany();
+
+    // ── 3. Build unified items ──────────────────────────────────────────────
+    const seen = new Set<string>();
+
+    const items: Array<Record<string, unknown>> = [];
+
+    for (const exp of personalExpenses) {
+      if (seen.has(exp.id)) continue;
+      seen.add(exp.id);
+      items.push({
+        id: exp.id,
+        title: exp.title,
+        description: exp.description,
+        amountTotal: Number(exp.amountTotal),
+        myShare: Number(exp.amountTotal),
+        category: exp.category,
+        expenseDate: exp.expenseDate,
+        currency: exp.currency,
+        status: exp.status,
+        encryptionScope: exp.encryptionScope,
+        expenseType: 'PERSONAL',
+        groupId: null,
+        groupName: null,
+        paidByUserId: exp.paidByUser?.id ?? null,
+        paidByDisplayName:
+          exp.paidByUser?.displayName ?? exp.paidByUser?.email ?? null,
+        groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
+        splitId: null,
+        isSettled: false,
+        deletedAt: null,
+      });
+    }
+
+    for (const split of groupSplits) {
+      const exp = split.expense;
+      if (seen.has(exp.id)) continue;
+      seen.add(exp.id);
+      items.push({
+        id: exp.id,
+        title: exp.title,
+        description: exp.description,
+        amountTotal: Number(exp.amountTotal),
+        myShare: Number(split.amountOwed),
+        category: exp.category,
+        expenseDate: exp.expenseDate,
+        currency: exp.currency,
+        status: exp.status,
+        encryptionScope: exp.encryptionScope,
+        expenseType: 'GROUP_SHARE',
+        groupId: exp.group?.id ?? null,
+        groupName: exp.group?.name ?? null,
+        paidByUserId: exp.paidByUser?.id ?? null,
+        paidByDisplayName:
+          exp.paidByUser?.displayName ?? exp.paidByUser?.email ?? null,
+        groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
+        splitId: split.id,
+        isSettled: split.isSettled ?? false,
+        deletedAt: null,
+      });
+    }
+
+    // Sort newest first
+    items.sort((a, b) =>
+      String(b.expenseDate).localeCompare(String(a.expenseDate)),
+    );
+
+    const total = items.length;
+    const pageItems = items.slice((p - 1) * l, (p - 1) * l + l);
+
+    return paginate(pageItems, total, p, l, '/api/v1/expenses/me', {});
+  }
+
   /** Combined category-level aggregated monthly expenditures (personal + group splits) */
   async getCombinedMonthlyAnalytics(
     userId: string,

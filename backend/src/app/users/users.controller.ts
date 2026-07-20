@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Delete,
   Body,
   UseGuards,
   Req,
@@ -11,8 +12,10 @@ import {
   Post,
   Param,
   ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
-import { UpdateProfileDto } from '@finmate/data-models';
+import { UpdateProfileDto, SetRecoveryKeyDto } from '@finmate/data-models';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SuccessResponse } from '../common/response.util';
@@ -79,6 +82,17 @@ export class UsersController {
     return new SuccessResponse('User profile updated successfully', data);
   }
 
+  /**
+   * Delete the caller's account (PII-only policy): anonymizes personal data,
+   * revokes auth + keys, removes sessions; preserves financial history.
+   */
+  @Delete('me')
+  @HttpCode(HttpStatus.OK)
+  async deleteMe(@Req() req: any) {
+    await this.usersService.deleteAccount(req.user.id);
+    return new SuccessResponse('Account deleted successfully', {});
+  }
+
   @Post('me/keys')
   async saveKeys(
     @Body()
@@ -100,6 +114,23 @@ export class UsersController {
   async getKeys(@Req() req: any) {
     const keys = await this.usersService.getKeys(req.user.id);
     return new SuccessResponse('Wrapping keys retrieved successfully', keys);
+  }
+
+  /** Store the client-produced recovery-wrapped key blob (zero-knowledge). */
+  @Post('me/recovery-key')
+  async setRecoveryKey(@Body() body: SetRecoveryKeyDto, @Req() req: any) {
+    const result = await this.usersService.setRecoveryKey(
+      req.user.id,
+      body.recoveryWrappedKey,
+    );
+    return new SuccessResponse('Recovery key saved successfully', result);
+  }
+
+  /** Whether the caller has a recovery key configured. */
+  @Get('me/recovery-key/status')
+  async getRecoveryKeyStatus(@Req() req: any) {
+    const result = await this.usersService.getRecoveryKeyStatus(req.user.id);
+    return new SuccessResponse('Recovery key status retrieved', result);
   }
 
   @Get(':id/public-key')

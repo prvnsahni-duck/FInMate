@@ -12,6 +12,7 @@ import {
   LoginDto,
   RefreshTokenDto,
   Verify2FaDto,
+  ChangePasswordDto,
 } from '@finmate/data-models';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -72,6 +73,35 @@ export class AuthController {
   ) {
     await this.authService.logout(refreshTokenDto.refreshToken, req.user.id);
     return new SuccessResponse('Logged out successfully', {});
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @ThrottleAs(THROTTLE_PROFILES.RESET_PASSWORD)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Body() dto: ChangePasswordDto,
+    @Req() req: RequestWithUser,
+  ) {
+    const context = {
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    await this.authService.changePassword(
+      req.user.id,
+      dto.currentPassword,
+      dto.newPassword,
+      dto.encryptedPrivateWrappingKey,
+      dto.recoveryWrappedKey,
+      context,
+    );
+    return new SuccessResponse(
+      'Password changed successfully. Please sign in again.',
+      {},
+    );
   }
 
   @UseGuards(JwtAuthGuard)

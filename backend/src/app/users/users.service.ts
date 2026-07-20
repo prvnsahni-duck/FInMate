@@ -7,7 +7,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { User, Profile, UpdateProfileDto } from '@finmate/data-models';
 import { EncryptionService } from '../encryption/encryption.service';
+import { RedisService } from '../redis/redis.service';
 import * as argon2 from 'argon2';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class UsersService {
@@ -18,6 +20,7 @@ export class UsersService {
     private readonly profileRepository: Repository<Profile>,
     private readonly dataSource: DataSource,
     private readonly encryptionService: EncryptionService,
+    private readonly redisService: RedisService,
   ) {}
 
   async createUser(
@@ -184,12 +187,103 @@ export class UsersService {
     };
   }
 
+  /**
+   * Stores the recovery-wrapped master-key blob. Zero-knowledge: the server
+   * persists the client-produced ciphertext only and never sees plaintext.
+   */
+  async setRecoveryKey(
+    userId: string,
+    recoveryWrappedKey: string,
+  ): Promise<{ recoveryKeyCreatedAt: Date }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    user.recoveryWrappedKey = recoveryWrappedKey;
+    user.recoveryKeyCreatedAt = new Date();
+    await this.userRepository.save(user);
+    return { recoveryKeyCreatedAt: user.recoveryKeyCreatedAt };
+  }
+
+  /** Returns whether a recovery key is configured (no key material leaked). */
+  async getRecoveryKeyStatus(
+    userId: string,
+  ): Promise<{ hasRecoveryKey: boolean; recoveryKeyCreatedAt: Date | null }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return {
+      hasRecoveryKey: !!user.recoveryWrappedKey,
+      recoveryKeyCreatedAt: user.recoveryKeyCreatedAt ?? null,
+    };
+  }
+
   async getPublicWrappingKey(userId: string): Promise<string | null> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
     return user.publicWrappingKey || null;
+  }
+
+  /**
+   * Deletes the account under the "PII only" policy: anonymizes personal data,
+   * revokes authentication and encryption keys, and removes active sessions —
+   * while preserving all financial history (expenses, splits, settlements,
+   * versions, audit logs) for ledger integrity. Irreversible.
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      const anonId = randomUUID();
+
+      // Anonymize PII on the user record
+      user.email = `deleted-${anonId}@deleted.finmate`;
+      user.username = undefined;
+      user.phoneNumber = undefined;
+      user.displayName = undefined;
+      // Revoke authentication: unusable password hash (random, discarded)
+      user.passwordHash = await argon2.hash(randomUUID());
+      // Revoke 2FA
+      user.twoFactorSecret = undefined;
+      user.isTwoFactorEnabled = false;
+      // Revoke encryption key material (encrypted data becomes unrecoverable —
+      // intended: the user's private content is cryptographically shredded)
+      user.publicWrappingKey = undefined;
+      user.encryptedPrivateWrappingKey = undefined;
+      user.recoveryWrappedKey = undefined;
+      user.recoveryKeyCreatedAt = undefined;
+      // Disable AI consent and mark account disabled (login checks status)
+      user.aiOptIn = false;
+      user.status = 'disabled';
+      user.lastLoginAt = undefined;
+
+      await manager.save(User, user);
+
+      // Null out PII on the profile (avatar); keep the row for FK integrity
+      const profile = await manager.getRepository(Profile).findOne({
+        where: { user: { id: userId } },
+      });
+      if (profile) {
+        profile.avatarUrl = undefined;
+        await manager.save(Profile, profile);
+      }
+    });
+
+    // Remove all active sessions (best-effort — never blocks deletion)
+    try {
+      const keys = await this.redisService.scanKeys(
+        `refresh_token:${userId}:*`,
+      );
+      await Promise.all(keys.map((k) => this.redisService.del(k)));
+    } catch {
+      // session cleanup is best-effort
+    }
   }
 
   async lookupUser(identifier: string): Promise<User | null> {

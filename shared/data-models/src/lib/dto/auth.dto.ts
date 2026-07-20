@@ -52,3 +52,31 @@ export class Verify2FaDto {
   })
   code!: string;
 }
+
+/**
+ * Change password with the old password known.
+ * The client re-derives the master key from the new password and re-wraps the
+ * private wrapping key; the server never sees plaintext key material.
+ */
+export class ChangePasswordDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Current password is required' })
+  currentPassword!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'New password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  newPassword!: string;
+
+  /** Private wrapping key re-encrypted under the new master key (ciphertext blob). */
+  @IsString()
+  @IsNotEmpty({
+    message: 'Re-wrapped private key is required to preserve encrypted data',
+  })
+  encryptedPrivateWrappingKey!: string;
+
+  /** Optional: recovery blob re-wrapped so recovery still works after the change. */
+  @IsString()
+  @IsOptional()
+  recoveryWrappedKey?: string;
+}

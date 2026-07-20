@@ -5,6 +5,7 @@ import { User, Profile } from '@finmate/data-models';
 import { Repository, DataSource } from 'typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { EncryptionService } from '../encryption/encryption.service';
+import { RedisService } from '../redis/redis.service';
 import * as argon2 from 'argon2';
 
 jest.mock('argon2');
@@ -32,6 +33,10 @@ describe('UsersService', () => {
     const mockManager = {
       create: jest.fn((entity, data) => data),
       save: jest.fn(async (entity, data) => data),
+      getRepository: jest.fn(() => ({
+        findOne: jest.fn().mockResolvedValue(null),
+        save: jest.fn(async (data) => data),
+      })),
     };
 
     const mockDataSource = {
@@ -41,6 +46,11 @@ describe('UsersService', () => {
     const mockEncryptionService = {
       encrypt: jest.fn((text) => `encrypted:${text}`),
       decrypt: jest.fn((cipher) => cipher.replace('encrypted:', '')),
+    };
+
+    const mockRedisService = {
+      scanKeys: jest.fn().mockResolvedValue([]),
+      del: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -53,6 +63,7 @@ describe('UsersService', () => {
         },
         { provide: DataSource, useValue: mockDataSource },
         { provide: EncryptionService, useValue: mockEncryptionService },
+        { provide: RedisService, useValue: mockRedisService },
       ],
     }).compile();
 
@@ -171,6 +182,196 @@ describe('UsersService', () => {
       expect(result.user.displayName).toBe('New Name');
       expect(result.profile.avatarUrl).toBe('https://example.com/new.png');
       expect(result.profile.defaultCurrency).toBe('EUR');
+    });
+
+    it('should update displayName and aiOptIn on the user entity', async () => {
+      const mockUser = {
+        id: 'user-id',
+        displayName: '',
+        aiOptIn: false,
+      } as any;
+      const mockProfile = { id: 'profile-id' } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      await service.updateProfile('user-id', {
+        displayName: 'Alice',
+        aiOptIn: true,
+      });
+
+      expect(mockUser.displayName).toBe('Alice');
+      expect(mockUser.aiOptIn).toBe(true);
+      expect(userRepository.save).toHaveBeenCalledWith(mockUser);
+    });
+
+    it('should update timezone and locale on the profile entity', async () => {
+      const mockUser = { id: 'user-id' } as any;
+      const mockProfile = {
+        id: 'profile-id',
+        timezone: 'Asia/Kolkata',
+        locale: 'en-IN',
+      } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      await service.updateProfile('user-id', {
+        timezone: 'America/New_York',
+        locale: 'en-US',
+      });
+
+      expect(mockProfile.timezone).toBe('America/New_York');
+      expect(mockProfile.locale).toBe('en-US');
+      expect(profileRepository.save).toHaveBeenCalledWith(mockProfile);
+    });
+
+    it('should clear avatarUrl when empty string is passed', async () => {
+      const mockUser = { id: 'user-id' } as any;
+      const mockProfile = {
+        id: 'profile-id',
+        avatarUrl: 'encrypted:old-avatar',
+      } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      await service.updateProfile('user-id', { avatarUrl: '' });
+
+      // Empty string → undefined (remove avatar)
+      expect(mockProfile.avatarUrl).toBeUndefined();
+      expect(encryptionService.encrypt).not.toHaveBeenCalled();
+    });
+
+    it('should not touch user entity when only profile fields are sent', async () => {
+      const mockUser = { id: 'user-id', displayName: 'Unchanged' } as any;
+      const mockProfile = { id: 'profile-id', timezone: 'UTC' } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+
+      await service.updateProfile('user-id', { timezone: 'Europe/London' });
+
+      expect(userRepository.save).not.toHaveBeenCalled();
+      expect(mockProfile.timezone).toBe('Europe/London');
+    });
+
+    it('should decrypt avatarUrl on the returned profile', async () => {
+      const encryptedUrl = 'encrypted:data:image/png;base64,abc';
+      const mockUser = { id: 'user-id' } as any;
+      const mockProfile = { id: 'profile-id', avatarUrl: encryptedUrl } as any;
+      userRepository.findOne.mockResolvedValue(mockUser);
+      profileRepository.findOne.mockResolvedValue(mockProfile);
+      profileRepository.save.mockResolvedValue(mockProfile);
+
+      const result = await service.updateProfile('user-id', {});
+
+      // decryptProfile mutates in-place; capture expected value from mock behaviour
+      expect(encryptionService.decrypt).toHaveBeenCalledWith(encryptedUrl);
+      expect(result.profile.avatarUrl).toBe('data:image/png;base64,abc');
+    });
+  });
+
+  describe('setRecoveryKey', () => {
+    it('throws NotFoundException if user not found', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+      await expect(service.setRecoveryKey('user-id', 'blob')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('stores the recovery blob and stamps createdAt', async () => {
+      const user = { id: 'user-id' } as any;
+      userRepository.findOne.mockResolvedValue(user);
+
+      const result = await service.setRecoveryKey('user-id', 'wrapped-blob');
+
+      expect(user.recoveryWrappedKey).toBe('wrapped-blob');
+      expect(user.recoveryKeyCreatedAt).toBeInstanceOf(Date);
+      expect(userRepository.save).toHaveBeenCalledWith(user);
+      expect(result.recoveryKeyCreatedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('getRecoveryKeyStatus', () => {
+    it('reports hasRecoveryKey false when unset', async () => {
+      userRepository.findOne.mockResolvedValue({ id: 'user-id' } as any);
+      const result = await service.getRecoveryKeyStatus('user-id');
+      expect(result.hasRecoveryKey).toBe(false);
+      expect(result.recoveryKeyCreatedAt).toBeNull();
+    });
+
+    it('reports hasRecoveryKey true when set', async () => {
+      const created = new Date();
+      userRepository.findOne.mockResolvedValue({
+        id: 'user-id',
+        recoveryWrappedKey: 'blob',
+        recoveryKeyCreatedAt: created,
+      } as any);
+      const result = await service.getRecoveryKeyStatus('user-id');
+      expect(result.hasRecoveryKey).toBe(true);
+      expect(result.recoveryKeyCreatedAt).toBe(created);
+    });
+  });
+
+  describe('deleteAccount', () => {
+    it('throws NotFoundException if user not found', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+      await expect(service.deleteAccount('user-id')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('anonymizes PII, revokes auth + keys, disables account', async () => {
+      const user = {
+        id: 'user-id',
+        email: 'real@example.com',
+        username: 'realuser',
+        phoneNumber: '+123456789',
+        displayName: 'Real Name',
+        passwordHash: 'old-hash',
+        twoFactorSecret: 'secret',
+        isTwoFactorEnabled: true,
+        publicWrappingKey: 'pub',
+        encryptedPrivateWrappingKey: 'priv',
+        recoveryWrappedKey: 'rec',
+        aiOptIn: true,
+        status: 'active',
+      } as any;
+      userRepository.findOne.mockResolvedValue(user);
+      (argon2.hash as jest.Mock).mockResolvedValue('random-hash');
+
+      await service.deleteAccount('user-id');
+
+      expect(user.email).toMatch(/^deleted-.*@deleted\.finmate$/);
+      expect(user.username).toBeUndefined();
+      expect(user.phoneNumber).toBeUndefined();
+      expect(user.displayName).toBeUndefined();
+      expect(user.twoFactorSecret).toBeUndefined();
+      expect(user.isTwoFactorEnabled).toBe(false);
+      expect(user.publicWrappingKey).toBeUndefined();
+      expect(user.encryptedPrivateWrappingKey).toBeUndefined();
+      expect(user.recoveryWrappedKey).toBeUndefined();
+      expect(user.aiOptIn).toBe(false);
+      expect(user.status).toBe('disabled');
+      expect(dataSource.transaction).toHaveBeenCalled();
+    });
+
+    it('removes active sessions from Redis', async () => {
+      const user = {
+        id: 'user-id',
+        email: 'real@example.com',
+        status: 'active',
+      } as any;
+      userRepository.findOne.mockResolvedValue(user);
+      (argon2.hash as jest.Mock).mockResolvedValue('random-hash');
+
+      const redis = (service as any).redisService;
+      redis.scanKeys.mockResolvedValue([
+        'refresh_token:user-id:a',
+        'refresh_token:user-id:b',
+      ]);
+
+      await service.deleteAccount('user-id');
+
+      expect(redis.scanKeys).toHaveBeenCalledWith('refresh_token:user-id:*');
+      expect(redis.del).toHaveBeenCalledTimes(2);
     });
   });
 });
