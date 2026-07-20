@@ -252,4 +252,46 @@ describe('UsersService', () => {
       expect(result.profile.avatarUrl).toBe('data:image/png;base64,abc');
     });
   });
+
+  describe('setRecoveryKey', () => {
+    it('throws NotFoundException if user not found', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+      await expect(
+        service.setRecoveryKey('user-id', 'blob'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('stores the recovery blob and stamps createdAt', async () => {
+      const user = { id: 'user-id' } as any;
+      userRepository.findOne.mockResolvedValue(user);
+
+      const result = await service.setRecoveryKey('user-id', 'wrapped-blob');
+
+      expect(user.recoveryWrappedKey).toBe('wrapped-blob');
+      expect(user.recoveryKeyCreatedAt).toBeInstanceOf(Date);
+      expect(userRepository.save).toHaveBeenCalledWith(user);
+      expect(result.recoveryKeyCreatedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('getRecoveryKeyStatus', () => {
+    it('reports hasRecoveryKey false when unset', async () => {
+      userRepository.findOne.mockResolvedValue({ id: 'user-id' } as any);
+      const result = await service.getRecoveryKeyStatus('user-id');
+      expect(result.hasRecoveryKey).toBe(false);
+      expect(result.recoveryKeyCreatedAt).toBeNull();
+    });
+
+    it('reports hasRecoveryKey true when set', async () => {
+      const created = new Date();
+      userRepository.findOne.mockResolvedValue({
+        id: 'user-id',
+        recoveryWrappedKey: 'blob',
+        recoveryKeyCreatedAt: created,
+      } as any);
+      const result = await service.getRecoveryKeyStatus('user-id');
+      expect(result.hasRecoveryKey).toBe(true);
+      expect(result.recoveryKeyCreatedAt).toBe(created);
+    });
+  });
 });

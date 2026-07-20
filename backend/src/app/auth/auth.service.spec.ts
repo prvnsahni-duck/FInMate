@@ -43,6 +43,7 @@ describe('AuthService', () => {
       get: jest.fn(),
       set: jest.fn(),
       del: jest.fn(),
+      scanKeys: jest.fn().mockResolvedValue([]),
     };
 
     const mockConfigService = {
@@ -122,6 +123,97 @@ describe('AuthService', () => {
         createdAt: mockUser.createdAt,
         updatedAt: mockUser.updatedAt,
       });
+    });
+  });
+
+  describe('changePassword', () => {
+    const baseUser = {
+      id: 'user-id',
+      email: 'test@example.com',
+      passwordHash: 'old-hash',
+    } as any;
+
+    it('throws UnauthorizedException if user not found', async () => {
+      usersService.findById.mockResolvedValue(null);
+
+      await expect(
+        service.changePassword('user-id', 'old', 'newpass12', 'wrapped'),
+      ).rejects.toThrow('User not found');
+    });
+
+    it('throws UnauthorizedException if current password is wrong', async () => {
+      usersService.findById.mockResolvedValue({ ...baseUser });
+      (argon2.verify as jest.Mock).mockResolvedValue(false);
+
+      await expect(
+        service.changePassword('user-id', 'wrong', 'newpass12', 'wrapped'),
+      ).rejects.toThrow('Current password is incorrect');
+    });
+
+    it('swaps password hash, stores re-wrapped key, and revokes all sessions', async () => {
+      const user = { ...baseUser };
+      usersService.findById.mockResolvedValue(user);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+      (argon2.hash as jest.Mock).mockResolvedValue('new-hash');
+      redisService.scanKeys.mockResolvedValue([
+        'refresh_token:user-id:aaa',
+        'refresh_token:user-id:bbb',
+      ]);
+
+      await service.changePassword(
+        'user-id',
+        'oldpass',
+        'newpass12',
+        'new-wrapped-key',
+      );
+
+      expect(user.passwordHash).toBe('new-hash');
+      expect(user.encryptedPrivateWrappingKey).toBe('new-wrapped-key');
+      expect(usersService.updateUser).toHaveBeenCalledWith(user);
+      expect(redisService.scanKeys).toHaveBeenCalledWith(
+        'refresh_token:user-id:*',
+      );
+      expect(redisService.del).toHaveBeenCalledTimes(2);
+    });
+
+    it('updates recovery blob when provided', async () => {
+      const user = { ...baseUser };
+      usersService.findById.mockResolvedValue(user);
+      (argon2.verify as jest.Mock).mockResolvedValue(true);
+      (argon2.hash as jest.Mock).mockResolvedValue('new-hash');
+
+      await service.changePassword(
+        'user-id',
+        'oldpass',
+        'newpass12',
+        'new-wrapped-key',
+        'new-recovery-blob',
+      );
+
+      expect(user.recoveryWrappedKey).toBe('new-recovery-blob');
+      expect(user.recoveryKeyCreatedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('revokeAllSessions', () => {
+    it('deletes every matching refresh-token key', async () => {
+      redisService.scanKeys.mockResolvedValue([
+        'refresh_token:u1:a',
+        'refresh_token:u1:b',
+        'refresh_token:u1:c',
+      ]);
+
+      await service.revokeAllSessions('u1');
+
+      expect(redisService.del).toHaveBeenCalledTimes(3);
+    });
+
+    it('is a no-op when there are no sessions', async () => {
+      redisService.scanKeys.mockResolvedValue([]);
+
+      await service.revokeAllSessions('u1');
+
+      expect(redisService.del).not.toHaveBeenCalled();
     });
   });
 

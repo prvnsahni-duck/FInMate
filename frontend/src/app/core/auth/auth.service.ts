@@ -54,4 +54,40 @@ export class AuthService {
       profileData,
     );
   }
+
+  /**
+   * Change password (current password known). The caller must supply the
+   * private wrapping key re-encrypted under the new master key so encrypted
+   * data stays accessible. Zero-knowledge — server never sees key plaintext.
+   */
+  changePassword(payload: {
+    currentPassword: string;
+    newPassword: string;
+    encryptedPrivateWrappingKey: string;
+    recoveryWrappedKey?: string;
+  }): Observable<unknown> {
+    return this.http.post(
+      `${this.baseUrl}/change-password`,
+      payload,
+    );
+  }
+
+  /** Store the client-produced recovery-wrapped key blob. */
+  setRecoveryKey(recoveryWrappedKey: string): Observable<unknown> {
+    return this.http.post(
+      `${environment.apiBaseUrl}/users/me/recovery-key`,
+      { recoveryWrappedKey },
+    );
+  }
+
+  /** Whether the current user has a recovery key configured. */
+  getRecoveryKeyStatus(): Observable<{
+    hasRecoveryKey: boolean;
+    recoveryKeyCreatedAt: string | null;
+  }> {
+    return this.http.get<{
+      hasRecoveryKey: boolean;
+      recoveryKeyCreatedAt: string | null;
+    }>(`${environment.apiBaseUrl}/users/me/recovery-key/status`);
+  }
 }

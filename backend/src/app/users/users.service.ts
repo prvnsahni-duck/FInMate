@@ -184,6 +184,38 @@ export class UsersService {
     };
   }
 
+  /**
+   * Stores the recovery-wrapped master-key blob. Zero-knowledge: the server
+   * persists the client-produced ciphertext only and never sees plaintext.
+   */
+  async setRecoveryKey(
+    userId: string,
+    recoveryWrappedKey: string,
+  ): Promise<{ recoveryKeyCreatedAt: Date }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    user.recoveryWrappedKey = recoveryWrappedKey;
+    user.recoveryKeyCreatedAt = new Date();
+    await this.userRepository.save(user);
+    return { recoveryKeyCreatedAt: user.recoveryKeyCreatedAt };
+  }
+
+  /** Returns whether a recovery key is configured (no key material leaked). */
+  async getRecoveryKeyStatus(
+    userId: string,
+  ): Promise<{ hasRecoveryKey: boolean; recoveryKeyCreatedAt: Date | null }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+    return {
+      hasRecoveryKey: !!user.recoveryWrappedKey,
+      recoveryKeyCreatedAt: user.recoveryKeyCreatedAt ?? null,
+    };
+  }
+
   async getPublicWrappingKey(userId: string): Promise<string | null> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {

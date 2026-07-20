@@ -9,6 +9,9 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { Store } from '@ngxs/store';
+import { Logout } from '../../../../core/auth/auth.state';
 import { Profile, UpdateProfileDto } from '@finmate/data-models';
 
 export const TIMEZONE_OPTIONS = [
@@ -53,6 +56,8 @@ export const LOCALE_OPTIONS = [
 })
 export class DashboardProfileComponent implements OnChanges {
   private authService = inject(AuthService);
+  private groupKeyService = inject(GroupKeyService);
+  private store = inject(Store);
 
   // ── Inputs from parent ──────────────────────────────────────────────────
   @Input() userName = '';
@@ -79,6 +84,15 @@ export class DashboardProfileComponent implements OnChanges {
   profileSaveSuccess = '';
   profileSaveError = '';
   avatarSizeWarning = '';
+
+  // ── Change Password state ───────────────────────────────────────────────
+  showPasswordSection = false;
+  currentPassword = '';
+  newPassword = '';
+  confirmPassword = '';
+  isChangingPassword = false;
+  passwordError = '';
+  passwordSuccess = '';
 
   // ── Options ─────────────────────────────────────────────────────────────
   readonly timezoneOptions = TIMEZONE_OPTIONS;
@@ -171,5 +185,66 @@ export class DashboardProfileComponent implements OnChanges {
   get displayInitial(): string {
     const name = this.userDisplayName || this.userName || this.userEmail;
     return name ? name[0].toUpperCase() : '?';
+  }
+
+  togglePasswordSection(): void {
+    this.showPasswordSection = !this.showPasswordSection;
+    this.currentPassword = '';
+    this.newPassword = '';
+    this.confirmPassword = '';
+    this.passwordError = '';
+    this.passwordSuccess = '';
+  }
+
+  async changePassword(): Promise<void> {
+    this.passwordError = '';
+    this.passwordSuccess = '';
+
+    if (!this.currentPassword || !this.newPassword) {
+      this.passwordError = 'All password fields are required.';
+      return;
+    }
+    if (this.newPassword.length < 8) {
+      this.passwordError = 'New password must be at least 8 characters.';
+      return;
+    }
+    if (this.newPassword !== this.confirmPassword) {
+      this.passwordError = 'New password and confirmation do not match.';
+      return;
+    }
+
+    this.isChangingPassword = true;
+    try {
+      // Zero-knowledge: re-wrap the private key under the new password's master key
+      const encryptedPrivateWrappingKey =
+        await this.groupKeyService.reWrapPrivateKeyForNewPassword(
+          this.newPassword,
+        );
+
+      this.authService
+        .changePassword({
+          currentPassword: this.currentPassword,
+          newPassword: this.newPassword,
+          encryptedPrivateWrappingKey,
+        })
+        .subscribe({
+          next: () => {
+            this.isChangingPassword = false;
+            this.passwordSuccess =
+              'Password changed. Signing you out — please sign in again.';
+            // All sessions were revoked server-side; force re-login.
+            setTimeout(() => this.store.dispatch(new Logout()), 1500);
+          },
+          error: (err) => {
+            this.isChangingPassword = false;
+            this.passwordError =
+              err.error?.message || 'Failed to change password.';
+          },
+        });
+    } catch (e: any) {
+      this.isChangingPassword = false;
+      this.passwordError =
+        e?.message || 'Could not re-secure your encryption keys. Try again.';
+    }
   }
 }

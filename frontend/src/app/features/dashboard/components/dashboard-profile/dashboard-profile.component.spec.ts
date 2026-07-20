@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { DashboardProfileComponent } from './dashboard-profile.component';
 import { AuthService } from '../../../../core/auth/auth.service';
+import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { Store } from '@ngxs/store';
 import { of, throwError } from 'rxjs';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -8,7 +10,12 @@ import { FormsModule } from '@angular/forms';
 describe('DashboardProfileComponent', () => {
   let component: DashboardProfileComponent;
   let fixture: ComponentFixture<DashboardProfileComponent>;
-  let mockAuthService: { updateProfile: jest.Mock };
+  let mockAuthService: {
+    updateProfile: jest.Mock;
+    changePassword: jest.Mock;
+  };
+  let mockGroupKeyService: { reWrapPrivateKeyForNewPassword: jest.Mock };
+  let mockStore: { dispatch: jest.Mock };
 
   const mockProfile = {
     id: 'profile-1',
@@ -25,11 +32,22 @@ describe('DashboardProfileComponent', () => {
       updateProfile: jest.fn().mockReturnValue(
         of({ user: { displayName: 'Alice' }, profile: mockProfile }),
       ),
+      changePassword: jest.fn().mockReturnValue(of({})),
     };
+    mockGroupKeyService = {
+      reWrapPrivateKeyForNewPassword: jest
+        .fn()
+        .mockResolvedValue('rewrapped-key-blob'),
+    };
+    mockStore = { dispatch: jest.fn() };
 
     await TestBed.configureTestingModule({
       imports: [DashboardProfileComponent],
-      providers: [{ provide: AuthService, useValue: mockAuthService }],
+      providers: [
+        { provide: AuthService, useValue: mockAuthService },
+        { provide: GroupKeyService, useValue: mockGroupKeyService },
+        { provide: Store, useValue: mockStore },
+      ],
       schemas: [NO_ERRORS_SCHEMA],
     })
       .overrideComponent(DashboardProfileComponent, {
@@ -198,6 +216,88 @@ describe('DashboardProfileComponent', () => {
   describe('AI toggle persistence', () => {
     it('component does not touch aiOptIn — handled by parent (Settings tab)', () => {
       expect('aiOptIn' in component).toBe(false);
+    });
+  });
+
+  describe('changePassword', () => {
+    beforeEach(() => {
+      component.currentPassword = 'oldpass123';
+      component.newPassword = 'newpass123';
+      component.confirmPassword = 'newpass123';
+    });
+
+    it('rejects when fields are empty', async () => {
+      component.currentPassword = '';
+      await component.changePassword();
+      expect(component.passwordError).toBeTruthy();
+      expect(mockAuthService.changePassword).not.toHaveBeenCalled();
+    });
+
+    it('rejects when new password is too short', async () => {
+      component.newPassword = 'short';
+      component.confirmPassword = 'short';
+      await component.changePassword();
+      expect(component.passwordError).toContain('8 characters');
+      expect(mockAuthService.changePassword).not.toHaveBeenCalled();
+    });
+
+    it('rejects when confirmation does not match', async () => {
+      component.confirmPassword = 'different1';
+      await component.changePassword();
+      expect(component.passwordError).toContain('do not match');
+      expect(mockAuthService.changePassword).not.toHaveBeenCalled();
+    });
+
+    it('re-wraps the private key and submits with the re-wrapped blob', async () => {
+      await component.changePassword();
+
+      expect(
+        mockGroupKeyService.reWrapPrivateKeyForNewPassword,
+      ).toHaveBeenCalledWith('newpass123');
+      expect(mockAuthService.changePassword).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currentPassword: 'oldpass123',
+          newPassword: 'newpass123',
+          encryptedPrivateWrappingKey: 'rewrapped-key-blob',
+        }),
+      );
+    });
+
+    it('dispatches Logout on success', async () => {
+      jest.useFakeTimers();
+      await component.changePassword();
+      expect(component.passwordSuccess).toBeTruthy();
+      jest.advanceTimersByTime(1600);
+      expect(mockStore.dispatch).toHaveBeenCalled();
+      jest.useRealTimers();
+    });
+
+    it('surfaces API error and does not sign out', async () => {
+      mockAuthService.changePassword.mockReturnValue(
+        throwError(() => ({ error: { message: 'Current password is incorrect' } })),
+      );
+      await component.changePassword();
+      expect(component.passwordError).toBe('Current password is incorrect');
+      expect(component.isChangingPassword).toBe(false);
+    });
+
+    it('surfaces re-wrap failure without calling the API', async () => {
+      mockGroupKeyService.reWrapPrivateKeyForNewPassword.mockRejectedValue(
+        new Error('Master encryption key not derived'),
+      );
+      await component.changePassword();
+      expect(component.passwordError).toContain('Master encryption key');
+      expect(mockAuthService.changePassword).not.toHaveBeenCalled();
+    });
+
+    it('togglePasswordSection clears fields', () => {
+      component.showPasswordSection = false;
+      component.togglePasswordSection();
+      expect(component.showPasswordSection).toBe(true);
+      component.currentPassword = 'x';
+      component.togglePasswordSection();
+      expect(component.showPasswordSection).toBe(false);
+      expect(component.currentPassword).toBe('');
     });
   });
 });

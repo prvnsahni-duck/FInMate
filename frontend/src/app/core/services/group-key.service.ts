@@ -712,6 +712,55 @@ export class GroupKeyService {
     return this.myAsymmetricKeys;
   }
 
+  /**
+   * Re-wraps the private wrapping key for a password change (zero-knowledge).
+   * Decrypts the stored private key with the OLD master key (loaded from
+   * session), derives a NEW master key from the new password, re-encrypts the
+   * private key JWK under it, updates the in-session master key, and returns the
+   * re-wrapped ciphertext to submit to POST /auth/change-password.
+   */
+  async reWrapPrivateKeyForNewPassword(
+    newPassword: string,
+  ): Promise<string> {
+    const user = this.store.selectSnapshot((state: any) => state.auth?.user);
+    if (!user || !user.email) {
+      throw new Error('User session not found');
+    }
+
+    const oldMasterKey = await this.encryptionService.loadKeyFromSession(
+      user.email,
+    );
+    if (!oldMasterKey) {
+      throw new Error('Master encryption key not derived');
+    }
+
+    const keysResponse = await firstValueFrom(
+      this.http.get<
+        | { encryptedPrivateWrappingKey: string | null }
+        | { data: { encryptedPrivateWrappingKey: string | null } }
+      >(`${this.baseUrl}/users/me/keys`),
+    );
+    const data = this.unwrapHttpData(keysResponse) as {
+      encryptedPrivateWrappingKey: string | null;
+    } | null;
+    if (!data || !data.encryptedPrivateWrappingKey) {
+      throw new Error('No wrapping key found to re-wrap');
+    }
+
+    // Decrypt private key JWK with the current master key
+    const privateKeyJwkStr = await this.encryptionService.decrypt(
+      data.encryptedPrivateWrappingKey,
+      oldMasterKey,
+    );
+
+    // Derive the new master key and store it in-session so the app keeps working
+    const { key: newMasterKey } =
+      await this.encryptionService.deriveAndStoreKey(newPassword, user.email);
+
+    // Re-encrypt the private key JWK under the new master key
+    return this.encryptionService.encrypt(privateKeyJwkStr, newMasterKey);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Private fetch implementation
   // ─────────────────────────────────────────────────────────────────────────
