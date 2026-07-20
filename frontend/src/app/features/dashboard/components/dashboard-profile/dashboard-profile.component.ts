@@ -94,6 +94,12 @@ export class DashboardProfileComponent implements OnChanges {
   passwordError = '';
   passwordSuccess = '';
 
+  // ── Delete Account state ────────────────────────────────────────────────
+  showDeleteSection = false;
+  deleteConfirmText = '';
+  isDeletingAccount = false;
+  deleteError = '';
+
   // ── Options ─────────────────────────────────────────────────────────────
   readonly timezoneOptions = TIMEZONE_OPTIONS;
   readonly localeOptions = LOCALE_OPTIONS;
@@ -185,6 +191,37 @@ export class DashboardProfileComponent implements OnChanges {
   get displayInitial(): string {
     const name = this.userDisplayName || this.userName || this.userEmail;
     return name ? name[0].toUpperCase() : '?';
+  }
+
+  toggleDeleteSection(): void {
+    this.showDeleteSection = !this.showDeleteSection;
+    this.deleteConfirmText = '';
+    this.deleteError = '';
+  }
+
+  get canDeleteAccount(): boolean {
+    return this.deleteConfirmText.trim().toUpperCase() === 'DELETE';
+  }
+
+  deleteAccount(): void {
+    if (!this.canDeleteAccount) {
+      this.deleteError = 'Type DELETE to confirm.';
+      return;
+    }
+    this.isDeletingAccount = true;
+    this.deleteError = '';
+
+    this.authService.deleteAccount().subscribe({
+      next: () => {
+        this.isDeletingAccount = false;
+        // Access revoked server-side; end the local session.
+        this.store.dispatch(new Logout());
+      },
+      error: (err) => {
+        this.isDeletingAccount = false;
+        this.deleteError = err.error?.message || 'Failed to delete account.';
+      },
+    });
   }
 
   togglePasswordSection(): void {

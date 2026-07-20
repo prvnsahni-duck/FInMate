@@ -90,4 +90,13 @@ export class AuthService {
       recoveryKeyCreatedAt: string | null;
     }>(`${environment.apiBaseUrl}/users/me/recovery-key/status`);
   }
+
+  /**
+   * Permanently delete the account (PII-only policy). Anonymizes personal data
+   * and revokes access server-side; financial history is preserved. Irreversible.
+   */
+  deleteAccount(): Observable<unknown> {
+    this.encryptionService.clearKey();
+    return this.http.delete(`${environment.apiBaseUrl}/users/me`);
+  }
 }

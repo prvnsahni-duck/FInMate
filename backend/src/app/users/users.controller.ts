@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Delete,
   Body,
   UseGuards,
   Req,
@@ -11,6 +12,8 @@ import {
   Post,
   Param,
   ParseUUIDPipe,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { UpdateProfileDto, SetRecoveryKeyDto } from '@finmate/data-models';
 import { UsersService } from './users.service';
@@ -77,6 +80,17 @@ export class UsersController {
       profile: result.profile,
     };
     return new SuccessResponse('User profile updated successfully', data);
+  }
+
+  /**
+   * Delete the caller's account (PII-only policy): anonymizes personal data,
+   * revokes auth + keys, removes sessions; preserves financial history.
+   */
+  @Delete('me')
+  @HttpCode(HttpStatus.OK)
+  async deleteMe(@Req() req: any) {
+    await this.usersService.deleteAccount(req.user.id);
+    return new SuccessResponse('Account deleted successfully', {});
   }
 
   @Post('me/keys')

@@ -13,6 +13,7 @@ describe('DashboardProfileComponent', () => {
   let mockAuthService: {
     updateProfile: jest.Mock;
     changePassword: jest.Mock;
+    deleteAccount: jest.Mock;
   };
   let mockGroupKeyService: { reWrapPrivateKeyForNewPassword: jest.Mock };
   let mockStore: { dispatch: jest.Mock };
@@ -33,6 +34,7 @@ describe('DashboardProfileComponent', () => {
         of({ user: { displayName: 'Alice' }, profile: mockProfile }),
       ),
       changePassword: jest.fn().mockReturnValue(of({})),
+      deleteAccount: jest.fn().mockReturnValue(of({})),
     };
     mockGroupKeyService = {
       reWrapPrivateKeyForNewPassword: jest
@@ -298,6 +300,50 @@ describe('DashboardProfileComponent', () => {
       component.togglePasswordSection();
       expect(component.showPasswordSection).toBe(false);
       expect(component.currentPassword).toBe('');
+    });
+  });
+
+  describe('deleteAccount', () => {
+    it('canDeleteAccount is false until DELETE is typed', () => {
+      component.deleteConfirmText = 'del';
+      expect(component.canDeleteAccount).toBe(false);
+      component.deleteConfirmText = 'DELETE';
+      expect(component.canDeleteAccount).toBe(true);
+      component.deleteConfirmText = 'delete';
+      expect(component.canDeleteAccount).toBe(true); // case-insensitive
+    });
+
+    it('does not call API when confirmation is wrong', () => {
+      component.deleteConfirmText = 'nope';
+      component.deleteAccount();
+      expect(mockAuthService.deleteAccount).not.toHaveBeenCalled();
+      expect(component.deleteError).toBeTruthy();
+    });
+
+    it('calls deleteAccount and dispatches Logout on success', () => {
+      component.deleteConfirmText = 'DELETE';
+      component.deleteAccount();
+      expect(mockAuthService.deleteAccount).toHaveBeenCalled();
+      expect(mockStore.dispatch).toHaveBeenCalled();
+    });
+
+    it('surfaces API error and does not sign out', () => {
+      mockAuthService.deleteAccount.mockReturnValue(
+        throwError(() => ({ error: { message: 'Server error' } })),
+      );
+      mockStore.dispatch.mockClear();
+      component.deleteConfirmText = 'DELETE';
+      component.deleteAccount();
+      expect(component.deleteError).toBe('Server error');
+      expect(component.isDeletingAccount).toBe(false);
+    });
+
+    it('toggleDeleteSection resets confirm text', () => {
+      component.deleteConfirmText = 'DELETE';
+      component.showDeleteSection = true;
+      component.toggleDeleteSection();
+      expect(component.showDeleteSection).toBe(false);
+      expect(component.deleteConfirmText).toBe('');
     });
   });
 });

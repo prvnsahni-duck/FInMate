@@ -5,6 +5,7 @@ import { User, Profile } from '@finmate/data-models';
 import { Repository, DataSource } from 'typeorm';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { EncryptionService } from '../encryption/encryption.service';
+import { RedisService } from '../redis/redis.service';
 import * as argon2 from 'argon2';
 
 jest.mock('argon2');
@@ -32,6 +33,10 @@ describe('UsersService', () => {
     const mockManager = {
       create: jest.fn((entity, data) => data),
       save: jest.fn(async (entity, data) => data),
+      getRepository: jest.fn(() => ({
+        findOne: jest.fn().mockResolvedValue(null),
+        save: jest.fn(async (data) => data),
+      })),
     };
 
     const mockDataSource = {
@@ -41,6 +46,11 @@ describe('UsersService', () => {
     const mockEncryptionService = {
       encrypt: jest.fn((text) => `encrypted:${text}`),
       decrypt: jest.fn((cipher) => cipher.replace('encrypted:', '')),
+    };
+
+    const mockRedisService = {
+      scanKeys: jest.fn().mockResolvedValue([]),
+      del: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -53,6 +63,7 @@ describe('UsersService', () => {
         },
         { provide: DataSource, useValue: mockDataSource },
         { provide: EncryptionService, useValue: mockEncryptionService },
+        { provide: RedisService, useValue: mockRedisService },
       ],
     }).compile();
 
@@ -292,6 +303,71 @@ describe('UsersService', () => {
       const result = await service.getRecoveryKeyStatus('user-id');
       expect(result.hasRecoveryKey).toBe(true);
       expect(result.recoveryKeyCreatedAt).toBe(created);
+    });
+  });
+
+  describe('deleteAccount', () => {
+    it('throws NotFoundException if user not found', async () => {
+      userRepository.findOne.mockResolvedValue(null);
+      await expect(service.deleteAccount('user-id')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('anonymizes PII, revokes auth + keys, disables account', async () => {
+      const user = {
+        id: 'user-id',
+        email: 'real@example.com',
+        username: 'realuser',
+        phoneNumber: '+123456789',
+        displayName: 'Real Name',
+        passwordHash: 'old-hash',
+        twoFactorSecret: 'secret',
+        isTwoFactorEnabled: true,
+        publicWrappingKey: 'pub',
+        encryptedPrivateWrappingKey: 'priv',
+        recoveryWrappedKey: 'rec',
+        aiOptIn: true,
+        status: 'active',
+      } as any;
+      userRepository.findOne.mockResolvedValue(user);
+      (argon2.hash as jest.Mock).mockResolvedValue('random-hash');
+
+      await service.deleteAccount('user-id');
+
+      expect(user.email).toMatch(/^deleted-.*@deleted\.finmate$/);
+      expect(user.username).toBeUndefined();
+      expect(user.phoneNumber).toBeUndefined();
+      expect(user.displayName).toBeUndefined();
+      expect(user.twoFactorSecret).toBeUndefined();
+      expect(user.isTwoFactorEnabled).toBe(false);
+      expect(user.publicWrappingKey).toBeUndefined();
+      expect(user.encryptedPrivateWrappingKey).toBeUndefined();
+      expect(user.recoveryWrappedKey).toBeUndefined();
+      expect(user.aiOptIn).toBe(false);
+      expect(user.status).toBe('disabled');
+      expect(dataSource.transaction).toHaveBeenCalled();
+    });
+
+    it('removes active sessions from Redis', async () => {
+      const user = {
+        id: 'user-id',
+        email: 'real@example.com',
+        status: 'active',
+      } as any;
+      userRepository.findOne.mockResolvedValue(user);
+      (argon2.hash as jest.Mock).mockResolvedValue('random-hash');
+
+      const redis = (service as any).redisService;
+      redis.scanKeys.mockResolvedValue([
+        'refresh_token:user-id:a',
+        'refresh_token:user-id:b',
+      ]);
+
+      await service.deleteAccount('user-id');
+
+      expect(redis.scanKeys).toHaveBeenCalledWith('refresh_token:user-id:*');
+      expect(redis.del).toHaveBeenCalledTimes(2);
     });
   });
 });
