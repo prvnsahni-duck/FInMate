@@ -845,6 +845,83 @@ describe('ExpensesService', () => {
     });
   });
 
+  // ── Single source of truth: one Expense row per group expense ───────────
+
+  describe('no duplicate Expense records', () => {
+    it('persists exactly one Expense row for a group expense with multiple participants, one ExpenseSplit per participant', async () => {
+      const friendMember = {
+        id: 'membership-friend',
+        role: 'member',
+        joinStatus: 'active',
+        user: { id: 'friend-id' },
+      } as any;
+      const callerMember = {
+        id: 'membership-caller',
+        role: 'member',
+        joinStatus: 'active',
+        user: { id: 'caller-id' },
+      } as any;
+
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValue(callerMember);
+      groupMemberRepository.find.mockResolvedValue([
+        callerMember,
+        friendMember,
+      ]);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+      groupKeyVersionRepository.findOne.mockResolvedValue({
+        id: 'gkv-1',
+        version: 1,
+        status: 'ACTIVE',
+      } as any);
+
+      expenseRepository.save.mockImplementation(async (data: any) => ({
+        ...data,
+        id: 'exp-shared-1',
+      }));
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-shared-1',
+        title: 'Dinner',
+        amountTotal: 1000,
+        currency: 'USD',
+        category: 'Food & Drinks',
+        expenseDate: '2026-07-10',
+        status: 'posted',
+        encryptionScope: 'group',
+        isCarryForward: false,
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        group: { id: 'group-id' },
+        groupKeyVersion: { id: 'gkv-1', version: 1 },
+      } as any);
+      splitRepository.find.mockResolvedValue([]);
+      attachmentRepository.find.mockResolvedValue([]);
+
+      await service.createExpense('caller-id', {
+        title: 'Dinner',
+        amountTotal: 1000,
+        currency: 'USD',
+        category: 'Food & Drinks',
+        paidByUserId: 'caller-id',
+        groupId: 'group-id',
+        expenseDate: '2026-07-10',
+        splits: [
+          { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
+          { participantUserId: 'friend-id', splitType: 'equal', shareValue: 1 },
+        ],
+      } as any);
+
+      // One Expense row regardless of how many participants share it.
+      expect(expenseRepository.save).toHaveBeenCalledTimes(1);
+      // One ExpenseSplit row per participant — the projection, not a copy.
+      expect(splitRepository.save).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('Phase 5 Verification Rules', () => {
     it('should reject createExpense when currency does not match group base currency', async () => {
       userRepository.findOne
@@ -1353,6 +1430,111 @@ describe('ExpensesService', () => {
       expect(page1.data).toHaveLength(3);
       expect(page2.data).toHaveLength(2);
       expect(page1.meta.totalItems).toBe(5);
+    });
+
+    // Regression guard: TypeORM only rewrites raw QueryBuilder condition
+    // strings when the token is an exact relation propertyPath
+    // (`participantUser`) or exact physical column name
+    // (`participant_user_id`) — `participantUserId` matches neither and is
+    // left as unresolved literal SQL, which Postgres rejects with
+    // "column split.participantuserid does not exist" on every call. Mocked
+    // `where`/`andWhere` can't detect that by itself (they never parse the
+    // string), so this test pins down the exact condition text passed in.
+    // See expenses-split-query-mapping.spec.ts for the real-SQL-generation
+    // check that would have caught the malformed identifier directly.
+    it('filters group splits using the participantUser relation, not a participantUserId shorthand', async () => {
+      const qb = makeQb([]);
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+      await service.listMyExpenses('user-1', 1, 20);
+
+      const conditionArgs = qb.andWhere.mock.calls.map((call) => call[0]);
+      expect(
+        conditionArgs.some((condition: string) =>
+          condition.includes('split.participantUser ='),
+        ),
+      ).toBe(true);
+      expect(
+        conditionArgs.some((condition: string) =>
+          condition.includes('participantUserId'),
+        ),
+      ).toBe(false);
+    });
+  });
+
+  // ── getCombinedMonthlyAnalytics ──────────────────────────────────────────
+
+  describe('getCombinedMonthlyAnalytics', () => {
+    const makeQb = (rows: any[]) => ({
+      leftJoinAndSelect: jest.fn().mockReturnThis(),
+      innerJoinAndSelect: jest.fn().mockReturnThis(),
+      leftJoin: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue(rows),
+    });
+
+    it('includes the user share (amountOwed) of group expenses in the monthly category totals', async () => {
+      // No 100%-personal expenses paid by the user this month.
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+
+      const groupExpense = {
+        id: 'g-1',
+        category: 'Food & Drinks',
+        currency: 'USD',
+        expenseDate: '2026-07-10',
+        ledgerMonth: null,
+      };
+      const groupShareSplit = {
+        id: 'sp-1',
+        amountOwed: 500,
+        expense: groupExpense,
+      };
+
+      // First call (inside the personal-expense branch) looks up splits for
+      // the user's own paid personal expenses via `.find`; second, the
+      // query-builder call, returns the splits where the user participates.
+      splitRepository.find = jest.fn().mockResolvedValue([]);
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([groupShareSplit]));
+
+      const result = await service.getCombinedMonthlyAnalytics(
+        'user-1',
+        '2026-07',
+      );
+
+      expect(result).toEqual([
+        { category: 'Food & Drinks', amount: 500, currency: 'USD' },
+      ]);
+    });
+
+    it('filters participant splits using the participantUser relation, not a participantUserId shorthand', async () => {
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+      splitRepository.find = jest.fn().mockResolvedValue([]);
+      const qb = makeQb([]);
+      splitRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+      await service.getCombinedMonthlyAnalytics('user-1', '2026-07');
+
+      const conditionArgs = qb.andWhere.mock.calls.map((call) => call[0]);
+      expect(
+        conditionArgs.some((condition: string) =>
+          condition.includes('split.participantUser ='),
+        ),
+      ).toBe(true);
+      expect(
+        conditionArgs.some((condition: string) =>
+          condition.includes('participantUserId'),
+        ),
+      ).toBe(false);
     });
   });
 });

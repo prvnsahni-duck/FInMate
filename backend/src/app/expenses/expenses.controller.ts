@@ -72,76 +72,12 @@ export class ExpensesController {
     return new SuccessResponse('Expenses retrieved successfully', result);
   }
 
-  @Get(':id')
-  async findOne(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request & { user: { id: string } },
-  ) {
-    const result = await this.expensesCrudService.getExpenseById(
-      req.user.id,
-      id,
-    );
-    return new SuccessResponse('Expense retrieved successfully', result);
-  }
-
-  @Patch(':id')
-  async update(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateExpenseDto,
-    @Req() req: Request & { user: { id: string } },
-  ) {
-    const result = await this.expensesCrudService.updateExpense(
-      req.user.id,
-      id,
-      dto,
-    );
-    return new SuccessResponse('Expense updated successfully', result);
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.OK)
-  async remove(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request & { user: { id: string } },
-  ) {
-    await this.expensesCrudService.deleteExpense(req.user.id, id);
-    return new SuccessResponse('Expense deleted successfully', {});
-  }
-
-  // ─── Version History ──────────────────────────────────────────────────────
-
-  /**
-   * Returns the append-only version history for an expense.
-   * Read-only. Restore is out of v2 scope.
-   */
-  @Get(':id/versions')
-  async getVersionHistory(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request & { user: { id: string } },
-  ) {
-    const result = await this.expensesCrudService.getExpenseVersionHistory(
-      req.user.id,
-      id,
-    );
-    return new SuccessResponse('Expense version history retrieved', result);
-  }
-
-  // ─── Restore ──────────────────────────────────────────────────────────────
-
-  /** Restore a soft-deleted expense within the allowed restore window. */
-  @Post(':id/restore')
-  async restore(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Req() req: Request & { user: { id: string } },
-  ) {
-    const result = await this.expensesCrudService.restoreExpense(
-      req.user.id,
-      id,
-    );
-    return new SuccessResponse('Expense restored successfully', result);
-  }
-
   // ─── My Expenses (personal + group shares) ───────────────────────────────
+  //
+  // NOTE: literal-segment routes below (`me`, `analytics/*`) must be declared
+  // before `@Get(':id')` — NestJS/Express match routes in registration order,
+  // not by specificity, so a param route declared first would shadow these
+  // and swallow them into `findOne()` with an invalid-UUID 400.
 
   /**
    * Returns the calling user's personal expenses PLUS their share of group
@@ -239,5 +175,76 @@ export class ExpensesController {
       'All monthly summary analytics retrieved successfully',
       result,
     );
+  }
+
+  // ─── Single-expense routes (must come after all literal routes above) ────
+
+  @Get(':id')
+  async findOne(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.expensesCrudService.getExpenseById(
+      req.user.id,
+      id,
+    );
+    return new SuccessResponse('Expense retrieved successfully', result);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateExpenseDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.expensesCrudService.updateExpense(
+      req.user.id,
+      id,
+      dto,
+    );
+    return new SuccessResponse('Expense updated successfully', result);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    await this.expensesCrudService.deleteExpense(req.user.id, id);
+    return new SuccessResponse('Expense deleted successfully', {});
+  }
+
+  // ─── Version History ──────────────────────────────────────────────────────
+
+  /**
+   * Returns the append-only version history for an expense.
+   * Read-only. Restore is out of v2 scope.
+   */
+  @Get(':id/versions')
+  async getVersionHistory(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.expensesCrudService.getExpenseVersionHistory(
+      req.user.id,
+      id,
+    );
+    return new SuccessResponse('Expense version history retrieved', result);
+  }
+
+  // ─── Restore ──────────────────────────────────────────────────────────────
+
+  /** Restore a soft-deleted expense within the allowed restore window. */
+  @Post(':id/restore')
+  async restore(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.expensesCrudService.restoreExpense(
+      req.user.id,
+      id,
+    );
+    return new SuccessResponse('Expense restored successfully', result);
   }
 }

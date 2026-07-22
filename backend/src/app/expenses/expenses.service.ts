@@ -2279,7 +2279,7 @@ export class ExpensesService {
       .leftJoin('split.participantGroupMember', 'groupMember')
       .where('expense.deletedAt IS NULL')
       .andWhere(
-        '(split.participantUserId = :userId OR groupMember.user_id = :userId)',
+        '(split.participantUser = :userId OR groupMember.user_id = :userId)',
         { userId },
       )
       .getMany();
@@ -2395,7 +2395,7 @@ export class ExpensesService {
         { month, monthPrefix: `${month}%` },
       )
       .andWhere(
-        '(split.participantUserId = :userId OR groupMember.user_id = :userId)',
+        '(split.participantUser = :userId OR groupMember.user_id = :userId)',
         { userId },
       )
       .getMany();
