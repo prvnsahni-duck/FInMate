@@ -1851,17 +1851,15 @@
                         class="w-8 h-8 rounded-full bg-surface flex items-center justify-center font-bold text-xs flex-shrink-0"
                       >
                         {{
-                          (member.user.displayName || member.user.email)
-                            .substring(0, 2)
-                            .toUpperCase()
+                          memberDisplayName(member).substring(0, 2).toUpperCase()
                         }}
                       </div>
                       <div>
                         <h4
                           class="font-semibold text-sm truncate max-w-[180px]"
-                          [title]="member.user.displayName || member.user.email"
+                          [title]="memberDisplayName(member)"
                         >
-                          {{ member.user.displayName || member.user.email }}
+                          {{ memberDisplayName(member) }}
                         </h4>
                         <p class="text-[10px] text-muted capitalize">
                           {{ member.joinStatus }}

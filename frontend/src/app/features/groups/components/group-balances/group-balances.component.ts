@@ -72,8 +72,6 @@ export class GroupBalancesComponent {
 
   getUserName(userId: string): string {
     const member = this.members().find((m) => m.user?.id === userId);
-    return member
-      ? member.user.displayName || member.user.email
-      : 'Unknown User';
+    return member?.user?.displayName || member?.user?.email || 'Unknown User';
   }
 }

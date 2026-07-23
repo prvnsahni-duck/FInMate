@@ -728,8 +728,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
                     (m) => m.user?.id === split.participantUserId,
                   );
                   if (member) {
-                    email = member.user.email;
-                    displayName = member.user.displayName;
+                    email = member.user?.email;
+                    displayName = member.user?.displayName;
                     participantUser = member.user;
                   }
                 } else if (split.participantGroupMemberId) {
@@ -867,9 +867,18 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
 
   getUserName(userId: string): string {
     const member = this.members().find((m) => m.user?.id === userId);
-    return member
-      ? member.user.displayName || member.user.email
-      : 'Unknown User';
+    return member?.user?.displayName || member?.user?.email || 'Unknown User';
+  }
+
+  /** Display name for a member, whichever identity backs it (registered or pending). */
+  memberDisplayName(member: GroupMember): string {
+    return (
+      member.user?.displayName ||
+      member.user?.email ||
+      member.contact?.displayName ||
+      member.contact?.email ||
+      'Pending Member'
+    );
   }
 
   openExpenseModal(expense?: GroupExpense) {

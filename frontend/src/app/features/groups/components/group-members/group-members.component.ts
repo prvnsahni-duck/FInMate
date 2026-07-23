@@ -108,6 +108,21 @@ export class GroupMembersComponent {
     });
   }
 
+  /** Display name for a member, whichever identity backs it (registered or pending). */
+  memberDisplayName(member: GroupMember): string {
+    return (
+      member.user?.displayName ||
+      member.user?.email ||
+      member.contact?.displayName ||
+      member.contact?.email ||
+      'Pending Member'
+    );
+  }
+
+  memberInitials(member: GroupMember): string {
+    return this.memberDisplayName(member).substring(0, 2).toUpperCase();
+  }
+
   isValidEmail(email: string): boolean {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   }
@@ -390,11 +405,7 @@ export class GroupMembersComponent {
   }
 
   removeOrRevokeMember(member: GroupMember) {
-    if (
-      confirm(
-        `Are you sure you want to remove ${member.user?.displayName || member.user?.email}?`,
-      )
-    ) {
+    if (confirm(`Are you sure you want to remove ${this.memberDisplayName(member)}?`)) {
       this.groupsService.removeMember(this.groupId(), member.id).subscribe({
         next: () => {
           this.memberChanged.emit();
