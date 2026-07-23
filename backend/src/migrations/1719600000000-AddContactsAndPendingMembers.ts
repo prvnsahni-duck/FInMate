@@ -222,9 +222,15 @@ export class AddContactsAndPendingMembers1719600000000
       `ALTER TABLE "group_members" ALTER COLUMN "user_id" SET NOT NULL;`,
     );
 
-    await queryRunner.query(`DROP INDEX IF EXISTS "IDX_contacts_created_by_user";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "UQ_contacts_pending_phone";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "UQ_contacts_pending_email";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "IDX_contacts_created_by_user";`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "UQ_contacts_pending_phone";`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "UQ_contacts_pending_email";`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS "contacts";`);
   }
 }

@@ -600,7 +600,7 @@ export class ExpensesService {
   ): Promise<ExpenseSplit[]> {
     const savedSplits: ExpenseSplit[] = [];
     const payerKey = dto.groupId
-      ? dto.paidByGroupMemberId ??
+      ? (dto.paidByGroupMemberId ??
         (
           await manager.getRepository(GroupMember).findOne({
             where: {
@@ -609,7 +609,7 @@ export class ExpensesService {
               joinStatus: In(['active', 'invited']),
             },
           })
-        )?.id
+        )?.id)
       : dto.paidByUserId;
 
     const calculated = calculateDeterministicSplits(
@@ -1132,12 +1132,12 @@ export class ExpensesService {
     const expense = await this.expenseRepository.findOne({
       where: { id },
       relations: [
-          'paidByUser',
-          'paidByGroupMember',
-          'ownerUser',
-          'group',
-          'groupKeyVersion',
-        ],
+        'paidByUser',
+        'paidByGroupMember',
+        'ownerUser',
+        'group',
+        'groupKeyVersion',
+      ],
     });
 
     if (!expense) {
@@ -1157,12 +1157,12 @@ export class ExpensesService {
     const expense = await this.expenseRepository.findOne({
       where: { id },
       relations: [
-          'paidByUser',
-          'paidByGroupMember',
-          'ownerUser',
-          'group',
-          'groupKeyVersion',
-        ],
+        'paidByUser',
+        'paidByGroupMember',
+        'ownerUser',
+        'group',
+        'groupKeyVersion',
+      ],
     });
 
     if (!expense) {
@@ -1539,12 +1539,12 @@ export class ExpensesService {
     const expense = await this.expenseRepository.findOne({
       where: { id },
       relations: [
-          'paidByUser',
-          'paidByGroupMember',
-          'ownerUser',
-          'group',
-          'groupKeyVersion',
-        ],
+        'paidByUser',
+        'paidByGroupMember',
+        'ownerUser',
+        'group',
+        'groupKeyVersion',
+      ],
     });
 
     if (!expense) {
@@ -1622,12 +1622,12 @@ export class ExpensesService {
     const expense = await this.expenseRepository.findOne({
       where: { id },
       relations: [
-          'paidByUser',
-          'paidByGroupMember',
-          'ownerUser',
-          'group',
-          'groupKeyVersion',
-        ],
+        'paidByUser',
+        'paidByGroupMember',
+        'ownerUser',
+        'group',
+        'groupKeyVersion',
+      ],
       withDeleted: true,
     });
 
@@ -1697,12 +1697,12 @@ export class ExpensesService {
     const restored = await this.expenseRepository.findOne({
       where: { id: expense.id },
       relations: [
-          'paidByUser',
-          'paidByGroupMember',
-          'ownerUser',
-          'group',
-          'groupKeyVersion',
-        ],
+        'paidByUser',
+        'paidByGroupMember',
+        'ownerUser',
+        'group',
+        'groupKeyVersion',
+      ],
     });
 
     if (!restored) {
@@ -2032,7 +2032,10 @@ export class ExpensesService {
         user: exp.paidByUser,
       });
       if (!memberId) continue;
-      paidMap.set(memberId, (paidMap.get(memberId) ?? 0) + Number(exp.amountTotal));
+      paidMap.set(
+        memberId,
+        (paidMap.get(memberId) ?? 0) + Number(exp.amountTotal),
+      );
     }
 
     // Look up monthly contribution percentages
@@ -2540,7 +2543,8 @@ export class ExpensesService {
         // Frozen rule: a group expense's payer resolves via
         // paidByGroupMember, never paidByUser — paidByUser is only ever
         // populated for a legacy, pre-migration row.
-        paidByUserId: exp.paidByUser?.id ?? exp.paidByGroupMember?.user?.id ?? null,
+        paidByUserId:
+          exp.paidByUser?.id ?? exp.paidByGroupMember?.user?.id ?? null,
         paidByGroupMemberId: exp.paidByGroupMember?.id ?? null,
         paidByDisplayName:
           exp.paidByUser?.displayName ??

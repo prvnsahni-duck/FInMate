@@ -405,7 +405,11 @@ export class GroupMembersComponent {
   }
 
   removeOrRevokeMember(member: GroupMember) {
-    if (confirm(`Are you sure you want to remove ${this.memberDisplayName(member)}?`)) {
+    if (
+      confirm(
+        `Are you sure you want to remove ${this.memberDisplayName(member)}?`,
+      )
+    ) {
       this.groupsService.removeMember(this.groupId(), member.id).subscribe({
         next: () => {
           this.memberChanged.emit();

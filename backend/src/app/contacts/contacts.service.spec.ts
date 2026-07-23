@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken, getDataSourceToken } from '@nestjs/typeorm';
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   AuditLog,
   Contact,
@@ -27,7 +31,10 @@ describe('ContactsService', () => {
     contactRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
-      save: jest.fn(async (data) => ({ id: data.id ?? 'new-contact-id', ...data })),
+      save: jest.fn(async (data) => ({
+        id: data.id ?? 'new-contact-id',
+        ...data,
+      })),
       create: jest.fn((data) => data),
       update: jest.fn(),
     };
@@ -290,8 +297,16 @@ describe('ContactsService', () => {
       };
       contactRepository.find.mockResolvedValueOnce([pendingContact]);
       groupMemberRepository.find.mockResolvedValueOnce([
-        { id: 'member-family', group: { id: 'group-family' }, joinStatus: 'invited' },
-        { id: 'member-trip', group: { id: 'group-trip' }, joinStatus: 'invited' },
+        {
+          id: 'member-family',
+          group: { id: 'group-family' },
+          joinStatus: 'invited',
+        },
+        {
+          id: 'member-trip',
+          group: { id: 'group-trip' },
+          joinStatus: 'invited',
+        },
       ]);
 
       const result = await service.claimContactsForUser(newUser);
@@ -350,10 +365,18 @@ describe('ContactsService', () => {
         phoneNumber: '+919876543210',
       } as User;
       contactRepository.find.mockResolvedValueOnce([
-        { id: 'contact-by-phone', phoneNumber: '+919876543210', status: 'pending' },
+        {
+          id: 'contact-by-phone',
+          phoneNumber: '+919876543210',
+          status: 'pending',
+        },
       ]);
       groupMemberRepository.find.mockResolvedValueOnce([
-        { id: 'member-office', group: { id: 'group-office' }, joinStatus: 'invited' },
+        {
+          id: 'member-office',
+          group: { id: 'group-office' },
+          joinStatus: 'invited',
+        },
       ]);
 
       const result = await service.claimContactsForUser(newUser);
@@ -440,7 +463,11 @@ describe('ContactsService', () => {
         .mockResolvedValueOnce([{ group: { id: 'g1' } }])
         .mockResolvedValueOnce([
           {
-            contact: { id: 'contact-3', status: 'archived', displayName: 'Carol' },
+            contact: {
+              id: 'contact-3',
+              status: 'archived',
+              displayName: 'Carol',
+            },
             group: { id: 'g1', name: 'Group One' },
           },
         ]);
@@ -468,7 +495,10 @@ describe('ContactsService', () => {
 
     it('scopes the lookup to only the groups the caller is an active member of', async () => {
       groupMemberRepository.find
-        .mockResolvedValueOnce([{ group: { id: 'g1' } }, { group: { id: 'g2' } }])
+        .mockResolvedValueOnce([
+          { group: { id: 'g1' } },
+          { group: { id: 'g2' } },
+        ])
         .mockResolvedValueOnce([]);
 
       await service.listAddressBook('caller-id');
@@ -608,12 +638,18 @@ describe('ContactsService', () => {
 
     it('merges a HIGH-confidence pair: archives the loser, stamps merge fields, repoints memberships', async () => {
       contactRepository.findOne
-        .mockResolvedValueOnce({ id: 'surviving', email: 'a@x.com', status: 'pending' })
-        .mockResolvedValueOnce({ id: 'losing', email: 'a@x.com', status: 'pending' });
+        .mockResolvedValueOnce({
+          id: 'surviving',
+          email: 'a@x.com',
+          status: 'pending',
+        })
+        .mockResolvedValueOnce({
+          id: 'losing',
+          email: 'a@x.com',
+          status: 'pending',
+        });
       groupMemberRepository.find
-        .mockResolvedValueOnce([
-          { id: 'gm-losing', group: { id: 'group-1' } },
-        ]) // losing's memberships
+        .mockResolvedValueOnce([{ id: 'gm-losing', group: { id: 'group-1' } }]) // losing's memberships
         .mockResolvedValueOnce([]); // surviving's memberships (no collision)
 
       const result = await service.mergeContacts({
@@ -632,14 +668,25 @@ describe('ContactsService', () => {
         }),
       );
       expect(groupMemberRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'gm-losing', contact: expect.objectContaining({ id: 'surviving' }) }),
+        expect.objectContaining({
+          id: 'gm-losing',
+          contact: expect.objectContaining({ id: 'surviving' }),
+        }),
       );
     });
 
     it('writes a contact.merged audit event, keyed to the losing Contact, when an actual merge happens', async () => {
       contactRepository.findOne
-        .mockResolvedValueOnce({ id: 'surviving', email: 'a@x.com', status: 'pending' })
-        .mockResolvedValueOnce({ id: 'losing', email: 'a@x.com', status: 'pending' });
+        .mockResolvedValueOnce({
+          id: 'surviving',
+          email: 'a@x.com',
+          status: 'pending',
+        })
+        .mockResolvedValueOnce({
+          id: 'losing',
+          email: 'a@x.com',
+          status: 'pending',
+        });
       groupMemberRepository.find.mockResolvedValue([]);
 
       await service.mergeContacts({
@@ -654,15 +701,25 @@ describe('ContactsService', () => {
           entityType: 'contact',
           entityId: 'losing',
           actorUser: admin,
-          metadataJson: expect.objectContaining({ survivingContactId: 'surviving' }),
+          metadataJson: expect.objectContaining({
+            survivingContactId: 'surviving',
+          }),
         }),
       );
     });
 
     it('rejects a LOW-confidence pair even with confirmed:true (hardening B — cannot merge unrelated identities)', async () => {
       contactRepository.findOne
-        .mockResolvedValueOnce({ id: 'surviving', email: 'a@x.com', displayName: 'Alice' })
-        .mockResolvedValueOnce({ id: 'losing', email: 'b@x.com', displayName: 'Bob' });
+        .mockResolvedValueOnce({
+          id: 'surviving',
+          email: 'a@x.com',
+          displayName: 'Alice',
+        })
+        .mockResolvedValueOnce({
+          id: 'losing',
+          email: 'b@x.com',
+          displayName: 'Bob',
+        });
 
       await expect(
         service.mergeContacts({
@@ -785,7 +842,10 @@ describe('ContactsService', () => {
       });
 
       expect(groupMemberRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'gm-losing-family', joinStatus: 'removed' }),
+        expect.objectContaining({
+          id: 'gm-losing-family',
+          joinStatus: 'removed',
+        }),
       );
     });
   });

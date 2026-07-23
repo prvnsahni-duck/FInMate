@@ -918,7 +918,10 @@ describe('SettlementsService', () => {
     });
 
     it('rejects proposing a settlement with oneself', async () => {
-      const mockCaller = { id: 'caller-member', user: { id: 'caller-id' } } as any;
+      const mockCaller = {
+        id: 'caller-member',
+        user: { id: 'caller-id' },
+      } as any;
       groupMemberRepository.findOne.mockResolvedValueOnce(mockCaller);
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
       groupMemberRepository.findOne.mockResolvedValueOnce(mockCaller);

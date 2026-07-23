@@ -138,9 +138,9 @@ describe('Personal Dashboard projection (group expense shares)', () => {
     const creatorMatches = (creatorRes.data.data.data as any[]).filter(
       (i) => i.id === expenseId,
     );
-    const participantMatches = (
-      participantRes.data.data.data as any[]
-    ).filter((i) => i.id === expenseId);
+    const participantMatches = (participantRes.data.data.data as any[]).filter(
+      (i) => i.id === expenseId,
+    );
 
     // Same single expense id surfaces for both users — never duplicated.
     expect(creatorMatches).toHaveLength(1);
@@ -154,8 +154,7 @@ describe('Personal Dashboard projection (group expense shares)', () => {
     );
 
     expect(res.status).toBe(200);
-    const categories: { category: string; amount: number }[] =
-      res.data.data;
+    const categories: { category: string; amount: number }[] = res.data.data;
     const food = categories.find((c) => c.category === 'Food & Drinks');
 
     expect(food).toBeDefined();

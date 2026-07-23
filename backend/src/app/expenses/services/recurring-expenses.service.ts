@@ -135,7 +135,7 @@ export class RecurringExpensesService {
     manager: EntityManager,
   ): Promise<void> {
     const payerKey = dto.groupId
-      ? dto.paidByGroupMemberId ??
+      ? (dto.paidByGroupMemberId ??
         (
           await manager.getRepository(GroupMember).findOne({
             where: {
@@ -144,7 +144,7 @@ export class RecurringExpensesService {
               joinStatus: In(['active', 'invited']),
             },
           })
-        )?.id
+        )?.id)
       : dto.paidByUserId;
 
     const calculated = calculateDeterministicSplits(

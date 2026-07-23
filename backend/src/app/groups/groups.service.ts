@@ -266,7 +266,8 @@ export class GroupsService {
           const newMember = manager.create(GroupMember, {
             group: savedGroup,
             user: resolution.type === 'user' ? resolution.user : undefined,
-            contact: resolution.type === 'contact' ? resolution.contact : undefined,
+            contact:
+              resolution.type === 'contact' ? resolution.contact : undefined,
             role: initialMember.role || 'member',
             joinStatus: 'invited',
           });
@@ -599,7 +600,8 @@ export class GroupsService {
       ) {
         throw new ConflictException({
           errorCode: 'RES_ALREADY_EXISTS',
-          message: 'This person is already a member or has a pending invitation',
+          message:
+            'This person is already a member or has a pending invitation',
         });
       }
       // Re-invite

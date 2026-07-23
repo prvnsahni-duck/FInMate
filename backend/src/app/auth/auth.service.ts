@@ -118,8 +118,7 @@ export class AuthService {
       EMAIL_VERIFICATION_TTL_SECONDS,
     );
     const frontendUrl =
-      this.configService.get<string>('FRONTEND_URL') ||
-      'http://localhost:4200';
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200';
     const verifyUrl = `${frontendUrl}/auth/verify-email?token=${token}`;
     await this.emailService.sendEmail(
       user.email,

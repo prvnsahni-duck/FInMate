@@ -527,7 +527,9 @@ export class SettlementsService {
       throw new BadRequestException('Recipient is not a member of this group');
     }
     if (recipientMember.id === callerMember.id) {
-      throw new BadRequestException('Cannot propose a settlement with yourself');
+      throw new BadRequestException(
+        'Cannot propose a settlement with yourself',
+      );
     }
 
     // Currency check

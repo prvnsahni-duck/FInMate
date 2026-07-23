@@ -200,7 +200,9 @@ export class ContactsService {
         const existing = await repo.findOne({
           where: [
             ...(email ? [{ email, status: 'pending' as const }] : []),
-            ...(phone ? [{ phoneNumber: phone, status: 'pending' as const }] : []),
+            ...(phone
+              ? [{ phoneNumber: phone, status: 'pending' as const }]
+              : []),
           ],
           order: { createdAt: 'ASC' },
         });
@@ -280,7 +282,9 @@ export class ContactsService {
       const matches = await contactRepo.find({
         where: [
           ...(email ? [{ email, status: 'pending' as const }] : []),
-          ...(phone ? [{ phoneNumber: phone, status: 'pending' as const }] : []),
+          ...(phone
+            ? [{ phoneNumber: phone, status: 'pending' as const }]
+            : []),
         ],
       });
 
@@ -337,12 +341,22 @@ export class ContactsService {
     const emailA = this.normalizeEmail(a.email);
     const emailB = this.normalizeEmail(b.email);
     if (emailA && emailA === emailB) {
-      return { contactA: a, contactB: b, confidence: 'HIGH', reason: 'Same email' };
+      return {
+        contactA: a,
+        contactB: b,
+        confidence: 'HIGH',
+        reason: 'Same email',
+      };
     }
     const phoneA = this.normalizePhone(a.phoneNumber);
     const phoneB = this.normalizePhone(b.phoneNumber);
     if (phoneA && phoneA === phoneB) {
-      return { contactA: a, contactB: b, confidence: 'HIGH', reason: 'Same phone' };
+      return {
+        contactA: a,
+        contactB: b,
+        confidence: 'HIGH',
+        reason: 'Same phone',
+      };
     }
     const nameA = a.displayName?.trim().toLowerCase();
     const nameB = b.displayName?.trim().toLowerCase();
@@ -481,117 +495,110 @@ export class ContactsService {
         opts.losingContactId,
       ].sort();
 
-      return this.withIdentityLock(
-        manager,
-        `contact-merge:${lockKeyA}`,
-        () =>
-          this.withIdentityLock(
-            manager,
-            `contact-merge:${lockKeyB}`,
-            async () => {
-              // All reads happen inside both locks so a caller that was
-              // blocked here sees fully up-to-date (post-commit) state from
-              // whichever merge ran first, not a stale pre-lock snapshot.
-              const [survivingRaw, losingRaw] = await Promise.all([
-                contactRepo.findOne({
-                  where: { id: opts.survivingContactId },
-                  relations: ['mergedIntoContact'],
-                }),
-                contactRepo.findOne({
-                  where: { id: opts.losingContactId },
-                  relations: ['mergedIntoContact'],
-                }),
-              ]);
-              if (!survivingRaw || !losingRaw) {
-                throw new NotFoundException('Contact not found');
+      return this.withIdentityLock(manager, `contact-merge:${lockKeyA}`, () =>
+        this.withIdentityLock(
+          manager,
+          `contact-merge:${lockKeyB}`,
+          async () => {
+            // All reads happen inside both locks so a caller that was
+            // blocked here sees fully up-to-date (post-commit) state from
+            // whichever merge ran first, not a stale pre-lock snapshot.
+            const [survivingRaw, losingRaw] = await Promise.all([
+              contactRepo.findOne({
+                where: { id: opts.survivingContactId },
+                relations: ['mergedIntoContact'],
+              }),
+              contactRepo.findOne({
+                where: { id: opts.losingContactId },
+                relations: ['mergedIntoContact'],
+              }),
+            ]);
+            if (!survivingRaw || !losingRaw) {
+              throw new NotFoundException('Contact not found');
+            }
+
+            // Idempotency: always resolve both sides to their terminal
+            // Contact first. If that collapses the pair to the same row,
+            // the merge this caller intended has already happened —
+            // return it, don't error.
+            const surviving = await this.resolveMergeRedirect(
+              survivingRaw,
+              manager,
+            );
+            const losing = await this.resolveMergeRedirect(losingRaw, manager);
+            if (surviving.id === losing.id) {
+              return { contact: surviving, merged: false as const };
+            }
+
+            // Authorization: the pair must satisfy the confidence rule.
+            const candidate = this.computeMergeConfidence(surviving, losing);
+            const authorized =
+              candidate.confidence === 'HIGH' ||
+              (candidate.confidence === 'MEDIUM' && opts.confirmed === true);
+            if (!authorized) {
+              throw new ForbiddenException({
+                errorCode: 'CONTACT_MERGE_UNAUTHORIZED',
+                message:
+                  candidate.confidence === 'MEDIUM'
+                    ? 'This pair only shares a weak signal (same name) — pass confirmed:true to merge anyway'
+                    : 'These Contacts share no matching identifier and cannot be merged',
+              });
+            }
+
+            // Archive the loser, never delete it — the timeline and every
+            // historical reference stay readable (hardening item D/E +
+            // Review 05).
+            losing.status = 'archived';
+            losing.mergedIntoContact = surviving;
+            losing.mergedAt = new Date();
+            losing.mergedByUser = opts.mergedByUser;
+            await contactRepo.save(losing);
+
+            // Re-point every GroupMember from the loser to the survivor —
+            // except where the survivor is already a member of that same
+            // group (both Contact rows were independently added to the
+            // same group before anyone noticed they were the same
+            // person). The GroupMember unique constraint on (group,
+            // contact) forbids two rows for one Contact in one group, so
+            // that specific losing membership is closed out instead of
+            // repointed — its historical Expense/ExpenseSplit/Settlement
+            // rows remain intact and still resolve via the surviving
+            // membership.
+            const memberRepo = manager.getRepository(GroupMember);
+            const [losingMembers, survivorMembers] = await Promise.all([
+              memberRepo.find({
+                where: { contact: { id: losing.id } },
+                relations: ['group'],
+              }),
+              memberRepo.find({
+                where: { contact: { id: surviving.id } },
+                relations: ['group'],
+              }),
+            ]);
+            const survivorGroupIds = new Set(
+              survivorMembers.map((m) => m.group.id),
+            );
+            for (const member of losingMembers) {
+              if (survivorGroupIds.has(member.group.id)) {
+                member.joinStatus = 'removed';
+                await memberRepo.save(member);
+              } else {
+                member.contact = surviving;
+                await memberRepo.save(member);
               }
+            }
 
-              // Idempotency: always resolve both sides to their terminal
-              // Contact first. If that collapses the pair to the same row,
-              // the merge this caller intended has already happened —
-              // return it, don't error.
-              const surviving = await this.resolveMergeRedirect(
-                survivingRaw,
-                manager,
-              );
-              const losing = await this.resolveMergeRedirect(
-                losingRaw,
-                manager,
-              );
-              if (surviving.id === losing.id) {
-                return { contact: surviving, merged: false as const };
-              }
+            await manager
+              .getRepository(GroupInvite)
+              .update({ contact: { id: losing.id } }, { contact: surviving });
 
-              // Authorization: the pair must satisfy the confidence rule.
-              const candidate = this.computeMergeConfidence(surviving, losing);
-              const authorized =
-                candidate.confidence === 'HIGH' ||
-                (candidate.confidence === 'MEDIUM' &&
-                  opts.confirmed === true);
-              if (!authorized) {
-                throw new ForbiddenException({
-                  errorCode: 'CONTACT_MERGE_UNAUTHORIZED',
-                  message:
-                    candidate.confidence === 'MEDIUM'
-                      ? 'This pair only shares a weak signal (same name) — pass confirmed:true to merge anyway'
-                      : 'These Contacts share no matching identifier and cannot be merged',
-                });
-              }
-
-              // Archive the loser, never delete it — the timeline and every
-              // historical reference stay readable (hardening item D/E +
-              // Review 05).
-              losing.status = 'archived';
-              losing.mergedIntoContact = surviving;
-              losing.mergedAt = new Date();
-              losing.mergedByUser = opts.mergedByUser;
-              await contactRepo.save(losing);
-
-              // Re-point every GroupMember from the loser to the survivor —
-              // except where the survivor is already a member of that same
-              // group (both Contact rows were independently added to the
-              // same group before anyone noticed they were the same
-              // person). The GroupMember unique constraint on (group,
-              // contact) forbids two rows for one Contact in one group, so
-              // that specific losing membership is closed out instead of
-              // repointed — its historical Expense/ExpenseSplit/Settlement
-              // rows remain intact and still resolve via the surviving
-              // membership.
-              const memberRepo = manager.getRepository(GroupMember);
-              const [losingMembers, survivorMembers] = await Promise.all([
-                memberRepo.find({
-                  where: { contact: { id: losing.id } },
-                  relations: ['group'],
-                }),
-                memberRepo.find({
-                  where: { contact: { id: surviving.id } },
-                  relations: ['group'],
-                }),
-              ]);
-              const survivorGroupIds = new Set(
-                survivorMembers.map((m) => m.group.id),
-              );
-              for (const member of losingMembers) {
-                if (survivorGroupIds.has(member.group.id)) {
-                  member.joinStatus = 'removed';
-                  await memberRepo.save(member);
-                } else {
-                  member.contact = surviving;
-                  await memberRepo.save(member);
-                }
-              }
-
-              await manager
-                .getRepository(GroupInvite)
-                .update({ contact: { id: losing.id } }, { contact: surviving });
-
-              return {
-                contact: surviving,
-                merged: true as const,
-                losingContactId: losing.id,
-              };
-            },
-          ),
+            return {
+              contact: surviving,
+              merged: true as const,
+              losingContactId: losing.id,
+            };
+          },
+        ),
       );
     });
 
@@ -627,9 +634,7 @@ export class ContactsService {
       const children = await this.contactRepository.find({
         where: { mergedIntoContact: { id: In(frontier) } },
       });
-      const newIds = children
-        .map((c) => c.id)
-        .filter((id) => !seen.has(id));
+      const newIds = children.map((c) => c.id).filter((id) => !seen.has(id));
       newIds.forEach((id) => seen.add(id));
       ancestorIds.push(...newIds);
       frontier = newIds;

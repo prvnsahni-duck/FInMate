@@ -90,8 +90,7 @@ describe('Pending Members API End-to-End', () => {
     );
     const conflicted = [resA, resB].filter(
       (r) =>
-        r.status === 'rejected' &&
-        (r as any).reason?.response?.status === 409,
+        r.status === 'rejected' && (r as any).reason?.response?.status === 409,
     );
     expect(succeeded.length).toBe(1);
     expect(conflicted.length).toBe(1);

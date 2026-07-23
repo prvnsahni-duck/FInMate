@@ -59,7 +59,9 @@ describe('ExpenseSplit query mapping (participant filter)', () => {
     });
     // Building metadata does not open a socket connection; it only compiles
     // decorators into EntityMetadata, which is all SQL generation needs.
-    await (dataSource as unknown as { buildMetadatas(): Promise<void> }).buildMetadatas();
+    await (
+      dataSource as unknown as { buildMetadatas(): Promise<void> }
+    ).buildMetadatas();
   });
 
   function buildGroupSplitsQuery(userId: string) {

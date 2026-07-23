@@ -280,10 +280,16 @@ describe('RecurringExpenses Service & Scheduler', () => {
           frequency: 'monthly',
           startDate: '2026-06-23',
           splits: [
-            { participantGroupMemberId: 'gm-1', splitType: 'equal', shareValue: 1 },
+            {
+              participantGroupMemberId: 'gm-1',
+              splitType: 'equal',
+              shareValue: 1,
+            },
           ],
         } as any),
-      ).rejects.toThrow('Provide only one of paidByUserId or paidByGroupMemberId');
+      ).rejects.toThrow(
+        'Provide only one of paidByUserId or paidByGroupMemberId',
+      );
     });
 
     it('should switch a group template payer from paidByUserId to paidByGroupMemberId on update', async () => {
@@ -306,7 +312,11 @@ describe('RecurringExpenses Service & Scheduler', () => {
       };
       mockRecurringExpenseRepo.findOne
         .mockResolvedValueOnce(template) // initial fetch
-        .mockResolvedValueOnce({ ...template, paidByGroupMember: { id: 'gm-new' }, paidByUser: undefined }); // post-transaction fetch
+        .mockResolvedValueOnce({
+          ...template,
+          paidByGroupMember: { id: 'gm-new' },
+          paidByUser: undefined,
+        }); // post-transaction fetch
 
       const membership = {
         id: 'gm-owner',
