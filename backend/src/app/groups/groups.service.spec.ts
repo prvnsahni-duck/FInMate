@@ -22,6 +22,7 @@ import {
 import * as argon2 from 'argon2';
 import { ConfigService } from '@nestjs/config';
 import { EmailService } from '../email/email.service';
+import { ContactsService } from '../contacts/contacts.service';
 
 jest.mock('argon2');
 
@@ -36,6 +37,7 @@ describe('GroupsService', () => {
   >;
   let userRepository: any;
   let dataSource: jest.Mocked<DataSource>;
+  let contactsService: { resolveOrCreateIdentity: jest.Mock };
 
   beforeEach(async () => {
     const mockGroupRepository = {
@@ -151,6 +153,10 @@ describe('GroupsService', () => {
       },
     };
 
+    const mockContactsService = {
+      resolveOrCreateIdentity: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         GroupsService,
@@ -178,6 +184,7 @@ describe('GroupsService', () => {
         { provide: DataSource, useValue: mockDataSource },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: EmailService, useValue: mockEmailService },
+        { provide: ContactsService, useValue: mockContactsService },
       ],
     }).compile();
 
@@ -190,6 +197,7 @@ describe('GroupsService', () => {
       getRepositoryToken(MemberWrappedGroupKey),
     );
     dataSource = module.get(DataSource);
+    contactsService = module.get(ContactsService);
 
     groupKeyVersionRepository.findOne.mockResolvedValue({
       id: 'active-version-id',
@@ -461,7 +469,7 @@ describe('GroupsService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should create placeholder user if target email does not exist', async () => {
+    it('creates a pending Contact-backed member if target email does not match a User', async () => {
       groupMemberRepository.findOne.mockResolvedValueOnce({
         id: 'caller-id',
         role: 'owner',
@@ -473,11 +481,9 @@ describe('GroupsService', () => {
       } as any);
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
       userRepository.findOne.mockResolvedValueOnce(null);
-      (argon2.hash as jest.Mock).mockResolvedValue('hashed-dummy-pass');
-      userRepository.save.mockResolvedValueOnce({
-        id: 'new-user-id',
-        email: 'new@example.com',
-        status: 'invited',
+      contactsService.resolveOrCreateIdentity.mockResolvedValueOnce({
+        type: 'contact',
+        contact: { id: 'new-contact-id', email: 'new@example.com' },
       });
       groupMemberRepository.findOne.mockResolvedValueOnce(null);
       groupMemberRepository.save.mockResolvedValueOnce({
@@ -489,13 +495,19 @@ describe('GroupsService', () => {
         role: 'member',
       });
 
-      expect(userRepository.create).toHaveBeenCalledWith(
+      expect(contactsService.resolveOrCreateIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ email: 'new@example.com' }),
+      );
+      expect(groupMemberRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          email: 'new@example.com',
-          status: 'invited',
+          contact: { id: 'new-contact-id', email: 'new@example.com' },
+          user: undefined,
         }),
       );
+      // No shadow User is ever created for a pending member.
+      expect(userRepository.save).not.toHaveBeenCalled();
       expect(result).toBeDefined();
+      expect((result as any).memberType).toBe('contact');
     });
 
     it('should throw ConflictException if user is already a member', async () => {

@@ -124,6 +124,11 @@ export class InviteMemberDto {
   @IsOptional()
   displayName?: string;
 
+  /** Explicit phone number for adding a non-registered person (optional). */
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
   @IsString()
   @IsOptional()
   wrappedGroupKey?: string;

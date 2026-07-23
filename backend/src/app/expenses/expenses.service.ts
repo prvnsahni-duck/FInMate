@@ -147,8 +147,12 @@ export class ExpensesService {
     for (const member of members) {
       groupMemberById.set(member.id, member);
       // Spectators are stored in the map so we can look them up, but they are
-      // validated against and rejected in persistSplits.
-      activeOrInvitedByUserId.set(member.user.id, member);
+      // validated against and rejected in persistSplits. A pending
+      // (Contact-backed) member has no user.id and is only ever resolvable
+      // via groupMemberById (participantGroupMemberId), never by user id.
+      if (member.user) {
+        activeOrInvitedByUserId.set(member.user.id, member);
+      }
     }
 
     return { groupMemberById, activeOrInvitedByUserId };
@@ -225,12 +229,17 @@ export class ExpensesService {
         throw new ForbiddenException('Viewers cannot modify expenses');
       }
 
-      // Members/spectators can only modify their own expenses (either created or paid by them)
+      // Members/spectators can only modify their own expenses (either created
+      // or paid by them). Group expenses always resolve payer via
+      // paidByGroupMember now (frozen rule), so "paid by them" must check
+      // that side too; paidByUser is only ever set for personal expenses.
+      // A group expense paid by a pending member matches neither and can
+      // only be edited by its owner.
       if (membership.role === 'member' || membership.role === 'spectator') {
-        if (
-          expense.ownerUser.id !== userId &&
-          expense.paidByUser.id !== userId
-        ) {
+        const paidByCaller =
+          expense.paidByUser?.id === userId ||
+          expense.paidByGroupMember?.user?.id === userId;
+        if (expense.ownerUser.id !== userId && !paidByCaller) {
           throw new ForbiddenException(
             'Members can only modify their own expenses',
           );
@@ -406,7 +415,8 @@ export class ExpensesService {
       amountTotal: Number(expense.amountTotal),
       currency: expense.currency,
       category: expense.category,
-      paidByUserId: expense.paidByUser.id,
+      paidByUserId: expense.paidByUser?.id ?? null,
+      paidByGroupMemberId: expense.paidByGroupMember?.id ?? null,
       ownerUserId: expense.ownerUser.id,
       groupId: expense.group?.id ?? null,
       groupKeyVersionId: expense.groupKeyVersion?.id ?? null,
@@ -462,6 +472,7 @@ export class ExpensesService {
       currency: expense.currency,
       category: expense.category,
       paidByUserId: expense.paidByUser?.id ?? null,
+      paidByGroupMemberId: expense.paidByGroupMember?.id ?? null,
       ownerUserId: expense.ownerUser?.id ?? null,
       groupId: expense.group?.id ?? null,
       groupKeyVersionId: expense.groupKeyVersion?.id ?? null,
@@ -579,13 +590,18 @@ export class ExpensesService {
     expense: Expense,
     dto: Pick<
       CreateExpenseDto,
-      'splits' | 'amountTotal' | 'paidByUserId' | 'groupId'
+      | 'splits'
+      | 'amountTotal'
+      | 'paidByUserId'
+      | 'paidByGroupMemberId'
+      | 'groupId'
     >,
     manager: EntityManager,
   ): Promise<ExpenseSplit[]> {
     const savedSplits: ExpenseSplit[] = [];
     const payerKey = dto.groupId
-      ? (
+      ? dto.paidByGroupMemberId ??
+        (
           await manager.getRepository(GroupMember).findOne({
             where: {
               group: { id: dto.groupId },
@@ -695,6 +711,19 @@ export class ExpensesService {
       });
     }
 
+    if (!dto.paidByUserId && !dto.paidByGroupMemberId) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Provide paidByUserId or paidByGroupMemberId',
+      });
+    }
+    if (dto.paidByUserId && dto.paidByGroupMemberId) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Provide only one of paidByUserId or paidByGroupMemberId',
+      });
+    }
+
     const ownerUser = await this.userRepository.findOne({
       where: { id: userId },
     });
@@ -702,13 +731,24 @@ export class ExpensesService {
       throw new NotFoundException('User not found');
     }
 
-    const paidByUser = await this.userRepository.findOne({
-      where: { id: dto.paidByUserId },
-    });
-    if (!paidByUser) {
+    let paidByUser: User | undefined;
+    let paidByGroupMember: GroupMember | undefined;
+    if (dto.paidByUserId) {
+      paidByUser =
+        (await this.userRepository.findOne({
+          where: { id: dto.paidByUserId },
+        })) ?? undefined;
+      if (!paidByUser) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'paidByUserId must reference an existing user',
+        });
+      }
+    }
+    if (dto.paidByGroupMemberId && !dto.groupId) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
-        message: 'paidByUserId must reference an existing user',
+        message: 'paidByGroupMemberId is only valid for group expenses',
       });
     }
 
@@ -751,19 +791,45 @@ export class ExpensesService {
         });
       }
 
-      const payerInGroup = await this.groupMemberRepository.findOne({
-        where: {
-          group: { id: dto.groupId },
-          user: { id: dto.paidByUserId },
-          joinStatus: In(['active', 'invited']),
-        },
-      });
-      if (!payerInGroup) {
-        throw new BadRequestException({
-          errorCode: 'VAL_INVALID_INPUT',
-          message: 'paidByUserId must belong to the selected group',
+      // Frozen rule: inside a group ledger, the payer always resolves to
+      // GroupMember, never User — paidByUserId is accepted as a client
+      // convenience (the common "I paid" case) but is resolved to its
+      // GroupMember row here and never persisted as paidByUser for a group
+      // expense. paidByUser is only ever the payer for personal expenses.
+      if (dto.paidByGroupMemberId) {
+        paidByGroupMember =
+          (await this.groupMemberRepository.findOne({
+            where: {
+              id: dto.paidByGroupMemberId,
+              group: { id: dto.groupId },
+              joinStatus: In(['active', 'invited']),
+            },
+          })) ?? undefined;
+        if (!paidByGroupMember) {
+          throw new BadRequestException({
+            errorCode: 'VAL_INVALID_INPUT',
+            message: 'paidByGroupMemberId must belong to the selected group',
+          });
+        }
+      } else {
+        const payerInGroup = await this.groupMemberRepository.findOne({
+          where: {
+            group: { id: dto.groupId },
+            user: { id: dto.paidByUserId },
+            joinStatus: In(['active', 'invited']),
+          },
         });
+        if (!payerInGroup) {
+          throw new BadRequestException({
+            errorCode: 'VAL_INVALID_INPUT',
+            message: 'paidByUserId must belong to the selected group',
+          });
+        }
+        paidByGroupMember = payerInGroup;
       }
+      // Always persist via GroupMember for group expenses, per the frozen
+      // group-ledger identity rule — regardless of which field the client sent.
+      paidByUser = undefined;
     } else {
       if (dto.paidByUserId !== userId) {
         throw new ForbiddenException(
@@ -811,6 +877,7 @@ export class ExpensesService {
           currency: dto.currency.toUpperCase(),
           category: dto.category,
           paidByUser,
+          paidByGroupMember,
           ownerUser,
           group,
           expenseDate: dto.expenseDate,
@@ -899,7 +966,14 @@ export class ExpensesService {
 
       return manager.getRepository(Expense).findOne({
         where: { id: expense.id },
-        relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+        relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'paidByGroupMember.user',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
       });
     });
 
@@ -1057,7 +1131,13 @@ export class ExpensesService {
   ): Promise<Record<string, unknown>> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+      relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
     });
 
     if (!expense) {
@@ -1076,7 +1156,13 @@ export class ExpensesService {
   ): Promise<Record<string, unknown>> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+      relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
     });
 
     if (!expense) {
@@ -1121,6 +1207,18 @@ export class ExpensesService {
       }
     }
 
+    if (dto.paidByUserId && dto.paidByGroupMemberId) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Provide only one of paidByUserId or paidByGroupMemberId',
+      });
+    }
+    if (dto.paidByGroupMemberId && !expense.group) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'paidByGroupMemberId is only valid for group expenses',
+      });
+    }
     if (dto.paidByUserId) {
       const paidByUser = await this.userRepository.findOne({
         where: { id: dto.paidByUserId },
@@ -1137,6 +1235,10 @@ export class ExpensesService {
         );
       }
       if (expense.group) {
+        // Frozen rule: a group expense's payer always resolves via
+        // GroupMember — paidByUserId is accepted as client convenience and
+        // resolved to its GroupMember row here, never persisted as
+        // paidByUser for a group expense.
         const payerMember = await this.groupMemberRepository.findOne({
           where: {
             group: { id: expense.group.id },
@@ -1150,8 +1252,28 @@ export class ExpensesService {
             message: 'paidByUserId must belong to the selected group',
           });
         }
+        expense.paidByGroupMember = payerMember;
+        expense.paidByUser = undefined;
+      } else {
+        expense.paidByUser = paidByUser;
+        expense.paidByGroupMember = undefined;
       }
-      expense.paidByUser = paidByUser;
+    } else if (dto.paidByGroupMemberId) {
+      const payerMember = await this.groupMemberRepository.findOne({
+        where: {
+          id: dto.paidByGroupMemberId,
+          group: { id: expense.group!.id },
+          joinStatus: In(['active', 'invited']),
+        },
+      });
+      if (!payerMember) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'paidByGroupMemberId must belong to the selected group',
+        });
+      }
+      expense.paidByGroupMember = payerMember;
+      expense.paidByUser = undefined;
     }
 
     const previousTitle = expense.title;
@@ -1262,7 +1384,9 @@ export class ExpensesService {
           {
             splits: dto.splits,
             amountTotal: dto.amountTotal ?? Number(expense.amountTotal),
-            paidByUserId: dto.paidByUserId ?? expense.paidByUser.id,
+            paidByUserId: dto.paidByUserId ?? expense.paidByUser?.id,
+            paidByGroupMemberId:
+              dto.paidByGroupMemberId ?? expense.paidByGroupMember?.id,
             groupId: expense.group?.id,
           },
           manager,
@@ -1373,7 +1497,14 @@ export class ExpensesService {
 
       return manager.getRepository(Expense).findOne({
         where: { id: expense.id },
-        relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+        relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'paidByGroupMember.user',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
       });
     });
 
@@ -1407,7 +1538,13 @@ export class ExpensesService {
   async deleteExpense(userId: string, id: string): Promise<void> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+      relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
     });
 
     if (!expense) {
@@ -1484,7 +1621,13 @@ export class ExpensesService {
     // withDeleted: true so we can find soft-deleted records
     const expense = await this.expenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+      relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
       withDeleted: true,
     });
 
@@ -1553,7 +1696,13 @@ export class ExpensesService {
 
     const restored = await this.expenseRepository.findOne({
       where: { id: expense.id },
-      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+      relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
     });
 
     if (!restored) {
@@ -1781,6 +1930,27 @@ export class ExpensesService {
     }
   }
 
+  /** Resolves a GroupMember to its display identity (registered or pending). */
+  private carryForwardMemberDisplay(m: GroupMember): {
+    groupMemberId: string;
+    userId: string | null;
+    displayName: string;
+  } {
+    if (m.user) {
+      return {
+        groupMemberId: m.id,
+        userId: m.user.id,
+        displayName: m.nickname || m.user.displayName || m.user.email,
+      };
+    }
+    return {
+      groupMemberId: m.id,
+      userId: null,
+      displayName:
+        m.nickname || m.contact?.displayName || m.contact?.email || 'Unknown',
+    };
+  }
+
   /**
    * Household carry-forward summary: net extra-paid balance per member for a given month.
    * Only applies to `household` group type.
@@ -1791,7 +1961,8 @@ export class ExpensesService {
     ledgerMonth: string,
   ): Promise<
     {
-      userId: string;
+      groupMemberId: string;
+      userId: string | null;
       displayName: string | null;
       netBalance: number;
       currency: string;
@@ -1816,14 +1987,30 @@ export class ExpensesService {
     // Get all posted expenses for the ledger month
     const expenses = await this.expenseRepository.find({
       where: { group: { id: groupId }, ledgerMonth, status: 'posted' },
-      relations: ['paidByUser', 'ownerUser'],
+      relations: ['paidByUser', 'paidByGroupMember', 'ownerUser'],
       withDeleted: false,
     });
 
     const activeMembers = await this.groupMemberRepository.find({
       where: { group: { id: groupId }, joinStatus: 'active' },
-      relations: ['user'],
+      relations: ['user', 'contact'],
     });
+
+    // Resolves a User-keyed payer/participant reference (legacy rows) to its
+    // current GroupMember.id — the frozen group-ledger identity always keys
+    // by GroupMember, never User, going forward.
+    const memberIdByUserId = new Map<string, string>();
+    for (const m of activeMembers) {
+      if (m.user) memberIdByUserId.set(m.user.id, m.id);
+    }
+    const resolveMemberKey = (opts: {
+      groupMember?: GroupMember;
+      user?: User;
+    }): string | undefined => {
+      if (opts.groupMember) return opts.groupMember.id;
+      if (opts.user) return memberIdByUserId.get(opts.user.id);
+      return undefined;
+    };
 
     const carryExpenses = expenses.filter((exp) => exp.isCarryForward);
     const normalExpenses = expenses.filter((exp) => !exp.isCarryForward);
@@ -1834,14 +2021,18 @@ export class ExpensesService {
       0,
     );
 
-    // Compute normal paid amounts per active user
+    // Compute normal paid amounts per active member (registered or pending).
     const paidMap = new Map<string, number>();
     for (const member of activeMembers) {
-      paidMap.set(member.user.id, 0);
+      paidMap.set(member.id, 0);
     }
     for (const exp of normalExpenses) {
-      const uid = exp.paidByUser.id;
-      paidMap.set(uid, (paidMap.get(uid) ?? 0) + Number(exp.amountTotal));
+      const memberId = resolveMemberKey({
+        groupMember: exp.paidByGroupMember,
+        user: exp.paidByUser,
+      });
+      if (!memberId) continue;
+      paidMap.set(memberId, (paidMap.get(memberId) ?? 0) + Number(exp.amountTotal));
     }
 
     // Look up monthly contribution percentages
@@ -1869,12 +2060,7 @@ export class ExpensesService {
     const carrySplits = carryExpenseIds.length
       ? await this.expenseSplitRepository.find({
           where: { expense: { id: In(carryExpenseIds) } },
-          relations: [
-            'expense',
-            'participantUser',
-            'participantGroupMember',
-            'participantGroupMember.user',
-          ],
+          relations: ['expense', 'participantUser', 'participantGroupMember'],
         })
       : [];
 
@@ -1882,12 +2068,16 @@ export class ExpensesService {
     const carryPaidMap = new Map<string, number>();
 
     for (const member of activeMembers) {
-      carryOwedMap.set(member.user.id, 0);
-      carryPaidMap.set(member.user.id, 0);
+      carryOwedMap.set(member.id, 0);
+      carryPaidMap.set(member.id, 0);
     }
 
     for (const exp of carryExpenses) {
-      const payerId = exp.paidByUser.id;
+      const payerId = resolveMemberKey({
+        groupMember: exp.paidByGroupMember,
+        user: exp.paidByUser,
+      });
+      if (!payerId) continue;
       carryPaidMap.set(
         payerId,
         (carryPaidMap.get(payerId) ?? 0) + Number(exp.amountTotal),
@@ -1895,8 +2085,10 @@ export class ExpensesService {
     }
 
     for (const split of carrySplits) {
-      const participantId =
-        split.participantUser?.id || split.participantGroupMember?.user?.id;
+      const participantId = resolveMemberKey({
+        groupMember: split.participantGroupMember,
+        user: split.participantUser,
+      });
       if (participantId) {
         carryOwedMap.set(
           participantId,
@@ -1908,17 +2100,20 @@ export class ExpensesService {
     return activeMembers.map((m) => {
       const pct = contributionMap.get(m.id) ?? 100 / activeMembers.length;
       const TuNormal = S * (pct / 100);
-      const PuNormal = paidMap.get(m.user.id) ?? 0;
+      const PuNormal = paidMap.get(m.id) ?? 0;
 
-      const carryPaid = carryPaidMap.get(m.user.id) ?? 0;
-      const carryOwed = carryOwedMap.get(m.user.id) ?? 0;
+      const carryPaid = carryPaidMap.get(m.id) ?? 0;
+      const carryOwed = carryOwedMap.get(m.id) ?? 0;
 
       const Pu = PuNormal + carryPaid;
       const Tu = TuNormal + carryOwed;
 
+      const display = this.carryForwardMemberDisplay(m);
+
       return {
-        userId: m.user.id,
-        displayName: m.user.displayName || m.user.email,
+        groupMemberId: display.groupMemberId,
+        userId: display.userId,
+        displayName: display.displayName,
         netBalance: Math.round((Pu - Tu) * 100) / 100,
         currency,
         paid: Math.round(Pu * 100) / 100,
@@ -1929,24 +2124,24 @@ export class ExpensesService {
   }
 
   private simplifyDebts(
-    balances: { userId: string; balance: number }[],
+    balances: { groupMemberId: string; balance: number }[],
     currency: string,
   ): {
-    fromUserId: string;
-    toUserId: string;
+    fromGroupMemberId: string;
+    toGroupMemberId: string;
     amount: number;
     currency: string;
   }[] {
     let activeBalances = balances
       .map((b) => ({
-        userId: b.userId,
+        groupMemberId: b.groupMemberId,
         balance: Number(b.balance),
       }))
       .filter((b) => Math.abs(b.balance) >= 0.01);
 
     const transactions: {
-      fromUserId: string;
-      toUserId: string;
+      fromGroupMemberId: string;
+      toGroupMemberId: string;
       amount: number;
       currency: string;
     }[] = [];
@@ -1956,7 +2151,7 @@ export class ExpensesService {
         .filter((b) => b.balance < 0)
         .sort((a, b) => {
           if (Math.abs(a.balance - b.balance) < 0.0001) {
-            return a.userId.localeCompare(b.userId);
+            return a.groupMemberId.localeCompare(b.groupMemberId);
           }
           return a.balance - b.balance;
         });
@@ -1965,7 +2160,7 @@ export class ExpensesService {
         .filter((b) => b.balance > 0)
         .sort((a, b) => {
           if (Math.abs(a.balance - b.balance) < 0.0001) {
-            return a.userId.localeCompare(b.userId);
+            return a.groupMemberId.localeCompare(b.groupMemberId);
           }
           return b.balance - a.balance;
         });
@@ -1984,8 +2179,8 @@ export class ExpensesService {
 
       if (roundedTransfer > 0) {
         transactions.push({
-          fromUserId: debtor.userId,
-          toUserId: creditor.userId,
+          fromGroupMemberId: debtor.groupMemberId,
+          toGroupMemberId: creditor.groupMemberId,
           amount: roundedTransfer,
           currency: currency,
         });
@@ -1996,9 +2191,9 @@ export class ExpensesService {
 
       activeBalances = activeBalances
         .map((b) => {
-          if (b.userId === debtor.userId)
+          if (b.groupMemberId === debtor.groupMemberId)
             return { ...b, balance: debtor.balance };
-          if (b.userId === creditor.userId)
+          if (b.groupMemberId === creditor.groupMemberId)
             return { ...b, balance: creditor.balance };
           return b;
         })
@@ -2080,7 +2275,7 @@ export class ExpensesService {
         ledgerMonth,
       );
       const balances = summary.map((s) => ({
-        userId: s.userId,
+        groupMemberId: s.groupMemberId,
         balance: s.netBalance,
       }));
 
@@ -2090,21 +2285,23 @@ export class ExpensesService {
       if (simplified.length > 0) {
         await this.dataSource.transaction(async (manager) => {
           for (const tx of simplified) {
-            const debtorUser = await manager
-              .getRepository(User)
-              .findOne({ where: { id: tx.fromUserId } });
-            const creditorUser = await manager
-              .getRepository(User)
-              .findOne({ where: { id: tx.toUserId } });
-            if (!debtorUser || !creditorUser) continue;
+            const debtorMember = await manager
+              .getRepository(GroupMember)
+              .findOne({ where: { id: tx.fromGroupMemberId } });
+            const creditorMember = await manager
+              .getRepository(GroupMember)
+              .findOne({ where: { id: tx.toGroupMemberId } });
+            if (!debtorMember || !creditorMember) continue;
 
+            // Frozen rule: inside a group ledger, payer/participant always
+            // resolve to GroupMember — mirrors createExpense()'s write path.
             const expense = manager.create(Expense, {
               title: `Carry-Forward from ${ledgerMonth}`,
               description: `System-generated carry-forward balance rollover`,
               amountTotal: tx.amount,
               currency: group.currency,
               category: 'Other',
-              paidByUser: creditorUser,
+              paidByGroupMember: creditorMember,
               ownerUser: callerMember.user,
               group,
               expenseDate: `${nextLedgerMonth}-01`,
@@ -2116,7 +2313,7 @@ export class ExpensesService {
 
             const split = manager.create(ExpenseSplit, {
               expense: savedExpense,
-              participantUser: debtorUser,
+              participantGroupMember: debtorMember,
               splitType: 'fixed',
               shareValue: tx.amount,
               amountOwed: tx.amount,
@@ -2274,6 +2471,12 @@ export class ExpensesService {
       .createQueryBuilder('split')
       .innerJoinAndSelect('split.expense', 'expense')
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember')
+      .leftJoinAndSelect('paidByGroupMember.user', 'paidByGroupMemberUser')
+      .leftJoinAndSelect(
+        'paidByGroupMember.contact',
+        'paidByGroupMemberContact',
+      )
       .leftJoinAndSelect('expense.group', 'group')
       .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
       .leftJoin('split.participantGroupMember', 'groupMember')
@@ -2334,9 +2537,19 @@ export class ExpensesService {
         expenseType: 'GROUP_SHARE',
         groupId: exp.group?.id ?? null,
         groupName: exp.group?.name ?? null,
-        paidByUserId: exp.paidByUser?.id ?? null,
+        // Frozen rule: a group expense's payer resolves via
+        // paidByGroupMember, never paidByUser — paidByUser is only ever
+        // populated for a legacy, pre-migration row.
+        paidByUserId: exp.paidByUser?.id ?? exp.paidByGroupMember?.user?.id ?? null,
+        paidByGroupMemberId: exp.paidByGroupMember?.id ?? null,
         paidByDisplayName:
-          exp.paidByUser?.displayName ?? exp.paidByUser?.email ?? null,
+          exp.paidByUser?.displayName ??
+          exp.paidByUser?.email ??
+          exp.paidByGroupMember?.user?.displayName ??
+          exp.paidByGroupMember?.user?.email ??
+          exp.paidByGroupMember?.contact?.displayName ??
+          exp.paidByGroupMember?.contact?.email ??
+          null,
         groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
         splitId: split.id,
         isSettled: split.isSettled ?? false,

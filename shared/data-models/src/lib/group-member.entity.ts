@@ -6,12 +6,24 @@ import {
   UpdateDateColumn,
   ManyToOne,
   Unique,
+  Check,
 } from 'typeorm';
 import { Group } from './group.entity';
 import { User } from './user.entity';
+import { Contact } from './contact.entity';
 
+/**
+ * A GroupMember references a User OR a Contact (at least one, not strict
+ * XOR). Once a Contact is claimed at registration, `user` is populated
+ * alongside the existing `contact` — both are kept, permanently, for audit/
+ * identity/search continuity. `contact` is write-once in practice: set at
+ * creation or claim, never repointed except via the formal Contact merge
+ * operation (see ContactsService.mergeContacts).
+ */
 @Entity('group_members')
 @Unique(['group', 'user'])
+@Unique(['group', 'contact'])
+@Check('"userId" IS NOT NULL OR "contactId" IS NOT NULL')
 export class GroupMember {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -19,8 +31,15 @@ export class GroupMember {
   @ManyToOne(() => Group, { nullable: false })
   group!: Group;
 
-  @ManyToOne(() => User, { nullable: false })
-  user!: User;
+  @ManyToOne(() => User, { nullable: true })
+  user?: User;
+
+  @ManyToOne(() => Contact, { nullable: true })
+  contact?: Contact;
+
+  /** Purely cosmetic, per-group override of the Contact/User's display name. */
+  @Column({ type: 'varchar', length: 120, nullable: true })
+  nickname?: string;
 
   /**
    * Member role within the group:

@@ -7,6 +7,7 @@ import {
   ExpenseSplit,
   Group,
   GroupMember,
+  GroupKeyVersion,
   User,
 } from '@finmate/data-models';
 import { DataSource, LessThanOrEqual } from 'typeorm';
@@ -55,6 +56,11 @@ describe('RecurringExpenses Service & Scheduler', () => {
     create: jest.fn((x) => x),
     save: jest.fn((x) => Promise.resolve({ id: 'split-id', ...x })),
   };
+  const mockGroupKeyVersionRepo = {
+    findOne: jest.fn(),
+    save: jest.fn((x) => Promise.resolve({ id: 'gkv-id', ...x })),
+    create: jest.fn((x) => x),
+  };
 
   const mockTransactionManager = {
     getRepository: jest.fn((entity) => {
@@ -65,6 +71,7 @@ describe('RecurringExpenses Service & Scheduler', () => {
       if (entity === ExpenseSplit) return mockExpenseSplitRepo;
       if (entity === User) return mockUserRepo;
       if (entity === GroupMember) return mockGroupMemberRepo;
+      if (entity === GroupKeyVersion) return mockGroupKeyVersionRepo;
       return null;
     }),
   };
@@ -168,6 +175,168 @@ describe('RecurringExpenses Service & Scheduler', () => {
       expect(result.splits).toHaveLength(1);
       expect(mockRecurringExpenseRepo.save).toHaveBeenCalled();
     });
+
+    it('should create group recurring expense template with a GroupMember (pending) payer', async () => {
+      const ownerUser = { id: 'user-owner' };
+      const group = { id: 'group-1', currency: 'USD' };
+      const membership = {
+        id: 'gm-owner',
+        joinStatus: 'active',
+        role: 'admin',
+        user: ownerUser,
+        group,
+      };
+      const paidByGroupMember = { id: 'gm-payer', group }; // pending — no .user
+      const registeredParticipant = {
+        id: 'gm-1',
+        role: 'member',
+        user: { id: 'user-1' },
+      };
+      const pendingNonParticipant = { id: 'gm-2', role: 'member' }; // no .user
+
+      mockUserRepo.findOne.mockResolvedValueOnce(ownerUser); // ownerUser lookup
+
+      mockGroupMemberRepo.findOne
+        .mockResolvedValueOnce(membership) // getGroupMembership
+        .mockResolvedValueOnce(paidByGroupMember); // paidByGroupMemberId resolution
+
+      mockGroupRepo.findOne.mockResolvedValueOnce(group);
+
+      mockGroupKeyVersionRepo.findOne.mockResolvedValueOnce({
+        id: 'gkv-1',
+        version: 1,
+        status: 'ACTIVE',
+      });
+
+      // buildGroupParticipantMaps — includes a pending member with no `.user`
+      // to prove the null-guard doesn't crash the map construction.
+      mockGroupMemberRepo.find.mockResolvedValueOnce([
+        registeredParticipant,
+        pendingNonParticipant,
+      ]);
+
+      mockRecurringExpenseRepo.findOne.mockResolvedValue({
+        id: 'template-id',
+        title: 'Group Subscription',
+        amountTotal: 100,
+        currency: 'USD',
+        paidByUser: undefined,
+        paidByGroupMember,
+        ownerUser,
+        group,
+        frequency: 'monthly',
+        startDate: '2026-06-23',
+        nextOccurrenceDate: '2026-06-23',
+        status: 'active',
+      });
+
+      mockRecurringExpenseSplitRepo.find.mockResolvedValue([
+        {
+          id: 'split-1',
+          participantGroupMember: registeredParticipant,
+          splitType: 'equal',
+          shareValue: 1,
+          amountOwed: 100,
+        },
+      ]);
+
+      const result = await service.createRecurringExpense('user-owner', {
+        title: 'Group Subscription',
+        amountTotal: 100,
+        currency: 'USD',
+        category: 'bills',
+        paidByGroupMemberId: 'gm-payer',
+        groupId: 'group-1',
+        frequency: 'monthly',
+        startDate: '2026-06-23',
+        splits: [
+          {
+            participantGroupMemberId: 'gm-1',
+            splitType: 'equal',
+            shareValue: 1,
+          },
+        ],
+      });
+
+      expect(result.id).toBe('template-id');
+      expect(result.paidByGroupMemberId).toBe('gm-payer');
+      expect(result.paidByUserId).toBeNull();
+      expect(mockRecurringExpenseRepo.save).toHaveBeenCalled();
+      const createCallArgs = mockRecurringExpenseRepo.create.mock.calls[0][0];
+      expect(createCallArgs.paidByGroupMember).toBe(paidByGroupMember);
+      expect(createCallArgs.paidByUser).toBeUndefined();
+    });
+
+    it('should reject creating a template with both paidByUserId and paidByGroupMemberId', async () => {
+      await expect(
+        service.createRecurringExpense('user-owner', {
+          title: 'Bad',
+          amountTotal: 100,
+          currency: 'USD',
+          category: 'bills',
+          paidByUserId: 'user-owner',
+          paidByGroupMemberId: 'gm-payer',
+          groupId: 'group-1',
+          frequency: 'monthly',
+          startDate: '2026-06-23',
+          splits: [
+            { participantGroupMemberId: 'gm-1', splitType: 'equal', shareValue: 1 },
+          ],
+        } as any),
+      ).rejects.toThrow('Provide only one of paidByUserId or paidByGroupMemberId');
+    });
+
+    it('should switch a group template payer from paidByUserId to paidByGroupMemberId on update', async () => {
+      const ownerUser = { id: 'user-owner' };
+      const group = { id: 'group-1', currency: 'USD' };
+      const existingPaidByUser = { id: 'user-owner' };
+      const template: any = {
+        id: 'template-id',
+        version: 1,
+        amountTotal: 100,
+        currency: 'USD',
+        paidByUser: existingPaidByUser,
+        paidByGroupMember: undefined,
+        ownerUser,
+        group,
+        frequency: 'monthly',
+        startDate: '2026-06-23',
+        nextOccurrenceDate: '2026-06-23',
+        status: 'active',
+      };
+      mockRecurringExpenseRepo.findOne
+        .mockResolvedValueOnce(template) // initial fetch
+        .mockResolvedValueOnce({ ...template, paidByGroupMember: { id: 'gm-new' }, paidByUser: undefined }); // post-transaction fetch
+
+      const membership = {
+        id: 'gm-owner',
+        joinStatus: 'active',
+        role: 'admin',
+        user: ownerUser,
+        group,
+      };
+      const newPayerMember = { id: 'gm-new', group };
+
+      mockGroupMemberRepo.findOne
+        .mockResolvedValueOnce(membership) // ensureAccess -> getGroupMembership
+        .mockResolvedValueOnce(newPayerMember); // paidByGroupMemberId resolution
+
+      mockRecurringExpenseSplitRepo.find.mockResolvedValue([]);
+
+      const result = await service.updateRecurringExpense(
+        'user-owner',
+        'template-id',
+        {
+          version: 1,
+          paidByGroupMemberId: 'gm-new',
+        } as any,
+      );
+
+      expect(result.paidByGroupMemberId).toBe('gm-new');
+      expect(result.paidByUserId).toBeNull();
+      expect(template.paidByGroupMember).toBe(newPayerMember);
+      expect(template.paidByUser).toBeUndefined();
+    });
   });
 
   describe('RecurringExpensesScheduler Cron Engine', () => {
@@ -214,6 +383,48 @@ describe('RecurringExpenses Service & Scheduler', () => {
       // Verify template dates are advanced (weekly rent from 2026-06-20 advances to 2026-06-27)
       expect(template.nextOccurrenceDate).toBe('2026-06-27');
       expect(template.status).toBe('active');
+
+      jest.useRealTimers();
+    });
+
+    it('should copy paidByGroupMember (not paidByUser) onto the materialized Expense for a GroupMember-payer template', async () => {
+      jest.useFakeTimers({ now: new Date('2026-06-20T12:00:00Z') });
+
+      const group = { id: 'group-1', groupType: 'shared' };
+      const paidByGroupMember = { id: 'gm-payer', group }; // pending — no .user
+      const template = {
+        id: 'template-2',
+        title: 'Group Rent',
+        amountTotal: 500,
+        currency: 'USD',
+        category: 'rent',
+        paidByUser: undefined,
+        paidByGroupMember,
+        ownerUser: { id: 'user-1' },
+        group,
+        groupKeyVersion: { id: 'gkv-1', version: 1, status: 'ACTIVE' },
+        frequency: 'weekly' as const,
+        startDate: '2026-06-20',
+        nextOccurrenceDate: '2026-06-20',
+        endDate: '2026-07-01',
+        status: 'active' as const,
+      };
+
+      mockRecurringExpenseRepo.find.mockResolvedValueOnce([template]);
+      mockRecurringExpenseSplitRepo.find.mockResolvedValueOnce([
+        {
+          participantGroupMember: { id: 'gm-1' },
+          splitType: 'equal',
+          shareValue: 1,
+          amountOwed: 500,
+        },
+      ]);
+
+      await scheduler.processDueExpenses();
+
+      const createCallArgs = mockExpenseRepo.create.mock.calls[0][0];
+      expect(createCallArgs.paidByGroupMember).toBe(paidByGroupMember);
+      expect(createCallArgs.paidByUser).toBeUndefined();
 
       jest.useRealTimers();
     });

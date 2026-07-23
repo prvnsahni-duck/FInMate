@@ -3,6 +3,7 @@ import * as dotenv from 'dotenv';
 import {
   User,
   Profile,
+  Contact,
   Group,
   GroupMember,
   GroupMemberContribution,
@@ -48,6 +49,7 @@ export default new DataSource({
   entities: [
     User,
     Profile,
+    Contact,
     Group,
     GroupMember,
     GroupMemberContribution,

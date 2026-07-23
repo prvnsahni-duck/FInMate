@@ -11,11 +11,15 @@ import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { RedisService } from '../redis/redis.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { EmailService } from '../email/email.service';
+import { ContactsService } from '../contacts/contacts.service';
 import { User, AuditLog } from '@finmate/data-models';
 import * as argon2 from 'argon2';
 import { randomUUID, createHash } from 'crypto';
 import { generateSecret, verifyTotp } from './utils/totp.util';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
+
+const EMAIL_VERIFICATION_TTL_SECONDS = 24 * 60 * 60;
 
 @Injectable()
 export class AuthService {
@@ -28,6 +32,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
     private readonly encryptionService: EncryptionService,
+    private readonly emailService: EmailService,
+    private readonly contactsService: ContactsService,
     @InjectRepository(AuditLog)
     private readonly auditLogRepository: Repository<AuditLog>,
   ) {
@@ -86,7 +92,92 @@ export class AuthService {
       passwordPlain,
       displayName,
     );
+
+    // The account is fully usable immediately — verification gates only the
+    // Contact-claim step (see verifyEmail), never login or general app
+    // access. Sending the email is best-effort and must never block
+    // registration itself.
+    this.sendVerificationEmail(savedUser).catch(() => {
+      // best-effort — verification can be resent later
+    });
+
     return this.serializeUser(savedUser);
+  }
+
+  /**
+   * Issues a single-use, 24h verification token for the given user's current
+   * email, stored server-side (Redis) rather than as a self-contained JWT so
+   * it can be invalidated/single-used on verify. Emails a link; the token
+   * itself is never logged or returned to the caller.
+   */
+  async sendVerificationEmail(user: User): Promise<void> {
+    const token = randomUUID();
+    await this.redisService.set(
+      `email_verify:${token}`,
+      user.id,
+      EMAIL_VERIFICATION_TTL_SECONDS,
+    );
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') ||
+      'http://localhost:4200';
+    const verifyUrl = `${frontendUrl}/auth/verify-email?token=${token}`;
+    await this.emailService.sendEmail(
+      user.email,
+      'Verify your email — FinMate',
+      `<p>Confirm your email to automatically link any groups you were added to before you registered:</p>
+       <p><a href="${verifyUrl}">${verifyUrl}</a></p>
+       <p>This link expires in 24 hours.</p>`,
+    );
+  }
+
+  /**
+   * Confirms a verification token and, on success, runs the Contact-claim
+   * fan-out for this user's now-verified email — linking every GroupMember
+   * row from Contacts matching it, in one transaction, with zero new
+   * Expense/ExpenseSplit/Settlement rows (see ContactsService.claimContactsForUser).
+   * This is the only thing gated on verification; it never touches login.
+   */
+  async verifyEmail(token: string): Promise<{
+    linkedGroupIds: string[];
+    claimedContactIds: string[];
+  }> {
+    const redisKey = `email_verify:${token}`;
+    // Atomic read-and-remove: a plain get()+del() lets two concurrent
+    // requests for the same token both pass the get() before either
+    // deletes it, running the Contact-claim fan-out twice. GETDEL closes
+    // that window — a second concurrent caller now sees null, exactly like
+    // an already-expired token.
+    const userId = await this.redisService.getDel(redisKey);
+    if (!userId) {
+      throw new BadRequestException({
+        errorCode: 'AUTH_VERIFICATION_INVALID',
+        message: 'This verification link is invalid or has expired',
+      });
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    if (!user.emailVerified) {
+      user.emailVerified = true;
+      await this.usersService.updateUser(user);
+    }
+
+    const claimResult = await this.contactsService.claimContactsForUser(user);
+
+    void this.writeAuditLog({
+      actorUser: user,
+      action: 'auth.email_verified',
+      entityId: user.id,
+      metadata: {
+        linkedGroupIds: claimResult.linkedGroupIds,
+        claimedContactIds: claimResult.claimedContactIds,
+      },
+    });
+
+    return claimResult;
   }
 
   async login(

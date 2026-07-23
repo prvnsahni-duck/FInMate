@@ -68,6 +68,11 @@ export class UpdateExpenseDto {
   @IsOptional()
   paidByUserId?: string;
 
+  /** Group expenses only — a pending (Contact-backed) member as payer. */
+  @IsUUID('4', { message: 'paidByGroupMemberId must be a valid UUID v4' })
+  @IsOptional()
+  paidByGroupMemberId?: string;
+
   @IsUUID('4', { message: 'groupKeyVersionId must be a valid UUID v4' })
   @IsOptional()
   groupKeyVersionId?: string;

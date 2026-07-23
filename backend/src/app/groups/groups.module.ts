@@ -17,6 +17,7 @@ import { InviteController } from './invite.controller';
 import { GroupRolesGuard } from '../auth/guards/group-roles.guard';
 import { ExpensesModule } from '../expenses/expenses.module';
 import { EmailModule } from '../email/email.module';
+import { ContactsModule } from '../contacts/contacts.module';
 import {
   GroupsAuditService,
   GroupsContributionsService,
@@ -38,6 +39,7 @@ import {
     ]),
     ExpensesModule,
     EmailModule,
+    ContactsModule,
   ],
   controllers: [GroupsController, MembersController, InviteController],
   providers: [

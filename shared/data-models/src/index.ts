@@ -7,6 +7,7 @@ export * from './lib/expense-version.entity';
 export * from './lib/expense-split-version.entity';
 export * from './lib/recurring-expense.entity';
 export * from './lib/recurring-expense-split.entity';
+export * from './lib/contact.entity';
 export * from './lib/group.entity';
 export * from './lib/group-member.entity';
 export * from './lib/group-member-contribution.entity';

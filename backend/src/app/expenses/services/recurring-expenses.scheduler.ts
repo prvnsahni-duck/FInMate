@@ -77,7 +77,13 @@ export class RecurringExpensesScheduler {
         status: 'active',
         nextOccurrenceDate: LessThanOrEqual(todayStr),
       },
-      relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+      relations: [
+        'paidByUser',
+        'paidByGroupMember',
+        'ownerUser',
+        'group',
+        'groupKeyVersion',
+      ],
     });
 
     this.logger.log({
@@ -160,6 +166,7 @@ export class RecurringExpensesScheduler {
           currency: template.currency,
           category: template.category,
           paidByUser: template.paidByUser,
+          paidByGroupMember: template.paidByGroupMember,
           ownerUser: template.ownerUser,
           group: template.group,
           encryptionScope,

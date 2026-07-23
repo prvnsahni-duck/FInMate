@@ -101,9 +101,15 @@ export class CreateExpenseDto {
   @MaxLength(64, { message: 'Expense category cannot exceed 64 characters' })
   category!: string;
 
+  /** Required for personal expenses; for group expenses, this or paidByGroupMemberId. */
   @IsUUID('4', { message: 'Paid-by User ID must be a valid UUID' })
-  @IsNotEmpty({ message: 'Payer ID is required' })
-  paidByUserId!: string;
+  @IsOptional()
+  paidByUserId?: string;
+
+  /** Group expenses only — a pending (Contact-backed) member as payer. */
+  @IsUUID('4', { message: 'Paid-by Group Member ID must be a valid UUID' })
+  @IsOptional()
+  paidByGroupMemberId?: string;
 
   @IsUUID('4', { message: 'Group ID must be a valid UUID' })
   @IsOptional()
@@ -188,6 +194,11 @@ export class UpdateExpenseDto {
   @IsUUID('4', { message: 'Paid-by User ID must be a valid UUID' })
   @IsOptional()
   paidByUserId?: string;
+
+  /** Group expenses only — a pending (Contact-backed) member as payer. */
+  @IsUUID('4', { message: 'Paid-by Group Member ID must be a valid UUID' })
+  @IsOptional()
+  paidByGroupMemberId?: string;
 
   @IsUUID('4', { message: 'Group key version ID must be a valid UUID' })
   @IsOptional()

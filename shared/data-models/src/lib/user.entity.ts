@@ -29,6 +29,14 @@ export class User {
   @Column({ type: 'varchar', length: 20, default: 'active' })
   status!: 'active' | 'disabled' | 'invited';
 
+  /**
+   * Gates Contact-claiming only (see ContactsService.claimContactsForUser) —
+   * never login or general app usage. Existing rows are backfilled to true
+   * by the migration; new registrations start false until verified.
+   */
+  @Column({ name: 'email_verified', type: 'boolean', default: false })
+  emailVerified!: boolean;
+
   @Column({ type: 'timestamptz', nullable: true })
   lastLoginAt?: Date;
 

@@ -83,10 +83,10 @@ export class RecurringExpensesService {
         );
       }
       if (membership.role === 'member' || membership.role === 'spectator') {
-        if (
-          template.ownerUser.id !== userId &&
-          template.paidByUser.id !== userId
-        ) {
+        const paidByCaller =
+          template.paidByUser?.id === userId ||
+          template.paidByGroupMember?.user?.id === userId;
+        if (template.ownerUser.id !== userId && !paidByCaller) {
           throw new ForbiddenException(
             'Members can only modify their own recurring expenses',
           );
@@ -112,7 +112,11 @@ export class RecurringExpensesService {
 
     for (const member of members) {
       groupMemberById.set(member.id, member);
-      activeOrInvitedByUserId.set(member.user.id, member);
+      // A pending (Contact-backed) member has no user and is only ever
+      // resolvable via groupMemberById (participantGroupMemberId).
+      if (member.user) {
+        activeOrInvitedByUserId.set(member.user.id, member);
+      }
     }
 
     return { groupMemberById, activeOrInvitedByUserId };
@@ -122,12 +126,17 @@ export class RecurringExpensesService {
     template: RecurringExpense,
     dto: Pick<
       CreateRecurringExpenseDto,
-      'splits' | 'amountTotal' | 'paidByUserId' | 'groupId'
+      | 'splits'
+      | 'amountTotal'
+      | 'paidByUserId'
+      | 'paidByGroupMemberId'
+      | 'groupId'
     >,
     manager: EntityManager,
   ): Promise<void> {
     const payerKey = dto.groupId
-      ? (
+      ? dto.paidByGroupMemberId ??
+        (
           await manager.getRepository(GroupMember).findOne({
             where: {
               group: { id: dto.groupId },
@@ -266,18 +275,31 @@ export class RecurringExpensesService {
       throw new BadRequestException('Splits cannot be empty');
     }
 
+    if (!dto.paidByUserId && !dto.paidByGroupMemberId) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Provide paidByUserId or paidByGroupMemberId',
+      });
+    }
+    if (dto.paidByUserId && dto.paidByGroupMemberId) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Provide only one of paidByUserId or paidByGroupMemberId',
+      });
+    }
+    if (dto.paidByGroupMemberId && !dto.groupId) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message:
+          'paidByGroupMemberId is only valid for group recurring expenses',
+      });
+    }
+
     const ownerUser = await this.userRepository.findOne({
       where: { id: userId },
     });
     if (!ownerUser) {
       throw new NotFoundException('User not found');
-    }
-
-    const paidByUser = await this.userRepository.findOne({
-      where: { id: dto.paidByUserId },
-    });
-    if (!paidByUser) {
-      throw new BadRequestException('paidByUser not found');
     }
 
     let group: Group | undefined;
@@ -307,6 +329,54 @@ export class RecurringExpensesService {
       }
     }
 
+    let paidByUser: User | undefined;
+    let paidByGroupMember: GroupMember | undefined;
+
+    if (group) {
+      // Frozen rule: inside a group ledger, the payer always resolves to
+      // GroupMember, never User — paidByUserId is accepted as client
+      // convenience and resolved to its GroupMember row here.
+      if (dto.paidByGroupMemberId) {
+        paidByGroupMember =
+          (await this.groupMemberRepository.findOne({
+            where: {
+              id: dto.paidByGroupMemberId,
+              group: { id: group.id },
+              joinStatus: In(['active', 'invited']),
+            },
+          })) ?? undefined;
+        if (!paidByGroupMember) {
+          throw new BadRequestException({
+            errorCode: 'VAL_INVALID_INPUT',
+            message: 'paidByGroupMemberId must belong to the selected group',
+          });
+        }
+      } else {
+        const payerInGroup = await this.groupMemberRepository.findOne({
+          where: {
+            group: { id: group.id },
+            user: { id: dto.paidByUserId },
+            joinStatus: In(['active', 'invited']),
+          },
+        });
+        if (!payerInGroup) {
+          throw new BadRequestException({
+            errorCode: 'VAL_INVALID_INPUT',
+            message: 'paidByUserId must belong to the selected group',
+          });
+        }
+        paidByGroupMember = payerInGroup;
+      }
+    } else {
+      paidByUser =
+        (await this.userRepository.findOne({
+          where: { id: dto.paidByUserId },
+        })) ?? undefined;
+      if (!paidByUser) {
+        throw new BadRequestException('paidByUser not found');
+      }
+    }
+
     const saved = await this.dataSource.transaction(async (manager) => {
       const groupKeyVersion = group
         ? await this.resolveTemplateGroupKeyVersion(
@@ -324,6 +394,7 @@ export class RecurringExpensesService {
           currency: dto.currency.toUpperCase(),
           category: dto.category,
           paidByUser,
+          paidByGroupMember,
           ownerUser,
           group,
           groupKeyVersion,
@@ -339,7 +410,13 @@ export class RecurringExpensesService {
 
       return manager.getRepository(RecurringExpense).findOne({
         where: { id: template.id },
-        relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+        relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
       });
     });
 
@@ -364,6 +441,7 @@ export class RecurringExpensesService {
     const query = this.recurringExpenseRepository
       .createQueryBuilder('template')
       .leftJoinAndSelect('template.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('template.paidByGroupMember', 'paidByGroupMember')
       .leftJoinAndSelect('template.ownerUser', 'ownerUser')
       .leftJoinAndSelect('template.group', 'group');
 
@@ -395,7 +473,13 @@ export class RecurringExpensesService {
   ): Promise<Record<string, any>> {
     const template = await this.recurringExpenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: [
+        'paidByUser',
+        'paidByGroupMember',
+        'paidByGroupMember.user',
+        'ownerUser',
+        'group',
+      ],
     });
     if (!template) {
       throw new NotFoundException('Recurring expense not found');
@@ -411,7 +495,13 @@ export class RecurringExpensesService {
   ): Promise<Record<string, any>> {
     const template = await this.recurringExpenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: [
+        'paidByUser',
+        'paidByGroupMember',
+        'paidByGroupMember.user',
+        'ownerUser',
+        'group',
+      ],
     });
     if (!template) {
       throw new NotFoundException('Recurring expense not found');
@@ -422,6 +512,19 @@ export class RecurringExpensesService {
       throw new PreconditionFailedException('Version conflict');
     }
 
+    if (dto.paidByUserId && dto.paidByGroupMemberId) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Provide only one of paidByUserId or paidByGroupMemberId',
+      });
+    }
+    if (dto.paidByGroupMemberId && !template.group) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message:
+          'paidByGroupMemberId is only valid for group recurring expenses',
+      });
+    }
     if (dto.paidByUserId) {
       const paidByUser = await this.userRepository.findOne({
         where: { id: dto.paidByUserId },
@@ -429,7 +532,45 @@ export class RecurringExpensesService {
       if (!paidByUser) {
         throw new BadRequestException('paidByUserId not found');
       }
-      template.paidByUser = paidByUser;
+      if (template.group) {
+        // Frozen rule: a group template's payer always resolves via
+        // GroupMember — paidByUserId is accepted as client convenience and
+        // resolved to its GroupMember row here.
+        const payerMember = await this.groupMemberRepository.findOne({
+          where: {
+            group: { id: template.group.id },
+            user: { id: dto.paidByUserId },
+            joinStatus: In(['active', 'invited']),
+          },
+        });
+        if (!payerMember) {
+          throw new BadRequestException({
+            errorCode: 'VAL_INVALID_INPUT',
+            message: 'paidByUserId must belong to the selected group',
+          });
+        }
+        template.paidByGroupMember = payerMember;
+        template.paidByUser = undefined;
+      } else {
+        template.paidByUser = paidByUser;
+        template.paidByGroupMember = undefined;
+      }
+    } else if (dto.paidByGroupMemberId) {
+      const payerMember = await this.groupMemberRepository.findOne({
+        where: {
+          id: dto.paidByGroupMemberId,
+          group: { id: template.group!.id },
+          joinStatus: In(['active', 'invited']),
+        },
+      });
+      if (!payerMember) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'paidByGroupMemberId must belong to the selected group',
+        });
+      }
+      template.paidByGroupMember = payerMember;
+      template.paidByUser = undefined;
     }
 
     if (dto.title !== undefined) template.title = dto.title;
@@ -476,7 +617,9 @@ export class RecurringExpensesService {
           {
             splits: dto.splits,
             amountTotal: dto.amountTotal ?? Number(template.amountTotal),
-            paidByUserId: dto.paidByUserId ?? template.paidByUser.id,
+            paidByUserId: dto.paidByUserId ?? template.paidByUser?.id,
+            paidByGroupMemberId:
+              dto.paidByGroupMemberId ?? template.paidByGroupMember?.id,
             groupId: template.group?.id,
           },
           manager,
@@ -485,7 +628,13 @@ export class RecurringExpensesService {
 
       return manager.getRepository(RecurringExpense).findOne({
         where: { id: template.id },
-        relations: ['paidByUser', 'ownerUser', 'group', 'groupKeyVersion'],
+        relations: [
+          'paidByUser',
+          'paidByGroupMember',
+          'ownerUser',
+          'group',
+          'groupKeyVersion',
+        ],
       });
     });
 
@@ -499,7 +648,13 @@ export class RecurringExpensesService {
   async deleteRecurringExpense(userId: string, id: string): Promise<void> {
     const template = await this.recurringExpenseRepository.findOne({
       where: { id },
-      relations: ['paidByUser', 'ownerUser', 'group'],
+      relations: [
+        'paidByUser',
+        'paidByGroupMember',
+        'paidByGroupMember.user',
+        'ownerUser',
+        'group',
+      ],
     });
     if (!template) {
       throw new NotFoundException('Recurring expense not found');
@@ -524,7 +679,8 @@ export class RecurringExpensesService {
       amountTotal: Number(template.amountTotal),
       currency: template.currency,
       category: template.category,
-      paidByUserId: template.paidByUser.id,
+      paidByUserId: template.paidByUser?.id ?? null,
+      paidByGroupMemberId: template.paidByGroupMember?.id ?? null,
       ownerUserId: template.ownerUser.id,
       groupId: template.group?.id ?? null,
       groupKeyVersionId: template.groupKeyVersion?.id ?? null,

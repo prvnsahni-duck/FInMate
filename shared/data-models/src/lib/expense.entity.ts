@@ -8,15 +8,28 @@ import {
   VersionColumn,
   Index,
   DeleteDateColumn,
+  Check,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
 import { GroupKeyVersion } from './group-key-version.entity';
+import { GroupMember } from './group-member.entity';
 
+/**
+ * `paidByUser` is required for personal (non-group) expenses — there is no
+ * GroupMember without a Group. For group expenses, exactly one of
+ * `paidByUser`/`paidByGroupMember` is set; a pending (Contact-backed) payer
+ * uses `paidByGroupMember`. Enforced by a single CHECK: exactly one of the
+ * two payer columns is always set, and `paidByGroupMember` additionally
+ * requires a group.
+ */
 @Entity('expenses')
 @Index(['group', 'status', 'expenseDate'])
 @Index(['group', 'category'])
 @Index(['group', 'ledgerMonth'])
+@Check(
+  '(("paidByUserId" IS NOT NULL) <> ("paidByGroupMemberId" IS NOT NULL)) AND ("groupId" IS NOT NULL OR "paidByGroupMemberId" IS NULL)',
+)
 export class Expense {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -40,8 +53,12 @@ export class Expense {
   @Column({ type: 'varchar', length: 64 })
   category!: string;
 
-  @ManyToOne(() => User, { nullable: false })
-  paidByUser!: User;
+  @ManyToOne(() => User, { nullable: true })
+  paidByUser?: User;
+
+  /** Group expenses only — a pending (Contact-backed) member as payer. */
+  @ManyToOne(() => GroupMember, { nullable: true })
+  paidByGroupMember?: GroupMember;
 
   @ManyToOne(() => User, { nullable: false })
   ownerUser!: User;

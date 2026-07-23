@@ -43,6 +43,7 @@ describe('ExpensesService', () => {
   >;
   let attachmentVersionRepository: jest.Mocked<Repository<AttachmentVersion>>;
   let receiptVersionRepository: jest.Mocked<Repository<ReceiptVersion>>;
+  let entityManagerMock: { create: jest.Mock; save: jest.Mock };
 
   beforeEach(async () => {
     const mockExpenseRepository = {
@@ -159,6 +160,10 @@ describe('ExpensesService', () => {
           return mockContributionRepository;
         }
       }),
+      // Generic EntityManager.create/save overloads (manager.create(Entity, data)),
+      // used directly by closeMonth()'s carry-forward rollover write path.
+      create: jest.fn((_entity, data) => data),
+      save: jest.fn((_entity, data) => Promise.resolve(data)),
     };
 
     const mockDataSource = {
@@ -233,6 +238,7 @@ describe('ExpensesService', () => {
       getRepositoryToken(AttachmentVersion),
     );
     receiptVersionRepository = module.get(getRepositoryToken(ReceiptVersion));
+    entityManagerMock = mockEntityManager;
   });
 
   it('should be defined', () => {
@@ -919,6 +925,102 @@ describe('ExpensesService', () => {
       expect(expenseRepository.save).toHaveBeenCalledTimes(1);
       // One ExpenseSplit row per participant — the projection, not a copy.
       expect(splitRepository.save).toHaveBeenCalledTimes(2);
+      // Frozen group-ledger identity rule: even a registered payer resolves
+      // via GroupMember for a group expense — paidByUserId was accepted as
+      // client convenience, but paidByUser is never persisted for a group
+      // expense; only paidByGroupMember is.
+      expect(expenseRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paidByGroupMember: callerMember,
+          paidByUser: undefined,
+        }),
+      );
+    });
+
+    it('supports a pending (Contact-backed) member as payer via paidByGroupMemberId — no paidByUser at all', async () => {
+      const callerMember = {
+        id: 'membership-caller',
+        role: 'member',
+        joinStatus: 'active',
+        user: { id: 'caller-id' },
+      } as any;
+      const pendingPayer = {
+        id: 'membership-pending',
+        role: 'member',
+        joinStatus: 'invited',
+        user: undefined,
+        contact: { id: 'contact-rahul', displayName: 'Rahul' },
+      } as any;
+
+      userRepository.findOne.mockResolvedValue({ id: 'caller-id' } as any);
+      groupMemberRepository.findOne.mockImplementation(async (opts: any) => {
+        if (opts?.where?.id === 'membership-pending') return pendingPayer;
+        return callerMember; // caller's own membership check
+      });
+      groupMemberRepository.find.mockResolvedValue([
+        callerMember,
+        pendingPayer,
+      ]);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+      groupKeyVersionRepository.findOne.mockResolvedValue({
+        id: 'gkv-1',
+        version: 1,
+        status: 'ACTIVE',
+      } as any);
+
+      expenseRepository.save.mockImplementation(async (data: any) => ({
+        ...data,
+        id: 'exp-pending-payer-1',
+      }));
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-pending-payer-1',
+        title: 'Taxi',
+        amountTotal: 500,
+        currency: 'USD',
+        category: 'Travel',
+        expenseDate: '2026-07-10',
+        status: 'posted',
+        encryptionScope: 'group',
+        isCarryForward: false,
+        paidByUser: undefined,
+        paidByGroupMember: pendingPayer,
+        ownerUser: { id: 'caller-id' },
+        group: { id: 'group-id' },
+        groupKeyVersion: { id: 'gkv-1', version: 1 },
+      } as any);
+      splitRepository.find.mockResolvedValue([]);
+      attachmentRepository.find.mockResolvedValue([]);
+
+      const result = await service.createExpense('caller-id', {
+        title: 'Taxi',
+        amountTotal: 500,
+        currency: 'USD',
+        category: 'Travel',
+        paidByGroupMemberId: 'membership-pending',
+        groupId: 'group-id',
+        expenseDate: '2026-07-10',
+        splits: [
+          { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
+          {
+            participantGroupMemberId: 'membership-pending',
+            splitType: 'equal',
+            shareValue: 1,
+          },
+        ],
+      } as any);
+
+      expect(expenseRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paidByUser: undefined,
+          paidByGroupMember: pendingPayer,
+        }),
+      );
+      expect((result as any).paidByUserId).toBeNull();
+      expect((result as any).paidByGroupMemberId).toBe('membership-pending');
     });
   });
 
@@ -1274,6 +1376,446 @@ describe('ExpensesService', () => {
     });
   });
 
+  // ── Phase 2: Carry-Forward GroupMember ownership ────────────────────────────
+
+  describe('Phase 2: Carry-Forward GroupMember ownership', () => {
+    describe('getCarryForwardSummary', () => {
+      it('includes a pending (Contact-backed) member as payer of a normal expense', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        const memberA = {
+          id: 'member-a',
+          user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' },
+          joinStatus: 'active',
+        };
+        const memberPending = {
+          id: 'member-p',
+          contact: { displayName: 'Pending Payer', email: 'p@finmate.com' },
+          joinStatus: 'active',
+        };
+        groupMemberRepository.find.mockResolvedValue([
+          memberA,
+          memberPending,
+        ] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 200,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByGroupMember: { id: 'member-p' },
+            paidByUser: undefined,
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        const pendingRow = balances.find((b) => b.groupMemberId === 'member-p');
+        const registeredRow = balances.find(
+          (b) => b.groupMemberId === 'member-a',
+        );
+
+        expect(pendingRow).toBeDefined();
+        expect(pendingRow!.userId).toBeNull();
+        expect(pendingRow!.displayName).toBe('Pending Payer');
+        expect(pendingRow!.netBalance).toBe(100); // paid 200, owed 100 (50%)
+
+        expect(registeredRow).toBeDefined();
+        expect(registeredRow!.userId).toBe('user-a');
+        expect(registeredRow!.netBalance).toBe(-100); // paid 0, owed 100
+      });
+
+      it('includes a pending (Contact-backed) member as participant of a carry-forward split', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        const memberA = {
+          id: 'member-a',
+          user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' },
+          joinStatus: 'active',
+        };
+        const memberPending = {
+          id: 'member-p',
+          contact: { displayName: 'Pending Debtor', email: 'p@finmate.com' },
+          joinStatus: 'active',
+        };
+        groupMemberRepository.find.mockResolvedValue([
+          memberA,
+          memberPending,
+        ] as any);
+
+        // A carry-forward expense (from a prior month's rollover) paid by the
+        // registered member, owed by the pending member.
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'cf-1',
+            amountTotal: 50,
+            currency: 'USD',
+            isCarryForward: true,
+            paidByUser: { id: 'user-a' },
+            paidByGroupMember: undefined,
+          },
+        ] as any);
+        splitRepository.find.mockResolvedValue([
+          {
+            id: 'cf-split-1',
+            amountOwed: 50,
+            participantGroupMember: { id: 'member-p' },
+            participantUser: undefined,
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        const pendingRow = balances.find((b) => b.groupMemberId === 'member-p');
+        const registeredRow = balances.find(
+          (b) => b.groupMemberId === 'member-a',
+        );
+
+        expect(pendingRow!.userId).toBeNull();
+        expect(pendingRow!.netBalance).toBe(-50); // owes the carried-forward 50
+        expect(registeredRow!.netBalance).toBe(50); // paid the carried-forward 50
+      });
+
+      it('reconciles totals for a mixed household (registered + pending members)', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        const memberA = {
+          id: 'member-a',
+          user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' },
+          joinStatus: 'active',
+        };
+        const memberPending = {
+          id: 'member-p',
+          contact: { displayName: 'Pending Member', email: 'p@finmate.com' },
+          joinStatus: 'active',
+        };
+        groupMemberRepository.find.mockResolvedValue([
+          memberA,
+          memberPending,
+        ] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 100,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByUser: { id: 'user-a' },
+            paidByGroupMember: undefined,
+          },
+          {
+            id: 'exp-2',
+            amountTotal: 60,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByGroupMember: { id: 'member-p' },
+            paidByUser: undefined,
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        // Total paid across all rows must reconcile with S (100 + 60 = 160)
+        const totalPaid = balances.reduce((sum, b) => sum + b.paid, 0);
+        expect(totalPaid).toBe(160);
+        // Net balances must sum to zero
+        const totalNet = balances.reduce((sum, b) => sum + b.netBalance, 0);
+        expect(Math.round(totalNet * 100) / 100).toBe(0);
+      });
+
+      it('historical compatibility: attributes a legacy paidByUser-only carry-forward expense via GroupMember fallback', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        const memberA = {
+          id: 'member-a',
+          user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' },
+          joinStatus: 'active',
+        };
+        const memberB = {
+          id: 'member-b',
+          user: { id: 'user-b', displayName: 'User B', email: 'b@finmate.com' },
+          joinStatus: 'active',
+        };
+        groupMemberRepository.find.mockResolvedValue([memberA, memberB] as any);
+
+        // Legacy row: written before GroupMember-payer support existed —
+        // paidByGroupMember is absent entirely, only paidByUser is set.
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'legacy-cf-1',
+            amountTotal: 30,
+            currency: 'USD',
+            isCarryForward: true,
+            paidByUser: { id: 'user-a' },
+          },
+        ] as any);
+        splitRepository.find.mockResolvedValue([
+          {
+            id: 'legacy-split-1',
+            amountOwed: 30,
+            participantUser: { id: 'user-b' },
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        const rowA = balances.find((b) => b.groupMemberId === 'member-a');
+        const rowB = balances.find((b) => b.groupMemberId === 'member-b');
+        expect(rowA!.netBalance).toBe(30);
+        expect(rowB!.netBalance).toBe(-30);
+      });
+
+      it('registered-only household regression: behaves identically to before', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        groupMemberRepository.find.mockResolvedValue([
+          {
+            id: 'member-a',
+            user: { id: 'user-a', displayName: 'User A' },
+            joinStatus: 'active',
+          },
+          {
+            id: 'member-b',
+            user: { id: 'user-b', displayName: 'User B' },
+            joinStatus: 'active',
+          },
+        ] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 150,
+            currency: 'USD',
+            paidByUser: { id: 'user-a', displayName: 'User A' },
+            ownerUser: { id: 'user-a' },
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        const userABal = balances.find((b) => b.userId === 'user-a');
+        const userBBal = balances.find((b) => b.userId === 'user-b');
+
+        expect(userABal?.netBalance).toBe(75);
+        expect(userBBal?.netBalance).toBe(-75);
+      });
+    });
+
+    describe('closeMonth', () => {
+      it('creates a carry-forward Expense with paidByGroupMember when the creditor is a pending member', async () => {
+        const callerMember = {
+          id: 'membership-id',
+          role: 'admin',
+          user: { id: 'caller-id', displayName: 'Admin User' },
+          joinStatus: 'active',
+        };
+        const memberRegistered = {
+          id: 'member-debtor',
+          user: { id: 'user-debtor', displayName: 'Debtor' },
+          joinStatus: 'active',
+        };
+        const memberPendingCreditor = {
+          id: 'member-creditor',
+          contact: { displayName: 'Pending Creditor' },
+          joinStatus: 'active',
+        };
+        // The caller-access lookup queries by (group, user, joinStatus); the
+        // in-transaction debtor/creditor resolution queries by `id` — branch
+        // on which shape of `where` is passed so each resolves correctly.
+        groupMemberRepository.findOne.mockImplementation((opts: any) => {
+          if (opts?.where?.id === memberRegistered.id)
+            return Promise.resolve(memberRegistered as any);
+          if (opts?.where?.id === memberPendingCreditor.id)
+            return Promise.resolve(memberPendingCreditor as any);
+          return Promise.resolve(callerMember as any);
+        });
+
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+          carryForwardEnabled: true,
+        } as any);
+
+        expenseRepository.count = jest.fn().mockResolvedValue(0);
+
+        groupMemberRepository.find.mockResolvedValue([
+          memberRegistered,
+          memberPendingCreditor,
+        ] as any);
+
+        // Pending member paid 100; registered member paid 0 => registered owes pending 50.
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 100,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByGroupMember: { id: 'member-creditor' },
+          },
+        ] as any);
+
+        const result = await service.closeMonth(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        expect(result.carryForwardExpenseCount).toBe(1);
+        expect(entityManagerMock.create).toHaveBeenCalledWith(
+          Expense,
+          expect.objectContaining({
+            paidByGroupMember: memberPendingCreditor,
+            isCarryForward: true,
+          }),
+        );
+        expect(entityManagerMock.create).toHaveBeenCalledWith(
+          ExpenseSplit,
+          expect.objectContaining({
+            participantGroupMember: memberRegistered,
+          }),
+        );
+      });
+
+      it('creates a carry-forward ExpenseSplit with participantGroupMember when the debtor is a pending member', async () => {
+        const callerMember = {
+          id: 'membership-id',
+          role: 'admin',
+          user: { id: 'caller-id', displayName: 'Admin User' },
+          joinStatus: 'active',
+        };
+        const memberPendingDebtor = {
+          id: 'member-debtor',
+          contact: { displayName: 'Pending Debtor' },
+          joinStatus: 'active',
+        };
+        const memberRegisteredCreditor = {
+          id: 'member-creditor',
+          user: { id: 'user-creditor', displayName: 'Creditor' },
+          joinStatus: 'active',
+        };
+        groupMemberRepository.findOne.mockImplementation((opts: any) => {
+          if (opts?.where?.id === memberPendingDebtor.id)
+            return Promise.resolve(memberPendingDebtor as any);
+          if (opts?.where?.id === memberRegisteredCreditor.id)
+            return Promise.resolve(memberRegisteredCreditor as any);
+          return Promise.resolve(callerMember as any);
+        });
+
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+          carryForwardEnabled: true,
+        } as any);
+
+        expenseRepository.count = jest.fn().mockResolvedValue(0);
+
+        groupMemberRepository.find.mockResolvedValue([
+          memberPendingDebtor,
+          memberRegisteredCreditor,
+        ] as any);
+
+        // Registered member paid 100; pending member paid 0 => pending owes registered 50.
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 100,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByGroupMember: { id: 'member-creditor' },
+          },
+        ] as any);
+
+        const result = await service.closeMonth(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        expect(result.carryForwardExpenseCount).toBe(1);
+        expect(entityManagerMock.create).toHaveBeenCalledWith(
+          Expense,
+          expect.objectContaining({
+            paidByGroupMember: memberRegisteredCreditor,
+          }),
+        );
+        expect(entityManagerMock.create).toHaveBeenCalledWith(
+          ExpenseSplit,
+          expect.objectContaining({
+            participantGroupMember: memberPendingDebtor,
+          }),
+        );
+      });
+    });
+  });
+
   // ── listMyExpenses ────────────────────────────────────────────────────────
 
   describe('listMyExpenses', () => {
@@ -1351,6 +1893,43 @@ describe('ExpensesService', () => {
       expect((result.data[0] as any).myShare).toBe(300);
       expect((result.data[0] as any).groupId).toBe('grp-1');
       expect((result.data[0] as any).groupName).toBe('House');
+    });
+
+    it('resolves the payer display for a GROUP_SHARE item via paidByGroupMember — the shape every new group expense uses (frozen group-ledger identity rule)', async () => {
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+      const groupExp = {
+        id: 'g-2',
+        title: 'enc:Taxi',
+        amountTotal: 400,
+        category: 'Travel',
+        expenseDate: '2026-07-03',
+        currency: 'USD',
+        status: 'posted',
+        encryptionScope: 'group',
+        group: { id: 'grp-1', name: 'House' },
+        paidByUser: undefined,
+        paidByGroupMember: {
+          id: 'member-bob',
+          user: { id: 'user-2', displayName: 'Bob', email: 'bob@e.com' },
+        },
+      };
+      const split = {
+        id: 'sp-2',
+        amountOwed: 200,
+        isSettled: false,
+        expense: groupExp,
+      };
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([split]));
+
+      const result = await service.listMyExpenses('user-1', 1, 20);
+
+      expect((result.data[0] as any).paidByUserId).toBe('user-2');
+      expect((result.data[0] as any).paidByGroupMemberId).toBe('member-bob');
+      expect((result.data[0] as any).paidByDisplayName).toBe('Bob');
     });
 
     it('does not duplicate an expense that appears as both personal and a split', async () => {

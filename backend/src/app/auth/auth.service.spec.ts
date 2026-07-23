@@ -6,6 +6,8 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { RedisService } from '../redis/redis.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import { EmailService } from '../email/email.service';
+import { ContactsService } from '../contacts/contacts.service';
 import { AuditLog } from '@finmate/data-models';
 import {
   UnauthorizedException,
@@ -24,6 +26,8 @@ describe('AuthService', () => {
   let jwtService: jest.Mocked<JwtService>;
   let redisService: jest.Mocked<RedisService>;
   let encryptionService: jest.Mocked<EncryptionService>;
+  let emailService: { sendEmail: jest.Mock };
+  let contactsService: { claimContactsForUser: jest.Mock };
 
   beforeEach(async () => {
     const mockUsersService = {
@@ -43,6 +47,7 @@ describe('AuthService', () => {
       get: jest.fn(),
       set: jest.fn(),
       del: jest.fn(),
+      getDel: jest.fn(),
       scanKeys: jest.fn().mockResolvedValue([]),
     };
 
@@ -64,6 +69,16 @@ describe('AuthService', () => {
       create: jest.fn(),
     };
 
+    const mockEmailService = {
+      sendEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const mockContactsService = {
+      claimContactsForUser: jest
+        .fn()
+        .mockResolvedValue({ linkedGroupIds: [], claimedContactIds: [] }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -72,6 +87,8 @@ describe('AuthService', () => {
         { provide: ConfigService, useValue: mockConfigService },
         { provide: RedisService, useValue: mockRedisService },
         { provide: EncryptionService, useValue: mockEncryptionService },
+        { provide: EmailService, useValue: mockEmailService },
+        { provide: ContactsService, useValue: mockContactsService },
         {
           provide: getRepositoryToken(AuditLog),
           useValue: mockAuditLogRepository,
@@ -84,6 +101,8 @@ describe('AuthService', () => {
     jwtService = module.get(JwtService);
     redisService = module.get(RedisService);
     encryptionService = module.get(EncryptionService);
+    emailService = module.get(EmailService);
+    contactsService = module.get(ContactsService);
   });
 
   it('should be defined', () => {
@@ -123,6 +142,87 @@ describe('AuthService', () => {
         createdAt: mockUser.createdAt,
         updatedAt: mockUser.updatedAt,
       });
+    });
+
+    it('sends a verification email but never blocks on it — registration succeeds even if sending fails', async () => {
+      const mockUser = {
+        id: 'user-id',
+        email: 'test@example.com',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any;
+      usersService.createUser.mockResolvedValue(mockUser);
+      emailService.sendEmail.mockRejectedValueOnce(new Error('SMTP down'));
+
+      await expect(
+        service.register('test@example.com', 'password'),
+      ).resolves.toBeDefined();
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('confirms the token, marks the user verified, and runs the Contact-claim fan-out', async () => {
+      redisService.getDel.mockResolvedValueOnce('user-id');
+      usersService.findById.mockResolvedValueOnce({
+        id: 'user-id',
+        email: 'rahul@gmail.com',
+        emailVerified: false,
+      } as any);
+      contactsService.claimContactsForUser.mockResolvedValueOnce({
+        linkedGroupIds: ['group-family', 'group-trip'],
+        claimedContactIds: ['contact-1'],
+      });
+
+      const result = await service.verifyEmail('good-token');
+
+      expect(redisService.getDel).toHaveBeenCalledWith(
+        'email_verify:good-token',
+      );
+      expect(usersService.updateUser).toHaveBeenCalledWith(
+        expect.objectContaining({ emailVerified: true }),
+      );
+      expect(contactsService.claimContactsForUser).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'user-id' }),
+      );
+      expect(result).toEqual({
+        linkedGroupIds: ['group-family', 'group-trip'],
+        claimedContactIds: ['contact-1'],
+      });
+    });
+
+    it('rejects an invalid or expired token without touching any Contact (never auto-claims on an unverified email)', async () => {
+      redisService.getDel.mockResolvedValueOnce(null);
+
+      await expect(service.verifyEmail('bad-token')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(contactsService.claimContactsForUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects a second concurrent use of the same token exactly like an expired one (GETDEL closes the race)', async () => {
+      // The atomic GETDEL means a token can only ever be read successfully
+      // once — a second caller racing the first sees the same null result
+      // an already-expired token would produce, never a partial claim.
+      redisService.getDel
+        .mockResolvedValueOnce('user-id') // first caller: wins
+        .mockResolvedValueOnce(null); // second, concurrent caller: loses
+      usersService.findById.mockResolvedValueOnce({
+        id: 'user-id',
+        email: 'rahul@gmail.com',
+        emailVerified: false,
+      } as any);
+      contactsService.claimContactsForUser.mockResolvedValueOnce({
+        linkedGroupIds: [],
+        claimedContactIds: [],
+      });
+
+      await expect(service.verifyEmail('shared-token')).resolves.toBeDefined();
+      await expect(service.verifyEmail('shared-token')).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(contactsService.claimContactsForUser).toHaveBeenCalledTimes(1);
     });
   });
 

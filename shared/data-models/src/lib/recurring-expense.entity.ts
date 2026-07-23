@@ -7,13 +7,22 @@ import {
   UpdateDateColumn,
   VersionColumn,
   Index,
+  Check,
 } from 'typeorm';
 import { User } from './user.entity';
 import { Group } from './group.entity';
 import { GroupKeyVersion } from './group-key-version.entity';
+import { GroupMember } from './group-member.entity';
 
+/**
+ * Mirrors `Expense`'s payer CHECK: exactly one of `paidByUser`/
+ * `paidByGroupMember` is set, and `paidByGroupMember` requires a group.
+ */
 @Entity('recurring_expenses')
 @Index(['nextOccurrenceDate', 'status'])
+@Check(
+  '(("paidByUserId" IS NOT NULL) <> ("paidByGroupMemberId" IS NOT NULL)) AND ("groupId" IS NOT NULL OR "paidByGroupMemberId" IS NULL)',
+)
 export class RecurringExpense {
   @PrimaryGeneratedColumn('uuid')
   id!: string;
@@ -33,8 +42,12 @@ export class RecurringExpense {
   @Column({ type: 'varchar', length: 64 })
   category!: string;
 
-  @ManyToOne(() => User, { nullable: false })
-  paidByUser!: User;
+  @ManyToOne(() => User, { nullable: true })
+  paidByUser?: User;
+
+  /** Group templates only — a pending (Contact-backed) member as payer. */
+  @ManyToOne(() => GroupMember, { nullable: true })
+  paidByGroupMember?: GroupMember;
 
   @ManyToOne(() => User, { nullable: false })
   ownerUser!: User;

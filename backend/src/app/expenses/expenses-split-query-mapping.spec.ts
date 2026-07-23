@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import {
+  Contact,
   Expense,
   ExpenseSplit,
   Group,
@@ -45,7 +46,15 @@ describe('ExpenseSplit query mapping (participant filter)', () => {
       username: 'unused',
       password: 'unused',
       database: 'unused',
-      entities: [Expense, ExpenseSplit, Group, GroupMember, GroupKeyVersion, User],
+      entities: [
+        Expense,
+        ExpenseSplit,
+        Group,
+        GroupMember,
+        GroupKeyVersion,
+        User,
+        Contact,
+      ],
       namingStrategy: new SnakeNamingStrategy(),
     });
     // Building metadata does not open a socket connection; it only compiles

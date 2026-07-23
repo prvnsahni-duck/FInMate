@@ -392,4 +392,251 @@ describe('GroupDetailComponent', () => {
       expect(component.isArchiving()).toBe(false);
     });
   });
+
+  // ── Phase 2.1: Carry-Forward rendering (groupMemberId tracking) ──────────
+
+  describe('Carry-Forward widget rendering', () => {
+    /** Scopes to the carry-forward widget's rows, avoiding ambiguous shared classes. */
+    const getCarryForwardRows = (): HTMLElement[] => {
+      const heading = Array.from(
+        fixture.nativeElement.querySelectorAll('h3'),
+      ).find((h: any) =>
+        h.textContent.includes('Household Target vs. Actual Contribution'),
+      ) as HTMLElement | undefined;
+      if (!heading) return [];
+      const rowsContainer = heading.nextElementSibling as HTMLElement | null;
+      if (!rowsContainer) return [];
+      return Array.from(rowsContainer.children) as HTMLElement[];
+    };
+
+    it('renders one row for a single registered member', () => {
+      mockGroupsService.getCarryForward = jest.fn().mockReturnValue(
+        of([
+          {
+            groupMemberId: 'member-owner',
+            userId: 'user-owner',
+            displayName: 'Owner User',
+            paid: 100,
+            expected: 100,
+            netBalance: 0,
+            percentage: 50,
+            currency: 'USD',
+          },
+        ]),
+      );
+
+      fixture.detectChanges();
+
+      const rows = getCarryForwardRows();
+      expect(rows.length).toBe(1);
+      expect(rows[0].textContent).toContain('Owner User');
+    });
+
+    it('renders one row for a single pending member (userId null)', () => {
+      mockGroupsService.getCarryForward = jest.fn().mockReturnValue(
+        of([
+          {
+            groupMemberId: 'gm-pending-1',
+            userId: null,
+            displayName: 'Pending Person',
+            paid: 0,
+            expected: 100,
+            netBalance: -100,
+            percentage: 50,
+            currency: 'USD',
+          },
+        ]),
+      );
+
+      fixture.detectChanges();
+
+      const rows = getCarryForwardRows();
+      expect(rows.length).toBe(1);
+      expect(rows[0].textContent).toContain('Pending Person');
+    });
+
+    it('renders multiple pending members independently (no duplicate/missing DOM nodes when userId is null for all)', () => {
+      mockGroupsService.getCarryForward = jest.fn().mockReturnValue(
+        of([
+          {
+            groupMemberId: 'gm-pending-1',
+            userId: null,
+            displayName: 'Pending One',
+            paid: 0,
+            expected: 50,
+            netBalance: -50,
+            percentage: 25,
+            currency: 'USD',
+          },
+          {
+            groupMemberId: 'gm-pending-2',
+            userId: null,
+            displayName: 'Pending Two',
+            paid: 0,
+            expected: 50,
+            netBalance: -50,
+            percentage: 25,
+            currency: 'USD',
+          },
+        ]),
+      );
+
+      fixture.detectChanges();
+
+      const rows = getCarryForwardRows();
+      // Both rows must render distinctly — a stale `track m.userId` would
+      // collapse these (both userId: null) into a single tracked entry.
+      expect(rows.length).toBe(2);
+      expect(rows[0].textContent).toContain('Pending One');
+      expect(rows[1].textContent).toContain('Pending Two');
+    });
+
+    it('renders correctly for a mixed household (registered + pending members)', () => {
+      mockGroupsService.getCarryForward = jest.fn().mockReturnValue(
+        of([
+          {
+            groupMemberId: 'member-owner',
+            userId: 'user-owner',
+            displayName: 'Owner User',
+            paid: 100,
+            expected: 50,
+            netBalance: 50,
+            percentage: 50,
+            currency: 'USD',
+          },
+          {
+            groupMemberId: 'gm-pending-1',
+            userId: null,
+            displayName: 'Pending Person',
+            paid: 0,
+            expected: 50,
+            netBalance: -50,
+            percentage: 50,
+            currency: 'USD',
+          },
+        ]),
+      );
+
+      fixture.detectChanges();
+
+      const rows = getCarryForwardRows();
+      expect(rows.length).toBe(2);
+      expect(rows[0].textContent).toContain('Owner User');
+      expect(rows[1].textContent).toContain('Pending Person');
+    });
+
+    it('is stable across a refresh with unchanged data (no duplicated DOM)', () => {
+      const balances = [
+        {
+          groupMemberId: 'gm-pending-1',
+          userId: null,
+          displayName: 'Pending Person',
+          paid: 0,
+          expected: 100,
+          netBalance: -100,
+          percentage: 50,
+          currency: 'USD',
+        },
+      ];
+      mockGroupsService.getCarryForward = jest
+        .fn()
+        .mockReturnValue(of(balances));
+
+      fixture.detectChanges();
+      expect(getCarryForwardRows().length).toBe(1);
+
+      // Simulate a refresh (e.g. polling / re-navigation) with identical data
+      component.fetchCarryForward('group-1');
+      fixture.detectChanges();
+
+      const rows = getCarryForwardRows();
+      expect(rows.length).toBe(1);
+      expect(rows[0].textContent).toContain('Pending Person');
+    });
+
+    it('is stable across a direct signal update (no duplicated DOM, correct final state)', () => {
+      mockGroupsService.getCarryForward = jest.fn().mockReturnValue(
+        of([
+          {
+            groupMemberId: 'gm-pending-1',
+            userId: null,
+            displayName: 'Pending One',
+            paid: 0,
+            expected: 50,
+            netBalance: -50,
+            percentage: 50,
+            currency: 'USD',
+          },
+        ]),
+      );
+      fixture.detectChanges();
+      expect(getCarryForwardRows().length).toBe(1);
+
+      // Update the signal directly with a new set of pending members
+      component.carryForwardBalances.set([
+        {
+          groupMemberId: 'gm-pending-1',
+          userId: null,
+          displayName: 'Pending One',
+          paid: 25,
+          expected: 50,
+          netBalance: -25,
+          percentage: 50,
+          currency: 'USD',
+        } as any,
+        {
+          groupMemberId: 'gm-pending-2',
+          userId: null,
+          displayName: 'Pending Two',
+          paid: 0,
+          expected: 50,
+          netBalance: -50,
+          percentage: 50,
+          currency: 'USD',
+        } as any,
+      ]);
+      fixture.detectChanges();
+
+      const rows = getCarryForwardRows();
+      expect(rows.length).toBe(2);
+      expect(rows[0].textContent).toContain('Pending One');
+      expect(rows[1].textContent).toContain('Pending Two');
+    });
+
+    it('regression: registered-only household renders exactly as before', () => {
+      mockGroupsService.getCarryForward = jest.fn().mockReturnValue(
+        of([
+          {
+            groupMemberId: 'member-owner',
+            userId: 'user-owner',
+            displayName: 'Owner User',
+            paid: 150,
+            expected: 75,
+            netBalance: 75,
+            percentage: 50,
+            currency: 'USD',
+          },
+          {
+            groupMemberId: 'member-admin',
+            userId: 'user-admin',
+            displayName: 'Admin User',
+            paid: 0,
+            expected: 75,
+            netBalance: -75,
+            percentage: 50,
+            currency: 'USD',
+          },
+        ]),
+      );
+
+      fixture.detectChanges();
+
+      const rows = getCarryForwardRows();
+      expect(rows.length).toBe(2);
+      expect(rows[0].textContent).toContain('Owner User');
+      expect(rows[0].textContent).toContain('+$75.00');
+      expect(rows[1].textContent).toContain('Admin User');
+      expect(rows[1].textContent).toContain('-$75.00');
+    });
+  });
 });

@@ -28,10 +28,10 @@ import {
 } from '@finmate/data-models';
 import { createHash } from 'crypto';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
-import * as argon2 from 'argon2';
 import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { EmailService } from '../email/email.service';
+import { ContactsService } from '../contacts/contacts.service';
 
 @Injectable()
 export class GroupsService {
@@ -51,6 +51,7 @@ export class GroupsService {
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
+    private readonly contactsService: ContactsService,
   ) {}
 
   private getIpHash(ip?: string): string | undefined {
@@ -60,6 +61,31 @@ export class GroupsService {
 
   private isInviteExpired(invite: GroupInvite): boolean {
     return !!invite.expiresAt && invite.expiresAt.getTime() < Date.now();
+  }
+
+  /** Display summary for a member response row, whichever identity backs it. */
+  private memberSummary(m: GroupMember): {
+    memberType: 'user' | 'contact';
+    displayName: string | null;
+    email: string | null;
+    phoneNumber: string | null;
+  } {
+    if (m.user) {
+      return {
+        memberType: 'user',
+        displayName: m.nickname || m.user.displayName || null,
+        email: m.user.email.endsWith('@placeholder.finmate')
+          ? null
+          : m.user.email,
+        phoneNumber: m.user.phoneNumber || null,
+      };
+    }
+    return {
+      memberType: 'contact',
+      displayName: m.nickname || m.contact?.displayName || null,
+      email: m.contact?.email || null,
+      phoneNumber: m.contact?.phoneNumber || null,
+    };
   }
 
   private async getActiveMembership(
@@ -201,60 +227,52 @@ export class GroupsService {
 
       await this.ensureActiveGroupKeyVersion(savedGroup, manager);
 
-      // Invite initial members if provided
+      // Invite initial members if provided. Resolution always checks for an
+      // existing registered User first (the permanent backstop); an
+      // unresolved identifier becomes a Contact-backed pending member
+      // instead of a shadow User — see ContactsService.resolveOrCreateIdentity.
       if (dto.members && dto.members.length > 0) {
         for (const initialMember of dto.members) {
           if (!initialMember.identifier) continue;
-          let targetUser = await manager
-            .getRepository(User)
-            .createQueryBuilder('user')
-            .where(
-              'user.email = :id OR user.username = :id OR user.phoneNumber = :id',
-              { id: initialMember.identifier },
-            )
-            .getOne();
-
-          if (!targetUser) {
-            const isEmail = initialMember.identifier.includes('@');
-            if (isEmail) {
-              const dummyPassword = await argon2.hash(randomUUID());
-              targetUser = manager.getRepository(User).create({
-                email: initialMember.identifier,
-                passwordHash: dummyPassword,
-                status: 'invited',
-              });
-              targetUser = await manager.save(User, targetUser);
-            } else {
-              const hasDigits = /^\+?[0-9\s-]{7,15}$/.test(
-                initialMember.identifier,
-              );
-              if (hasDigits) {
-                const dummyPassword = await argon2.hash(randomUUID());
-                targetUser = manager.getRepository(User).create({
-                  email: `${initialMember.identifier}@placeholder.finmate`,
-                  phoneNumber: initialMember.identifier,
-                  passwordHash: dummyPassword,
-                  status: 'invited',
-                });
-                targetUser = await manager.save(User, targetUser);
-              } else {
-                continue; // Skip invalid usernames/identifiers
-              }
-            }
+          const isEmail = initialMember.identifier.includes('@');
+          const isPhone = /^\+?[0-9\s-]{7,15}$/.test(initialMember.identifier);
+          if (!isEmail && !isPhone) {
+            // Could still be an existing user's username — resolve directly.
+            const targetUser = await manager
+              .getRepository(User)
+              .createQueryBuilder('user')
+              .where('user.username = :id', { id: initialMember.identifier })
+              .getOne();
+            if (!targetUser) continue; // Skip unresolvable usernames
+            const newMember = manager.create(GroupMember, {
+              group: savedGroup,
+              user: targetUser,
+              role: initialMember.role || 'member',
+              joinStatus: 'invited',
+            });
+            await manager.save(GroupMember, newMember);
+            continue;
           }
+
+          const resolution = await this.contactsService.resolveOrCreateIdentity(
+            {
+              email: isEmail ? initialMember.identifier : undefined,
+              phone: isPhone ? initialMember.identifier : undefined,
+              createdByUser: owner,
+            },
+            manager,
+          );
+
           const newMember = manager.create(GroupMember, {
             group: savedGroup,
-            user: targetUser,
+            user: resolution.type === 'user' ? resolution.user : undefined,
+            contact: resolution.type === 'contact' ? resolution.contact : undefined,
             role: initialMember.role || 'member',
             joinStatus: 'invited',
           });
           await manager.save(GroupMember, newMember);
 
-          if (
-            targetUser &&
-            targetUser.email &&
-            !targetUser.email.endsWith('@placeholder.finmate')
-          ) {
+          if (resolution.type === 'user') {
             const frontendUrl =
               this.configService.get<string>('FRONTEND_URL') ||
               'http://localhost:4200';
@@ -262,14 +280,33 @@ export class GroupsService {
             const inviterName = owner.displayName || owner.email;
             this.emailService
               .sendInviteEmail(
-                targetUser.email,
+                resolution.user!.email,
                 savedGroup.name,
                 inviteUrl,
                 inviterName,
               )
               .catch((err) =>
                 this.emailService['logger'].error(
-                  `Failed to send invite email to ${targetUser.email} during group creation:`,
+                  `Failed to send invite email to ${resolution.user!.email} during group creation:`,
+                  err,
+                ),
+              );
+          } else if (resolution.contact!.email) {
+            const frontendUrl =
+              this.configService.get<string>('FRONTEND_URL') ||
+              'http://localhost:4200';
+            const inviteUrl = `${frontendUrl}/groups/join/${savedGroup.inviteToken}`;
+            const inviterName = owner.displayName || owner.email;
+            this.emailService
+              .sendInviteEmail(
+                resolution.contact!.email,
+                savedGroup.name,
+                inviteUrl,
+                inviterName,
+              )
+              .catch((err) =>
+                this.emailService['logger'].error(
+                  `Failed to send invite email to ${resolution.contact!.email} during group creation:`,
                   err,
                 ),
               );
@@ -506,58 +543,53 @@ export class GroupsService {
         .findOne({ where: { email: dto.email } });
     }
 
+    // Not resolved directly by id/username — resolve-or-create via
+    // ContactsService, which re-checks for an existing User first (the
+    // permanent backstop) before reusing/creating a pending Contact. This
+    // replaces the previous shadow-User creation entirely.
+    let resolvedContact: import('@finmate/data-models').Contact | undefined;
     if (!targetUser) {
-      const input = dto.identifier || dto.email;
+      const input = dto.identifier || dto.email || dto.phone;
       if (!input) {
         throw new BadRequestException(
           'Provide email, username, or phone number to invite',
         );
       }
-
       const isEmail = input.includes('@');
-      if (isEmail) {
-        const dummyPassword = await argon2.hash(randomUUID());
-        targetUser = this.dataSource.getRepository(User).create({
-          email: input,
-          passwordHash: dummyPassword,
-          status: 'invited',
-          displayName: dto.displayName,
-        });
-        targetUser = await this.dataSource.getRepository(User).save(targetUser);
+      const isPhone = /^\+?[0-9\s-]{7,15}$/.test(input);
+      if (!isEmail && !isPhone) {
+        throw new NotFoundException(
+          'User not found by the provided username/identifier',
+        );
+      }
+      const resolution = await this.contactsService.resolveOrCreateIdentity({
+        email: isEmail ? input : undefined,
+        phone: isPhone ? input : dto.phone,
+        displayName: dto.displayName,
+        createdByUser: callerMember.user,
+      });
+      if (resolution.type === 'user') {
+        targetUser = resolution.user!;
       } else {
-        const hasDigits = /^\+?[0-9\s-]{7,15}$/.test(input);
-        if (hasDigits) {
-          const dummyPassword = await argon2.hash(randomUUID());
-          targetUser = this.dataSource.getRepository(User).create({
-            email: `${input}@placeholder.finmate`,
-            phoneNumber: input,
-            passwordHash: dummyPassword,
-            status: 'invited',
-            displayName: dto.displayName,
-          });
-          targetUser = await this.dataSource
-            .getRepository(User)
-            .save(targetUser);
-        } else {
-          throw new NotFoundException(
-            'User not found by the provided username/identifier',
-          );
-        }
+        resolvedContact = resolution.contact;
       }
     }
 
-    // Check existing membership
+    // Check existing membership, whether User- or Contact-backed.
     const existingMember = await this.groupMemberRepository
       .createQueryBuilder('member')
       .leftJoinAndSelect('member.user', 'user')
+      .leftJoinAndSelect('member.contact', 'contact')
       .where('member.group_id = :groupId', { groupId })
-      .andWhere('member.user_id = :targetUserId', {
-        targetUserId: targetUser.id,
-      })
+      .andWhere(
+        targetUser
+          ? 'member.user_id = :targetId'
+          : 'member.contact_id = :targetId',
+        { targetId: targetUser ? targetUser.id : resolvedContact!.id },
+      )
       .getOne();
 
     let savedMember: GroupMember;
-
     let inviteToken: string | undefined;
 
     if (existingMember) {
@@ -567,7 +599,7 @@ export class GroupsService {
       ) {
         throw new ConflictException({
           errorCode: 'RES_ALREADY_EXISTS',
-          message: 'User is already a member or has a pending invitation',
+          message: 'This person is already a member or has a pending invitation',
         });
       }
       // Re-invite
@@ -579,14 +611,17 @@ export class GroupsService {
     } else {
       const newMember = this.groupMemberRepository.create({
         group,
-        user: targetUser,
+        user: targetUser ?? undefined,
+        contact: resolvedContact,
         role: dto.role || 'member',
         joinStatus: 'invited',
       });
       savedMember = await this.groupMemberRepository.save(newMember);
     }
 
-    if (dto.wrappedGroupKey) {
+    // Key wrapping only ever applies to a registered User — a pending
+    // Contact has no account and no public key to wrap to.
+    if (dto.wrappedGroupKey && targetUser) {
       const activeVersion =
         (await this.getActiveGroupKeyVersion(group.id)) ||
         (await this.dataSource.transaction((manager) =>
@@ -637,11 +672,8 @@ export class GroupsService {
       }
     }
 
-    if (
-      targetUser &&
-      targetUser.email &&
-      !targetUser.email.endsWith('@placeholder.finmate')
-    ) {
+    const inviteeEmail = targetUser?.email ?? resolvedContact?.email;
+    if (inviteeEmail) {
       const frontendUrl =
         this.configService.get<string>('FRONTEND_URL') ||
         'http://localhost:4200';
@@ -653,10 +685,10 @@ export class GroupsService {
       const inviterName =
         callerMember.user.displayName || callerMember.user.email;
       this.emailService
-        .sendInviteEmail(targetUser.email, group.name, inviteUrl, inviterName)
+        .sendInviteEmail(inviteeEmail, group.name, inviteUrl, inviterName)
         .catch((err) =>
           this.emailService['logger'].error(
-            `Failed to send invite email to ${targetUser.email}:`,
+            `Failed to send invite email to ${inviteeEmail}:`,
             err,
           ),
         );
@@ -667,13 +699,18 @@ export class GroupsService {
       action: 'group.member_invited',
       entityId: savedMember.id,
       groupId: group.id,
-      metadata: { invitedEmail: targetUser.email, role: savedMember.role },
+      metadata: {
+        memberType: targetUser ? 'user' : 'contact',
+        invitedEmail: inviteeEmail ?? null,
+        role: savedMember.role,
+      },
       ip: context?.ip,
       userAgent: context?.userAgent,
     });
 
     return {
       member: savedMember,
+      memberType: targetUser ? 'user' : 'contact',
       inviteToken: inviteToken || group.inviteToken,
     };
   }
@@ -693,7 +730,7 @@ export class GroupsService {
       where: {
         group: { id: groupId },
       },
-      relations: ['user'],
+      relations: ['user', 'contact'],
     });
   }
 
@@ -751,7 +788,7 @@ export class GroupsService {
           'Admins cannot change the role of other admins or the owner',
         );
       }
-      if (targetMember.user.id === userId && dto.role !== 'owner') {
+      if (targetMember.user?.id === userId && dto.role !== 'owner') {
         throw new ForbiddenException(
           'Use ownership transfer or leave the group instead of changing your own role',
         );
@@ -799,7 +836,9 @@ export class GroupsService {
 
     // Handle join status updates
     if (dto.joinStatus) {
-      const isSelf = targetMember.user.id === userId;
+      // A pending (Contact-backed) target has no account and can never be
+      // the caller — `isSelf` correctly evaluates false for them.
+      const isSelf = targetMember.user?.id === userId;
       if (isSelf) {
         if (dto.joinStatus === 'active') {
           if (targetMember.joinStatus !== 'invited') {
@@ -898,6 +937,7 @@ export class GroupsService {
     const targetMember = await this.groupMemberRepository
       .createQueryBuilder('member')
       .leftJoinAndSelect('member.user', 'user')
+      .leftJoinAndSelect('member.contact', 'contact')
       .where('member.id = :memberId', { memberId })
       .andWhere('member.group_id = :groupId', { groupId })
       .getOne();
@@ -905,7 +945,10 @@ export class GroupsService {
       throw new NotFoundException('Member record not found');
     }
 
-    const isSelf = targetMember.user.id === userId;
+    // A pending (Contact-backed) target has no account and can never be the
+    // caller — `isSelf` correctly evaluates false for them, so only a real
+    // registered member ever takes the "self" branch below.
+    const isSelf = targetMember.user?.id === userId;
 
     if (isSelf) {
       if (targetMember.role === 'owner') {
@@ -918,12 +961,12 @@ export class GroupsService {
       const savedMember = await this.groupMemberRepository.save(targetMember);
 
       void this.writeAuditLog({
-        actorUser: targetMember.user,
+        actorUser: targetMember.user!,
         action: 'group.member_left',
         entityId: savedMember.id,
         groupId,
         metadata: {
-          memberEmail: targetMember.user.email,
+          memberEmail: targetMember.user!.email,
           role: targetMember.role,
         },
         ip: context?.ip,
@@ -961,7 +1004,8 @@ export class GroupsService {
           entityId: savedMember.id,
           groupId,
           metadata: {
-            memberEmail: targetMember.user.email,
+            memberEmail: targetMember.user?.email ?? null,
+            memberType: targetMember.user ? 'user' : 'contact',
             role: targetMember.role,
           },
           ip: context?.ip,
@@ -1070,7 +1114,7 @@ export class GroupsService {
           group: { id: group.id },
           joinStatus: In(['active', 'invited']),
         },
-        relations: ['user'],
+        relations: ['user', 'contact'],
       });
 
       return {
@@ -1084,11 +1128,7 @@ export class GroupsService {
         groupKeyVersionId: invite.groupKeyVersion?.id ?? null,
         groupKeyVersion: invite.groupKeyVersion?.version ?? null,
         members: members.map((m) => ({
-          displayName: m.user.displayName || null,
-          email: m.user.email.endsWith('@placeholder.finmate')
-            ? null
-            : m.user.email,
-          phoneNumber: m.user.phoneNumber || null,
+          ...this.memberSummary(m),
           role: m.role,
           joinStatus: m.joinStatus,
         })),
@@ -1106,7 +1146,7 @@ export class GroupsService {
 
     const members = await this.groupMemberRepository.find({
       where: { group: { id: group.id }, joinStatus: In(['active', 'invited']) },
-      relations: ['user'],
+      relations: ['user', 'contact'],
     });
 
     return {
@@ -1120,11 +1160,7 @@ export class GroupsService {
       groupKeyVersionId: null,
       groupKeyVersion: null,
       members: members.map((m) => ({
-        displayName: m.user.displayName || null,
-        email: m.user.email.endsWith('@placeholder.finmate')
-          ? null
-          : m.user.email,
-        phoneNumber: m.user.phoneNumber || null,
+        ...this.memberSummary(m),
         role: m.role,
         joinStatus: m.joinStatus,
       })),
@@ -1549,7 +1585,7 @@ export class GroupsService {
           group: { id: m.group.id },
           joinStatus: In(['active', 'invited']),
         },
-        relations: ['user'],
+        relations: ['user', 'contact'],
       });
 
       results.push({
@@ -1561,11 +1597,7 @@ export class GroupsService {
         groupType: m.group.groupType,
         ownerName: m.group.ownerUser.displayName || m.group.ownerUser.email,
         members: members.map((member) => ({
-          displayName: member.user.displayName || null,
-          email: member.user.email.endsWith('@placeholder.finmate')
-            ? null
-            : member.user.email,
-          phoneNumber: member.user.phoneNumber || null,
+          ...this.memberSummary(member),
           role: member.role,
           joinStatus: member.joinStatus,
         })),
@@ -1588,14 +1620,13 @@ export class GroupsService {
 
     const activeMembers = await this.groupMemberRepository.find({
       where: { group: { id: groupId }, joinStatus: 'active' },
-      relations: ['user'],
+      relations: ['user', 'contact'],
     });
 
     const contributions = await this.dataSource
       .getRepository(GroupMemberContribution)
       .createQueryBuilder('contribution')
       .innerJoinAndSelect('contribution.groupMember', 'groupMember')
-      .innerJoinAndSelect('groupMember.user', 'user')
       .where('groupMember.group_id = :groupId', { groupId })
       .andWhere('contribution.ledgerMonth = :ledgerMonth', { ledgerMonth })
       .getMany();
@@ -1607,10 +1638,12 @@ export class GroupsService {
     const result = activeMembers.map((m) => {
       const percentage =
         contributionsMap.get(m.id) ?? 100 / activeMembers.length;
+      const summary = this.memberSummary(m);
       return {
         memberId: m.id,
-        userId: m.user.id,
-        displayName: m.user.displayName || m.user.email,
+        userId: m.user?.id ?? null,
+        contactId: m.contact?.id ?? null,
+        displayName: summary.displayName || summary.email,
         percentage: Math.round(percentage * 100) / 100,
       };
     });

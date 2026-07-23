@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { Group } from './group.entity';
 import { User } from './user.entity';
+import { Contact } from './contact.entity';
 import { GroupKeyVersion } from './group-key-version.entity';
 
 @Entity('group_invites')
@@ -30,6 +31,10 @@ export class GroupInvite {
 
   @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   inviteeUser?: User;
+
+  /** Set when the invitee isn't a registered User yet. */
+  @ManyToOne(() => Contact, { nullable: true, onDelete: 'SET NULL' })
+  contact?: Contact;
 
   @Column({ name: 'wrapped_group_key', type: 'text', nullable: true })
   wrappedGroupKey?: string;

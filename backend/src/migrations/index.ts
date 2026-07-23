@@ -15,3 +15,5 @@ export { AddRecurringExpenseKeyVersion1719200000000 } from './1719200000000-AddR
 export { AddExpenseSplitVersionAndSoftDelete1719300000000 } from './1719300000000-AddExpenseSplitVersionAndSoftDelete';
 export { AddExpenseVersionHistory1719400000000 } from './1719400000000-AddExpenseVersionHistory';
 export { AddPasswordRecoveryKey1719500000000 } from './1719500000000-AddPasswordRecoveryKey';
+export { AddContactsAndPendingMembers1719600000000 } from './1719600000000-AddContactsAndPendingMembers';
+export { AddRecurringExpenseGroupMemberPayer1719700000000 } from './1719700000000-AddRecurringExpenseGroupMemberPayer';

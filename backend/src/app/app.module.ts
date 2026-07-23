@@ -18,6 +18,7 @@ import { SnakeNamingStrategy } from './common/snake-naming-strategy';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { GroupsModule } from './groups/groups.module';
+import { ContactsModule } from './contacts/contacts.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { SettlementsModule } from './settlements/settlements.module';
 import { ImportModule } from './import/import.module';
@@ -170,6 +171,7 @@ import { THROTTLE_PROFILES } from './throttler/throttle.constants';
     AuthModule,
     UsersModule,
     GroupsModule,
+    ContactsModule,
     ExpensesModule,
     SettlementsModule,
     ImportModule,

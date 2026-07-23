@@ -74,9 +74,15 @@ export class CreateRecurringExpenseDto {
   @MaxLength(64, { message: 'Expense category cannot exceed 64 characters' })
   category!: string;
 
+  /** Required for personal templates; for group templates, this or paidByGroupMemberId. */
   @IsUUID('4', { message: 'Paid-by User ID must be a valid UUID' })
-  @IsNotEmpty({ message: 'Payer ID is required' })
-  paidByUserId!: string;
+  @IsOptional()
+  paidByUserId?: string;
+
+  /** Group templates only — a pending (Contact-backed) member as payer. */
+  @IsUUID('4', { message: 'paidByGroupMemberId must be a valid UUID v4' })
+  @IsOptional()
+  paidByGroupMemberId?: string;
 
   @IsUUID('4', { message: 'Group ID must be a valid UUID' })
   @IsOptional()
@@ -153,6 +159,11 @@ export class UpdateRecurringExpenseDto {
   @IsUUID('4', { message: 'Paid-by User ID must be a valid UUID' })
   @IsOptional()
   paidByUserId?: string;
+
+  /** Group templates only — a pending (Contact-backed) member as payer. */
+  @IsUUID('4', { message: 'paidByGroupMemberId must be a valid UUID v4' })
+  @IsOptional()
+  paidByGroupMemberId?: string;
 
   @IsEnum(['daily', 'weekly', 'monthly', 'yearly'], {
     message: 'Invalid frequency option',
