@@ -1159,7 +1159,8 @@ export class ExpensesService {
       .createQueryBuilder('expense')
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
       .leftJoinAndSelect('expense.ownerUser', 'ownerUser')
-      .leftJoinAndSelect('expense.group', 'group');
+      .leftJoinAndSelect('expense.group', 'group')
+      .leftJoinAndSelect('expense.groupKeyVersion', 'groupKeyVersion');
 
     if (params.groupId) {
       if (params.groupId === 'personal') {
