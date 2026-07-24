@@ -343,24 +343,70 @@ export class GroupKeyService {
 
     // Learn the concrete version id the backend bound the wrapped key to, so
     // write paths can declare it (ciphertext / version-stamp consistency).
+    //
+    // A concurrent createGroupKey() call may have stored a DIFFERENT wrapped
+    // key before ours arrived. The backend's idempotent guard silently ignores
+    // the duplicate POST, so the key actually in the DB may differ from the
+    // one we just generated. We detect this by comparing the wrappedKey the
+    // backend echoes back; when they differ we unwrap the backend's key and
+    // use that as the canonical key — ensuring the cache, the IndexedDB, and
+    // the ciphertext we are about to produce all agree with what is stored.
+    let canonicalKey = groupKey;
     try {
       const versionResponse = await firstValueFrom(
         this.http.get<
-          | { groupKeyVersionId: string | null }
-          | { data: { groupKeyVersionId: string | null } }
+          | {
+              groupKeyVersionId: string | null;
+              wrappedKey?: string | null;
+            }
+          | {
+              data: {
+                groupKeyVersionId: string | null;
+                wrappedKey?: string | null;
+              };
+            }
         >(`${this.baseUrl}/groups/${groupId}/keys/me`),
       );
       const versionData = this.unwrapHttpData(versionResponse);
       const mintedVersionId = versionData?.groupKeyVersionId;
+      const storedWrappedKey = versionData?.wrappedKey;
+
+      // If the backend has a different wrapped key (race condition), unwrap
+      // it so the canonical key matches what every future session will fetch.
+      if (storedWrappedKey && storedWrappedKey !== wrappedKeyForSelf) {
+        try {
+          // extractable: true — must match generateDataKey() so the key can
+          // later be re-wrapped when provisioning keys for new members.
+          canonicalKey = await this.encryptionService.unwrapKey(
+            storedWrappedKey,
+            masterKey,
+            true,
+          );
+          // Update the :active alias to the canonical key as well.
+          this.groupKeysMemoryCache.set(cacheKey, canonicalKey);
+          try {
+            await this.zkVault.storeGroupKey(cacheKey, canonicalKey);
+          } catch (e) {
+            console.warn('Failed to update :active alias in IndexedDB', e);
+          }
+        } catch (e) {
+          console.warn(
+            'Failed to unwrap concurrent key from backend; falling back to generated key',
+            e,
+          );
+          canonicalKey = groupKey;
+        }
+      }
+
       if (mintedVersionId) {
         this.activeGroupKeyVersionIds.set(groupId, mintedVersionId);
         const versionedCacheKey = this.buildVersionedKey(
           groupId,
           mintedVersionId,
         );
-        this.groupKeysMemoryCache.set(versionedCacheKey, groupKey);
+        this.groupKeysMemoryCache.set(versionedCacheKey, canonicalKey);
         try {
-          await this.zkVault.storeGroupKey(versionedCacheKey, groupKey);
+          await this.zkVault.storeGroupKey(versionedCacheKey, canonicalKey);
         } catch (e) {
           console.warn('Failed to persist versioned group key to IndexedDB', e);
         }
@@ -376,7 +422,7 @@ export class GroupKeyService {
       console.warn('Failed to pre-provision personal asymmetric keys', e);
     }
 
-    return groupKey;
+    return canonicalKey;
   }
 
   /**
