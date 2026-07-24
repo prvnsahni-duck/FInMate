@@ -463,6 +463,130 @@ export class ExpensesService {
     };
   }
 
+  /**
+   * Batch variant of mapExpenseResponse for list endpoints.
+   * Replaces N×3 per-expense queries with 3 bulk queries regardless of list size.
+   *
+   * Query pattern: 1 expense query (caller) + 3 IN-clause queries (this method)
+   * vs. the previous 1 expense query + 3×N per-expense queries.
+   */
+  private async batchMapExpenseResponses(
+    expenses: Expense[],
+  ): Promise<Record<string, unknown>[]> {
+    if (expenses.length === 0) return [];
+
+    const ids = expenses.map((e) => e.id);
+
+    // Three parallel batch fetches — one query each regardless of list size.
+    // `relations: ['expense']` loads expense.id for grouping via the identity map;
+    // TypeORM deduplicates entity instances within a single query so each unique
+    // expense UUID is only instantiated once.
+    const [allSplits, allAttachments, allWrappedKeys] = await Promise.all([
+      this.expenseSplitRepository.find({
+        where: { expense: { id: In(ids) } },
+        relations: ['expense', 'participantUser', 'participantGroupMember'],
+        order: { createdAt: 'ASC' },
+      }),
+      this.attachmentRepository.find({
+        where: { expense: { id: In(ids) } },
+        relations: ['expense', 'uploaderUser'],
+        order: { createdAt: 'ASC' },
+      }),
+      this.encryptedExpenseKeyRepository.find({
+        where: { expense: { id: In(ids) } },
+        relations: ['expense', 'user'],
+      }),
+    ]);
+
+    // Group each batch result by expense ID for O(1) lookup during mapping.
+    const splitsByExpId = new Map<string, ExpenseSplit[]>();
+    for (const split of allSplits) {
+      const eid = split.expense.id;
+      const arr = splitsByExpId.get(eid);
+      if (arr) arr.push(split);
+      else splitsByExpId.set(eid, [split]);
+    }
+
+    const attachsByExpId = new Map<string, Attachment[]>();
+    for (const att of allAttachments) {
+      const eid = att.expense.id;
+      const arr = attachsByExpId.get(eid);
+      if (arr) arr.push(att);
+      else attachsByExpId.set(eid, [att]);
+    }
+
+    const keysByExpId = new Map<string, EncryptedExpenseKey[]>();
+    for (const key of allWrappedKeys) {
+      const eid = key.expense.id;
+      const arr = keysByExpId.get(eid);
+      if (arr) arr.push(key);
+      else keysByExpId.set(eid, [key]);
+    }
+
+    return expenses.map((expense) => {
+      const splits = splitsByExpId.get(expense.id) ?? [];
+      const attachments = attachsByExpId.get(expense.id) ?? [];
+      const wrappedKeys = keysByExpId.get(expense.id) ?? [];
+
+      return {
+        id: expense.id,
+        title: expense.title,
+        description: expense.description ?? null,
+        amountTotal: Number(expense.amountTotal),
+        currency: expense.currency,
+        category: expense.category,
+        paidByUserId: expense.paidByUser?.id ?? null,
+        paidByGroupMemberId: expense.paidByGroupMember?.id ?? null,
+        ownerUserId: expense.ownerUser.id,
+        groupId: expense.group?.id ?? null,
+        groupKeyVersionId: expense.groupKeyVersion?.id ?? null,
+        groupKeyVersion: expense.groupKeyVersion?.version ?? null,
+        expenseDate: expense.expenseDate,
+        status: expense.status,
+        encryptionScope: expense.encryptionScope ?? 'personal',
+        ledgerMonth: expense.ledgerMonth ?? null,
+        isCarryForward: expense.isCarryForward,
+        splits: splits.map((split) => ({
+          id: split.id,
+          expenseId: expense.id,
+          participantUserId: split.participantUser?.id ?? null,
+          participantGroupMemberId: split.participantGroupMember?.id ?? null,
+          splitType: split.splitType,
+          shareValue: Number(split.shareValue),
+          amountOwed: Number(split.amountOwed),
+          isSettled: split.isSettled,
+          settledAt: split.settledAt ?? null,
+          createdAt: split.createdAt,
+          updatedAt: split.updatedAt,
+        })),
+        attachments: attachments.map((attachment) => ({
+          id: attachment.id,
+          uploaderUserId: attachment.uploaderUser.id,
+          expenseId: expense.id,
+          noteId: null,
+          goalId: null,
+          groupId: expense.group?.id ?? null,
+          storageKey: attachment.storageKey,
+          originalName: attachment.originalName,
+          mimeType: attachment.mimeType,
+          sizeBytes: Number(attachment.sizeBytes),
+          checksumSha256: attachment.checksumSha256 ?? null,
+          encryptedFileKey: attachment.encryptedFileKey ?? null,
+          encryptedOriginalName: attachment.encryptedOriginalName ?? null,
+          createdAt: attachment.createdAt,
+        })),
+        wrappedContentKeys: wrappedKeys.map((k) => ({
+          userId: k.user.id,
+          wrappedKey: k.wrappedKey,
+        })),
+        version: expense.version,
+        createdAt: expense.createdAt,
+        updatedAt: expense.updatedAt,
+        deletedAt: expense.deletedAt ?? null,
+      };
+    });
+  }
+
   private expenseSnapshot(expense: Expense): Record<string, unknown> {
     return {
       id: expense.id,
@@ -1110,9 +1234,7 @@ export class ExpensesService {
       .take(limit)
       .getMany();
 
-    const mapped = await Promise.all(
-      expenses.map((expense) => this.mapExpenseResponse(expense)),
-    );
+    const mapped = await this.batchMapExpenseResponses(expenses);
 
     return paginate(mapped, total, page, limit, '/api/v1/expenses', {
       groupId: params.groupId,
