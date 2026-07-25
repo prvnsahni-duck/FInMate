@@ -4,18 +4,18 @@ Start here when updating or auditing FinMate documentation. The canonical source
 
 ## Daily Drivers
 
-| Doc | Use it for |
-| --- | --- |
-| [`architecture/canonical-sources.md`](architecture/canonical-sources.md) | The authoritative map of docs by topic. |
-| [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | Current system architecture, module boundaries, security model, frontend/backend responsibilities, and key ledger mechanics. |
-| [`../DATABASE_SCHEMA.md`](../DATABASE_SCHEMA.md) | Data model and migration-backed schema reference. |
-| [`contracts/`](contracts/) | Module/API boundary contracts and non-negotiable invariants. |
-| [`group-key-flow.md`](group-key-flow.md) | Canonical group key lifecycle, cache, rotation, and expense decryption reference. |
-| [`EXPENSE_MODULE_STATUS.md`](EXPENSE_MODULE_STATUS.md) | Expense module status: architecture overview, canonical doc map, recent consolidations, known limitations. |
-| [`EXPENSE_MODULE_FREEZE.md`](EXPENSE_MODULE_FREEZE.md) | Point-in-time freeze verification report for the expense module (2026-07-25). Read `EXPENSE_MODULE_STATUS.md` for the living status; this is the sign-off evidence. |
-| [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) | Known implementation limitations that remain current. |
-| [`PROJECT_DECISIONS.md`](PROJECT_DECISIONS.md) and [`frozen-decisions.md`](frozen-decisions.md) | Historical reasoning and approved decisions. |
-| [`coding-rules.md`](coding-rules.md), [`file-map.md`](file-map.md), [`testing-matrix.md`](testing-matrix.md) | Developer and AI-agent working rules. |
+| Doc                                                                                                          | Use it for                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`architecture/canonical-sources.md`](architecture/canonical-sources.md)                                     | The authoritative map of docs by topic.                                                                                                                             |
+| [`../ARCHITECTURE.md`](../ARCHITECTURE.md)                                                                   | Current system architecture, module boundaries, security model, frontend/backend responsibilities, and key ledger mechanics.                                        |
+| [`../DATABASE_SCHEMA.md`](../DATABASE_SCHEMA.md)                                                             | Data model and migration-backed schema reference.                                                                                                                   |
+| [`contracts/`](contracts/)                                                                                   | Module/API boundary contracts and non-negotiable invariants.                                                                                                        |
+| [`group-key-flow.md`](group-key-flow.md)                                                                     | Canonical group key lifecycle, cache, rotation, and expense decryption reference.                                                                                   |
+| [`EXPENSE_MODULE_STATUS.md`](EXPENSE_MODULE_STATUS.md)                                                       | Expense module status: architecture overview, canonical doc map, recent consolidations, known limitations.                                                          |
+| [`EXPENSE_MODULE_FREEZE.md`](EXPENSE_MODULE_FREEZE.md)                                                       | Point-in-time freeze verification report for the expense module (2026-07-25). Read `EXPENSE_MODULE_STATUS.md` for the living status; this is the sign-off evidence. |
+| [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md)                                                                         | Known implementation limitations that remain current.                                                                                                               |
+| [`PROJECT_DECISIONS.md`](PROJECT_DECISIONS.md) and [`frozen-decisions.md`](frozen-decisions.md)              | Historical reasoning and approved decisions.                                                                                                                        |
+| [`coding-rules.md`](coding-rules.md), [`file-map.md`](file-map.md), [`testing-matrix.md`](testing-matrix.md) | Developer and AI-agent working rules.                                                                                                                               |
 
 ## Operational Docs
 

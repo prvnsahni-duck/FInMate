@@ -20,7 +20,7 @@ Nothing here blocks `docs/releases/BETA_1.0.md`.
   Source: `docs/release/BETA_RECEIPT_DECISION.md`.
 - **Audit-log key versioning.** `AuditLog.metadataJson` carries no `groupKeyVersionId`, so group
   history entries encrypted before a key rotation become permanently undecryptable after one.
-  Currently latent (key rotation has no UI entry point). Must ship *before* any UI that can trigger
+  Currently latent (key rotation has no UI entry point). Must ship _before_ any UI that can trigger
   `GroupKeyService.rotateGroupKey`. Tracked as KI-1 in `docs/KNOWN_ISSUES.md`, with an agreed
   direction (stop persisting titles in audit metadata) already recorded there.
   Source: `docs/audits/history-decryption-audit.md`, `docs/EXPENSE_MODULE_STATUS.md`.

@@ -16,6 +16,7 @@ beta.
 
 **Architecture consolidation** (behavior-preserving; each recorded individually under
 `docs/changes/`):
+
 - Debt simplification unified into one canonical `simplifyLedgerDebts`, shared by Settlements and
   Carry Forward (`docs/changes/debt-simplifier-consolidation.md`).
 - Expense response mapping unified into one canonical `toExpenseResponse`, used by both the
@@ -32,6 +33,7 @@ described as IndexedDB-persisted; they are session-memory only). See
 `docs/EXPENSE_MODULE_STATUS.md` and `docs/DOCUMENTATION_AUDIT.md`.
 
 **Release verification**:
+
 - `docs/EXPENSE_MODULE_FREEZE.md` — independent freeze verification: no duplicate logic, no dead
   code, no unresolved correctness issues in the areas covered. Verdict: freeze with known
   limitations.
@@ -46,7 +48,7 @@ described as IndexedDB-persisted; they are session-memory only). See
   Verdict at the time: Not Ready.
 
 **The release blocker, found and fixed**: joining a group via its invite link resolved existing
-membership by `user_id` only. Anyone invited by email/phone *before* they had a FinMate account —
+membership by `user_id` only. Anyone invited by email/phone _before_ they had a FinMate account —
 the normal way of inviting a new person — got a duplicate `GroupMember` row on joining instead of
 having their existing (Contact-backed) membership claimed: their invited role was silently reset to
 `'member'`, and any expense history already logged against them was orphaned on the original row.
@@ -83,7 +85,7 @@ These are disclosed, intentional, and — for personal daily use — non-blockin
 5. **Groups module has significant internal duplication** (membership-active-checks implemented
    six different ways across Groups/Expenses/Settlements; role-authorization checks retyped at 11+
    call sites; invite-token minting duplicated four times). This is a maintainability risk for
-   *future* Groups feature work, not a correctness issue in what exists today — the one correctness
+   _future_ Groups feature work, not a correctness issue in what exists today — the one correctness
    bug this duplication contributed to (the invite-join bug) has already been fixed independently
    of consolidating the duplication itself. See `docs/audits/groups-architecture-audit.md`.
 6. **`Settlement.note` is not ciphertext-validated.** A client could in principle persist a
@@ -104,13 +106,13 @@ blocks this release.
 
 All suites re-run fresh for this release (not carried over from memory):
 
-| Suite | Result |
-| --- | --- |
-| Backend (Jest) | 29 suites / 394 tests passing |
-| Frontend (Jest) | 28 suites / 226 tests passing |
-| `shared/utils` (Jest) | 1 suite / 1 test passing |
-| Backend `tsc --noEmit` | Clean, 0 errors |
-| Frontend `tsc --noEmit` | Clean, 0 errors |
+| Suite                                   | Result                                                                                                               |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Backend (Jest)                          | 29 suites / 394 tests passing                                                                                        |
+| Frontend (Jest)                         | 28 suites / 226 tests passing                                                                                        |
+| `shared/utils` (Jest)                   | 1 suite / 1 test passing                                                                                             |
+| Backend `tsc --noEmit`                  | Clean, 0 errors                                                                                                      |
+| Frontend `tsc --noEmit`                 | Clean, 0 errors                                                                                                      |
 | ESLint (all files touched this release) | 0 errors; only pre-existing `@typescript-eslint/no-explicit-any` / `no-non-null-assertion` warnings, no new warnings |
 
 The receipt-warning change in this release was verified to introduce **no behavior change beyond
@@ -128,6 +130,6 @@ Ready for personal daily use. The one release-blocking correctness bug found dur
 verification is fixed and regression-tested. The one remaining storage-design limitation (receipts)
 is now honestly disclosed rather than silently risked, matching the "Safe with Warning" decision.
 Everything else outstanding is a disclosed, non-blocking limitation or a maintainability
-consolidation opportunity for *future* work — not a defect in what ships today.
+consolidation opportunity for _future_ work — not a defect in what ships today.
 
 **FinMate Beta 1.0 is ready for personal daily use.**

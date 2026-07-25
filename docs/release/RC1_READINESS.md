@@ -54,6 +54,7 @@ is shown to the user; `join-group.component.ts`'s `onJoin()` sees a 200 response
 straight to the group page (`join-group.component.ts:167-172`).
 
 **Concrete impact:**
+
 - If the person was invited as `admin` or `owner`-track, they are silently downgraded to `member`.
 - If any expenses/splits were ever attributed to the original Contact-backed membership before
   they joined (plausible in a household group where the owner starts logging shared expenses
@@ -61,11 +62,11 @@ straight to the group page (`join-group.component.ts:167-172`).
   attached to the orphaned row and will not show as "theirs" going forward — both their own balance
   view and other members' views of who-owes-whom will be **incorrect**, meeting this report's
   "incorrect balances" blocker criterion directly.
-- Compare: the *other* path that links an invite to a real account —
+- Compare: the _other_ path that links an invite to a real account —
   `AuthService.verifyEmail` → `ContactsService.claimContactsForUser`
   (`contacts.service.ts:294-310`) — does this correctly: it finds the existing Contact-backed
   `GroupMember` row and **updates** it in place (`member.user = user; member.joinStatus =
-  'active';`), no duplicate created. The bug is specific to the direct join-link path, not the
+'active';`), no duplicate created. The bug is specific to the direct join-link path, not the
   email-verification path — but the join-link is the more prominent, more likely-to-be-used path
   (it's the one in the invite email itself; email verification is a separate email most users
   won't specifically seek out unless told to).
@@ -87,6 +88,7 @@ call. This is a development placeholder (`gap-tracker.md` ATT-001, confirmed sti
 in for the roadmap Supabase-backed attachment storage — it was never wired to a real backend.
 
 **Concrete impact:**
+
 - Receipts do not sync across devices or browsers — attach a receipt on your phone, it is invisible
   from your laptop.
 - Receipts are lost the moment the browser's site data is cleared, in a private/incognito window,
@@ -94,7 +96,7 @@ in for the roadmap Supabase-backed attachment storage — it was never wired to 
 - `localStorage` has a small per-origin quota (typically 5–10MB total, shared across everything the
   app stores there, including cached keys). A handful of receipt photos can plausibly exceed it;
   the unguarded `setItem` call would throw `QuotaExceededError` synchronously inside an `async`
-  block with no surrounding `try/catch` at this call site — whether the *outer* submit handler
+  block with no surrounding `try/catch` at this call site — whether the _outer_ submit handler
   catches and surfaces this was not traced further in this pass, but at minimum the attach
   succeeding at all is bounded by quota in a way nothing in the UI communicates.
 - Nothing in the UI indicates that "attach receipt" is not really persisted — a user has no reason

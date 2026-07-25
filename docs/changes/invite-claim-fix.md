@@ -43,7 +43,7 @@ Traced end to end, from invite creation through acceptance:
    pending `Contact` rows by the user's email/phone, marks them `claimed`, and **updates the
    existing** `GroupMember` row in place (`member.user = user; member.joinStatus = 'active';`,
    `contacts.service.ts:305-309`) rather than creating a new one. But it was only ever called from
-   one place: `AuthService.verifyEmail` (`auth.service.ts:167`), triggered by clicking a *separate*
+   one place: `AuthService.verifyEmail` (`auth.service.ts:167`), triggered by clicking a _separate_
    "verify your email" link — not by the invite-link join flow at all.
 6. **`GroupInvite` updates**: `claimContactsForUser` also updates any `GroupInvite` rows tied to the
    claimed `Contact` (`contacts.service.ts:313-315`). In the current codebase `GroupInvite.contact`
@@ -58,7 +58,7 @@ Traced end to end, from invite creation through acceptance:
    orphaned row — invisible from the perspective of the new row the person actually ended up using.
 
 **Root cause, in one sentence:** `joinGroupByToken` had no path that resolved a joining user's
-*Contact-backed* pending membership — only `AuthService.verifyEmail` did, via a completely
+_Contact-backed_ pending membership — only `AuthService.verifyEmail` did, via a completely
 separate, optional step most users have no specific reason to trigger before clicking the more
 prominent "join this group" link in their invite email.
 
@@ -69,20 +69,14 @@ authenticated `User` — before it queries for an existing `user`-linked members
 
 ```ts
 // backend/src/app/groups/groups.service.ts
-const user = await this.dataSource
-  .getRepository(User)
-  .findOne({ where: { id: userId } });
+const user = await this.dataSource.getRepository(User).findOne({ where: { id: userId } });
 if (!user) {
   throw new NotFoundException('User not found');
 }
 
-await this.contactsService.claimContactsForUser(user);   // ← the fix
+await this.contactsService.claimContactsForUser(user); // ← the fix
 
-const existingMember = await this.groupMemberRepository
-  .createQueryBuilder('member')
-  .where('member.group_id = :groupId', { groupId: group.id })
-  .andWhere('member.user_id = :userId', { userId })
-  .getOne();
+const existingMember = await this.groupMemberRepository.createQueryBuilder('member').where('member.group_id = :groupId', { groupId: group.id }).andWhere('member.user_id = :userId', { userId }).getOne();
 ```
 
 This reuses `ContactsService.claimContactsForUser` — the same method `AuthService.verifyEmail`
@@ -90,7 +84,7 @@ already calls — rather than introducing new claim logic. `GroupsService` alrea
 `ContactsService` (it was already used for `resolveOrCreateIdentity` in `inviteMember`), so no
 module wiring changed. If the joining user has a pending Contact-backed membership for this group
 (or any group, matching the existing, already-shipped behavior of the email-verification claim
-path), it gets linked and activated *before* `joinGroupByToken`'s own `existingMember` lookup runs
+path), it gets linked and activated _before_ `joinGroupByToken`'s own `existingMember` lookup runs
 — so that lookup now finds the just-linked row instead of finding nothing and creating a duplicate.
 Calling it is safe unconditionally: it only touches `Contact` rows with `status: 'pending'`, so a
 user with no pending contacts, or one who already verified their email earlier, gets a harmless
@@ -104,9 +98,9 @@ was unnecessary and out of scope.
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `backend/src/app/groups/groups.service.ts` | One-line fix (plus explanatory comment) in `joinGroupByToken`: call `this.contactsService.claimContactsForUser(user)` before the existing-membership query. |
+| File                                            | Change                                                                                                                                                                                                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/src/app/groups/groups.service.ts`      | One-line fix (plus explanatory comment) in `joinGroupByToken`: call `this.contactsService.claimContactsForUser(user)` before the existing-membership query.                                                                                 |
 | `backend/src/app/groups/groups.service.spec.ts` | Added `claimContactsForUser` to the `ContactsService` mock (defaults to a safe no-op so all pre-existing tests are unaffected); added a new `describe('joinGroupByToken', ...)` block with 8 regression tests covering the scenarios below. |
 
 ## Duplicate Implementations Removed
@@ -117,11 +111,11 @@ a second call site, not consolidated from multiple copies.
 
 ## Behavioral Comparison
 
-| Scenario | Before | After |
-| --- | --- | --- |
-| Contact-backed invitee registers, then joins via invite link | New duplicate `GroupMember` row created; role reset to `'member'`; original row (and any history attached to it) orphaned | Existing Contact-backed row claimed in place (`user` set, `joinStatus: 'active'`); same `id`, same `role` as originally invited; no new row |
-| User-backed invitee (resolved directly at invite time) joins via invite link | Found by `user_id`, activated in place | Unchanged — still found by `user_id`, activated in place (claim call is a no-op here since there's no pending Contact to match) |
-| Authenticated user joins a group cold via its permanent link, with no prior invite of any kind | New `GroupMember` row created, role `'member'` | Unchanged — claim call finds nothing to claim, falls through to the same "create new member" path as before |
+| Scenario                                                                                       | Before                                                                                                                    | After                                                                                                                                       |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Contact-backed invitee registers, then joins via invite link                                   | New duplicate `GroupMember` row created; role reset to `'member'`; original row (and any history attached to it) orphaned | Existing Contact-backed row claimed in place (`user` set, `joinStatus: 'active'`); same `id`, same `role` as originally invited; no new row |
+| User-backed invitee (resolved directly at invite time) joins via invite link                   | Found by `user_id`, activated in place                                                                                    | Unchanged — still found by `user_id`, activated in place (claim call is a no-op here since there's no pending Contact to match)             |
+| Authenticated user joins a group cold via its permanent link, with no prior invite of any kind | New `GroupMember` row created, role `'member'`                                                                            | Unchanged — claim call finds nothing to claim, falls through to the same "create new member" path as before                                 |
 
 ## Verification Results
 
@@ -129,19 +123,19 @@ a second call site, not consolidated from multiple copies.
 `groups.service.spec.ts` → `describe('joinGroupByToken', ...)`:
 
 - ✅ **Existing user accepts invite** — `'activates an already-active-track existing user
-  membership in place — no duplicate, role preserved (regression: already-working path)'`
+membership in place — no duplicate, role preserved (regression: already-working path)'`
 - ✅ **Pending contact accepts invite** / **invited email registers before accepting** —
   `'claims the existing Contact-backed membership instead of creating a duplicate, for an invitee
-  who registered before accepting'`
+who registered before accepting'`
 - ✅ **Invited email registers during acceptance** — `'calls claimContactsForUser before resolving
-  existing membership, so a not-yet-linked Contact-backed row is claimed within the same join call
-  (covers registering during acceptance)'`; asserts `claimContactsForUser`'s mock invocation order
+existing membership, so a not-yet-linked Contact-backed row is claimed within the same join call
+(covers registering during acceptance)'`; asserts `claimContactsForUser`'s mock invocation order
   is strictly before the existing-membership query's invocation order.
 - ✅ **Admin / member / spectator invitation** — parametrized test, `'preserves the %s role granted
-  at invite time when a Contact-backed invitee joins'`, run for all three roles.
+at invite time when a Contact-backed invitee joins'`, run for all three roles.
 - ✅ **Preserves historical expenses and balances / no orphaned history** — `'preserves the original
-  GroupMember id when claiming a Contact-backed invitee, so history already attached to it
-  (expenses, splits, settlements) stays correctly linked'` (history correctness reduces to id
+GroupMember id when claiming a Contact-backed invitee, so history already attached to it
+(expenses, splits, settlements) stays correctly linked'` (history correctness reduces to id
   preservation, since `Expense`/`ExpenseSplit`/`Settlement` reference members by
   `GroupMember.id` — this is the level `GroupsService`'s own tests can and should verify;
   cross-module balance math is `ExpensesService`/`SettlementsService`'s own, already-covered
@@ -189,7 +183,7 @@ endpoint and trusts its response; the bug and its fix are entirely server-side.
   covers Contact-backed member creation against a real server/Postgres, but its own comment notes
   the full "register → verify email → historical data appears" round trip is intentionally not
   covered there (the verification token isn't retrievable via HTTP by design). The join-by-link
-  path this fix touches *is* reachable via a normal HTTP call with no such obstacle — adding an
+  path this fix touches _is_ reachable via a normal HTTP call with no such obstacle — adding an
   E2E test exercising "Contact-backed invite → register → `POST /groups/join/:token` → single
   member, correct role" against a live server would be a reasonable follow-up for higher-confidence
   coverage, but was not added here since this codebase's own convention (per that file's comment)

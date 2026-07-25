@@ -9,11 +9,11 @@ Reduce debt simplification to exactly one implementation across the backend, so 
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `backend/src/app/common/ledger-debt-simplifier.ts` | New. Canonical `simplifyLedgerDebts(balances, currency)` greedy debt-simplification algorithm, keyed by an opaque `key: string`. |
+| File                                                 | Change                                                                                                                                                                                                                                                      |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/src/app/common/ledger-debt-simplifier.ts`   | New. Canonical `simplifyLedgerDebts(balances, currency)` greedy debt-simplification algorithm, keyed by an opaque `key: string`.                                                                                                                            |
 | `backend/src/app/settlements/settlements.service.ts` | `SettlementsService.simplifyDebts` now maps `MemberBalance[]` → `LedgerBalance[]`, delegates to `simplifyLedgerDebts`, and maps the result back to `SimplifiedTransaction[]`. Public signature, `MemberBalance`, and `SimplifiedTransaction` are unchanged. |
-| `backend/src/app/expenses/expenses.service.ts` | `ExpensesService.simplifyDebts` (private, used by `closeMonth`'s Carry Forward rollover) now does the same map-delegate-map through `simplifyLedgerDebts`. Signature and return shape (`fromGroupMemberId`/`toGroupMemberId`) are unchanged. |
+| `backend/src/app/expenses/expenses.service.ts`       | `ExpensesService.simplifyDebts` (private, used by `closeMonth`'s Carry Forward rollover) now does the same map-delegate-map through `simplifyLedgerDebts`. Signature and return shape (`fromGroupMemberId`/`toGroupMemberId`) are unchanged.                |
 
 No DTOs, public method signatures, controller routes, or HTTP response shapes changed in either service.
 
@@ -28,16 +28,16 @@ Both services independently implemented the same greedy min-cash-flow algorithm:
 
 Line-by-line comparison of the two pre-consolidation implementations showed they were **algorithmically identical**, differing only in field naming:
 
-| Aspect | Settlements | Expenses (Carry Forward) | Match |
-| --- | --- | --- | --- |
-| Zero-balance tolerance | `Math.abs(b.balance) >= 0.01` | same | ✅ |
-| Debtor/creditor tie-break | lexicographic `localeCompare` on the opaque id when balances differ by `< 0.0001` | same | ✅ |
-| Debtor sort (no tie) | most-negative first | same | ✅ |
-| Creditor sort (no tie) | largest-positive first | same | ✅ |
-| Transfer amount | `Math.min(|debtor|, creditor)` | same | ✅ |
-| Rounding | `Math.round(transferAmount * 100) / 100`, skip if `<= 0` | same | ✅ |
-| Loop termination | stop when either side is empty | same | ✅ |
-| Opaque key semantics | `MemberBalance.userId` is documented as actually holding a `GroupMember.id` (see comment at `settlements.service.ts:429`, preserved from before this change) | `groupMemberId` directly | ✅ (same underlying identity — `GroupMember.id`) |
+| Aspect                    | Settlements                                                                                                                                                  | Expenses (Carry Forward) | Match                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ | ------------------------------------------------ | ---- | --- |
+| Zero-balance tolerance    | `Math.abs(b.balance) >= 0.01`                                                                                                                                | same                     | ✅                                               |
+| Debtor/creditor tie-break | lexicographic `localeCompare` on the opaque id when balances differ by `< 0.0001`                                                                            | same                     | ✅                                               |
+| Debtor sort (no tie)      | most-negative first                                                                                                                                          | same                     | ✅                                               |
+| Creditor sort (no tie)    | largest-positive first                                                                                                                                       | same                     | ✅                                               |
+| Transfer amount           | `Math.min(                                                                                                                                                   | debtor                   | , creditor)`                                     | same | ✅  |
+| Rounding                  | `Math.round(transferAmount * 100) / 100`, skip if `<= 0`                                                                                                     | same                     | ✅                                               |
+| Loop termination          | stop when either side is empty                                                                                                                               | same                     | ✅                                               |
+| Opaque key semantics      | `MemberBalance.userId` is documented as actually holding a `GroupMember.id` (see comment at `settlements.service.ts:429`, preserved from before this change) | `groupMemberId` directly | ✅ (same underlying identity — `GroupMember.id`) |
 
 No behavioral differences were found. Both call sites already operated on the same opaque identity space (`GroupMember.id`), just under different field names on the input/output DTOs. This confirms the audit's assessment — the risk was future drift, not a live bug.
 
@@ -46,14 +46,17 @@ No behavioral differences were found. Both call sites already operated on the sa
 `backend/src/app/common/ledger-debt-simplifier.ts` exports:
 
 ```ts
-export interface LedgerBalance { key: string; balance: number; }
-export interface SimplifiedLedgerTransaction {
-  fromKey: string; toKey: string; amount: number; currency: string;
+export interface LedgerBalance {
+  key: string;
+  balance: number;
 }
-export function simplifyLedgerDebts(
-  balances: LedgerBalance[],
-  currency: string,
-): SimplifiedLedgerTransaction[]
+export interface SimplifiedLedgerTransaction {
+  fromKey: string;
+  toKey: string;
+  amount: number;
+  currency: string;
+}
+export function simplifyLedgerDebts(balances: LedgerBalance[], currency: string): SimplifiedLedgerTransaction[];
 ```
 
 It is a byte-for-byte port of the two prior method bodies (same tolerance, sort, tie-break, rounding, and loop logic), generalized to an opaque `key` field. Both services now call it and translate their domain-specific field names (`userId`/`groupMemberId`) at the boundary, keeping their public DTOs unchanged.
@@ -75,6 +78,7 @@ Tests:       86 passed, 86 total
 ```
 
 Suites run:
+
 - `backend/src/app/settlements/settlements.service.spec.ts` — includes the `simplifyDebts (Core Math Algorithm)` suite (simple debt, rounding remainder, sorting/tie-breaking, net-zero, circular-debt cases) and `calculateGroupBalances` integration tests.
 - `backend/src/app/expenses/expenses.service.spec.ts` — includes `closeMonth` integration tests exercising the Carry Forward rollover path that depends on `simplifyDebts`.
 - `backend/src/app/expenses/services/expenses-carry-forward.service.spec.ts` — facade delegation tests for `closeMonth`.

@@ -14,87 +14,87 @@ documents' own claims.
 ### Implementation
 
 - [x] **No duplicate business logic remains.** Confirmed by repo-wide search: `simplifyDebts` in
-  both `SettlementsService` and `ExpensesService` are thin wrappers around the single
-  `simplifyLedgerDebts` (`backend/src/app/common/ledger-debt-simplifier.ts`); `SplitCalculator`
-  (the duplicate class) no longer exists anywhere in `shared/utils`; `mapExpenseResponse` and
-  `batchMapExpenseResponses` both call the single `toExpenseResponse`; member display-name
-  resolution has exactly one backend resolver (`common/member-display.util.ts`) and one frontend
-  resolver (`features/groups/utils/member-display.util.ts`).
+      both `SettlementsService` and `ExpensesService` are thin wrappers around the single
+      `simplifyLedgerDebts` (`backend/src/app/common/ledger-debt-simplifier.ts`); `SplitCalculator`
+      (the duplicate class) no longer exists anywhere in `shared/utils`; `mapExpenseResponse` and
+      `batchMapExpenseResponses` both call the single `toExpenseResponse`; member display-name
+      resolution has exactly one backend resolver (`common/member-display.util.ts`) and one frontend
+      resolver (`features/groups/utils/member-display.util.ts`).
 - [x] **One source of truth exists for every major responsibility.** See Architecture Summary
-  below — verified per-area, not asserted.
+      below — verified per-area, not asserted.
 - [x] **No dead production code remains.** `ExpensesAccessService`, `GroupKeyService.refreshGroupKey`/
-  `clearLocalState`, `ZkKeyVaultService.storeGroupKey`/`loadGroupKey`/`deleteGroupKey` — zero
-  matches for any of these names anywhere in `backend/`, `frontend/`, or `shared/` outside their
-  own (now-removed) definitions. The one surviving name collision,
-  `GroupDetailComponent.refreshGroupKey()` (a live, UI-bound component method, distinct from the
-  removed `GroupKeyService` method of the same name), was re-confirmed unaffected.
+      `clearLocalState`, `ZkKeyVaultService.storeGroupKey`/`loadGroupKey`/`deleteGroupKey` — zero
+      matches for any of these names anywhere in `backend/`, `frontend/`, or `shared/` outside their
+      own (now-removed) definitions. The one surviving name collision,
+      `GroupDetailComponent.refreshGroupKey()` (a live, UI-bound component method, distinct from the
+      removed `GroupKeyService` method of the same name), was re-confirmed unaffected.
 - [x] **No obsolete APIs remain.** Same evidence as above; `shared/utils`' `SplitCalculator`/
-  `SplitInput`/`SplitResult` are gone, and nothing imports them.
+      `SplitInput`/`SplitResult` are gone, and nothing imports them.
 - [x] **No TODO/FIXME/HACK comments indicate unfinished expense-module work.** Zero matches in
-  `backend/src/app/expenses`, `backend/src/app/settlements`, `backend/src/app/common`,
-  `frontend/src/app/features/groups`, `frontend/src/app/core/services/group-key.service.ts`,
-  `expense-decryption.service.ts`, `expense-decrypt-coordinator.service.ts`, and
-  `shared/utils/src/lib/split-calculator.ts`.
+      `backend/src/app/expenses`, `backend/src/app/settlements`, `backend/src/app/common`,
+      `frontend/src/app/features/groups`, `frontend/src/app/core/services/group-key.service.ts`,
+      `expense-decryption.service.ts`, `expense-decrypt-coordinator.service.ts`, and
+      `shared/utils/src/lib/split-calculator.ts`.
 
 ### Architecture
 
 Ownership re-verified for all twelve areas (single owner each, confirmed by reading the
 current implementation, not by re-reading prior session notes):
 
-| Area | Sole owner |
-| --- | --- |
-| Expense CRUD | `ExpensesService` (backend/src/app/expenses/expenses.service.ts), facaded by `ExpensesCrudService` |
-| Encryption | `ClientEncryptionService` (client-side only; backend never encrypts/decrypts content) |
-| Decryption | `ExpenseDecryptionService` + `ExpenseDecryptCoordinator` for the ledger; `GroupsService.getHistoryLogs` for History (intentionally separate — see Limitations) |
-| Group key lifecycle | `GroupKeyService` |
-| Session key cache | `GroupKeyService`'s in-memory `groupKeysMemoryCache` (confirmed: no IndexedDB group-key path remains anywhere in the code, matching the `ARCHITECTURE.md` correction made in this pass) |
-| Carry Forward | `ExpensesCarryForwardService` / `ExpensesService.closeMonth`, HTTP surface owned by `GroupsController` |
-| Settlement | `SettlementsService` |
-| History | `GroupsService.getHistoryLogs` (frontend) + backend `groups-audit.service.ts` write path |
-| Response mapping | `ExpensesService.toExpenseResponse` |
-| Display-name resolution | `common/member-display.util.ts` (backend), `features/groups/utils/member-display.util.ts` (frontend) — one per runtime, by design |
-| Split calculation | `calculateDeterministicSplits` in `shared/utils`, wrapped (not reimplemented) by `backend/src/app/expenses/split-calculator.util.ts` |
-| Debt simplification | `simplifyLedgerDebts` in `backend/src/app/common/ledger-debt-simplifier.ts` |
+| Area                    | Sole owner                                                                                                                                                                              |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Expense CRUD            | `ExpensesService` (backend/src/app/expenses/expenses.service.ts), facaded by `ExpensesCrudService`                                                                                      |
+| Encryption              | `ClientEncryptionService` (client-side only; backend never encrypts/decrypts content)                                                                                                   |
+| Decryption              | `ExpenseDecryptionService` + `ExpenseDecryptCoordinator` for the ledger; `GroupsService.getHistoryLogs` for History (intentionally separate — see Limitations)                          |
+| Group key lifecycle     | `GroupKeyService`                                                                                                                                                                       |
+| Session key cache       | `GroupKeyService`'s in-memory `groupKeysMemoryCache` (confirmed: no IndexedDB group-key path remains anywhere in the code, matching the `ARCHITECTURE.md` correction made in this pass) |
+| Carry Forward           | `ExpensesCarryForwardService` / `ExpensesService.closeMonth`, HTTP surface owned by `GroupsController`                                                                                  |
+| Settlement              | `SettlementsService`                                                                                                                                                                    |
+| History                 | `GroupsService.getHistoryLogs` (frontend) + backend `groups-audit.service.ts` write path                                                                                                |
+| Response mapping        | `ExpensesService.toExpenseResponse`                                                                                                                                                     |
+| Display-name resolution | `common/member-display.util.ts` (backend), `features/groups/utils/member-display.util.ts` (frontend) — one per runtime, by design                                                       |
+| Split calculation       | `calculateDeterministicSplits` in `shared/utils`, wrapped (not reimplemented) by `backend/src/app/expenses/split-calculator.util.ts`                                                    |
+| Debt simplification     | `simplifyLedgerDebts` in `backend/src/app/common/ledger-debt-simplifier.ts`                                                                                                             |
 
 ### Documentation
 
 - [x] **Canonical documentation map is correct.** `docs/architecture/canonical-sources.md` and
-  `docs/EXPENSE_MODULE_STATUS.md` name exactly one primary document per topic for all twelve
-  topics; verified by reading both files in full this session.
-- [x] **No conflicting documentation exists.** One real conflict was found and fixed *in the prior
-  documentation pass, not this one*: `ARCHITECTURE.md` §2 claimed group keys persist to IndexedDB,
-  contradicting `docs/group-key-flow.md`'s session-memory-only model. Re-verified fixed and
-  consistent in this pass.
+      `docs/EXPENSE_MODULE_STATUS.md` name exactly one primary document per topic for all twelve
+      topics; verified by reading both files in full this session.
+- [x] **No conflicting documentation exists.** One real conflict was found and fixed _in the prior
+      documentation pass, not this one_: `ARCHITECTURE.md` §2 claimed group keys persist to IndexedDB,
+      contradicting `docs/group-key-flow.md`'s session-memory-only model. Re-verified fixed and
+      consistent in this pass.
 - [x] **Historical audit documents remain unchanged.** Confirmed via `git log --name-status -- docs/audits/`
-  across every commit made in this body of work: the only audit-directory changes are two new
-  files (`expense-architecture-audit.md`, `history-decryption-audit.md`); no pre-existing audit
-  file was modified.
+      across every commit made in this body of work: the only audit-directory changes are two new
+      files (`expense-architecture-audit.md`, `history-decryption-audit.md`); no pre-existing audit
+      file was modified.
 - [x] **No stale references remain** to any removed API name, in either code or documentation
-  (repo-wide search, this session).
+      (repo-wide search, this session).
 
 ### Testing
 
 - [x] **TypeScript compiles** — `tsc --noEmit` clean (0 errors) for `backend/tsconfig.app.json`,
-  `frontend/tsconfig.app.json`, `shared/utils/tsconfig.lib.json`, re-run fresh for this report.
+      `frontend/tsconfig.app.json`, `shared/utils/tsconfig.lib.json`, re-run fresh for this report.
 - [x] **Lint passes** — `eslint` re-run fresh over every directory touched across this body of work
-  (`backend/src/app/{expenses,settlements,common,groups}`, `frontend/src/app/features/groups`,
-  `frontend/src/app/core/services/{group-key,zk-key-vault,expense-decryption,expense-decrypt-coordinator}.service.ts`,
-  `shared/utils/src`): **0 errors** (389 + 146 pre-existing `@typescript-eslint/no-explicit-any` /
-  `no-non-null-assertion` warnings, none new).
+      (`backend/src/app/{expenses,settlements,common,groups}`, `frontend/src/app/features/groups`,
+      `frontend/src/app/core/services/{group-key,zk-key-vault,expense-decryption,expense-decrypt-coordinator}.service.ts`,
+      `shared/utils/src`): **0 errors** (389 + 146 pre-existing `@typescript-eslint/no-explicit-any` /
+      `no-non-null-assertion` warnings, none new).
 - [x] **Existing test suites pass** — re-run fresh, full suites (not just the affected subset):
-  backend 386/386 (29 suites), frontend 226/226 (28 suites), `shared/utils` 1/1.
+      backend 386/386 (29 suites), frontend 226/226 (28 suites), `shared/utils` 1/1.
 - [x] **No skipped tests were introduced** — repo-wide search for `.skip(`, `xit(`, `xdescribe(`,
-  `it.todo(`, `.only(` across every `.spec.ts` in `backend/src/app`, `frontend/src/app`, and
-  `shared/utils` returned zero matches (the two `.skip(` hits in non-spec files are TypeORM
-  pagination calls, not test skips).
+      `it.todo(`, `.only(` across every `.spec.ts` in `backend/src/app`, `frontend/src/app`, and
+      `shared/utils` returned zero matches (the two `.skip(` hits in non-spec files are TypeORM
+      pagination calls, not test skips).
 
 ### Known Limitations
 
 - [x] Confirmed the two pre-specified limitations are real, current, and correctly scoped (see
-  below).
+      below).
 - [x] **One additional pre-existing item found during this verification, outside this work's
-  scope** — reported below, not silently added to the "intentional limitations" list, since it
-  wasn't part of the consolidation work and wasn't previously framed as intentional.
+      scope** — reported below, not silently added to the "intentional limitations" list, since it
+      wasn't part of the consolidation work and wasn't previously framed as intentional.
 
 ## Final Architecture Summary
 
@@ -116,7 +116,7 @@ session-memory-only end to end, with no lingering IndexedDB group-key path in co
 
 1. **Audit-log encryption requires versioned metadata before exposing group-key rotation.**
    `AuditLog.metadataJson` carries no `groupKeyVersionId`, unlike `Expense` rows, so History
-   decryption always uses the *current active* key. After a rotation, pre-rotation history
+   decryption always uses the _current active_ key. After a rotation, pre-rotation history
    entries become permanently undecryptable. Currently latent — `GroupKeyService.rotateGroupKey`
    has no UI entry point. Tracked as **KI-1** in `docs/KNOWN_ISSUES.md`, independently confirmed
    by `docs/audits/history-decryption-audit.md` and `docs/audits/expense-audit.md` finding #7.

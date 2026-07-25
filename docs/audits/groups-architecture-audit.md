@@ -21,34 +21,34 @@ module, but owns the HTTP surface and authorization for both.
 
 **File inventory** (all files that exist — this matters, see Finding P1-1):
 
-| File | Lines | Role |
-| --- | --- | --- |
-| `groups.service.ts` | 1850 | All business logic. Every method any other file in this module calls eventually lands here. |
-| `groups.controller.ts` | 428 | HTTP surface: group CRUD, history, carry-forward passthrough, contributions, key endpoints |
-| `members.controller.ts` | 104 | Member list/update/remove HTTP surface |
-| `invite.controller.ts` | 28 | Invite-details/lookup HTTP surface |
-| `groups.module.ts` | 61 | DI wiring |
-| `groups.service.spec.ts` | 1166 | The **only** spec file in the backend Groups directory |
-| `services/groups-crud.service.ts` | 57 | Facade — see P1-1 |
-| `services/groups-membership.service.ts` | 106 | Facade — see P1-1 |
-| `services/groups-contributions.service.ts` | 20 | Facade — see P1-1 |
-| `services/groups-audit.service.ts` | 17 | Facade — see P1-1 |
+| File                                       | Lines | Role                                                                                        |
+| ------------------------------------------ | ----- | ------------------------------------------------------------------------------------------- |
+| `groups.service.ts`                        | 1850  | All business logic. Every method any other file in this module calls eventually lands here. |
+| `groups.controller.ts`                     | 428   | HTTP surface: group CRUD, history, carry-forward passthrough, contributions, key endpoints  |
+| `members.controller.ts`                    | 104   | Member list/update/remove HTTP surface                                                      |
+| `invite.controller.ts`                     | 28    | Invite-details/lookup HTTP surface                                                          |
+| `groups.module.ts`                         | 61    | DI wiring                                                                                   |
+| `groups.service.spec.ts`                   | 1166  | The **only** spec file in the backend Groups directory                                      |
+| `services/groups-crud.service.ts`          | 57    | Facade — see P1-1                                                                           |
+| `services/groups-membership.service.ts`    | 106   | Facade — see P1-1                                                                           |
+| `services/groups-contributions.service.ts` | 20    | Facade — see P1-1                                                                           |
+| `services/groups-audit.service.ts`         | 17    | Facade — see P1-1                                                                           |
 
 ## Source-of-Truth Map
 
-| Responsibility | Current owner | Notes |
-| --- | --- | --- |
-| Group CRUD, archive, currency lock | `GroupsService` (via `GroupsCrudService` facade) | Currency lock enforced in exactly one place (`groups.service.ts:437-457`) — no drift found here |
-| Membership role transitions, owner-transfer, leave/remove | `GroupsService.updateMember` / `.removeMember` | Caller-role checks now present (GRP-001 fix verified, see §8) but reimplemented per-method, not shared — see P1-2 |
-| "Is this user an active/invited member" resolution | **No single owner** — at least 4 variants inside `GroupsService` alone, a 5th in `GroupRolesGuard`, and independent copies in `ExpensesService`/`SettlementsService` | See P1-3 |
-| Route-level role gating | `GroupRolesGuard` + `@GroupRoles()`, but only wired onto `MembersController` | `GroupsController`/`InviteController` rely solely on inline checks inside `GroupsService` — two enforcement mechanisms for one concern, see P1-2 |
-| Invite issuance (durable) | `GroupsService.inviteMember` and `GroupsService.createGroupInvite` — two independent mint sites | See P1-4 |
-| Invite issuance (permanent link) | `GroupsService.createGroup` / `.regenerateInviteToken` | Never expires (tracked, GRP-004, still open) |
-| Invite resolution/join | `GroupsService.getInviteDetails` and `.joinGroupByToken` — two independent copies of the same dual-path (GroupInvite-then-Group.inviteToken) resolution | See P1-4 |
-| Group-key-version persistence | `GroupsService` (create/rotate/provision/get) | Contract (`groups-contract.md:15`) attributes this to "the membership service boundary" — not accurate, see P2-6 |
-| Group history/audit read | `GroupsService.getGroupHistory` (backend, returns raw ciphertext) + `GroupsService.getHistoryLogs` (frontend, decrypts with active key only) | Matches `KNOWN_ISSUES.md` KI-1 / `docs/audits/history-decryption-audit.md`; GRP-007, still open, corroborates prior finding |
-| Member-summary / display-name resolution | **`GroupsService.memberSummary()`** (`groups.service.ts:66-89`) | A **fourth** nickname-first display resolver, not migrated to the canonical `common/member-display.util.ts` — see P1-5 |
-| Contact-claim linkage for invited members | `GroupInvite.contact` field, written by `ContactsService`, **never populated** by the Groups module that creates the rows | See P1-6 |
+| Responsibility                                            | Current owner                                                                                                                                                        | Notes                                                                                                                                            |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Group CRUD, archive, currency lock                        | `GroupsService` (via `GroupsCrudService` facade)                                                                                                                     | Currency lock enforced in exactly one place (`groups.service.ts:437-457`) — no drift found here                                                  |
+| Membership role transitions, owner-transfer, leave/remove | `GroupsService.updateMember` / `.removeMember`                                                                                                                       | Caller-role checks now present (GRP-001 fix verified, see §8) but reimplemented per-method, not shared — see P1-2                                |
+| "Is this user an active/invited member" resolution        | **No single owner** — at least 4 variants inside `GroupsService` alone, a 5th in `GroupRolesGuard`, and independent copies in `ExpensesService`/`SettlementsService` | See P1-3                                                                                                                                         |
+| Route-level role gating                                   | `GroupRolesGuard` + `@GroupRoles()`, but only wired onto `MembersController`                                                                                         | `GroupsController`/`InviteController` rely solely on inline checks inside `GroupsService` — two enforcement mechanisms for one concern, see P1-2 |
+| Invite issuance (durable)                                 | `GroupsService.inviteMember` and `GroupsService.createGroupInvite` — two independent mint sites                                                                      | See P1-4                                                                                                                                         |
+| Invite issuance (permanent link)                          | `GroupsService.createGroup` / `.regenerateInviteToken`                                                                                                               | Never expires (tracked, GRP-004, still open)                                                                                                     |
+| Invite resolution/join                                    | `GroupsService.getInviteDetails` and `.joinGroupByToken` — two independent copies of the same dual-path (GroupInvite-then-Group.inviteToken) resolution              | See P1-4                                                                                                                                         |
+| Group-key-version persistence                             | `GroupsService` (create/rotate/provision/get)                                                                                                                        | Contract (`groups-contract.md:15`) attributes this to "the membership service boundary" — not accurate, see P2-6                                 |
+| Group history/audit read                                  | `GroupsService.getGroupHistory` (backend, returns raw ciphertext) + `GroupsService.getHistoryLogs` (frontend, decrypts with active key only)                         | Matches `KNOWN_ISSUES.md` KI-1 / `docs/audits/history-decryption-audit.md`; GRP-007, still open, corroborates prior finding                      |
+| Member-summary / display-name resolution                  | **`GroupsService.memberSummary()`** (`groups.service.ts:66-89`)                                                                                                      | A **fourth** nickname-first display resolver, not migrated to the canonical `common/member-display.util.ts` — see P1-5                           |
+| Contact-claim linkage for invited members                 | `GroupInvite.contact` field, written by `ContactsService`, **never populated** by the Groups module that creates the rows                                            | See P1-6                                                                                                                                         |
 
 ## Dependency Map
 
@@ -353,15 +353,15 @@ the rest of the frontend's service-layering convention, and confirmed by invento
 
 ## Duplicate Implementations
 
-| Area | Duplicates | Severity |
-| --- | --- | --- |
-| Membership-active-check resolution | `getActiveMembership` helper + 9 inline copies + a distinct `updateMember`/`removeMember` variant, inside Groups; a 4th algorithm in `GroupRolesGuard`; independent copies in `ExpensesService`/`SettlementsService` | P1 |
-| Group-member role authorization | 11+ inline checks in `GroupsService`, plus a separate `GroupRolesGuard` mechanism wired onto only one of three controllers | P1 |
-| Invite-token minting | 4 independent mint sites (2 for the permanent link, 2 for durable `GroupInvite` rows) | P1 |
-| Invite resolution | `getInviteDetails` / `joinGroupByToken` — same two-branch fallback logic duplicated | P1 |
-| Member display-name resolution | Canonical `resolveMemberDisplay` (backend/common) vs. `GroupsService.memberSummary()` — not migrated, different shape | P1 |
-| "Owner cannot leave" guard | Verbatim copy in `updateMember` (`:852-856`) and `removeMember` (`:955-960`) | P2 |
-| TIK wrap/generate sequence | Duplicated within `GroupMembersComponent` (`sendBulkInvites` vs. `generateSecureInviteLink`) | P2 |
+| Area                               | Duplicates                                                                                                                                                                                                           | Severity |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
+| Membership-active-check resolution | `getActiveMembership` helper + 9 inline copies + a distinct `updateMember`/`removeMember` variant, inside Groups; a 4th algorithm in `GroupRolesGuard`; independent copies in `ExpensesService`/`SettlementsService` | P1       |
+| Group-member role authorization    | 11+ inline checks in `GroupsService`, plus a separate `GroupRolesGuard` mechanism wired onto only one of three controllers                                                                                           | P1       |
+| Invite-token minting               | 4 independent mint sites (2 for the permanent link, 2 for durable `GroupInvite` rows)                                                                                                                                | P1       |
+| Invite resolution                  | `getInviteDetails` / `joinGroupByToken` — same two-branch fallback logic duplicated                                                                                                                                  | P1       |
+| Member display-name resolution     | Canonical `resolveMemberDisplay` (backend/common) vs. `GroupsService.memberSummary()` — not migrated, different shape                                                                                                | P1       |
+| "Owner cannot leave" guard         | Verbatim copy in `updateMember` (`:852-856`) and `removeMember` (`:955-960`)                                                                                                                                         | P2       |
+| TIK wrap/generate sequence         | Duplicated within `GroupMembersComponent` (`sendBulkInvites` vs. `generateSecureInviteLink`)                                                                                                                         | P2       |
 
 ## Dead Code / Obsolete APIs
 
@@ -433,6 +433,6 @@ and a previously-uncounted fourth display-name resolver. This is a materially hi
 density than the Expense module had before its own consolidation pass, and the facade-service
 layer's cosmetic (non-functional) split (P1-1) means the file structure actively points a future
 implementer toward the wrong mental model. Building new Groups-module features today — invite UX
-changes, new roles, new membership states — would very likely add a *seventh* copy of a membership
-check or a *fifth* invite-mint site rather than extending a single source of truth, exactly the
+changes, new roles, new membership states — would very likely add a _seventh_ copy of a membership
+check or a _fifth_ invite-mint site rather than extending a single source of truth, exactly the
 failure mode this audit methodology exists to catch before it compounds further.

@@ -4,12 +4,12 @@ FinMate uses client-side zero-knowledge encryption for sensitive expense fields.
 
 ## Key Types
 
-| Key | Owner | Storage | Purpose |
-| --- | --- | --- | --- |
-| Master key / UDK | One user session | Derived client-side from password and email; cached by `ClientEncryptionService` | Encrypts personal-scope fields and wraps the user's private RSA key |
-| Group key | One group key version | Raw key in browser memory only; wrapped copies in `member_wrapped_group_keys` | Encrypts group-scope expense fields |
-| RSA-OAEP wrapping key pair | One user | Public key on backend; private key encrypted under the master key | Wraps group keys for direct member provisioning |
-| Temporary Invite Key (TIK) | Invite link only | URL hash fragment, never sent to backend | Legacy/link invite unwrap path for recipients without a public wrapping key |
+| Key                        | Owner                 | Storage                                                                          | Purpose                                                                     |
+| -------------------------- | --------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Master key / UDK           | One user session      | Derived client-side from password and email; cached by `ClientEncryptionService` | Encrypts personal-scope fields and wraps the user's private RSA key         |
+| Group key                  | One group key version | Raw key in browser memory only; wrapped copies in `member_wrapped_group_keys`    | Encrypts group-scope expense fields                                         |
+| RSA-OAEP wrapping key pair | One user              | Public key on backend; private key encrypted under the master key                | Wraps group keys for direct member provisioning                             |
+| Temporary Invite Key (TIK) | Invite link only      | URL hash fragment, never sent to backend                                         | Legacy/link invite unwrap path for recipients without a public wrapping key |
 
 ## Current Lifecycle
 

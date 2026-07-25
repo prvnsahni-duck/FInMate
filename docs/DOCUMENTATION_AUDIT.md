@@ -63,22 +63,22 @@ Historical reasoning was preserved in `docs/PROJECT_DECISIONS.md`, `docs/frozen-
 
 ## Canonical Documentation Map
 
-| Topic | Canonical source |
-| --- | --- |
-| System architecture | `ARCHITECTURE.md` |
-| Data model and migrations | `DATABASE_SCHEMA.md` |
-| API contracts | `docs/contracts/` and `openapi.yaml` |
-| Encryption and group key lifecycle | `docs/group-key-flow.md`, `docs/contracts/encryption-contract.md` |
-| Session-only group key cache | `docs/group-key-flow.md` |
-| Canonical key resolution | `docs/group-key-flow.md` |
-| Key rotation | `docs/group-key-flow.md` |
-| Expense encryption/decryption | `docs/contracts/expense-contract.md`, `docs/group-key-flow.md` |
-| Carry Forward | `docs/contracts/groups-contract.md`, `ARCHITECTURE.md` |
-| History/Audit model | `ARCHITECTURE.md`, `docs/contracts/groups-contract.md` |
-| Frontend/backend responsibilities | `ARCHITECTURE.md`, `docs/contracts/` |
-| Security model | `ARCHITECTURE.md`, `docs/group-key-flow.md`, `docs/SECURITY_VERIFICATION_CHECKLIST.md` |
-| Historical decisions | `docs/PROJECT_DECISIONS.md`, `docs/frozen-decisions.md` |
-| AI/developer guidance | `AGENT_RULES.md`, `docs/coding-rules.md`, `docs/file-map.md` |
+| Topic                              | Canonical source                                                                       |
+| ---------------------------------- | -------------------------------------------------------------------------------------- |
+| System architecture                | `ARCHITECTURE.md`                                                                      |
+| Data model and migrations          | `DATABASE_SCHEMA.md`                                                                   |
+| API contracts                      | `docs/contracts/` and `openapi.yaml`                                                   |
+| Encryption and group key lifecycle | `docs/group-key-flow.md`, `docs/contracts/encryption-contract.md`                      |
+| Session-only group key cache       | `docs/group-key-flow.md`                                                               |
+| Canonical key resolution           | `docs/group-key-flow.md`                                                               |
+| Key rotation                       | `docs/group-key-flow.md`                                                               |
+| Expense encryption/decryption      | `docs/contracts/expense-contract.md`, `docs/group-key-flow.md`                         |
+| Carry Forward                      | `docs/contracts/groups-contract.md`, `ARCHITECTURE.md`                                 |
+| History/Audit model                | `ARCHITECTURE.md`, `docs/contracts/groups-contract.md`                                 |
+| Frontend/backend responsibilities  | `ARCHITECTURE.md`, `docs/contracts/`                                                   |
+| Security model                     | `ARCHITECTURE.md`, `docs/group-key-flow.md`, `docs/SECURITY_VERIFICATION_CHECKLIST.md` |
+| Historical decisions               | `docs/PROJECT_DECISIONS.md`, `docs/frozen-decisions.md`                                |
+| AI/developer guidance              | `AGENT_RULES.md`, `docs/coding-rules.md`, `docs/file-map.md`                           |
 
 ## Remaining Follow-Up
 
@@ -223,4 +223,3 @@ with how `PRD.md`/`TRD.md` are already handled — they retain historical planni
 (content, not the `ARCHITECTURE.md` cross-references into them), `docs/module-checklist.md`,
 `docs/file-map.md`, `docs/testing-matrix.md`. All internal cross-references in every file touched
 across both passes were checked to resolve to an existing file.
-

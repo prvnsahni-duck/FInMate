@@ -9,15 +9,15 @@ One canonical member display-name resolver per runtime: one backend resolver for
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
-| `backend/src/app/common/member-display.util.ts` | New. Canonical `resolveMemberDisplay(m: GroupMember): MemberDisplay` — registered-user vs. pending-Contact resolution, including `nickname` override. |
-| `backend/src/app/settlements/settlements.service.ts` | Removed the local `MemberDisplay` interface and inlined resolution logic from `memberDisplay`; both now come from `member-display.util.ts`. `memberDisplay` stays as a thin private wrapper (unused by anything outside the class, so kept for call-site stability). |
-| `backend/src/app/expenses/expenses.service.ts` | `carryForwardMemberDisplay` now calls `resolveMemberDisplay` and destructures the 3 fields it exposes (`groupMemberId`, `userId`, `displayName`). Return type unchanged. |
-| `frontend/src/app/features/groups/utils/member-display.util.ts` | New. Canonical `resolveMemberDisplayName(member)` and `resolveUserDisplayName(members, userId)` pure functions. |
-| `frontend/src/app/features/groups/pages/group-detail/group-detail.component.ts` | `getUserName` and `memberDisplayName` now delegate to the shared util. `payerDisplayName` is unchanged (it already composes `memberDisplayName`, so it inherits the shared resolver transitively — it wasn't itself duplicated anywhere). |
-| `frontend/src/app/features/groups/components/group-balances/group-balances.component.ts` | `getUserName` now delegates to `resolveUserDisplayName`. |
-| `frontend/src/app/features/groups/components/group-members/group-members.component.ts` | `memberDisplayName` now delegates to `resolveMemberDisplayName`. |
+| File                                                                                     | Change                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend/src/app/common/member-display.util.ts`                                          | New. Canonical `resolveMemberDisplay(m: GroupMember): MemberDisplay` — registered-user vs. pending-Contact resolution, including `nickname` override.                                                                                                                |
+| `backend/src/app/settlements/settlements.service.ts`                                     | Removed the local `MemberDisplay` interface and inlined resolution logic from `memberDisplay`; both now come from `member-display.util.ts`. `memberDisplay` stays as a thin private wrapper (unused by anything outside the class, so kept for call-site stability). |
+| `backend/src/app/expenses/expenses.service.ts`                                           | `carryForwardMemberDisplay` now calls `resolveMemberDisplay` and destructures the 3 fields it exposes (`groupMemberId`, `userId`, `displayName`). Return type unchanged.                                                                                             |
+| `frontend/src/app/features/groups/utils/member-display.util.ts`                          | New. Canonical `resolveMemberDisplayName(member)` and `resolveUserDisplayName(members, userId)` pure functions.                                                                                                                                                      |
+| `frontend/src/app/features/groups/pages/group-detail/group-detail.component.ts`          | `getUserName` and `memberDisplayName` now delegate to the shared util. `payerDisplayName` is unchanged (it already composes `memberDisplayName`, so it inherits the shared resolver transitively — it wasn't itself duplicated anywhere).                            |
+| `frontend/src/app/features/groups/components/group-balances/group-balances.component.ts` | `getUserName` now delegates to `resolveUserDisplayName`.                                                                                                                                                                                                             |
+| `frontend/src/app/features/groups/components/group-members/group-members.component.ts`   | `memberDisplayName` now delegates to `resolveMemberDisplayName`.                                                                                                                                                                                                     |
 
 Templates (`group-detail.component.html`, `group-members.component.html`) call `memberDisplayName(...)`/`getUserName(...)`/`payerDisplayName(...)` as component methods, which is why those methods are kept as thin wrappers rather than removed — Angular templates can't call a bare imported function. No template changed.
 
@@ -39,15 +39,15 @@ Templates (`group-detail.component.html`, `group-members.component.html`) call `
 
 ### Backend: `SettlementsService.memberDisplay` vs. `ExpensesService.carryForwardMemberDisplay`
 
-| Case | Settlements | Expenses (Carry Forward) | Match |
-| --- | --- | --- | --- |
-| Registered user | `m.nickname \|\| m.user.displayName \|\| m.user.email` | same | ✅ |
-| Pending/contact-only member | `m.nickname \|\| m.contact?.displayName \|\| m.contact?.email \|\| 'Unknown'` | same | ✅ |
-| `groupMemberId` | `m.id` | same | ✅ |
-| `userId` (registered) | `m.user.id` | same | ✅ |
-| `userId` (pending) | `null` | same | ✅ |
-| `contactId` | `m.contact?.id ?? null` | *(not exposed — Carry Forward's DTO never included it)* | Subset, not a conflict |
-| `email` | `m.user.email` / `m.contact?.email ?? null` | *(not exposed — same reason)* | Subset, not a conflict |
+| Case                        | Settlements                                                                   | Expenses (Carry Forward)                                | Match                  |
+| --------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------- |
+| Registered user             | `m.nickname \|\| m.user.displayName \|\| m.user.email`                        | same                                                    | ✅                     |
+| Pending/contact-only member | `m.nickname \|\| m.contact?.displayName \|\| m.contact?.email \|\| 'Unknown'` | same                                                    | ✅                     |
+| `groupMemberId`             | `m.id`                                                                        | same                                                    | ✅                     |
+| `userId` (registered)       | `m.user.id`                                                                   | same                                                    | ✅                     |
+| `userId` (pending)          | `null`                                                                        | same                                                    | ✅                     |
+| `contactId`                 | `m.contact?.id ?? null`                                                       | _(not exposed — Carry Forward's DTO never included it)_ | Subset, not a conflict |
+| `email`                     | `m.user.email` / `m.contact?.email ?? null`                                   | _(not exposed — same reason)_                           | Subset, not a conflict |
 
 The two backend implementations were identical in every field they both exposed. `carryForwardMemberDisplay`'s return type was simply a narrower projection (3 of the 5 fields) of what is now `resolveMemberDisplay`'s full `MemberDisplay` shape — no behavioral difference, just an unused-field omission in the old duplicate.
 
@@ -80,7 +80,7 @@ export interface MemberDisplay {
   displayName: string;
   email: string | null;
 }
-export function resolveMemberDisplay(m: GroupMember): MemberDisplay
+export function resolveMemberDisplay(m: GroupMember): MemberDisplay;
 ```
 
 A verbatim port of `SettlementsService.memberDisplay`'s body (the superset implementation). `SettlementsService.memberDisplay` and `ExpensesService.carryForwardMemberDisplay` are now thin wrappers over it.
@@ -89,11 +89,8 @@ A verbatim port of `SettlementsService.memberDisplay`'s body (the superset imple
 
 ```ts
 // frontend/src/app/features/groups/utils/member-display.util.ts
-export function resolveMemberDisplayName(member: GroupMember): string
-export function resolveUserDisplayName(
-  members: GroupMember[],
-  userId: string | null | undefined,
-): string
+export function resolveMemberDisplayName(member: GroupMember): string;
+export function resolveUserDisplayName(members: GroupMember[], userId: string | null | undefined): string;
 ```
 
 Pure functions, verbatim ports of the two duplicated method bodies. `GroupDetailComponent`, `GroupBalancesComponent`, and `GroupMembersComponent` now call these from their (unchanged-signature) component methods, which templates continue to bind against directly.

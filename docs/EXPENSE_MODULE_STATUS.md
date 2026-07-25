@@ -32,12 +32,12 @@ Known Intentional Limitations).
 
 ## Current Responsibilities
 
-| Module | Owns | Contract |
-| --- | --- | --- |
-| Expense | CRUD, splits, recurring templates, soft-delete/restore, version history, dashboard aggregation source | [`contracts/expense-contract.md`](contracts/expense-contract.md) |
-| Settlements & Friends Balances | Propose/update settlements, compute group and cross-group friend balances | [`contracts/settlements-contract.md`](contracts/settlements-contract.md) |
-| Groups | Membership/roles, Carry Forward HTTP surface (delegates ledger math to Expense), group history/audit surface, group-key-version persistence | [`contracts/groups-contract.md`](contracts/groups-contract.md) |
-| Encryption / Key Management | Master key derivation, group key generation/wrap/unwrap/cache/rotation, classified key resolution | [`contracts/encryption-contract.md`](contracts/encryption-contract.md), [`group-key-flow.md`](group-key-flow.md) |
+| Module                         | Owns                                                                                                                                        | Contract                                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Expense                        | CRUD, splits, recurring templates, soft-delete/restore, version history, dashboard aggregation source                                       | [`contracts/expense-contract.md`](contracts/expense-contract.md)                                                 |
+| Settlements & Friends Balances | Propose/update settlements, compute group and cross-group friend balances                                                                   | [`contracts/settlements-contract.md`](contracts/settlements-contract.md)                                         |
+| Groups                         | Membership/roles, Carry Forward HTTP surface (delegates ledger math to Expense), group history/audit surface, group-key-version persistence | [`contracts/groups-contract.md`](contracts/groups-contract.md)                                                   |
+| Encryption / Key Management    | Master key derivation, group key generation/wrap/unwrap/cache/rotation, classified key resolution                                           | [`contracts/encryption-contract.md`](contracts/encryption-contract.md), [`group-key-flow.md`](group-key-flow.md) |
 
 Full responsibility/input/output/must-never boundaries live in each contract, not here — this
 table is a map, not a restatement.
@@ -73,20 +73,20 @@ where the boundary lines are, not why each rule exists.
 
 ## Canonical Documentation Map
 
-| Topic | Canonical document |
-| --- | --- |
-| Expense architecture | [`contracts/expense-contract.md`](contracts/expense-contract.md), [`architecture/architecture-inventory.md`](architecture/architecture-inventory.md) |
-| Encryption/decryption | [`group-key-flow.md`](group-key-flow.md) → "Expense Decryption"; [`contracts/encryption-contract.md`](contracts/encryption-contract.md) |
-| Group key lifecycle | [`group-key-flow.md`](group-key-flow.md) → "Current Lifecycle" |
-| Session-memory group key cache | [`group-key-flow.md`](group-key-flow.md) → "Cache Rules" |
-| Canonical group key convergence | [`group-key-flow.md`](group-key-flow.md) → "Canonical Key Resolution" |
-| Expense lifecycle | [`contracts/expense-contract.md`](contracts/expense-contract.md); [`ARCHITECTURE.md`](../ARCHITECTURE.md) §4 "Critical Ledger Mechanics" |
-| Carry Forward | [`contracts/groups-contract.md`](contracts/groups-contract.md) → "Carry Forward Boundary" |
-| Settlement | [`contracts/settlements-contract.md`](contracts/settlements-contract.md) |
-| History | [`contracts/groups-contract.md`](contracts/groups-contract.md) → "History / Audit Boundary"; [`audits/history-decryption-audit.md`](audits/history-decryption-audit.md) (architecture review); [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) → KI-1 (tracked limitation) |
-| API contracts | [`contracts/`](contracts/), [`../openapi.yaml`](../openapi.yaml) |
-| Security model | [`ARCHITECTURE.md`](../ARCHITECTURE.md) §2; [`group-key-flow.md`](group-key-flow.md) → "Security Invariants"; [`SECURITY_VERIFICATION_CHECKLIST.md`](SECURITY_VERIFICATION_CHECKLIST.md) |
-| Refresh/invalidation flow | [`group-key-flow.md`](group-key-flow.md) → "Cache Rules" (`invalidateGroupKey`, `clearCache`, `clearPersistentCache`) |
+| Topic                           | Canonical document                                                                                                                                                                                                                                              |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Expense architecture            | [`contracts/expense-contract.md`](contracts/expense-contract.md), [`architecture/architecture-inventory.md`](architecture/architecture-inventory.md)                                                                                                            |
+| Encryption/decryption           | [`group-key-flow.md`](group-key-flow.md) → "Expense Decryption"; [`contracts/encryption-contract.md`](contracts/encryption-contract.md)                                                                                                                         |
+| Group key lifecycle             | [`group-key-flow.md`](group-key-flow.md) → "Current Lifecycle"                                                                                                                                                                                                  |
+| Session-memory group key cache  | [`group-key-flow.md`](group-key-flow.md) → "Cache Rules"                                                                                                                                                                                                        |
+| Canonical group key convergence | [`group-key-flow.md`](group-key-flow.md) → "Canonical Key Resolution"                                                                                                                                                                                           |
+| Expense lifecycle               | [`contracts/expense-contract.md`](contracts/expense-contract.md); [`ARCHITECTURE.md`](../ARCHITECTURE.md) §4 "Critical Ledger Mechanics"                                                                                                                        |
+| Carry Forward                   | [`contracts/groups-contract.md`](contracts/groups-contract.md) → "Carry Forward Boundary"                                                                                                                                                                       |
+| Settlement                      | [`contracts/settlements-contract.md`](contracts/settlements-contract.md)                                                                                                                                                                                        |
+| History                         | [`contracts/groups-contract.md`](contracts/groups-contract.md) → "History / Audit Boundary"; [`audits/history-decryption-audit.md`](audits/history-decryption-audit.md) (architecture review); [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) → KI-1 (tracked limitation) |
+| API contracts                   | [`contracts/`](contracts/), [`../openapi.yaml`](../openapi.yaml)                                                                                                                                                                                                |
+| Security model                  | [`ARCHITECTURE.md`](../ARCHITECTURE.md) §2; [`group-key-flow.md`](group-key-flow.md) → "Security Invariants"; [`SECURITY_VERIFICATION_CHECKLIST.md`](SECURITY_VERIFICATION_CHECKLIST.md)                                                                        |
+| Refresh/invalidation flow       | [`group-key-flow.md`](group-key-flow.md) → "Cache Rules" (`invalidateGroupKey`, `clearCache`, `clearPersistentCache`)                                                                                                                                           |
 
 If a topic document and the code disagree, the code wins and the topic document is stale —
 fix the document, not this rollup (this file only needs to change when the map itself changes).
@@ -98,13 +98,13 @@ The expense architecture audit ([`audits/expense-architecture-audit.md`](audits/
 implementations. Each was resolved as a behavior-preserving internal refactor — same public APIs,
 same DTOs, same business rules — recorded individually:
 
-| Consolidation | What changed | Record |
-| --- | --- | --- |
-| Debt simplification | `SettlementsService.simplifyDebts` and `ExpensesService.simplifyDebts` (Carry Forward) now both call one `simplifyLedgerDebts` in `backend/src/app/common/ledger-debt-simplifier.ts` | [`changes/debt-simplifier-consolidation.md`](changes/debt-simplifier-consolidation.md) |
-| Expense response mapping | `mapExpenseResponse` (single) and `batchMapExpenseResponses` (list) now both call one pure `toExpenseResponse` mapper; only their data-loading strategy still differs | [`changes/expense-response-mapper-consolidation.md`](changes/expense-response-mapper-consolidation.md) |
-| Member display-name resolution | One backend resolver (`common/member-display.util.ts`) and one frontend resolver (`features/groups/utils/member-display.util.ts`) replace five duplicated implementations across Settlements/Expenses/three group components | [`changes/display-name-resolver-consolidation.md`](changes/display-name-resolver-consolidation.md) |
-| Split calculation | Backend `calculateDeterministicSplits` (in `shared/utils`) is the single split algorithm; the backend wrapper translates its errors to `BadRequestException` | Predates this pass — see `docs/audits/expense-architecture-audit.md` P1-1 for the original finding |
-| Legacy/dead code removal | Removed `ExpensesAccessService` (never injected), `GroupKeyService.refreshGroupKey`/`clearLocalState`, `ZkKeyVaultService.storeGroupKey`/`loadGroupKey`/`deleteGroupKey` (all zero-caller), and the `shared/utils` `SplitCalculator` legacy shim + its already-failing spec | [`changes/legacy-cleanup.md`](changes/legacy-cleanup.md) |
+| Consolidation                  | What changed                                                                                                                                                                                                                                                                | Record                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Debt simplification            | `SettlementsService.simplifyDebts` and `ExpensesService.simplifyDebts` (Carry Forward) now both call one `simplifyLedgerDebts` in `backend/src/app/common/ledger-debt-simplifier.ts`                                                                                        | [`changes/debt-simplifier-consolidation.md`](changes/debt-simplifier-consolidation.md)                 |
+| Expense response mapping       | `mapExpenseResponse` (single) and `batchMapExpenseResponses` (list) now both call one pure `toExpenseResponse` mapper; only their data-loading strategy still differs                                                                                                       | [`changes/expense-response-mapper-consolidation.md`](changes/expense-response-mapper-consolidation.md) |
+| Member display-name resolution | One backend resolver (`common/member-display.util.ts`) and one frontend resolver (`features/groups/utils/member-display.util.ts`) replace five duplicated implementations across Settlements/Expenses/three group components                                                | [`changes/display-name-resolver-consolidation.md`](changes/display-name-resolver-consolidation.md)     |
+| Split calculation              | Backend `calculateDeterministicSplits` (in `shared/utils`) is the single split algorithm; the backend wrapper translates its errors to `BadRequestException`                                                                                                                | Predates this pass — see `docs/audits/expense-architecture-audit.md` P1-1 for the original finding     |
+| Legacy/dead code removal       | Removed `ExpensesAccessService` (never injected), `GroupKeyService.refreshGroupKey`/`clearLocalState`, `ZkKeyVaultService.storeGroupKey`/`loadGroupKey`/`deleteGroupKey` (all zero-caller), and the `shared/utils` `SplitCalculator` legacy shim + its already-failing spec | [`changes/legacy-cleanup.md`](changes/legacy-cleanup.md)                                               |
 
 One design review concluded the existing separation was correct and made **no code change**:
 group history decryption (`GroupsService.getHistoryLogs`) stays a dedicated, lighter-weight path
@@ -154,6 +154,7 @@ because it is reachable, validated code, not zero-caller dead code.
      shape).
 
   Shipping rotation UI without one of these first will surface KI-1 as a live, user-visible defect.
+
 - **`direct_shared` non-goal decision.** If `direct_shared` expenses are never going to ship, the
   dormant plumbing should be removed rather than carried indefinitely (per
   `expense-architecture-audit.md`'s recommendation to "document as intentionally dormant or
