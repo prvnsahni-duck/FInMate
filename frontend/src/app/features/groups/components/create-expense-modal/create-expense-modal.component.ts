@@ -7,6 +7,8 @@ import {
   SimpleChanges,
   inject,
   DestroyRef,
+  signal,
+  computed,
 } from '@angular/core';
 import { Subscription } from 'rxjs';
 import {
@@ -30,7 +32,10 @@ import {
 } from '@finmate/data-models';
 import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../../core/services/encryption.service';
-import { GroupKeyService } from '../../../../core/services/group-key.service';
+import {
+  GroupKeyService,
+  GroupKeyResult,
+} from '../../../../core/services/group-key.service';
 import { environment } from '../../../../../environments/environment';
 import { GroupExpense } from '../../pages/group-detail/group-detail.component';
 import {
@@ -88,6 +93,50 @@ export class CreateExpenseModalComponent implements OnChanges {
   isSubmitting = false;
   errorMessage = '';
   attachedFiles: { name: string; size: string; key: string }[] = [];
+
+  /**
+   * Reactive group-key availability, checked proactively as soon as groupId
+   * is known (see ngOnChanges) so the form can warn/disable before the user
+   * fills it out, rather than only discovering a blocked key mid-submit.
+   */
+  scopeKeyStatus = signal<GroupKeyResult['status'] | 'idle'>('idle');
+
+  scopeKeyBlocked = computed(() => {
+    const status = this.scopeKeyStatus();
+    if (!this.groupId || status === 'ready' || status === 'idle') {
+      return false;
+    }
+    // Owners/admins facing 'pending' can still submit — resolveGroupScopeKey
+    // will mint the key for them inline. Every other status (and 'pending'
+    // for non-owners/admins) genuinely blocks submission.
+    return !(status === 'pending' && this.isCurrentUserOwnerOrAdmin());
+  });
+
+  private isCurrentUserOwnerOrAdmin(): boolean {
+    const currentUserId = this.getCurrentUserId();
+    return this.members.some(
+      (m) =>
+        m.user?.id === currentUserId &&
+        (m.role === 'owner' || m.role === 'admin'),
+    );
+  }
+
+  scopeKeyMessage = computed(() => {
+    switch (this.scopeKeyStatus()) {
+      case 'no_session':
+        return 'Your session key is not loaded. Please refresh the page and log in again.';
+      case 'pending':
+        return "This group's encryption key isn't available on this device yet. Try refreshing, or ask the group owner to open the group once to share it.";
+      case 'no_access':
+        return 'You no longer have access to this group.';
+      case 'rate_limited':
+        return 'Too many requests. Please wait a moment and try again.';
+      case 'error':
+        return 'Could not check the group encryption key. Please try again.';
+      default:
+        return '';
+    }
+  });
 
   // Direct splits with friends fields
   splitWithFriend = false;
@@ -149,6 +198,66 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
   }
 
+  /**
+   * Resolves the group data key for encryption, self-healing inline if it
+   * isn't cached yet — mirrors GroupMembersComponent.ensureGroupKey().
+   *
+   * The naive `getGroupDataKey() ?? createGroupKey()` fallback this replaced
+   * would unconditionally try to mint a brand-new key for ANY member whose
+   * key wasn't cached yet, including when the real cause is simply that
+   * their own master key/session isn't loaded (a `no_session` result) — in
+   * which case createGroupKey() also needs the master key and throws the
+   * unrelated-sounding "Master key not loaded", and, in the case where a
+   * key already exists but isn't yet provisioned to this member, minting
+   * blind would risk generating a second, divergent key. Only owners/admins
+   * facing a genuinely un-minted (`pending`) key attempt to create one.
+   */
+  private scopeKeyInFlight?: Promise<CryptoKey>;
+
+  /**
+   * De-duplicates concurrent resolutions (e.g. a fast double-submit before the
+   * disabled attribute reflects, or a submit racing a proactive re-check) so
+   * `createAndStoreGroupKey()` — which has no in-flight guard of its own and
+   * would otherwise mint and POST a second key — can only run once per window.
+   */
+  private resolveGroupScopeKey(groupId: string): Promise<CryptoKey> {
+    if (this.scopeKeyInFlight) {
+      return this.scopeKeyInFlight;
+    }
+    const inFlight = this.doResolveGroupScopeKey(groupId).finally(() => {
+      this.scopeKeyInFlight = undefined;
+    });
+    this.scopeKeyInFlight = inFlight;
+    return inFlight;
+  }
+
+  private async doResolveGroupScopeKey(groupId: string): Promise<CryptoKey> {
+    const result = await this.groupKeyService.resolveGroupKey(groupId);
+    this.scopeKeyStatus.set(result.status);
+    if (result.status === 'ready') {
+      return result.key;
+    }
+
+    if (result.status === 'pending') {
+      if (this.isCurrentUserOwnerOrAdmin()) {
+        const key = await this.groupKeyService.createAndStoreGroupKey(groupId);
+        this.scopeKeyStatus.set('ready');
+        return key;
+      }
+      throw new Error(
+        "Your group key hasn't been shared with you yet. Try refreshing, or contact the group owner.",
+      );
+    }
+
+    if (result.status === 'no_session') {
+      throw new Error(
+        'Your session key is not loaded. Please refresh the page and log in again.',
+      );
+    }
+
+    throw new Error('Encryption key not loaded/derived. Please try again.');
+  }
+
   get availablePayers(): { id: string; name: string }[] {
     if (this.groupId) {
       // Pending (Contact-backed) members have no User account and can't be
@@ -197,6 +306,21 @@ export class CreateExpenseModalComponent implements OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges) {
+    // Runs before the edit-mode early return below so the proactive key check
+    // also happens when the modal opens in edit mode (both `expense` and
+    // `groupId` arrive in the same change). Re-checked on `members` changes so
+    // that when the parent's background key self-heal finishes and re-emits
+    // members, a previously-blocked banner clears automatically.
+    if (changes['groupId'] || changes['members']) {
+      if (this.groupId) {
+        if (changes['groupId'] || this.scopeKeyStatus() !== 'ready') {
+          void this.refreshScopeKeyStatus(this.groupId);
+        }
+      } else {
+        this.scopeKeyStatus.set('idle');
+      }
+    }
+
     if (!this.expense && changes['defaultCategory'] && this.defaultCategory) {
       this.expenseForm.patchValue({ category: this.defaultCategory });
     }
@@ -302,6 +426,23 @@ export class CreateExpenseModalComponent implements OnChanges {
       }
       if (!this.expenseForm.get('currency')?.value) {
         this.expenseForm.patchValue({ currency: 'USD' });
+      }
+    }
+  }
+
+  /** Proactively checks group-key availability and publishes it to scopeKeyStatus. */
+  private async refreshScopeKeyStatus(groupId: string): Promise<void> {
+    try {
+      const result = await this.groupKeyService.resolveGroupKey(groupId);
+      // A submit-triggered mint (resolveGroupScopeKey) owns the authoritative
+      // status while it runs; don't let a concurrent proactive read stomp it
+      // back to a stale pre-mint value.
+      if (!this.scopeKeyInFlight) {
+        this.scopeKeyStatus.set(result.status);
+      }
+    } catch {
+      if (!this.scopeKeyInFlight) {
+        this.scopeKeyStatus.set('error');
       }
     }
   }
@@ -435,10 +576,7 @@ export class CreateExpenseModalComponent implements OnChanges {
 
         if (this.groupId) {
           scope = 'group';
-          scopeKey = await this.groupKeyService.getGroupDataKey(this.groupId);
-          if (!scopeKey) {
-            scopeKey = await this.groupKeyService.createGroupKey(this.groupId);
-          }
+          scopeKey = await this.resolveGroupScopeKey(this.groupId);
         } else {
           const otherParticipants = splits.filter(
             (s) => s.participantUserId && s.participantUserId !== user,

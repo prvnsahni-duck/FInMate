@@ -437,4 +437,143 @@ describe('CreateExpenseModalComponent', () => {
       expect(component.selectedUserIds.has('user-1')).toBeTruthy();
     });
   });
+
+  // --- Group key classification (pending / no_session) ---
+  describe('group key resolution', () => {
+    const mockCryptoKey = {} as CryptoKey;
+
+    const validForm = () => {
+      component.groupId = 'group-1';
+      component.selectedUserIds.add('user-1');
+      component.expenseForm.patchValue({
+        title: 'Test Expense',
+        amountTotal: 100,
+        currency: 'USD',
+        category: 'food',
+        expenseDate: '2026-06-28',
+        paidByUserId: 'user-1',
+      });
+    };
+
+    const asOwner = () => {
+      component.members = [{ user: { id: 'user-1' }, role: 'owner' } as any];
+    };
+
+    const asMember = () => {
+      component.members = [{ user: { id: 'user-1' }, role: 'member' } as any];
+    };
+
+    it('ready: uses the resolved key without minting a new one', async () => {
+      mockGroupKeyService.resolveGroupKey.mockResolvedValue({
+        status: 'ready',
+        key: mockCryptoKey,
+      });
+      validForm();
+
+      await component.onSubmit();
+
+      expect(mockGroupKeyService.createAndStoreGroupKey).not.toHaveBeenCalled();
+      expect(mockExpensesService.createExpense).toHaveBeenCalled();
+    });
+
+    it('pending + owner/admin: mints the key inline and proceeds', async () => {
+      mockGroupKeyService.resolveGroupKey.mockResolvedValue({
+        status: 'pending',
+      });
+      mockGroupKeyService.createAndStoreGroupKey.mockResolvedValue(
+        mockCryptoKey,
+      );
+      validForm();
+      asOwner();
+
+      await component.onSubmit();
+
+      expect(mockGroupKeyService.createAndStoreGroupKey).toHaveBeenCalledWith(
+        'group-1',
+      );
+      expect(component.scopeKeyStatus()).toBe('ready');
+      expect(mockExpensesService.createExpense).toHaveBeenCalled();
+    });
+
+    it('pending + non-owner: does NOT mint and surfaces a friendly error', async () => {
+      mockGroupKeyService.resolveGroupKey.mockResolvedValue({
+        status: 'pending',
+      });
+      validForm();
+      asMember();
+
+      await component.onSubmit();
+
+      expect(mockGroupKeyService.createAndStoreGroupKey).not.toHaveBeenCalled();
+      expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
+      expect(component.errorMessage).toContain("group key hasn't been shared");
+      expect(component.isSubmitting).toBe(false);
+    });
+
+    it('no_session: does NOT mint and reports a session-specific error', async () => {
+      mockGroupKeyService.resolveGroupKey.mockResolvedValue({
+        status: 'no_session',
+      });
+      validForm();
+      asOwner();
+
+      await component.onSubmit();
+
+      expect(mockGroupKeyService.createAndStoreGroupKey).not.toHaveBeenCalled();
+      expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
+      expect(component.errorMessage).toContain('session key is not loaded');
+    });
+
+    it('scopeKeyBlocked/scopeKeyMessage reflect a no_session status', () => {
+      component.groupId = 'group-1';
+      component.scopeKeyStatus.set('no_session');
+
+      expect(component.scopeKeyBlocked()).toBe(true);
+      expect(component.scopeKeyMessage()).toContain(
+        'session key is not loaded',
+      );
+    });
+
+    it('owner/admin facing pending is NOT blocked from submitting', () => {
+      component.groupId = 'group-1';
+      asOwner();
+      component.scopeKeyStatus.set('pending');
+
+      expect(component.scopeKeyBlocked()).toBe(false);
+    });
+
+    it('banner auto-clears reactively when status flips to ready', () => {
+      component.groupId = 'group-1';
+      component.scopeKeyStatus.set('no_session');
+      expect(component.scopeKeyBlocked()).toBe(true);
+
+      component.scopeKeyStatus.set('ready');
+
+      expect(component.scopeKeyBlocked()).toBe(false);
+      expect(component.scopeKeyMessage()).toBe('');
+    });
+
+    it('concurrent resolutions mint the key only once (in-flight guard)', async () => {
+      let resolveMint!: (k: CryptoKey) => void;
+      mockGroupKeyService.resolveGroupKey.mockResolvedValue({
+        status: 'pending',
+      });
+      mockGroupKeyService.createAndStoreGroupKey.mockReturnValue(
+        new Promise<CryptoKey>((res) => {
+          resolveMint = res;
+        }),
+      );
+      validForm();
+      asOwner();
+
+      const first = component.onSubmit();
+      const second = component.onSubmit();
+      resolveMint(mockCryptoKey);
+      await Promise.all([first, second]);
+
+      expect(mockGroupKeyService.createAndStoreGroupKey).toHaveBeenCalledTimes(
+        1,
+      );
+    });
+  });
 });
