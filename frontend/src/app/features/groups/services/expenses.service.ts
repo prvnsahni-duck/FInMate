@@ -3,8 +3,6 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { from, Observable } from 'rxjs';
 import { mergeMap, shareReplay } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
-import { Store } from '@ngxs/store';
-import { AuthState } from '../../../core/auth/auth.state';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import {
   CategoryAnalyticsPoint,
@@ -14,20 +12,20 @@ import {
   MonthlyAnalyticsPoint,
   UpdateExpenseDto,
 } from '@finmate/data-models';
-import { SESSION_EXPIRED_MESSAGE } from '../../../core/constants/crypto.constants';
 import { mapDecryptExpense } from '../../../core/utils/crypto-operators';
 import { GroupKeyService } from '../../../core/services/group-key.service';
 import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
+import { CryptoSessionManager } from '../../../core/services/crypto-session-manager.service';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ExpensesService {
   private http = inject(HttpClient);
-  private store = inject(Store);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
   private decryptor = inject(ExpenseDecryptionService);
+  private cryptoSession = inject(CryptoSessionManager);
   private baseUrl = environment.apiBaseUrl;
 
   /**
@@ -36,69 +34,83 @@ export class ExpensesService {
   private async encryptPayload(
     payload: CreateExpenseDto | UpdateExpenseDto,
   ): Promise<any> {
-    const user = this.store.selectSnapshot(AuthState.getUser);
-    const email = user?.email;
-    if (email) {
-      const masterKey = await this.encryptionService.loadKeyFromSession(email);
-      if (!masterKey) {
-        throw new Error(SESSION_EXPIRED_MESSAGE);
-      }
+    const context =
+      await this.cryptoSession.ensureCryptoContext('expense_encrypt');
+    const user = context.user;
+    const masterKey = context.masterKey;
 
-      const encrypted = { ...payload } as any;
+    const encrypted = { ...payload } as any;
 
-      // 1. Determine encryption scope and pick corresponding key
-      let scope: 'personal' | 'group' = 'personal';
-      let key: CryptoKey = masterKey;
+    // 1. Determine encryption scope and pick corresponding key
+    let scope: 'personal' | 'group' = 'personal';
+    let key: CryptoKey = masterKey;
 
-      if ((payload as any).groupId) {
-        scope = 'group';
-        const groupId = (payload as any).groupId as string;
-        const resolved =
-          await this.groupKeyService.getGroupKeyForEncryption(groupId);
-        if (resolved) {
-          key = resolved.key;
-          encrypted.groupKeyVersionId = resolved.versionId;
-        } else {
-          key = await this.groupKeyService.createGroupKey(groupId);
-          const mintedVersionId =
-            this.groupKeyService.getKnownActiveVersionId(groupId);
-          if (mintedVersionId) {
-            encrypted.groupKeyVersionId = mintedVersionId;
-          }
+    if ((payload as any).groupId) {
+      scope = 'group';
+      const groupId = (payload as any).groupId as string;
+      const resolved = await this.cryptoSession.ensureGroupKey(
+        groupId,
+        'write',
+      );
+      if (resolved.status === 'ready') {
+        key = resolved.key;
+        encrypted.groupKeyVersionId = resolved.versionId;
+      } else if (resolved.status === 'pending') {
+        // Genuinely un-minted key (e.g. brand-new group). Self-provisioning
+        // is always backend-permitted (provisionGroupKeys treats self as an
+        // implicit exception to the owner/admin-only rule) — and
+        // createGroupKey() itself refuses via requiresKeyProvisioning() if a
+        // key already exists for other members but isn't shared with this
+        // caller yet, so this can't mint a second, divergent key.
+        key = await this.groupKeyService.createGroupKey(groupId);
+        const mintedVersionId =
+          this.groupKeyService.getKnownActiveVersionId(groupId);
+        if (mintedVersionId) {
+          encrypted.groupKeyVersionId = mintedVersionId;
         }
       } else {
-        const currentUserId = user?.userId;
-        const splits = payload.splits || [];
-        const otherParticipants = splits.filter(
-          (s) => s.participantUserId && s.participantUserId !== currentUserId,
-        );
-
-        if (otherParticipants.length > 0) {
-          throw new Error(
-            'Shared expenses must belong to a group and use group encryption scope.',
-          );
-        }
-      }
-
-      encrypted.encryptionScope = scope;
-
-      if (payload.title) {
-        encrypted.title = await this.encryptionService.encrypt(
-          payload.title,
-          key,
+        // no_access / rate_limited / error: minting would be pointless or
+        // wrong here — surface the real, classified reason instead.
+        throw new Error(
+          resolved.status === 'no_access'
+            ? 'You no longer have access to this group.'
+            : resolved.status === 'rate_limited'
+              ? 'Too many requests. Please wait a moment and try again.'
+              : "Couldn't resolve this group's encryption key. Please try again.",
         );
       }
+    } else {
+      const currentUserId = user?.userId;
+      const splits = payload.splits || [];
+      const otherParticipants = splits.filter(
+        (s) => s.participantUserId && s.participantUserId !== currentUserId,
+      );
 
-      if (payload.description) {
-        encrypted.description = await this.encryptionService.encrypt(
-          payload.description,
-          key,
+      if (otherParticipants.length > 0) {
+        throw new Error(
+          'Shared expenses must belong to a group and use group encryption scope.',
         );
       }
-
-      return encrypted;
     }
-    return payload;
+
+    encrypted.encryptionScope = scope;
+
+    if (payload.title) {
+      encrypted.title = await this.encryptionService.encrypt(
+        payload.title,
+        key,
+      );
+    }
+
+    if (payload.description) {
+      encrypted.description = await this.encryptionService.encrypt(
+        payload.description,
+        key,
+      );
+    }
+
+    this.cryptoSession.assertCurrentEpoch(context.epoch);
+    return encrypted;
   }
 
   /**

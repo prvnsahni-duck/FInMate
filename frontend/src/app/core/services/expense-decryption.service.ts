@@ -1,8 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { Store } from '@ngxs/store';
-import { AuthState } from '../auth/auth.state';
 import { ClientEncryptionService } from './encryption.service';
-import { GroupKeyService } from './group-key.service';
+import { CryptoSessionManager } from './crypto-session-manager.service';
 import {
   ExpenseDecryptionMeta,
   DecryptionMeta,
@@ -64,21 +62,22 @@ function looksEncrypted(expense: DecryptableExpense): boolean {
  */
 @Injectable({ providedIn: 'root' })
 export class ExpenseDecryptionService {
-  private store = inject(Store);
   private encryption = inject(ClientEncryptionService);
-  private groupKeys = inject(GroupKeyService);
+  private cryptoSession = inject(CryptoSessionManager);
 
   /** Decrypt a single expense in place (returns a new annotated copy). */
   async decryptExpense<T extends DecryptableExpense>(expense: T): Promise<T> {
-    const user = this.store.selectSnapshot(AuthState.getUser);
-    const email = user?.email;
-
     // Not encrypted (e.g. legacy plaintext) — nothing to do.
     if (!looksEncrypted(expense)) {
       return { ...expense, decryption: DecryptionMeta.success() } as T;
     }
 
-    if (!email) {
+    let context: Awaited<
+      ReturnType<CryptoSessionManager['ensureCryptoContext']>
+    >;
+    try {
+      context = await this.cryptoSession.ensureCryptoContext('expense_decrypt');
+    } catch {
       return this.fail(expense, { sessionReady: false }, 'no_session');
     }
 
@@ -89,7 +88,7 @@ export class ExpenseDecryptionService {
       (expense.description as string | undefined);
 
     const scope = expense.encryptionScope || 'personal';
-    const { key, keyStatus } = await this.resolveKey(expense, user, email);
+    const { key, keyStatus } = await this.resolveKey(expense, context);
 
     if (!key) {
       return this.fail(
@@ -105,10 +104,12 @@ export class ExpenseDecryptionService {
 
     // Key is ready — attempt the actual decryption.
     try {
+      this.cryptoSession.assertCurrentEpoch(context.epoch);
       const decrypted = await this.encryption.decryptExpense(
         { title: cipherTitle, description: cipherDescription },
         key,
       );
+      this.cryptoSession.assertCurrentEpoch(context.epoch);
       return {
         ...expense,
         title: decrypted.title,
@@ -165,25 +166,27 @@ export class ExpenseDecryptionService {
   async resolveExpenseKey(
     expense: DecryptableExpense,
   ): Promise<{ key: CryptoKey | null; keyStatus: GroupKeyStatus }> {
-    const user = this.store.selectSnapshot(AuthState.getUser);
-    const email = user?.email;
-    if (!email) {
+    try {
+      const context = await this.cryptoSession.ensureCryptoContext(
+        'expense_key_resolve',
+      );
+      return this.resolveKey(expense, context);
+    } catch {
       return { key: null, keyStatus: 'no_session' };
     }
-    return this.resolveKey(expense, user, email);
   }
 
   /** Resolve the decryption key for an expense's scope, with a status. */
   private async resolveKey(
     expense: DecryptableExpense,
-    user: { userId?: string } | null,
-    email: string,
+    context: Awaited<ReturnType<CryptoSessionManager['ensureCryptoContext']>>,
   ): Promise<{ key: CryptoKey | null; keyStatus: GroupKeyStatus }> {
     const scope = expense.encryptionScope || 'personal';
 
     if (scope === 'group' && expense.groupId) {
-      const result = await this.groupKeys.resolveGroupKey(
+      const result = await this.cryptoSession.ensureGroupKey(
         expense.groupId,
+        'read',
         expense.groupKeyVersionId,
       );
       return result.status === 'ready'
@@ -193,15 +196,12 @@ export class ExpenseDecryptionService {
 
     if (scope === 'direct_shared') {
       const myWrapped = (expense.wrappedContentKeys || []).find(
-        (wk) => wk.userId === user?.userId,
+        (wk) => wk.userId === context.user.userId,
       );
       if (!myWrapped) {
         return { key: null, keyStatus: 'no_access' };
       }
-      const masterKey = await this.encryption.loadKeyFromSession(email);
-      if (!masterKey) {
-        return { key: null, keyStatus: 'no_session' };
-      }
+      const masterKey = context.masterKey;
       try {
         const key = await this.encryption.unwrapKey(
           myWrapped.wrappedKey,
@@ -218,10 +218,7 @@ export class ExpenseDecryptionService {
     }
 
     // personal
-    const masterKey = await this.encryption.loadKeyFromSession(email);
-    return masterKey
-      ? { key: masterKey, keyStatus: 'ready' }
-      : { key: null, keyStatus: 'no_session' };
+    return { key: context.masterKey, keyStatus: 'ready' };
   }
 
   /** Classify a failure, log it once, and annotate the expense. */
@@ -239,6 +236,16 @@ export class ExpenseDecryptionService {
       state: meta.state,
       error: ctx.decryptError,
     });
+    // NOT wired to cryptoSession.markFatal(): `category === 'permanent'` here
+    // covers keyUnavailable() (an auth-tag failure), which is the expected,
+    // routine signature of a record encrypted under a since-rotated group key
+    // (KI-1) — not evidence of tampering. It fires today, per-item, for
+    // ordinary old records. CryptoSessionManager.transition() makes Fatal
+    // sticky app-wide (only NoSession/logout escapes it), so treating this as
+    // fatal would brick every user's session on the first rotated-key record
+    // they load. A real tamper/integrity signal (e.g. key-lineage/version
+    // downgrade detection) needs to exist and be distinguished from routine
+    // key unavailability before anything here calls markFatal().
     // Fallback display value: any template that just renders `title` still
     // shows a meaningful message rather than ciphertext or a blank.
     return {
