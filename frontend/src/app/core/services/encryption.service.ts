@@ -163,7 +163,7 @@ export class ClientEncryptionService {
     const encodedPlaintext = encoder.encode(plaintext);
 
     // Generate a unique 12-byte IV
-    let iv: Uint8Array;
+    let iv: Uint8Array<ArrayBuffer>;
     if (typeof window !== 'undefined' && window.crypto) {
       iv = window.crypto.getRandomValues(new Uint8Array(12));
     } else if (typeof globalThis !== 'undefined' && globalThis.crypto) {
@@ -172,20 +172,22 @@ export class ClientEncryptionService {
       throw new Error('Web Cryptography API (SubtleCrypto) is not available');
     }
 
-    const ivBuffer = iv.buffer.slice(
-      iv.byteOffset,
-      iv.byteOffset + iv.byteLength,
-    ) as ArrayBuffer;
+    // Pass the Uint8Array itself (a valid BufferSource per the WebCrypto
+    // spec) rather than a `.buffer.slice()`d ArrayBuffer. In a jsdom test
+    // environment, a TypedArray's `.buffer` is bound to jsdom's realm; the
+    // native Node WebCrypto implementation's `instanceof ArrayBuffer` check
+    // then fails on it (TypedArray/DataView pass the same check directly,
+    // sidestepping the cross-realm identity mismatch entirely).
     const ciphertextBuffer = await subtle.encrypt(
       {
         name: 'AES-GCM',
-        iv: ivBuffer,
+        iv,
       },
       key,
       encodedPlaintext,
     );
 
-    const ivBase64 = arrayBufferToBase64(ivBuffer);
+    const ivBase64 = arrayBufferToBase64(iv.buffer as ArrayBuffer);
     const ciphertextBase64 = arrayBufferToBase64(ciphertextBuffer);
 
     return `${ivBase64}:${ciphertextBase64}`;
@@ -208,16 +210,12 @@ export class ClientEncryptionService {
 
     const subtle = this.getSubtleCrypto();
     const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
-    const ivBuffer = iv.buffer.slice(
-      iv.byteOffset,
-      iv.byteOffset + iv.byteLength,
-    ) as ArrayBuffer;
     const ciphertextBuffer = base64ToArrayBuffer(parts[1]);
 
     const decryptedBuffer = await subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv: ivBuffer,
+        iv,
       },
       key,
       ciphertextBuffer,
@@ -392,7 +390,7 @@ export class ClientEncryptionService {
       return arrayBufferToBase64(wrappedBuffer);
     }
 
-    let iv: Uint8Array;
+    let iv: Uint8Array<ArrayBuffer>;
     if (typeof window !== 'undefined' && window.crypto) {
       iv = window.crypto.getRandomValues(new Uint8Array(12));
     } else if (typeof globalThis !== 'undefined' && globalThis.crypto) {
@@ -400,23 +398,18 @@ export class ClientEncryptionService {
     } else {
       throw new Error('Web Cryptography API (SubtleCrypto) is not available');
     }
-    const ivBuffer = iv.buffer.slice(
-      iv.byteOffset,
-      iv.byteOffset + iv.byteLength,
-    ) as ArrayBuffer;
-
     // Export the data key and encrypt it symmetrically
     const rawKeyBuffer = await subtle.exportKey('raw', dataKey);
     const ciphertextBuffer = await subtle.encrypt(
       {
         name: 'AES-GCM',
-        iv: ivBuffer,
+        iv,
       },
       wrappingKey,
       rawKeyBuffer,
     );
 
-    const ivBase64 = arrayBufferToBase64(ivBuffer);
+    const ivBase64 = arrayBufferToBase64(iv.buffer as ArrayBuffer);
     const wrappedBase64 = arrayBufferToBase64(ciphertextBuffer);
 
     return `${ivBase64}:${wrappedBase64}`;
@@ -461,17 +454,13 @@ export class ClientEncryptionService {
     }
 
     const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
-    const ivBuffer = iv.buffer.slice(
-      iv.byteOffset,
-      iv.byteOffset + iv.byteLength,
-    ) as ArrayBuffer;
     const wrappedBuffer = base64ToArrayBuffer(parts[1]);
 
     // Decrypt the wrapped key symmetrically and import it
     const rawKeyBuffer = await subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv: ivBuffer,
+        iv,
       },
       unwrappingKey,
       wrappedBuffer,
@@ -494,7 +483,7 @@ export class ClientEncryptionService {
    */
   async encryptBytes(data: ArrayBuffer, key: CryptoKey): Promise<string> {
     const subtle = this.getSubtleCrypto();
-    let iv: Uint8Array;
+    let iv: Uint8Array<ArrayBuffer>;
     if (typeof window !== 'undefined' && window.crypto) {
       iv = window.crypto.getRandomValues(new Uint8Array(12));
     } else if (typeof globalThis !== 'undefined' && globalThis.crypto) {
@@ -502,21 +491,16 @@ export class ClientEncryptionService {
     } else {
       throw new Error('Web Cryptography API (SubtleCrypto) is not available');
     }
-    const ivBuffer = iv.buffer.slice(
-      iv.byteOffset,
-      iv.byteOffset + iv.byteLength,
-    ) as ArrayBuffer;
-
     const ciphertextBuffer = await subtle.encrypt(
       {
         name: 'AES-GCM',
-        iv: ivBuffer,
+        iv,
       },
       key,
       data,
     );
 
-    const ivBase64 = arrayBufferToBase64(ivBuffer);
+    const ivBase64 = arrayBufferToBase64(iv.buffer as ArrayBuffer);
     const ciphertextBase64 = arrayBufferToBase64(ciphertextBuffer);
 
     return `${ivBase64}:${ciphertextBase64}`;
@@ -541,16 +525,12 @@ export class ClientEncryptionService {
 
     const subtle = this.getSubtleCrypto();
     const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
-    const ivBuffer = iv.buffer.slice(
-      iv.byteOffset,
-      iv.byteOffset + iv.byteLength,
-    ) as ArrayBuffer;
     const ciphertextBuffer = base64ToArrayBuffer(parts[1]);
 
     return await subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv: ivBuffer,
+        iv,
       },
       key,
       ciphertextBuffer,
