@@ -25,6 +25,7 @@ import {
 import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import { simplifyLedgerDebts } from '../common/ledger-debt-simplifier';
+import { resolveMemberDisplay } from '../common/member-display.util';
 import { calculateDeterministicSplits } from './split-calculator.util';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto';
 
@@ -2038,19 +2039,8 @@ export class ExpensesService {
     userId: string | null;
     displayName: string;
   } {
-    if (m.user) {
-      return {
-        groupMemberId: m.id,
-        userId: m.user.id,
-        displayName: m.nickname || m.user.displayName || m.user.email,
-      };
-    }
-    return {
-      groupMemberId: m.id,
-      userId: null,
-      displayName:
-        m.nickname || m.contact?.displayName || m.contact?.email || 'Unknown',
-    };
+    const { groupMemberId, userId, displayName } = resolveMemberDisplay(m);
+    return { groupMemberId, userId, displayName };
   }
 
   /**

@@ -55,6 +55,10 @@ import {
   SuggestedSettlement,
 } from '../../components/group-balances/group-balances.component';
 import { GroupMembersComponent } from '../../components/group-members/group-members.component';
+import {
+  resolveMemberDisplayName,
+  resolveUserDisplayName,
+} from '../../utils/member-display.util';
 
 export interface GroupExpense extends Expense {
   paidByUserId: string | null;
@@ -867,9 +871,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   getUserName(userId: string | null | undefined): string {
-    if (!userId) return 'Unknown User';
-    const member = this.members().find((m) => m.user?.id === userId);
-    return member?.user?.displayName || member?.user?.email || 'Unknown User';
+    return resolveUserDisplayName(this.members(), userId);
   }
 
   /** Resolves the payer display name for a group expense or recurring template.
@@ -892,13 +894,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
 
   /** Display name for a member, whichever identity backs it (registered or pending). */
   memberDisplayName(member: GroupMember): string {
-    return (
-      member.user?.displayName ||
-      member.user?.email ||
-      member.contact?.displayName ||
-      member.contact?.email ||
-      'Pending Member'
-    );
+    return resolveMemberDisplayName(member);
   }
 
   openExpenseModal(expense?: GroupExpense) {

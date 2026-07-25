@@ -22,6 +22,10 @@ import {
 import { createHash } from 'crypto';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
 import { simplifyLedgerDebts } from '../common/ledger-debt-simplifier';
+import {
+  MemberDisplay,
+  resolveMemberDisplay,
+} from '../common/member-display.util';
 
 export interface MemberBalance {
   userId: string;
@@ -53,14 +57,6 @@ export interface SuggestedSettlement {
   toContactId: string | null;
   amount: number;
   currency: string;
-}
-
-interface MemberDisplay {
-  groupMemberId: string;
-  userId: string | null;
-  contactId: string | null;
-  displayName: string;
-  email: string | null;
 }
 
 @Injectable()
@@ -170,23 +166,7 @@ export class SettlementsService {
 
   /** Resolves display info for a GroupMember, whichever identity backs it. */
   private memberDisplay(m: GroupMember): MemberDisplay {
-    if (m.user) {
-      return {
-        groupMemberId: m.id,
-        userId: m.user.id,
-        contactId: m.contact?.id ?? null,
-        displayName: m.nickname || m.user.displayName || m.user.email,
-        email: m.user.email,
-      };
-    }
-    return {
-      groupMemberId: m.id,
-      userId: null,
-      contactId: m.contact?.id ?? null,
-      displayName:
-        m.nickname || m.contact?.displayName || m.contact?.email || 'Unknown',
-      email: m.contact?.email ?? null,
-    };
+    return resolveMemberDisplay(m);
   }
 
   async calculateGroupBalances(userId: string, groupId: string) {

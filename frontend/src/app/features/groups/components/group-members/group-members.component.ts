@@ -18,6 +18,7 @@ import {
   DropdownComponent,
   DropdownOption,
 } from '../../../../shared/components/dropdown/dropdown.component';
+import { resolveMemberDisplayName } from '../../utils/member-display.util';
 import {
   ClientEncryptionService,
   arrayBufferToBase64,
@@ -110,13 +111,7 @@ export class GroupMembersComponent {
 
   /** Display name for a member, whichever identity backs it (registered or pending). */
   memberDisplayName(member: GroupMember): string {
-    return (
-      member.user?.displayName ||
-      member.user?.email ||
-      member.contact?.displayName ||
-      member.contact?.email ||
-      'Pending Member'
-    );
+    return resolveMemberDisplayName(member);
   }
 
   memberInitials(member: GroupMember): string {
