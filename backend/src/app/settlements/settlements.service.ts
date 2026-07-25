@@ -21,6 +21,11 @@ import {
 } from '@finmate/data-models';
 import { createHash } from 'crypto';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
+import { simplifyLedgerDebts } from '../common/ledger-debt-simplifier';
+import {
+  MemberDisplay,
+  resolveMemberDisplay,
+} from '../common/member-display.util';
 
 export interface MemberBalance {
   userId: string;
@@ -30,6 +35,26 @@ export interface MemberBalance {
 export interface SimplifiedTransaction {
   fromUserId: string;
   toUserId: string;
+  amount: number;
+  currency: string;
+}
+
+/**
+ * Enriched, externally-exposed shape of a suggested settlement.
+ *
+ * `simplifyDebts`/`SimplifiedTransaction` are unchanged and stay keyed by an
+ * opaque identifier (internally, GroupMember.id) — this shape is the
+ * post-processing step that resolves each side back to a real user or a
+ * pending Contact for display, so the balance graph itself never needs to
+ * know whether either party has an account.
+ */
+export interface SuggestedSettlement {
+  fromGroupMemberId: string;
+  fromUserId: string | null;
+  fromContactId: string | null;
+  toGroupMemberId: string;
+  toUserId: string | null;
+  toContactId: string | null;
   amount: number;
   currency: string;
 }
@@ -94,7 +119,9 @@ export class SettlementsService {
       id: settlement.id,
       groupId: settlement.group?.id ?? null,
       fromUserId: settlement.fromUser?.id ?? null,
+      fromGroupMemberId: settlement.fromGroupMember?.id ?? null,
       toUserId: settlement.toUser?.id ?? null,
+      toGroupMemberId: settlement.toGroupMember?.id ?? null,
       amount: Number(settlement.amount),
       currency: settlement.currency,
       status: settlement.status,
@@ -126,78 +153,20 @@ export class SettlementsService {
     balances: MemberBalance[],
     currency: string,
   ): SimplifiedTransaction[] {
-    // 1. Filter out users with zero balances (within a 0.01 tolerance)
-    let activeBalances = balances
-      .map((b) => ({
-        userId: b.userId,
-        balance: Number(b.balance),
-      }))
-      .filter((b) => Math.abs(b.balance) >= 0.01);
+    return simplifyLedgerDebts(
+      balances.map((b) => ({ key: b.userId, balance: b.balance })),
+      currency,
+    ).map((t) => ({
+      fromUserId: t.fromKey,
+      toUserId: t.toKey,
+      amount: t.amount,
+      currency: t.currency,
+    }));
+  }
 
-    const transactions: SimplifiedTransaction[] = [];
-
-    while (true) {
-      // 2. Separate and sort debtors and creditors
-      const debtors = activeBalances
-        .filter((b) => b.balance < 0)
-        .sort((a, b) => {
-          if (Math.abs(a.balance - b.balance) < 0.0001) {
-            return a.userId.localeCompare(b.userId); // Tie-break lexicographically
-          }
-          return a.balance - b.balance; // Most negative first (descending balance magnitude)
-        });
-
-      const creditors = activeBalances
-        .filter((b) => b.balance > 0)
-        .sort((a, b) => {
-          if (Math.abs(a.balance - b.balance) < 0.0001) {
-            return a.userId.localeCompare(b.userId); // Tie-break lexicographically
-          }
-          return b.balance - a.balance; // Largest positive first
-        });
-
-      // If either list is empty, we are done
-      if (debtors.length === 0 || creditors.length === 0) {
-        break;
-      }
-
-      const debtor = debtors[0];
-      const creditor = creditors[0];
-
-      // Calculate transfer amount
-      const debitAmount = Math.abs(debtor.balance);
-      const creditAmount = creditor.balance;
-      const transferAmount = Math.min(debitAmount, creditAmount);
-
-      // Round to 2 decimal places (standard financial rounding)
-      const roundedTransfer = Math.round(transferAmount * 100) / 100;
-
-      if (roundedTransfer > 0) {
-        transactions.push({
-          fromUserId: debtor.userId,
-          toUserId: creditor.userId,
-          amount: roundedTransfer,
-          currency: currency,
-        });
-      }
-
-      // Update balances
-      debtor.balance += transferAmount;
-      creditor.balance -= transferAmount;
-
-      // Refresh active balances list by filtering out settled users
-      activeBalances = activeBalances
-        .map((b) => {
-          if (b.userId === debtor.userId)
-            return { ...b, balance: debtor.balance };
-          if (b.userId === creditor.userId)
-            return { ...b, balance: creditor.balance };
-          return b;
-        })
-        .filter((b) => Math.abs(b.balance) >= 0.01);
-    }
-
-    return transactions;
+  /** Resolves display info for a GroupMember, whichever identity backs it. */
+  private memberDisplay(m: GroupMember): MemberDisplay {
+    return resolveMemberDisplay(m);
   }
 
   async calculateGroupBalances(userId: string, groupId: string) {
@@ -220,16 +189,21 @@ export class SettlementsService {
       throw new NotFoundException('Group not found');
     }
 
-    // 2. Fetch active and invited group members
+    // 2. Fetch active and invited group members (User- or Contact-backed)
     const allMembers = await this.groupMemberRepository.find({
       where: { group: { id: groupId }, joinStatus: In(['active', 'invited']) },
-      relations: ['user'],
+      relations: ['user', 'contact'],
     });
 
     // 3. Fetch all posted expenses in this group
     const expenses = await this.expenseRepository.find({
       where: { group: { id: groupId }, status: 'posted' },
-      relations: ['paidByUser'],
+      relations: [
+        'paidByUser',
+        'paidByGroupMember',
+        'paidByGroupMember.user',
+        'paidByGroupMember.contact',
+      ],
     });
 
     // 4. Fetch expense splits for those expenses
@@ -243,6 +217,7 @@ export class SettlementsService {
               'participantUser',
               'participantGroupMember',
               'participantGroupMember.user',
+              'participantGroupMember.contact',
             ],
           })
         : [];
@@ -250,45 +225,83 @@ export class SettlementsService {
     // 5. Fetch confirmed settlements
     const settlements = await this.settlementRepository.find({
       where: { group: { id: groupId }, status: 'confirmed' },
-      relations: ['fromUser', 'toUser'],
+      relations: [
+        'fromUser',
+        'toUser',
+        'fromGroupMember',
+        'fromGroupMember.user',
+        'fromGroupMember.contact',
+        'toGroupMember',
+        'toGroupMember.user',
+        'toGroupMember.contact',
+      ],
     });
 
-    // 6. Build list of all unique currencies and users
+    // 6. Build list of all unique currencies
     const currencies = new Set<string>();
     expenses.forEach((e) => currencies.add(e.currency));
     settlements.forEach((s) => currencies.add(s.currency));
 
-    // Mapping of userId -> User Entity / displayName to format response
-    const userMap = new Map<
-      string,
-      { id: string; displayName?: string; email: string }
-    >();
-    allMembers.forEach((m) => userMap.set(m.user.id, m.user));
-    expenses.forEach((e) => userMap.set(e.paidByUser.id, e.paidByUser));
-    splits.forEach((s) => {
-      const u = s.participantUser || s.participantGroupMember?.user;
-      if (u) userMap.set(u.id, u);
-    });
-    settlements.forEach((s) => {
-      userMap.set(s.fromUser.id, s.fromUser);
-      userMap.set(s.toUser.id, s.toUser);
+    // Balances are keyed internally by GroupMember.id — the only identifier
+    // guaranteed to exist whether or not a member has a User account.
+    // Mapping of userId -> the owning GroupMember, for legacy rows that only
+    // populated fromUser/toUser (pre-dating the GroupMember columns).
+    const memberIdByUserId = new Map<string, string>();
+    allMembers.forEach((m) => {
+      if (m.user) memberIdByUserId.set(m.user.id, m.id);
     });
 
-    const finalBalances: any[] = [];
-    const finalSuggestedSettlements: SimplifiedTransaction[] = [];
+    const displayMap = new Map<string, MemberDisplay>();
+    const registerMember = (m?: GroupMember) => {
+      if (!m) return;
+      if (!displayMap.has(m.id)) {
+        displayMap.set(m.id, this.memberDisplay(m));
+      }
+    };
+    allMembers.forEach((m) => registerMember(m));
+    expenses.forEach((e) => registerMember(e.paidByGroupMember));
+    splits.forEach((s) => registerMember(s.participantGroupMember));
+    settlements.forEach((s) => {
+      registerMember(s.fromGroupMember);
+      registerMember(s.toGroupMember);
+    });
+
+    /** Resolves any expense/split/settlement party to a GroupMember.id. */
+    const resolveMemberId = (opts: {
+      groupMember?: GroupMember;
+      user?: User;
+    }): string | undefined => {
+      if (opts.groupMember) return opts.groupMember.id;
+      if (opts.user) return memberIdByUserId.get(opts.user.id);
+      return undefined;
+    };
+
+    const finalBalances: Array<{
+      userId: string | null;
+      contactId: string | null;
+      groupMemberId: string;
+      displayName: string;
+      netBalance: number;
+      currency: string;
+    }> = [];
+    const finalSuggestedSettlements: SuggestedSettlement[] = [];
 
     // 7. Calculate balances per currency
     for (const currency of currencies) {
-      // Map of userId -> balance
+      // Map of GroupMember.id -> balance
       const balanceMap = new Map<string, number>();
 
-      // Initialize all members to 0 for this currency
-      allMembers.forEach((m) => balanceMap.set(m.user.id, 0));
+      // Initialize all current members to 0 for this currency
+      allMembers.forEach((m) => balanceMap.set(m.id, 0));
 
       // Add paid expenses
       for (const expense of expenses) {
         if (expense.currency !== currency) continue;
-        const payerId = expense.paidByUser.id;
+        const payerId = resolveMemberId({
+          groupMember: expense.paidByGroupMember,
+          user: expense.paidByUser,
+        });
+        if (!payerId) continue;
         balanceMap.set(
           payerId,
           (balanceMap.get(payerId) || 0) + Number(expense.amountTotal),
@@ -298,8 +311,10 @@ export class SettlementsService {
       // Subtract split owes
       for (const split of splits) {
         if (split.expense.currency !== currency) continue;
-        const participantId =
-          split.participantUser?.id || split.participantGroupMember?.user?.id;
+        const participantId = resolveMemberId({
+          groupMember: split.participantGroupMember,
+          user: split.participantUser,
+        });
         if (!participantId) continue;
         balanceMap.set(
           participantId,
@@ -310,8 +325,15 @@ export class SettlementsService {
       // Add settlements
       for (const settlement of settlements) {
         if (settlement.currency !== currency) continue;
-        const fromId = settlement.fromUser.id;
-        const toId = settlement.toUser.id;
+        const fromId = resolveMemberId({
+          groupMember: settlement.fromGroupMember,
+          user: settlement.fromUser,
+        });
+        const toId = resolveMemberId({
+          groupMember: settlement.toGroupMember,
+          user: settlement.toUser,
+        });
+        if (!fromId || !toId) continue;
         balanceMap.set(
           fromId,
           (balanceMap.get(fromId) || 0) + Number(settlement.amount),
@@ -322,28 +344,47 @@ export class SettlementsService {
         );
       }
 
-      // Convert to MemberBalance array
+      // Convert to MemberBalance array — `userId` here is repurposed as the
+      // opaque balance-graph key (a GroupMember.id); simplifyDebts's math
+      // doesn't care what the string represents.
       const memberBalances: MemberBalance[] = [];
-      for (const [userId, balance] of balanceMap.entries()) {
-        memberBalances.push({ userId, balance });
+      for (const [groupMemberId, balance] of balanceMap.entries()) {
+        memberBalances.push({ userId: groupMemberId, balance });
       }
 
-      // Add to final balances list (formatting each user entry)
+      // Add to final balances list (formatting each member entry)
       for (const mb of memberBalances) {
-        const u = userMap.get(mb.userId);
-        if (u) {
+        const display = displayMap.get(mb.userId);
+        if (display) {
           finalBalances.push({
-            userId: mb.userId,
-            displayName: u.displayName || u.email,
+            userId: display.userId,
+            contactId: display.contactId,
+            groupMemberId: display.groupMemberId,
+            displayName: display.displayName,
             netBalance: Math.round(mb.balance * 100) / 100,
             currency,
           });
         }
       }
 
-      // Run simplifyDebts for this currency
+      // Run simplifyDebts for this currency, then resolve each side back to
+      // a real user or a pending Contact for the response.
       const simplified = this.simplifyDebts(memberBalances, currency);
-      finalSuggestedSettlements.push(...simplified);
+      for (const s of simplified) {
+        const from = displayMap.get(s.fromUserId);
+        const to = displayMap.get(s.toUserId);
+        if (!from || !to) continue;
+        finalSuggestedSettlements.push({
+          fromGroupMemberId: from.groupMemberId,
+          fromUserId: from.userId,
+          fromContactId: from.contactId,
+          toGroupMemberId: to.groupMemberId,
+          toUserId: to.userId,
+          toContactId: to.contactId,
+          amount: s.amount,
+          currency: s.currency,
+        });
+      }
     }
 
     return {
@@ -378,17 +419,35 @@ export class SettlementsService {
       throw new NotFoundException('Group not found');
     }
 
-    // 2. Validate recipient active/invited membership in group
+    // 2. Validate recipient active/invited membership in group. `toGroupMemberId`
+    // is the primary path — it resolves a member whether they're a registered
+    // User or a pending Contact. `toUserId` is kept for backward compatibility.
+    if (!dto.toGroupMemberId && !dto.toUserId) {
+      throw new BadRequestException(
+        'Provide toGroupMemberId or toUserId to identify the recipient',
+      );
+    }
     const recipientMember = await this.groupMemberRepository.findOne({
-      where: {
-        group: { id: groupId },
-        user: { id: dto.toUserId },
-        joinStatus: In(['active', 'invited']),
-      },
-      relations: ['user'],
+      where: dto.toGroupMemberId
+        ? {
+            id: dto.toGroupMemberId,
+            group: { id: groupId },
+            joinStatus: In(['active', 'invited']),
+          }
+        : {
+            group: { id: groupId },
+            user: { id: dto.toUserId },
+            joinStatus: In(['active', 'invited']),
+          },
+      relations: ['user', 'contact'],
     });
     if (!recipientMember) {
       throw new BadRequestException('Recipient is not a member of this group');
+    }
+    if (recipientMember.id === callerMember.id) {
+      throw new BadRequestException(
+        'Cannot propose a settlement with yourself',
+      );
     }
 
     // Currency check
@@ -404,10 +463,14 @@ export class SettlementsService {
 
     const savedSettlement = await this.dataSource.transaction(
       async (manager) => {
+        // Frozen group-ledger identity rule: both settlement parties always
+        // resolve via GroupMember, never User — including the caller, who
+        // is always a real registered member but is referenced by their
+        // GroupMember row here, not their User row directly.
         const settlement = manager.create(Settlement, {
           group,
-          fromUser: callerMember.user,
-          toUser: recipientMember.user,
+          fromGroupMember: callerMember,
+          toGroupMember: recipientMember,
           amount: dto.amount,
           currency: dto.currency.toUpperCase(),
           status: 'proposed',
@@ -431,7 +494,9 @@ export class SettlementsService {
       entityId: savedSettlement.id,
       groupId: group.id,
       metadata: {
-        toUserId: recipientMember.user.id,
+        toUserId: recipientMember.user?.id ?? null,
+        toContactId: recipientMember.contact?.id ?? null,
+        toGroupMemberId: recipientMember.id,
         amount: Number(savedSettlement.amount),
         currency: savedSettlement.currency,
       },
@@ -464,6 +529,12 @@ export class SettlementsService {
       .createQueryBuilder('settlement')
       .leftJoinAndSelect('settlement.fromUser', 'fromUser')
       .leftJoinAndSelect('settlement.toUser', 'toUser')
+      .leftJoinAndSelect('settlement.fromGroupMember', 'fromGroupMember')
+      .leftJoinAndSelect('fromGroupMember.user', 'fromMemberUser')
+      .leftJoinAndSelect('fromGroupMember.contact', 'fromMemberContact')
+      .leftJoinAndSelect('settlement.toGroupMember', 'toGroupMember')
+      .leftJoinAndSelect('toGroupMember.user', 'toMemberUser')
+      .leftJoinAndSelect('toGroupMember.contact', 'toMemberContact')
       .where('settlement.group = :groupId', { groupId })
       .orderBy('settlement.createdAt', 'DESC');
 
@@ -506,7 +577,14 @@ export class SettlementsService {
 
         const settlement = await manager.findOne(Settlement, {
           where: { id, group: { id: groupId } },
-          relations: ['fromUser', 'toUser'],
+          relations: [
+            'fromUser',
+            'toUser',
+            'fromGroupMember',
+            'fromGroupMember.user',
+            'toGroupMember',
+            'toGroupMember.user',
+          ],
         });
         if (!settlement) {
           throw new NotFoundException('Settlement not found');
@@ -521,10 +599,26 @@ export class SettlementsService {
           });
         }
 
+        // A pending (Contact-backed) creditor/debtor has no account and can
+        // never be the caller — resolve both sides to a real userId where
+        // one exists, so the checks below degrade correctly when one side
+        // is pending, instead of throwing on a null dereference.
+        const creditorUserId =
+          settlement.toUser?.id ?? settlement.toGroupMember?.user?.id ?? null;
+        const debtorUserId =
+          settlement.fromUser?.id ??
+          settlement.fromGroupMember?.user?.id ??
+          null;
+
         let auditAction = '';
         if (dto.status === 'confirmed') {
-          // ONLY the creditor (toUser) can confirm receipt
-          if (settlement.toUser.id !== userId) {
+          // Only the creditor can confirm receipt — unless the creditor is
+          // pending (no account, can never be the caller), in which case
+          // the debtor confirms on their behalf, since no one else can.
+          const canConfirm =
+            creditorUserId === userId ||
+            (creditorUserId === null && debtorUserId === userId);
+          if (!canConfirm) {
             throw new ForbiddenException({
               errorCode: 'RES_FORBIDDEN',
               message:
@@ -536,11 +630,10 @@ export class SettlementsService {
             dto.settledOn || new Date().toISOString().split('T')[0];
           auditAction = 'settlement.confirmed';
         } else if (dto.status === 'cancelled') {
-          // Either debtor (fromUser) or creditor (toUser) can cancel
-          if (
-            settlement.fromUser.id !== userId &&
-            settlement.toUser.id !== userId
-          ) {
+          // Either debtor or creditor can cancel — a null (pending) side
+          // never matches `userId`, so this degrades to "only the debtor"
+          // when the creditor is pending, with no special-casing needed.
+          if (debtorUserId !== userId && creditorUserId !== userId) {
             throw new ForbiddenException({
               errorCode: 'RES_FORBIDDEN',
               message: 'Only the debtor or creditor can cancel the settlement',
@@ -573,8 +666,10 @@ export class SettlementsService {
         entityId: savedSettlement.id,
         groupId,
         metadata: {
-          toUserId: savedSettlement.toUser.id,
-          fromUserId: savedSettlement.fromUser.id,
+          toUserId: savedSettlement.toUser?.id ?? null,
+          toGroupMemberId: savedSettlement.toGroupMember?.id ?? null,
+          fromUserId: savedSettlement.fromUser?.id ?? null,
+          fromGroupMemberId: savedSettlement.fromGroupMember?.id ?? null,
           amount: Number(savedSettlement.amount),
           currency: savedSettlement.currency,
           status: savedSettlement.status,
@@ -629,6 +724,24 @@ export class SettlementsService {
         if (s.fromUserId === userId || s.toUserId === userId) {
           const isDebtor = s.fromUserId === userId;
           const friendId = isDebtor ? s.toUserId : s.fromUserId;
+          // FROZEN PRODUCT RULE (Phase 3): Friends aggregates only registered
+          // users, by design — not a migration gap. `calculateGroupBalances`
+          // already resolves every party via GroupMember (registered or
+          // pending), but "Friends" answers a fundamentally different
+          // question: "what do I owe this *person*, across every group we
+          // share?" That requires a stable identity across groups, which only
+          // a User account has. A pending Contact has no such identity — the
+          // same real person could be an entirely distinct, unlinked Contact
+          // row in each group they're pending in, until they register and
+          // each group's Contact is independently claimed. Aggregating those
+          // as one "friend" would silently merge unrelated ledger entries.
+          // Do NOT "fix" this by keying on GroupMember.id — that would change
+          // the feature's semantics and break cross-group aggregation. A
+          // pending member's balances remain fully visible in their own
+          // group's calculateGroupBalances(); they simply have no place in
+          // this cross-group, registered-identity-only view until they claim
+          // an account.
+          if (!friendId) continue;
           const key = `${friendId}_${s.currency.toUpperCase()}`;
 
           let entry = friendsMap.get(key);

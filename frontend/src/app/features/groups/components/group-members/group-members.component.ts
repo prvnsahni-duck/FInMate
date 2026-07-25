@@ -18,6 +18,7 @@ import {
   DropdownComponent,
   DropdownOption,
 } from '../../../../shared/components/dropdown/dropdown.component';
+import { resolveMemberDisplayName } from '../../utils/member-display.util';
 import {
   ClientEncryptionService,
   arrayBufferToBase64,
@@ -106,6 +107,15 @@ export class GroupMembersComponent {
       }
       this.searchSub?.unsubscribe();
     });
+  }
+
+  /** Display name for a member, whichever identity backs it (registered or pending). */
+  memberDisplayName(member: GroupMember): string {
+    return resolveMemberDisplayName(member);
+  }
+
+  memberInitials(member: GroupMember): string {
+    return this.memberDisplayName(member).substring(0, 2).toUpperCase();
   }
 
   isValidEmail(email: string): boolean {
@@ -392,7 +402,7 @@ export class GroupMembersComponent {
   removeOrRevokeMember(member: GroupMember) {
     if (
       confirm(
-        `Are you sure you want to remove ${member.user?.displayName || member.user?.email}?`,
+        `Are you sure you want to remove ${this.memberDisplayName(member)}?`,
       )
     ) {
       this.groupsService.removeMember(this.groupId(), member.id).subscribe({

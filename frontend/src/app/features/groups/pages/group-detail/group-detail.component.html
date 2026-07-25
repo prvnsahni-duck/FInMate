@@ -305,7 +305,7 @@
         </h3>
 
         <div class="space-y-6">
-          @for (m of carryForwardBalances(); track m.userId) {
+          @for (m of carryForwardBalances(); track m.groupMemberId) {
             <div>
               <div
                 class="flex justify-between items-center text-xs font-semibold mb-2"
@@ -1078,7 +1078,7 @@
                             }}
                           </p>
                           <p class="text-xs text-muted">
-                            Paid by {{ getUserName(expense.paidByUserId) }}
+                            Paid by {{ payerDisplayName(expense) }}
                           </p>
                         </div>
 
@@ -1851,17 +1851,15 @@
                         class="w-8 h-8 rounded-full bg-surface flex items-center justify-center font-bold text-xs flex-shrink-0"
                       >
                         {{
-                          (member.user.displayName || member.user.email)
-                            .substring(0, 2)
-                            .toUpperCase()
+                          memberDisplayName(member).substring(0, 2).toUpperCase()
                         }}
                       </div>
                       <div>
                         <h4
                           class="font-semibold text-sm truncate max-w-[180px]"
-                          [title]="member.user.displayName || member.user.email"
+                          [title]="memberDisplayName(member)"
                         >
-                          {{ member.user.displayName || member.user.email }}
+                          {{ memberDisplayName(member) }}
                         </h4>
                         <p class="text-[10px] text-muted capitalize">
                           {{ member.joinStatus }}
@@ -2091,11 +2089,7 @@
                       >
                         <span
                           >Payer:
-                          {{
-                            getUserName(
-                              template.paidByUser?.id || template.paidByUserId
-                            )
-                          }}</span
+                          {{ payerDisplayName(template) }}</span
                         >
                         <span>Starts: {{ template.startDate }}</span>
                         @if (template.endDate) {

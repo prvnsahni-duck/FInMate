@@ -12,9 +12,19 @@ import {
 } from 'class-validator';
 
 export class ProposeSettlementDto {
+  /** Legacy path — resolves the recipient by their User id. */
   @IsUUID('4', { message: 'Recipient User ID must be a valid UUID' })
-  @IsNotEmpty({ message: 'Recipient ID is required' })
-  toUserId!: string;
+  @IsOptional()
+  toUserId?: string;
+
+  /**
+   * Primary path — resolves the recipient by their GroupMember id, whether
+   * they are a registered User or a pending Contact. Provide this or
+   * `toUserId`.
+   */
+  @IsUUID('4', { message: 'Recipient GroupMember ID must be a valid UUID' })
+  @IsOptional()
+  toGroupMemberId?: string;
 
   @IsNumber(
     {},

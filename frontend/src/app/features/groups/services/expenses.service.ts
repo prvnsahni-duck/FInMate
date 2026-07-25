@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { from, Observable } from 'rxjs';
-import { mergeMap } from 'rxjs/operators';
+import { mergeMap, shareReplay } from 'rxjs/operators';
 import { environment } from '../../../../environments/environment';
 import { Store } from '@ngxs/store';
 import { AuthState } from '../../../core/auth/auth.state';
@@ -216,7 +216,9 @@ export class ExpensesService {
     if (groupId && groupId !== 'personal') {
       url += `?groupId=${groupId}`;
     }
-    return this.http.get<MonthlyAnalyticsPoint[]>(url);
+    return this.http
+      .get<MonthlyAnalyticsPoint[]>(url)
+      .pipe(shareReplay({ bufferSize: 1, refCount: true }));
   }
 
   /**
@@ -227,7 +229,9 @@ export class ExpensesService {
     if (groupId && groupId !== 'personal') {
       url += `?groupId=${groupId}`;
     }
-    return this.http.get<CategoryAnalyticsPoint[]>(url);
+    return this.http
+      .get<CategoryAnalyticsPoint[]>(url)
+      .pipe(shareReplay({ bufferSize: 1, refCount: true }));
   }
 
   /**
@@ -277,6 +281,7 @@ export class ExpensesService {
             : [];
           return items.reduce((sum, i) => sum + Number(i.amount), 0);
         }),
+        shareReplay({ bufferSize: 1, refCount: true }),
       );
   }
 

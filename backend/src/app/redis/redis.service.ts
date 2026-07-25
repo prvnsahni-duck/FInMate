@@ -105,6 +105,26 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Atomically reads and deletes a key in one round trip (Redis GETDEL,
+   * available since 6.2). Use this instead of a separate get()+del() for any
+   * single-use token — a non-atomic get-then-delete lets two concurrent
+   * callers both read the value before either deletes it.
+   */
+  async getDel(key: string): Promise<string | null> {
+    try {
+      return (await this.client.getDel(key)) as any;
+    } catch (err: any) {
+      this.logger.error(
+        `Redis getDel operation failed: ${err.message}`,
+        err.stack,
+      );
+      throw new ServiceUnavailableException(
+        'Cache service is temporarily unavailable',
+      );
+    }
+  }
+
   async setNx(
     key: string,
     value: string,

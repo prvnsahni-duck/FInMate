@@ -133,10 +133,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.userEmail = user.email;
     }
     this.aiOptIn = localStorage.getItem('finmate_ai_opt_in') === 'true';
-    this.fetchData();
+    this.fetchStaticData();
+    this.refreshExpenseData();
 
     const sub = this.expensesUiStore.expenseCreated$.subscribe(() => {
-      this.fetchData();
+      this.refreshExpenseData();
     });
     this.destroy$.add(sub);
   }
@@ -145,7 +146,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.destroy$.unsubscribe();
   }
 
-  fetchData() {
+  /**
+   * Refreshes only expense-derived data.
+   * Call after any expense create / edit / delete so that stats stay current
+   * without reloading profile, groups, or invitations (which did not change).
+   */
+  refreshExpenseData() {
     this.isLoading = true;
 
     // 1. Fetch personal + group-share expenses (unified list)
@@ -194,7 +200,32 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
     });
 
-    // 3. Fetch active groups to count them
+    // 3. Fetch category analytics
+    this.expensesService.getCategoryAnalytics('personal').subscribe({
+      next: (res) => {
+        const total = res.reduce((sum, item) => sum + Number(item.total), 0);
+        this.categoryAnalytics = res
+          .map((item) => ({
+            category: item.category,
+            amount: Number(item.total),
+            percentage:
+              total > 0 ? Math.round((Number(item.total) / total) * 100) : 0,
+          }))
+          .sort((a, b) => b.amount - a.amount);
+      },
+      error: () => {
+        console.error('Failed to fetch category analytics');
+      },
+    });
+  }
+
+  /**
+   * Loads profile, group count, and pending invitations.
+   * Call once on init. Re-call only when these change (invitation accept/decline,
+   * group join/leave). Profile is updated locally by saveIncome() after edits.
+   */
+  fetchStaticData() {
+    // Fetch active groups to count them
     this.groupsService.getGroups().subscribe({
       next: (res) => {
         this.activeGroupsCount = res.meta?.totalItems || res.data?.length || 0;
@@ -204,7 +235,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
     });
 
-    // 4. Fetch profile
+    // Fetch profile (once per mount; saveIncome() updates it locally on success)
     this.authService.getMe().subscribe({
       next: (res) => {
         this.userProfile = res.profile;
@@ -229,31 +260,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
     });
 
-    // 5. Fetch pending invitations
+    // Fetch pending invitations
     this.groupsService.getPendingInvitations().subscribe({
       next: (res) => {
         this.pendingInvitations = res;
       },
       error: () => {
         console.error('Failed to fetch pending invitations');
-      },
-    });
-
-    // 6. Fetch category analytics
-    this.expensesService.getCategoryAnalytics('personal').subscribe({
-      next: (res) => {
-        const total = res.reduce((sum, item) => sum + Number(item.total), 0);
-        this.categoryAnalytics = res
-          .map((item) => ({
-            category: item.category,
-            amount: Number(item.total),
-            percentage:
-              total > 0 ? Math.round((Number(item.total) / total) * 100) : 0,
-          }))
-          .sort((a, b) => b.amount - a.amount);
-      },
-      error: () => {
-        console.error('Failed to fetch category analytics');
       },
     });
   }
@@ -349,7 +362,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .updateMember(invite.id, invite.membershipId, { joinStatus: 'active' })
       .subscribe({
         next: () => {
-          this.fetchData();
+          // Groups, invitations, AND expense data all change on accept:
+          // the newly joined group's expense splits are now visible in My Expenses.
+          this.fetchStaticData();
+          this.refreshExpenseData();
           this.router.navigate(['/groups', invite.id]);
         },
         error: (err) => {
@@ -361,7 +377,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
   declineInvitation(invite: PendingInvitationResponse) {
     this.groupsService.removeMember(invite.id, invite.membershipId).subscribe({
       next: () => {
-        this.fetchData();
+        // Only the invitations list changed; re-fetch static data.
+        this.fetchStaticData();
       },
       error: (err) => {
         alert(err.error?.message || 'Failed to decline invitation');
@@ -388,7 +405,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   onExpenseCreated() {
-    this.fetchData();
+    this.refreshExpenseData();
   }
 
   confirmDeleteExpense(expenseId: string) {
@@ -402,7 +419,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         next: () => {
           this.isDeleteConfirmOpen = false;
           this.deleteExpenseId = null;
-          this.fetchData();
+          this.refreshExpenseData();
         },
         error: (err) => {
           this.isDeleteConfirmOpen = false;

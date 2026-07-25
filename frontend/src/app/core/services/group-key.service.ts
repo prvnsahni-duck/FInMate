@@ -15,6 +15,15 @@ export type GroupKeyResult =
   | { status: 'ready'; key: CryptoKey; versionId?: string }
   | { status: Exclude<GroupKeyStatus, 'ready'>; error?: unknown };
 
+interface GroupKeyCacheEntry {
+  key: CryptoKey;
+  /** Wrapped-key ciphertext as received from the backend — kept in memory for
+   *  diagnostic retries within the session; never written to any persistent store. */
+  wrappedKey?: string;
+  /** Concrete group-key version ID this entry belongs to. */
+  versionId?: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -25,8 +34,9 @@ export class GroupKeyService {
   private store = inject(Store);
   private baseUrl = environment.apiBaseUrl;
 
-  // ─── In-memory cache keyed by `${groupId}:${groupKeyVersionId}` ──────────
-  private groupKeysMemoryCache = new Map<string, CryptoKey>();
+  // ─── Session-scoped in-memory cache — never persisted ────────────────────
+  // Keyed by `${groupId}:${groupKeyVersionId}` (or `${groupId}:active` alias)
+  private groupKeysMemoryCache = new Map<string, GroupKeyCacheEntry>();
 
   // ─── Concrete ACTIVE version id per group, learned from the backend. Lets
   //     write paths declare which version their ciphertext was produced with. ─
@@ -89,7 +99,7 @@ export class GroupKeyService {
    * Primary method for application code.
    *
    * Returns the group data key using the cache precedence:
-   *   Memory → IndexedDB → Backend (unwrap)
+   *   Memory → Backend (unwrap)
    *
    * Deduplicates concurrent calls for the same groupId so only one
    * in-flight request exists at any time.
@@ -104,8 +114,8 @@ export class GroupKeyService {
    * Returns a *classified* result so callers can distinguish a key that is
    * merely not provisioned yet (temporary, auto-recoverable) from one that will
    * never be available (removed from group), from transient conditions
-   * (rate-limit, missing session). Checks in-memory cache -> deduplicated
-   * in-flight request -> IndexedDB vault -> server (and unwraps).
+   * (rate-limit, missing session). Checks in-memory cache → deduplicated
+   * in-flight request → server (and unwraps).
    */
   async resolveGroupKey(
     groupId: string,
@@ -116,9 +126,11 @@ export class GroupKeyService {
     if (cached) {
       return {
         status: 'ready',
-        key: cached,
+        key: cached.key,
         versionId:
-          groupKeyVersionId ?? this.activeGroupKeyVersionIds.get(groupId),
+          groupKeyVersionId ??
+          cached.versionId ??
+          this.activeGroupKeyVersionIds.get(groupId),
       };
     }
 
@@ -155,8 +167,8 @@ export class GroupKeyService {
    * ciphertext was produced with. A previously learned (key, versionId) pair
    * is served from cache — even if since superseded, the pair is internally
    * consistent so the stamp stays correct. Only when the concrete version is
-   * unknown (e.g. the 'active' alias was restored from IndexedDB after a
-   * reload) is the alias evicted and resolution forced through the backend.
+   * unknown (e.g. the 'active' alias was not yet resolved this session) is the
+   * alias evicted and resolution forced through the backend.
    */
   async getGroupKeyForEncryption(
     groupId: string,
@@ -172,11 +184,6 @@ export class GroupKeyService {
     const aliasKey = this.buildVersionedKey(groupId);
     this.groupKeysMemoryCache.delete(aliasKey);
     this.activeGroupKeyRequests.delete(aliasKey);
-    try {
-      await this.zkVault.deleteGroupKey(aliasKey);
-    } catch (e) {
-      console.warn('Failed to evict aliased group key from IndexedDB', e);
-    }
 
     const result = await this.resolveGroupKey(groupId);
     if (result.status === 'ready' && result.versionId) {
@@ -191,45 +198,9 @@ export class GroupKeyService {
   }
 
   /**
-   * Bypasses all caches and reloads the group key from the backend.
-   * Intended for: post-provisioning, self-healing, key rotation.
-   * NOT exposed in the UI — call from services only.
-   */
-  async refreshGroupKey(
-    groupId: string,
-    groupKeyVersionId?: string,
-  ): Promise<CryptoKey | null> {
-    const requestKey = this.buildVersionedKey(groupId, groupKeyVersionId);
-
-    // Evict every cached entry for this group so we go all the way to the backend
-    for (const key of Array.from(this.groupKeysMemoryCache.keys())) {
-      if (key.startsWith(`${groupId}:`)) {
-        this.groupKeysMemoryCache.delete(key);
-      }
-    }
-    this.activeGroupKeyRequests.delete(requestKey);
-    this.activeGroupKeyVersionIds.delete(groupId);
-
-    try {
-      await this.zkVault.deleteGroupKey(requestKey);
-    } catch (e) {
-      console.warn('Failed to clear IndexedDB group key during refresh', e);
-    }
-
-    const promise = this.fetchAndCacheGroupKey(groupId, groupKeyVersionId);
-    this.activeGroupKeyRequests.set(requestKey, promise);
-
-    try {
-      const result = await promise;
-      return result.status === 'ready' ? result.key : null;
-    } finally {
-      this.activeGroupKeyRequests.delete(requestKey);
-    }
-  }
-
-  /**
-   * Clears in-memory caches only. IndexedDB entries survive.
-   * Safe to call at any time (e.g., on route change).
+   * Clears the session-scoped in-memory key cache. Decrypted group keys are
+   * never persisted, so this is a complete wipe for the current session.
+   * Safe to call at any time (e.g., on route change or logout).
    */
   clearCache(): void {
     this.groupKeysMemoryCache.clear();
@@ -241,7 +212,8 @@ export class GroupKeyService {
   }
 
   /**
-   * Clears both in-memory and IndexedDB persistent caches.
+   * Clears the in-memory cache and removes any legacy group-key data that may
+   * have been written to IndexedDB by older app versions.
    * Use on logout or full reset.
    */
   async clearPersistentCache(): Promise<void> {
@@ -254,8 +226,7 @@ export class GroupKeyService {
   }
 
   /**
-   * Invalidates the cached keys for a single group (memory only).
-   * Does not touch IndexedDB.
+   * Invalidates the cached keys for a single group.
    */
   invalidateGroupKey(groupId: string): void {
     for (const key of Array.from(this.groupKeysMemoryCache.keys())) {
@@ -271,13 +242,6 @@ export class GroupKeyService {
     this.activeGroupKeyVersionIds.delete(groupId);
   }
 
-  /**
-   * @deprecated Use clearCache() for in-memory reset or clearPersistentCache() for full reset.
-   */
-  clearLocalState(): void {
-    this.clearCache();
-  }
-
   // ─────────────────────────────────────────────────────────────────────────
   // Key generation & provisioning
   // ─────────────────────────────────────────────────────────────────────────
@@ -285,8 +249,8 @@ export class GroupKeyService {
   /**
    * Canonical implementation.
    * Generates a new AES-GCM group data key, wraps it symmetrically with
-   * the caller's master key, persists it locally (memory + IndexedDB),
-   * and posts the wrapped copy to the backend.
+   * the caller's master key, caches it in memory, and posts the wrapped copy
+   * to the backend.
    *
    * Guarded: refuses to generate when the backend reports an existing active
    * key that simply has not been shared with this member yet (prevents
@@ -320,14 +284,13 @@ export class GroupKeyService {
       masterKey,
     );
 
-    // Persist locally under the active-version alias
+    // Optimistically cache under the active-version alias; updated below once
+    // the backend confirms the concrete version id.
     const cacheKey = this.buildVersionedKey(groupId, 'active');
-    this.groupKeysMemoryCache.set(cacheKey, groupKey);
-    try {
-      await this.zkVault.storeGroupKey(cacheKey, groupKey);
-    } catch (e) {
-      console.warn('Failed to persist group key to IndexedDB', e);
-    }
+    this.groupKeysMemoryCache.set(cacheKey, {
+      key: groupKey,
+      wrappedKey: wrappedKeyForSelf,
+    });
 
     // Post wrapped key to backend
     await firstValueFrom(
@@ -343,27 +306,77 @@ export class GroupKeyService {
 
     // Learn the concrete version id the backend bound the wrapped key to, so
     // write paths can declare it (ciphertext / version-stamp consistency).
+    //
+    // A concurrent createGroupKey() call may have stored a DIFFERENT wrapped
+    // key before ours arrived. The backend's idempotent guard silently ignores
+    // the duplicate POST, so the key actually in the DB may differ from the
+    // one we just generated. We detect this by comparing the wrappedKey the
+    // backend echoes back; when they differ we unwrap the backend's key and
+    // use that as the canonical key — ensuring the cache and the ciphertext
+    // we are about to produce all agree with what is stored.
+    let canonicalKey = groupKey;
+    let canonicalWrappedKey = wrappedKeyForSelf;
     try {
       const versionResponse = await firstValueFrom(
         this.http.get<
-          | { groupKeyVersionId: string | null }
-          | { data: { groupKeyVersionId: string | null } }
+          | {
+              groupKeyVersionId: string | null;
+              wrappedKey?: string | null;
+            }
+          | {
+              data: {
+                groupKeyVersionId: string | null;
+                wrappedKey?: string | null;
+              };
+            }
         >(`${this.baseUrl}/groups/${groupId}/keys/me`),
       );
       const versionData = this.unwrapHttpData(versionResponse);
       const mintedVersionId = versionData?.groupKeyVersionId;
+      const storedWrappedKey = versionData?.wrappedKey;
+
+      // If the backend has a different wrapped key (race condition), unwrap
+      // it so the canonical key matches what every future session will fetch.
+      if (storedWrappedKey && storedWrappedKey !== wrappedKeyForSelf) {
+        try {
+          // extractable: true — must match generateDataKey() so the key can
+          // later be re-wrapped when provisioning keys for new members.
+          canonicalKey = await this.encryptionService.unwrapKey(
+            storedWrappedKey,
+            masterKey,
+            true,
+          );
+          canonicalWrappedKey = storedWrappedKey;
+        } catch (e) {
+          console.warn(
+            'Failed to unwrap concurrent key from backend; falling back to generated key',
+            e,
+          );
+          canonicalKey = groupKey;
+          canonicalWrappedKey = wrappedKeyForSelf;
+        }
+      }
+
       if (mintedVersionId) {
         this.activeGroupKeyVersionIds.set(groupId, mintedVersionId);
         const versionedCacheKey = this.buildVersionedKey(
           groupId,
           mintedVersionId,
         );
-        this.groupKeysMemoryCache.set(versionedCacheKey, groupKey);
-        try {
-          await this.zkVault.storeGroupKey(versionedCacheKey, groupKey);
-        } catch (e) {
-          console.warn('Failed to persist versioned group key to IndexedDB', e);
-        }
+        const entry: GroupKeyCacheEntry = {
+          key: canonicalKey,
+          wrappedKey: canonicalWrappedKey,
+          versionId: mintedVersionId,
+        };
+        this.groupKeysMemoryCache.set(versionedCacheKey, entry);
+        // Promote the :active alias to the fully-resolved entry.
+        this.groupKeysMemoryCache.set(cacheKey, entry);
+      } else {
+        // No version id yet — update :active with the canonical key.
+        this.groupKeysMemoryCache.set(cacheKey, {
+          key: canonicalKey,
+          wrappedKey: canonicalWrappedKey,
+        });
       }
     } catch (e) {
       console.warn('Failed to resolve minted group key version id', e);
@@ -376,7 +389,7 @@ export class GroupKeyService {
       console.warn('Failed to pre-provision personal asymmetric keys', e);
     }
 
-    return groupKey;
+    return canonicalKey;
   }
 
   /**
@@ -489,14 +502,14 @@ export class GroupKeyService {
     const keys: Array<{ userId: string; wrappedKey: string }> = [];
     const skippedUserIds: string[] = [];
     const subtle = this.getSubtleCrypto();
+    let selfWrappedKey: string | undefined;
 
     for (const member of members) {
       const uid = member.user?.id as string;
       if (uid === selfId) {
-        keys.push({
-          userId: uid,
-          wrappedKey: await this.encryptionService.wrapKey(newKey, masterKey),
-        });
+        const wk = await this.encryptionService.wrapKey(newKey, masterKey);
+        selfWrappedKey = wk;
+        keys.push({ userId: uid, wrappedKey: wk });
         continue;
       }
       try {
@@ -547,21 +560,16 @@ export class GroupKeyService {
     // Move local caches to the new ACTIVE version.
     this.invalidateGroupKey(groupId);
     const aliasKey = this.buildVersionedKey(groupId);
-    try {
-      await this.zkVault.deleteGroupKey(aliasKey);
-    } catch (e) {
-      console.warn('Failed to evict aliased group key during rotation', e);
-    }
     if (newVersionId) {
       this.activeGroupKeyVersionIds.set(groupId, newVersionId);
       const versionedCacheKey = this.buildVersionedKey(groupId, newVersionId);
-      this.groupKeysMemoryCache.set(versionedCacheKey, newKey);
-      this.groupKeysMemoryCache.set(aliasKey, newKey);
-      try {
-        await this.zkVault.storeGroupKey(versionedCacheKey, newKey);
-      } catch (e) {
-        console.warn('Failed to persist rotated group key to IndexedDB', e);
-      }
+      const entry: GroupKeyCacheEntry = {
+        key: newKey,
+        wrappedKey: selfWrappedKey,
+        versionId: newVersionId,
+      };
+      this.groupKeysMemoryCache.set(versionedCacheKey, entry);
+      this.groupKeysMemoryCache.set(aliasKey, entry);
     }
 
     return { groupKeyVersionId: newVersionId, skippedUserIds };
@@ -764,11 +772,10 @@ export class GroupKeyService {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Internal fetch: IndexedDB → Backend (unwrap) → classified result.
+   * Internal fetch: Backend (unwrap) → in-memory cache → classified result.
    *
-   * On a successful backend fetch, the unwrapped CryptoKey is written to
-   * both the in-memory cache and IndexedDB for future page loads, under the
-   * concrete returned version id as well as the requested alias.
+   * Decrypted group keys are stored only in the session-scoped in-memory
+   * cache and are never written to IndexedDB or any other persistent store.
    *
    * Also maintains the `requiresKeyProvisioning` signal: it is set only when
    * the group has an active key wrapped for *other* members but not for the
@@ -781,19 +788,6 @@ export class GroupKeyService {
   ): Promise<GroupKeyResult> {
     const requestKey = this.buildVersionedKey(groupId, groupKeyVersionId);
 
-    // 1. IndexedDB cache
-    try {
-      const cachedKey = await this.zkVault.loadGroupKey(requestKey);
-      if (cachedKey) {
-        this.groupKeysMemoryCache.set(requestKey, cachedKey);
-        this.requiresKeyProvisioning.set(false);
-        return { status: 'ready', key: cachedKey };
-      }
-    } catch (e) {
-      console.warn('Failed to load group key from IndexedDB', e);
-    }
-
-    // 2. Fetch from backend
     const user = this.store.selectSnapshot((state: any) => state.auth?.user);
     if (!user || !user.email) {
       return { status: 'no_session' };
@@ -860,21 +854,21 @@ export class GroupKeyService {
         );
       }
 
+      const concreteVersionId =
+        returnedVersionId !== 'active' ? returnedVersionId : undefined;
+      const entry: GroupKeyCacheEntry = {
+        key: unwrappedKey,
+        wrappedKey,
+        versionId: concreteVersionId,
+      };
+
       // Cache under both the concrete returned version and the requested alias
       // so later lookups (which carry the concrete versionId) hit memory.
       this.groupKeysMemoryCache.set(
         this.buildVersionedKey(groupId, returnedVersionId),
-        unwrappedKey,
+        entry,
       );
-      this.groupKeysMemoryCache.set(requestKey, unwrappedKey);
-      try {
-        await this.zkVault.storeGroupKey(
-          this.buildVersionedKey(groupId, returnedVersionId),
-          unwrappedKey,
-        );
-      } catch (e) {
-        console.warn('Failed to store unwrapped group key in IndexedDB', e);
-      }
+      this.groupKeysMemoryCache.set(requestKey, entry);
 
       // An unversioned request resolves the ACTIVE version — remember its
       // concrete id so write paths can declare it on their ciphertext.
@@ -882,14 +876,12 @@ export class GroupKeyService {
         this.activeGroupKeyVersionIds.set(groupId, returnedVersionId);
       }
 
-      // Only clear requiresKeyProvisioning after successful unwrap and cache write
       this.requiresKeyProvisioning.set(false);
       this.rateLimitError.set(null);
       return {
         status: 'ready',
         key: unwrappedKey,
-        versionId:
-          returnedVersionId !== 'active' ? returnedVersionId : undefined,
+        versionId: concreteVersionId,
       };
     } catch (e: any) {
       // Backend-status → classified reason. A wrapped key that simply is not

@@ -55,9 +55,14 @@ import {
   SuggestedSettlement,
 } from '../../components/group-balances/group-balances.component';
 import { GroupMembersComponent } from '../../components/group-members/group-members.component';
+import {
+  resolveMemberDisplayName,
+  resolveUserDisplayName,
+} from '../../utils/member-display.util';
 
 export interface GroupExpense extends Expense {
-  paidByUserId: string;
+  paidByUserId: string | null;
+  paidByGroupMemberId?: string | null;
   ownerUserId: string;
   splits?: Array<
     ExpenseSplitInputDto & {
@@ -728,8 +733,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
                     (m) => m.user?.id === split.participantUserId,
                   );
                   if (member) {
-                    email = member.user.email;
-                    displayName = member.user.displayName;
+                    email = member.user?.email;
+                    displayName = member.user?.displayName;
                     participantUser = member.user;
                   }
                 } else if (split.participantGroupMemberId) {
@@ -865,11 +870,31 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  getUserName(userId: string): string {
-    const member = this.members().find((m) => m.user?.id === userId);
-    return member
-      ? member.user.displayName || member.user.email
-      : 'Unknown User';
+  getUserName(userId: string | null | undefined): string {
+    return resolveUserDisplayName(this.members(), userId);
+  }
+
+  /** Resolves the payer display name for a group expense or recurring template.
+   *  Prefers paidByUserId; falls back to paidByGroupMemberId so contact-backed
+   *  (pending) payers are handled correctly via memberDisplayName(). */
+  payerDisplayName(entity: {
+    paidByUserId?: string | null;
+    paidByGroupMemberId?: string | null;
+  }): string {
+    if (entity.paidByUserId) {
+      const m = this.members().find((m) => m.user?.id === entity.paidByUserId);
+      if (m) return this.memberDisplayName(m);
+    }
+    if (entity.paidByGroupMemberId) {
+      const m = this.members().find((m) => m.id === entity.paidByGroupMemberId);
+      if (m) return this.memberDisplayName(m);
+    }
+    return 'Unknown User';
+  }
+
+  /** Display name for a member, whichever identity backs it (registered or pending). */
+  memberDisplayName(member: GroupMember): string {
+    return resolveMemberDisplayName(member);
   }
 
   openExpenseModal(expense?: GroupExpense) {

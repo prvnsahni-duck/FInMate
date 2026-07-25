@@ -61,8 +61,15 @@ export class CreateExpenseDto {
   @MaxLength(64, { message: 'category cannot exceed 64 characters' })
   category!: string;
 
+  /** Required for personal expenses; for group expenses, this or paidByGroupMemberId. */
   @IsUUID('4', { message: 'paidByUserId must be a valid UUID v4' })
-  paidByUserId!: string;
+  @IsOptional()
+  paidByUserId?: string;
+
+  /** Group expenses only — a pending (Contact-backed) member as payer. */
+  @IsUUID('4', { message: 'paidByGroupMemberId must be a valid UUID v4' })
+  @IsOptional()
+  paidByGroupMemberId?: string;
 
   @IsUUID('4', { message: 'groupId must be a valid UUID v4' })
   @IsOptional()

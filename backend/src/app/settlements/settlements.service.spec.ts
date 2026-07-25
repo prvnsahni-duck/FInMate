@@ -280,8 +280,8 @@ describe('SettlementsService', () => {
       const userB = { id: 'bbbb', email: 'b@ex.com', displayName: 'User B' };
 
       const mockMembers = [
-        { user: userA, joinStatus: 'active' },
-        { user: userB, joinStatus: 'active' },
+        { id: 'member-a', user: userA, joinStatus: 'active' },
+        { id: 'member-b', user: userB, joinStatus: 'active' },
       ] as any[];
 
       groupMemberRepository.findOne.mockResolvedValueOnce({
@@ -343,14 +343,444 @@ describe('SettlementsService', () => {
         }),
       );
 
-      // Suggested settlements should simplify: B pays A $70
+      // Suggested settlements should simplify: B pays A $70. The response
+      // additionally carries GroupMember/Contact ids for pending-member
+      // support — fromUserId/toUserId stay populated and unchanged for an
+      // all-registered group like this one.
       expect(result.suggestedSettlements).toHaveLength(1);
-      expect(result.suggestedSettlements[0]).toEqual({
+      expect(result.suggestedSettlements[0]).toMatchObject({
         fromUserId: 'bbbb',
         toUserId: 'aaaa',
         amount: 70.0,
         currency: 'USD',
       });
+    });
+  });
+
+  // ── Phase 3: Friends Balance (registered-user-only aggregation) ─────────
+
+  describe('calculateFriendsBalances', () => {
+    const callerId = 'caller-id';
+
+    /**
+     * Wires the repository mocks so `calculateGroupBalances` (invoked once
+     * per membership by `calculateFriendsBalances`) resolves correctly for
+     * an arbitrary number of groups in a single test, without depending on
+     * call order — each mock branches on the entity id in its own `where`.
+     */
+    function setupGroups(
+      groups: Array<{
+        id: string;
+        currency: string;
+        members: any[];
+        expenses: any[];
+        splits: any[];
+        settlements?: any[];
+      }>,
+    ) {
+      groupMemberRepository.find.mockImplementation((opts: any) => {
+        if (opts?.where?.group?.id) {
+          const g = groups.find((x) => x.id === opts.where.group.id);
+          return Promise.resolve(g ? g.members : []);
+        }
+        if (opts?.where?.user?.id === callerId) {
+          return Promise.resolve(
+            groups.map((g) => ({ group: { id: g.id, name: `${g.id}-name` } })),
+          );
+        }
+        return Promise.resolve([]);
+      });
+
+      groupMemberRepository.findOne.mockImplementation((opts?: any) => {
+        if (!opts) {
+          // createQueryBuilder().getOne() — caller access check inside
+          // calculateGroupBalances; any truthy membership passes it.
+          return Promise.resolve({ id: 'caller-access-ok' } as any);
+        }
+        // Direct `.findOne()` call — the friendMember display lookup inside
+        // calculateFriendsBalances.
+        const groupId = opts?.where?.group?.id;
+        const wantedUserId = opts?.where?.user?.id;
+        const g = groups.find((x) => x.id === groupId);
+        const member = g?.members.find((m: any) => m.user?.id === wantedUserId);
+        return Promise.resolve(member ?? null);
+      });
+
+      groupRepository.findOne.mockImplementation((opts: any) => {
+        const g = groups.find((x) => x.id === opts?.where?.id);
+        return Promise.resolve(
+          (g ? { id: g.id, currency: g.currency } : null) as any,
+        );
+      });
+
+      expenseRepository.find.mockImplementation((opts: any) => {
+        const g = groups.find((x) => x.id === opts?.where?.group?.id);
+        return Promise.resolve(g ? g.expenses : []);
+      });
+
+      expenseSplitRepository.find.mockImplementation((opts: any) => {
+        const ids: string[] = opts?.where?.expense?.id?.value ?? [];
+        const allSplits = groups.flatMap((g) => g.splits);
+        return Promise.resolve(
+          allSplits.filter((s) => ids.includes(s.expense.id)),
+        );
+      });
+
+      settlementRepository.find.mockImplementation((opts: any) => {
+        const g = groups.find((x) => x.id === opts?.where?.group?.id);
+        return Promise.resolve(g?.settlements ?? []);
+      });
+    }
+
+    it('aggregates a registered friend across multiple shared groups in the same currency into one entry', async () => {
+      const callerG1 = {
+        id: 'gm-caller-g1',
+        user: { id: callerId, displayName: 'Caller', email: 'caller@x.com' },
+      };
+      const friendG1 = {
+        id: 'gm-friend-g1',
+        user: {
+          id: 'user-friend',
+          displayName: 'Friend One',
+          email: 'friend@x.com',
+        },
+      };
+      const callerG2 = {
+        id: 'gm-caller-g2',
+        user: { id: callerId, displayName: 'Caller', email: 'caller@x.com' },
+      };
+      const friendG2 = {
+        id: 'gm-friend-g2',
+        user: {
+          id: 'user-friend',
+          displayName: 'Friend One',
+          email: 'friend@x.com',
+        },
+      };
+
+      setupGroups([
+        {
+          id: 'g1',
+          currency: 'USD',
+          members: [callerG1, friendG1],
+          // Caller paid 100, split equally -> friend owes caller 50.
+          expenses: [
+            {
+              id: 'g1-exp-1',
+              currency: 'USD',
+              amountTotal: 100,
+              paidByGroupMember: callerG1,
+            },
+          ],
+          splits: [
+            {
+              expense: { id: 'g1-exp-1', currency: 'USD' },
+              amountOwed: 50,
+              participantGroupMember: callerG1,
+            },
+            {
+              expense: { id: 'g1-exp-1', currency: 'USD' },
+              amountOwed: 50,
+              participantGroupMember: friendG1,
+            },
+          ],
+        },
+        {
+          id: 'g2',
+          currency: 'USD',
+          members: [callerG2, friendG2],
+          // Friend paid 40, split equally -> caller owes friend 20.
+          expenses: [
+            {
+              id: 'g2-exp-1',
+              currency: 'USD',
+              amountTotal: 40,
+              paidByGroupMember: friendG2,
+            },
+          ],
+          splits: [
+            {
+              expense: { id: 'g2-exp-1', currency: 'USD' },
+              amountOwed: 20,
+              participantGroupMember: callerG2,
+            },
+            {
+              expense: { id: 'g2-exp-1', currency: 'USD' },
+              amountOwed: 20,
+              participantGroupMember: friendG2,
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.calculateFriendsBalances(callerId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        friendId: 'user-friend_USD',
+        displayName: 'Friend One (USD)',
+        netBalance: 30, // +50 (g1) - 20 (g2)
+      });
+      expect(result[0].currencyDetails).toHaveLength(2);
+    });
+
+    it('buckets the same friend separately per currency', async () => {
+      const callerG1 = {
+        id: 'gm-caller-g1',
+        user: { id: callerId, displayName: 'Caller', email: 'caller@x.com' },
+      };
+      const friendG1 = {
+        id: 'gm-friend-g1',
+        user: {
+          id: 'user-friend',
+          displayName: 'Friend One',
+          email: 'friend@x.com',
+        },
+      };
+      const callerG3 = {
+        id: 'gm-caller-g3',
+        user: { id: callerId, displayName: 'Caller', email: 'caller@x.com' },
+      };
+      const friendG3 = {
+        id: 'gm-friend-g3',
+        user: {
+          id: 'user-friend',
+          displayName: 'Friend One',
+          email: 'friend@x.com',
+        },
+      };
+
+      setupGroups([
+        {
+          id: 'g1',
+          currency: 'USD',
+          members: [callerG1, friendG1],
+          expenses: [
+            {
+              id: 'g1-exp-1',
+              currency: 'USD',
+              amountTotal: 100,
+              paidByGroupMember: callerG1,
+            },
+          ],
+          splits: [
+            {
+              expense: { id: 'g1-exp-1', currency: 'USD' },
+              amountOwed: 50,
+              participantGroupMember: callerG1,
+            },
+            {
+              expense: { id: 'g1-exp-1', currency: 'USD' },
+              amountOwed: 50,
+              participantGroupMember: friendG1,
+            },
+          ],
+        },
+        {
+          id: 'g3',
+          currency: 'EUR',
+          members: [callerG3, friendG3],
+          // Friend paid 60 EUR, split equally -> caller owes friend 30 EUR.
+          expenses: [
+            {
+              id: 'g3-exp-1',
+              currency: 'EUR',
+              amountTotal: 60,
+              paidByGroupMember: friendG3,
+            },
+          ],
+          splits: [
+            {
+              expense: { id: 'g3-exp-1', currency: 'EUR' },
+              amountOwed: 30,
+              participantGroupMember: callerG3,
+            },
+            {
+              expense: { id: 'g3-exp-1', currency: 'EUR' },
+              amountOwed: 30,
+              participantGroupMember: friendG3,
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.calculateFriendsBalances(callerId);
+
+      expect(result).toHaveLength(2);
+      const usd = result.find((r) => r.friendId === 'user-friend_USD');
+      const eur = result.find((r) => r.friendId === 'user-friend_EUR');
+      expect(usd?.netBalance).toBe(50);
+      expect(eur?.netBalance).toBe(-30);
+    });
+
+    it('excludes a pending (Contact-backed) co-member from Friends aggregation', async () => {
+      const caller = {
+        id: 'gm-caller-g4',
+        user: { id: callerId, displayName: 'Caller', email: 'caller@x.com' },
+      };
+      const pending = {
+        id: 'gm-pending-g4',
+        contact: { displayName: 'Pending Guy', email: 'pending@x.com' },
+      };
+
+      setupGroups([
+        {
+          id: 'g4',
+          currency: 'USD',
+          members: [caller, pending],
+          // Caller paid 60, split equally -> pending owes caller 30.
+          expenses: [
+            {
+              id: 'g4-exp-1',
+              currency: 'USD',
+              amountTotal: 60,
+              paidByGroupMember: caller,
+            },
+          ],
+          splits: [
+            {
+              expense: { id: 'g4-exp-1', currency: 'USD' },
+              amountOwed: 30,
+              participantGroupMember: caller,
+            },
+            {
+              expense: { id: 'g4-exp-1', currency: 'USD' },
+              amountOwed: 30,
+              participantGroupMember: pending,
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.calculateFriendsBalances(callerId);
+
+      // The pending member has no `userId`, so `friendId` resolves to null
+      // and the entry is skipped entirely — they still fully appear in
+      // calculateGroupBalances, just not in this registered-user-only view.
+      expect(result).toHaveLength(0);
+    });
+
+    it('mixed group: a registered co-member still appears in Friends even when a pending member shares the same group', async () => {
+      const caller = {
+        id: 'gm-caller-g5',
+        user: { id: callerId, displayName: 'Caller', email: 'caller@x.com' },
+      };
+      const registeredFriend = {
+        id: 'gm-friend-g5',
+        user: {
+          id: 'user-friend-2',
+          displayName: 'Friend Two',
+          email: 'friend2@x.com',
+        },
+      };
+      const pending = {
+        id: 'gm-pending-g5',
+        contact: { displayName: 'Pending Guy', email: 'pending@x.com' },
+      };
+
+      setupGroups([
+        {
+          id: 'g5',
+          currency: 'USD',
+          members: [caller, registeredFriend, pending],
+          // Caller paid 90, split equally three ways (30 each).
+          expenses: [
+            {
+              id: 'g5-exp-1',
+              currency: 'USD',
+              amountTotal: 90,
+              paidByGroupMember: caller,
+            },
+          ],
+          splits: [
+            {
+              expense: { id: 'g5-exp-1', currency: 'USD' },
+              amountOwed: 30,
+              participantGroupMember: caller,
+            },
+            {
+              expense: { id: 'g5-exp-1', currency: 'USD' },
+              amountOwed: 30,
+              participantGroupMember: registeredFriend,
+            },
+            {
+              expense: { id: 'g5-exp-1', currency: 'USD' },
+              amountOwed: 30,
+              participantGroupMember: pending,
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.calculateFriendsBalances(callerId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        friendId: 'user-friend-2_USD',
+        displayName: 'Friend Two (USD)',
+        netBalance: 30,
+      });
+    });
+
+    it('registered-only regression: single group, single currency behaves as a simple two-party ledger', async () => {
+      const caller = {
+        id: 'gm-caller-g6',
+        user: { id: callerId, displayName: 'Caller', email: 'caller@x.com' },
+      };
+      const friend = {
+        id: 'gm-friend-g6',
+        user: {
+          id: 'user-friend-3',
+          displayName: 'Friend Three',
+          email: 'friend3@x.com',
+        },
+      };
+
+      setupGroups([
+        {
+          id: 'g6',
+          currency: 'USD',
+          members: [caller, friend],
+          expenses: [
+            {
+              id: 'g6-exp-1',
+              currency: 'USD',
+              amountTotal: 100,
+              paidByGroupMember: caller,
+            },
+          ],
+          splits: [
+            {
+              expense: { id: 'g6-exp-1', currency: 'USD' },
+              amountOwed: 50,
+              participantGroupMember: caller,
+            },
+            {
+              expense: { id: 'g6-exp-1', currency: 'USD' },
+              amountOwed: 50,
+              participantGroupMember: friend,
+            },
+          ],
+        },
+      ]);
+
+      const result = await service.calculateFriendsBalances(callerId);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({
+        friendId: 'user-friend-3_USD',
+        displayName: 'Friend Three (USD)',
+        email: 'friend3@x.com',
+        netBalance: 50,
+      });
+    });
+
+    it('returns an empty list when the caller has no active group memberships', async () => {
+      groupMemberRepository.find.mockResolvedValueOnce([]);
+
+      const result = await service.calculateFriendsBalances(callerId);
+
+      expect(result).toEqual([]);
     });
   });
 
@@ -419,6 +849,17 @@ describe('SettlementsService', () => {
           amount: 100,
           currency: 'USD',
           note: 'lunch',
+          // Frozen group-ledger identity rule: even a fully registered-to-
+          // registered settlement resolves both parties via GroupMember —
+          // fromUser/toUser are never written for new rows.
+          fromGroupMember: mockCaller,
+          toGroupMember: mockRecipient,
+        }),
+      );
+      expect(settlementRepository.create).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          fromUser: expect.anything(),
+          toUser: expect.anything(),
         }),
       );
       expect(settlementVersionRepository.create).toHaveBeenCalledWith(
@@ -430,6 +871,68 @@ describe('SettlementsService', () => {
       );
       expect(settlementVersionRepository.save).toHaveBeenCalledTimes(1);
       expect(result).toBeDefined();
+    });
+
+    it('proposes a settlement with a pending (Contact-backed) recipient via toGroupMemberId', async () => {
+      const mockCaller = {
+        id: 'caller-member',
+        user: { id: 'caller-id' },
+      } as any;
+      const pendingRecipient = {
+        id: 'pending-member-id',
+        user: undefined,
+        contact: { id: 'contact-rahul' },
+      } as any;
+
+      groupMemberRepository.findOne.mockResolvedValueOnce(mockCaller);
+      groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce(pendingRecipient);
+
+      settlementRepository.create.mockImplementation((data) => data as any);
+      settlementRepository.save.mockImplementationOnce(
+        async (data) => ({ ...data, id: 'settlement-id-2', version: 1 }) as any,
+      );
+
+      const result = await service.proposeSettlement('caller-id', 'group-id', {
+        toGroupMemberId: 'pending-member-id',
+        amount: 50,
+        currency: 'USD',
+      });
+
+      // Frozen group-ledger identity rule: both parties always resolve via
+      // GroupMember, never User — including the caller, who is always a
+      // real account but is referenced by their GroupMember row here.
+      expect(settlementRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fromGroupMember: mockCaller,
+          toGroupMember: pendingRecipient,
+        }),
+      );
+      expect(settlementRepository.create).toHaveBeenCalledWith(
+        expect.not.objectContaining({
+          fromUser: expect.anything(),
+          toUser: expect.anything(),
+        }),
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('rejects proposing a settlement with oneself', async () => {
+      const mockCaller = {
+        id: 'caller-member',
+        user: { id: 'caller-id' },
+      } as any;
+      groupMemberRepository.findOne.mockResolvedValueOnce(mockCaller);
+      groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
+      groupMemberRepository.findOne.mockResolvedValueOnce(mockCaller);
+
+      await expect(
+        service.proposeSettlement('caller-id', 'group-id', {
+          toGroupMemberId: 'caller-member',
+          amount: 10,
+          currency: 'USD',
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -516,6 +1019,57 @@ describe('SettlementsService', () => {
           version: 1,
         }),
       ).rejects.toThrow(PreconditionFailedException);
+    });
+
+    it('allows the debtor to confirm on behalf of a pending (Contact-backed) creditor, who has no account to confirm with', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
+
+      const mockSettlement = {
+        id: 'settlement-id',
+        version: 1,
+        fromUser: { id: 'debtor-id' },
+        toUser: undefined,
+        toGroupMember: { id: 'pending-member-id', user: undefined },
+        status: 'proposed',
+      } as any;
+      settlementRepository.findOne.mockResolvedValueOnce(mockSettlement);
+      settlementRepository.save.mockResolvedValueOnce(mockSettlement);
+
+      const result = await service.updateSettlement(
+        'debtor-id',
+        'group-id',
+        'settlement-id',
+        { status: 'confirmed', version: 1 },
+      );
+
+      expect(result.status).toBe('confirmed');
+    });
+
+    it('still rejects an unrelated third party from confirming a settlement with a pending creditor', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
+
+      const mockSettlement = {
+        id: 'settlement-id',
+        version: 1,
+        fromUser: { id: 'debtor-id' },
+        toUser: undefined,
+        toGroupMember: { id: 'pending-member-id', user: undefined },
+        status: 'proposed',
+      } as any;
+      settlementRepository.findOne.mockResolvedValueOnce(mockSettlement);
+
+      await expect(
+        service.updateSettlement(
+          'someone-else-id',
+          'group-id',
+          'settlement-id',
+          { status: 'confirmed', version: 1 },
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw ForbiddenException if non-creditor tries to confirm', async () => {

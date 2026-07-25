@@ -4,11 +4,17 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app/app.module';
 import { HttpExceptionFilter } from './app/filters/http-exception.filter';
 import helmet from 'helmet';
+import compression from 'compression';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const globalPrefix = 'api/v1';
   app.setGlobalPrefix(globalPrefix);
+
+  // HTTP response compression. Negotiates Brotli (br) when the client
+  // supports it, otherwise falls back to gzip. Responses under 1 KB are
+  // sent uncompressed (overhead exceeds benefit at that size).
+  app.use(compression({ threshold: 1024 }));
 
   // Security headers with CSP configured to allow Swagger UI
   app.use(

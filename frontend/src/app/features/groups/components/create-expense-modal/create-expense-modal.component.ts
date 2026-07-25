@@ -151,10 +151,14 @@ export class CreateExpenseModalComponent implements OnChanges {
 
   get availablePayers(): { id: string; name: string }[] {
     if (this.groupId) {
-      return this.members.map((m) => ({
-        id: m.user.id,
-        name: m.user.displayName || m.user.username || m.user.email || '',
-      }));
+      // Pending (Contact-backed) members have no User account and can't be
+      // selected as payer in this User-keyed flow.
+      return this.members
+        .filter((m) => !!m.user)
+        .map((m) => ({
+          id: m.user!.id,
+          name: m.user!.displayName || m.user!.username || m.user!.email || '',
+        }));
     } else {
       const currentUserId = this.getCurrentUserId();
       const list = [];
@@ -174,10 +178,10 @@ export class CreateExpenseModalComponent implements OnChanges {
   get availableParticipants() {
     if (this.groupId) {
       return this.members
-        .filter((m) => m.role !== 'spectator')
+        .filter((m) => m.role !== 'spectator' && !!m.user)
         .map((m) => ({
-          id: m.user.id,
-          name: m.user.displayName || m.user.email,
+          id: m.user!.id,
+          name: m.user!.displayName || m.user!.email,
         }));
     } else {
       const currentUserId = this.getCurrentUserId();
@@ -263,6 +267,7 @@ export class CreateExpenseModalComponent implements OnChanges {
       this.selectedUserIds.clear();
       this.members.forEach((m) => {
         if (
+          m.user &&
           (m.joinStatus === 'active' || m.joinStatus === 'invited') &&
           m.role !== 'spectator'
         ) {
@@ -271,13 +276,16 @@ export class CreateExpenseModalComponent implements OnChanges {
       });
 
       const currentUserId = this.getCurrentUserId();
+      const registeredMembers = this.members.filter((m) => !!m.user);
       if (
         currentUserId &&
-        this.members.some((m) => m.user.id === currentUserId)
+        registeredMembers.some((m) => m.user!.id === currentUserId)
       ) {
         this.expenseForm.patchValue({ paidByUserId: currentUserId });
-      } else if (this.members.length > 0) {
-        this.expenseForm.patchValue({ paidByUserId: this.members[0].user.id });
+      } else if (registeredMembers.length > 0) {
+        this.expenseForm.patchValue({
+          paidByUserId: registeredMembers[0].user!.id,
+        });
       }
     }
 

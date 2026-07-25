@@ -1,7 +1,9 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Query,
   UseGuards,
   Req,
   HttpCode,
@@ -35,6 +37,13 @@ export class AuthController {
       registerDto.displayName,
     );
     return new SuccessResponse('User registered successfully', result);
+  }
+
+  @Get('verify-email')
+  @ThrottleAs(THROTTLE_PROFILES.OTP)
+  async verifyEmail(@Query('token') token: string) {
+    const result = await this.authService.verifyEmail(token);
+    return new SuccessResponse('Email verified successfully', result);
   }
 
   @Post('login')

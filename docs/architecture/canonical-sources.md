@@ -1,52 +1,36 @@
-# Canonical Architecture Sources
+﻿# Canonical Documentation Sources
 
-This page defines what will become the **canonical source of truth** for FinMate's architecture, and the current (provisional) state until those documents are imported.
+This file is the source-of-truth map for FinMate documentation. Documentation is implementation-driven: when code changes, update the canonical document for the affected topic in the same change.
 
-## Canonical set (pending import)
+## Canonical Map
 
-Once provided by the project owner, the following documents become the authoritative references. Every gap, audit, and implementation decision will be reconciled against them. They live as **placeholders** today under [`adr/`](adr/) — reserved slots, no invented content:
+| Topic | Canonical document | Implementation anchors |
+| --- | --- | --- |
+| System architecture | [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) | `backend/src/app/app.module.ts`, `frontend/src/app/app.routes.ts`, `shared/data-models/src/lib/` |
+| Data model and migrations | [`../../DATABASE_SCHEMA.md`](../../DATABASE_SCHEMA.md) | `shared/data-models/src/lib/*.entity.ts`, `backend/src/migrations/` |
+| API contracts | [`../contracts/`](../contracts/) and [`../../openapi.yaml`](../../openapi.yaml) | Nest controllers under `backend/src/app/**` |
+| Encryption and key lifecycle | [`../group-key-flow.md`](../group-key-flow.md), [`../contracts/encryption-contract.md`](../contracts/encryption-contract.md) | `frontend/src/app/core/services/encryption.service.ts`, `group-key.service.ts`, `zk-key-vault.service.ts`, backend group key endpoints |
+| Expense encryption/decryption | [`../contracts/expense-contract.md`](../contracts/expense-contract.md) | `frontend/src/app/core/services/expense-decryption.service.ts`, `expense-decrypt-coordinator.service.ts`, `backend/src/app/expenses/expenses.service.ts` |
+| Carry Forward | [`../contracts/groups-contract.md`](../contracts/groups-contract.md), [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) | `backend/src/app/expenses/services/expenses-carry-forward.service.ts`, `ExpensesService.closeMonth`, `ExpensesService.getCarryForwardSummary`, `backend/src/app/common/ledger-debt-simplifier.ts` |
+| Settlement | [`../contracts/settlements-contract.md`](../contracts/settlements-contract.md) | `backend/src/app/settlements/settlements.service.ts`, `backend/src/app/common/ledger-debt-simplifier.ts` (canonical debt-simplification, shared with Carry Forward) |
+| History and audit model | [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md), [`../contracts/groups-contract.md`](../contracts/groups-contract.md), [`../audits/history-decryption-audit.md`](../audits/history-decryption-audit.md) | `shared/data-models/src/lib/audit-log.entity.ts`, `expense-version.entity.ts`, `backend/src/app/groups/services/groups-audit.service.ts`, `frontend/src/app/features/groups/services/groups.service.ts` (`getHistoryLogs`), expense version methods |
+| Security operations | [`../SECURITY_VERIFICATION_CHECKLIST.md`](../SECURITY_VERIFICATION_CHECKLIST.md), [`../PRODUCTION_READINESS_CHECKLIST.md`](../PRODUCTION_READINESS_CHECKLIST.md) | Auth, throttling, Redis session, and encryption services |
+| Historical decisions | [`../PROJECT_DECISIONS.md`](../PROJECT_DECISIONS.md), [`../frozen-decisions.md`](../frozen-decisions.md) | Historical reasoning only; do not duplicate current behavior here |
+| AI/developer rules | [`../../AGENT_RULES.md`](../../AGENT_RULES.md), [`../coding-rules.md`](../coding-rules.md), [`../file-map.md`](../file-map.md) | Repo workflow and coding invariants |
+| Expense module status (overview + rollup) | [`../EXPENSE_MODULE_STATUS.md`](../EXPENSE_MODULE_STATUS.md) | Rolls up the rows above for the expense module specifically; not a replacement for the per-topic canonical documents |
 
-| Canonical document      | Placeholder                                                      | Status            |
-| ----------------------- | ---------------------------------------------------------------- | ----------------- |
-| ADR-000                 | [adr/ADR-000.md](adr/ADR-000.md)                                 | ⏳ Pending import |
-| ADR-001                 | [adr/ADR-001.md](adr/ADR-001.md)                                 | ⏳ Pending import |
-| ADR-002                 | [adr/ADR-002.md](adr/ADR-002.md)                                 | ⏳ Pending import |
-| ADR-003                 | [adr/ADR-003.md](adr/ADR-003.md)                                 | ⏳ Pending import |
-| ADR-004                 | [adr/ADR-004.md](adr/ADR-004.md)                                 | ⏳ Pending import |
-| ADR-005                 | [adr/ADR-005.md](adr/ADR-005.md)                                 | ⏳ Pending import |
-| ADR-006                 | [adr/ADR-006.md](adr/ADR-006.md)                                 | ⏳ Pending import |
-| ADR-007                 | [adr/ADR-007.md](adr/ADR-007.md)                                 | ⏳ Pending import |
-| ADR-008                 | [adr/ADR-008.md](adr/ADR-008.md)                                 | ⏳ Pending import |
-| ADR-009                 | [adr/ADR-009.md](adr/ADR-009.md)                                 | ⏳ Pending import |
-| ADR-010                 | [adr/ADR-010.md](adr/ADR-010.md)                                 | ⏳ Pending import |
-| ADR-011                 | [adr/ADR-011.md](adr/ADR-011.md)                                 | ⏳ Pending import |
-| ADR-012                 | [adr/ADR-012.md](adr/ADR-012.md)                                 | ⏳ Pending import |
-| ADR-013                 | [adr/ADR-013.md](adr/ADR-013.md)                                 | ⏳ Pending import |
-| ADR-014                 | [adr/ADR-014.md](adr/ADR-014.md)                                 | ⏳ Pending import |
-| ADR-015                 | [adr/ADR-015.md](adr/ADR-015.md)                                 | ⏳ Pending import |
-| Non-Goals               | [adr/NON-GOALS.md](adr/NON-GOALS.md)                             | ⏳ Pending import |
-| Architecture Principles | [adr/ARCHITECTURE-PRINCIPLES.md](adr/ARCHITECTURE-PRINCIPLES.md) | ⏳ Pending import |
+## Authority Rules
 
-## Provisional sources (in force until import)
+- Each major topic has one canonical document. Other docs should link to it instead of restating the same design.
+- Historical documents preserve why a decision was made, but current behavior belongs in the canonical topic document.
+- Audits under `docs/audits/` are evidence snapshots. They are not authoritative after the code changes unless refreshed.
+- Internal refactors that consolidate duplicate implementations without changing behavior or public APIs are recorded under `docs/changes/*.md` (files-changed / verification format), not by rewriting the canonical topic document — the canonical document already describes the resulting single implementation at the responsibility level and rarely needs to change for these.
+- Roadmaps, PRDs, TRDs, and project specifications are planning references. Treat implementation and canonical contracts as authoritative when they disagree.
+- ADR placeholder files were removed in the 2026-07-25 documentation audit because they contained no decisions. Future ADRs should be added only with real accepted content.
 
-Until the canonical set is imported, these are the **working** sources of truth. They are provisional and may be superseded, in part or whole, by the ADRs:
+## Update Protocol
 
-- [`docs/frozen-decisions.md`](../frozen-decisions.md) — working decision list (approximation of Non-Goals + settled decisions).
-- [`docs/coding-rules.md`](../coding-rules.md) — working implementation rules (approximation of Architecture Principles).
-- [`docs/PROJECT_DECISIONS.md`](../PROJECT_DECISIONS.md) — APPROVED decisions on record.
-- [`ARCHITECTURE.md`](../../ARCHITECTURE.md) — current architecture overview.
-
-## Reconciliation protocol (runs the moment ADRs land)
-
-The current [gap-tracker.md](gap-tracker.md) and all [audits/](../audits/) are **provisional** until reconciled. When the ADRs are imported:
-
-1. Map each gap-tracker row to the specific ADR(s) it depends on; replace the "Source-of-truth" column value with the ADR id.
-2. Drop or downgrade any gap that the ADRs render a non-issue (false positive) — **without** deleting the ID; mark it `Won't Fix (ADR-reconciled)` with a note.
-3. Confirm the phase ordering in [implementation-roadmap-pre-adr.md](implementation-roadmap-pre-adr.md) against the ADR-stated principles/non-goals.
-4. Promote that roadmap from "(Pre-ADR)" to the canonical roadmap.
-
-## Rules while placeholders are unfilled
-
-- Do **not** author ADR content, Non-Goals, or Principles into the placeholders.
-- Do **not** treat the provisional sources as final.
-- Do **not** begin implementation of any gap until its governing ADR is imported and the gap is reconciled.
+1. Change code.
+2. Update the canonical document for the affected topic.
+3. Update API docs or `openapi.yaml` when request/response shapes change.
+4. Record large documentation cleanups in `docs/DOCUMENTATION_AUDIT.md`.

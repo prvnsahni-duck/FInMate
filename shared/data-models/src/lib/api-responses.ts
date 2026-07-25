@@ -129,7 +129,9 @@ export interface PendingInvitationResponse extends InviteDetailsResponse {
 }
 
 export interface CarryForwardBalance {
-  userId: string;
+  groupMemberId: string;
+  /** Null for a pending (Contact-backed) member — they have no User account. */
+  userId: string | null;
   displayName: string | null;
   paid: number;
   expected: number;

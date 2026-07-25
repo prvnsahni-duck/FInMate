@@ -67,8 +67,9 @@ sequenceDiagram
    - **User Data Key (UDK)**: Used to encrypt personal-scope data (personal expenses, personal notes, goals, and user secrets). It is derived from the user's password using PBKDF2 (AES-256-GCM).
    - **Group Key**: Each group owns a dedicated AES-256-GCM symmetric key. All collaborative data (group expenses, group notes, group attachments) is encrypted using this Group Key. Shared data is never encrypted using a personal UDK.
 2. **Key Cache & Refresh Behavior (Current Release)**:
-   - **Temporary Key Cache**: The wrapped/exported User Data Key (UDK) and wrapped Group Keys are stored in a local **IndexedDB** cache via `ZkKeyVaultService` and in memory. This ensures keys survive page refreshes without re-prompting the user for their password.
-   - **Cache Lifetime**: The cache is strictly cleared upon logout, session expiration, or explicit security revoking.
+   - **Personal master key (UDK)**: cached in a local **IndexedDB** vault via `ZkKeyVaultService` and in memory, so it survives page refreshes without re-prompting for the password.
+   - **Group keys**: session-memory only (`GroupKeyService`'s in-memory cache) — never written to IndexedDB or any other persistent store. A refresh re-resolves them from the backend (unwrap) rather than restoring them from disk. Canonical cache/lifecycle detail: [`docs/group-key-flow.md`](docs/group-key-flow.md) → "Cache Rules".
+   - **Cache Lifetime**: Both caches are cleared upon logout, session expiration, or explicit security revoking.
 3. **Future Key Vault Architecture (Roadmap)**:
    - The temporary cache will be replaced with an **Encrypted IndexedDB Key Vault** protected by:
      - **WebAuthn** / Device Trust
@@ -84,9 +85,9 @@ sequenceDiagram
    - Handled gracefully using the placeholder `DECRYPTION_FAILED_PLACEHOLDER` (`'Unable to display this item'`) to avoid leaking ciphertexts or raw technical details in the UI.
 7. **Central Decryption Pipeline (v2)**:
    - All expense decryption flows through `ExpenseDecryptionService` (scope-aware key resolution, classified failure states, ciphertext preserved for retries) orchestrated by `ExpenseDecryptCoordinator` (provision → decrypt → retry with backoff). Ledger, dashboard, trash, and create/update/restore responses all use this single pipeline; the group History tab decrypts audit metadata titles field-level in `GroupsService.getHistoryLogs` (see `docs/KNOWN_ISSUES.md` KI-1 for its rotation caveat).
-   - The client group-key cache is **version-keyed** (`${groupId}:${groupKeyVersionId ?? 'active'}`) in both memory and the IndexedDB vault, and `resolveGroupKey(groupId, versionId?)` passes `?versionId=` to `GET /groups/:id/keys/me`. The backend serves the requested version (scoped to the group; SUPERSEDED allowed, REVOKED rejected) and falls back to ACTIVE when no version is requested. On writes, the client declares the concrete `groupKeyVersionId` it encrypted with (`GroupKeyService.getGroupKeyForEncryption`) and the backend validates and stamps exactly that version — the ciphertext and its version stamp always travel as a consistent pair (ENC-002 / EXP-003, implemented 2026-07-17).
+   - The client group-key cache is **version-keyed** (`${groupId}:${groupKeyVersionId ?? 'active'}`), session-memory only, and `resolveGroupKey(groupId, versionId?)` passes `?versionId=` to `GET /groups/:id/keys/me`. On writes, the client declares the concrete `groupKeyVersionId` it encrypted with (`GroupKeyService.getGroupKeyForEncryption`) and the backend validates and stamps exactly that version — the ciphertext and its version stamp always travel as a consistent pair (ENC-002 / EXP-003, implemented 2026-07-17). Full cache/resolution/rotation rules: [`docs/group-key-flow.md`](docs/group-key-flow.md).
 
-### Zero-Knowledge Key Lifecycle
+### Zero-Knowledge Key Lifecycle (Personal Master Key / UDK)
 
 Primary storage:
 
@@ -104,9 +105,12 @@ If IndexedDB persistence is unavailable:
 - Refresh/browser restart requires re-authentication
 - Zero-Knowledge guarantees remain unchanged
 
+Group keys do not follow this lifecycle — they are never IndexedDB-persisted; see the
+session-memory cache described above and in [`docs/group-key-flow.md`](docs/group-key-flow.md).
+
 ### Automatic Group Key Provisioning Flow (Zero-Knowledge)
 
-To make key distribution seamless without requiring the group owner to be online or manually approve new keys, the system supports automatic provisioning:
+To make key distribution seamless without requiring the group owner to be online or manually approve new keys, the system supports automatic provisioning. These are the message flows; canonical provisioning/self-healing rules live in [`docs/group-key-flow.md`](docs/group-key-flow.md) → "Provisioning":
 
 #### Flow A: Invite Links & QR Codes (TIK Symmetric Wrapping)
 
@@ -145,7 +149,9 @@ When User A invites User B directly via email/username lookup, User A's browser 
 
 #### Flow C: Group Key Rotation (Versioned)
 
-Group key rotation uses immutable version history. Rotating creates a new ACTIVE key version and marks the previous ACTIVE version as SUPERSEDED.
+Group key rotation uses immutable version history — see [`docs/group-key-flow.md`](docs/group-key-flow.md)
+→ "Rotation" for the full rule set (SUPERSEDED vs. REVOKED, historical decryptability, skipped-member
+handling). Message flow:
 
 ```mermaid
 sequenceDiagram

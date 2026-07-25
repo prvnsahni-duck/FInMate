@@ -1,6 +1,7 @@
 import { Component, input } from '@angular/core';
 import { CurrencyPipe, NgClass } from '@angular/common';
 import { GroupMember } from '@finmate/data-models';
+import { resolveUserDisplayName } from '../../utils/member-display.util';
 
 export interface SuggestedSettlement {
   fromUserId: string;
@@ -70,10 +71,7 @@ export class GroupBalancesComponent {
   suggestedSettlements = input.required<SuggestedSettlement[]>();
   members = input.required<GroupMember[]>();
 
-  getUserName(userId: string): string {
-    const member = this.members().find((m) => m.user?.id === userId);
-    return member
-      ? member.user.displayName || member.user.email
-      : 'Unknown User';
+  getUserName(userId: string | null | undefined): string {
+    return resolveUserDisplayName(this.members(), userId);
   }
 }

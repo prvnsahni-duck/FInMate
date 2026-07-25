@@ -1,0 +1,4 @@
+# Normalize all text files to LF in the repo, regardless of OS checkout settings.
+* text=auto eol=lf
+
+# Diff-friendly handling for binary-ish or generated files can be added here as needed.

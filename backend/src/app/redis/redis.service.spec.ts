@@ -8,6 +8,7 @@ const mockRedisClient = {
   set: jest.fn(),
   get: jest.fn(),
   del: jest.fn(),
+  getDel: jest.fn(),
   on: jest.fn(),
 };
 
@@ -63,6 +64,32 @@ describe('RedisService', () => {
       );
       const result = await service.setNx('test-key', 'test-val', 10);
       expect(result).toBe(false);
+    });
+  });
+
+  describe('getDel', () => {
+    it('returns the value via a single atomic GETDEL call', async () => {
+      mockRedisClient.getDel.mockResolvedValueOnce('stored-value');
+      const result = await service.getDel('test-key');
+      expect(result).toBe('stored-value');
+      expect(mockRedisClient.getDel).toHaveBeenCalledWith('test-key');
+      expect(mockRedisClient.get).not.toHaveBeenCalled();
+      expect(mockRedisClient.del).not.toHaveBeenCalled();
+    });
+
+    it('returns null when the key does not exist (already consumed or expired)', async () => {
+      mockRedisClient.getDel.mockResolvedValueOnce(null);
+      const result = await service.getDel('missing-key');
+      expect(result).toBeNull();
+    });
+
+    it('throws ServiceUnavailableException on redis client error', async () => {
+      mockRedisClient.getDel.mockRejectedValueOnce(
+        new Error('Redis command timeout'),
+      );
+      await expect(service.getDel('test-key')).rejects.toThrow(
+        'Cache service is temporarily unavailable',
+      );
     });
   });
 });

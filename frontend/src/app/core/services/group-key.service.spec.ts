@@ -23,9 +23,7 @@ describe('GroupKeyService', () => {
     };
 
     const vaultSpy = {
-      loadGroupKey: jest.fn().mockResolvedValue(null),
-      storeGroupKey: jest.fn().mockResolvedValue(undefined),
-      deleteGroupKey: jest.fn().mockResolvedValue(undefined),
+      clearAll: jest.fn().mockResolvedValue(undefined),
     };
 
     TestBed.configureTestingModule({
