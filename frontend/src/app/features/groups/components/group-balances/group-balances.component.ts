@@ -70,7 +70,8 @@ export class GroupBalancesComponent {
   suggestedSettlements = input.required<SuggestedSettlement[]>();
   members = input.required<GroupMember[]>();
 
-  getUserName(userId: string): string {
+  getUserName(userId: string | null | undefined): string {
+    if (!userId) return 'Unknown User';
     const member = this.members().find((m) => m.user?.id === userId);
     return member?.user?.displayName || member?.user?.email || 'Unknown User';
   }
