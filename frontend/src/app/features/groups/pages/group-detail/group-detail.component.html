@@ -1078,7 +1078,7 @@
                             }}
                           </p>
                           <p class="text-xs text-muted">
-                            Paid by {{ getUserName(expense.paidByUserId) }}
+                            Paid by {{ payerDisplayName(expense) }}
                           </p>
                         </div>
 
@@ -2089,11 +2089,7 @@
                       >
                         <span
                           >Payer:
-                          {{
-                            getUserName(
-                              template.paidByUser?.id || template.paidByUserId
-                            )
-                          }}</span
+                          {{ payerDisplayName(template) }}</span
                         >
                         <span>Starts: {{ template.startDate }}</span>
                         @if (template.endDate) {

@@ -57,7 +57,8 @@ import {
 import { GroupMembersComponent } from '../../components/group-members/group-members.component';
 
 export interface GroupExpense extends Expense {
-  paidByUserId: string;
+  paidByUserId: string | null;
+  paidByGroupMemberId?: string | null;
   ownerUserId: string;
   splits?: Array<
     ExpenseSplitInputDto & {
@@ -865,9 +866,28 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  getUserName(userId: string): string {
+  getUserName(userId: string | null | undefined): string {
+    if (!userId) return 'Unknown User';
     const member = this.members().find((m) => m.user?.id === userId);
     return member?.user?.displayName || member?.user?.email || 'Unknown User';
+  }
+
+  /** Resolves the payer display name for a group expense or recurring template.
+   *  Prefers paidByUserId; falls back to paidByGroupMemberId so contact-backed
+   *  (pending) payers are handled correctly via memberDisplayName(). */
+  payerDisplayName(entity: {
+    paidByUserId?: string | null;
+    paidByGroupMemberId?: string | null;
+  }): string {
+    if (entity.paidByUserId) {
+      const m = this.members().find((m) => m.user?.id === entity.paidByUserId);
+      if (m) return this.memberDisplayName(m);
+    }
+    if (entity.paidByGroupMemberId) {
+      const m = this.members().find((m) => m.id === entity.paidByGroupMemberId);
+      if (m) return this.memberDisplayName(m);
+    }
+    return 'Unknown User';
   }
 
   /** Display name for a member, whichever identity backs it (registered or pending). */

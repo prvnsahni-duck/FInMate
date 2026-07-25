@@ -1160,7 +1160,8 @@ export class ExpensesService {
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
       .leftJoinAndSelect('expense.ownerUser', 'ownerUser')
       .leftJoinAndSelect('expense.group', 'group')
-      .leftJoinAndSelect('expense.groupKeyVersion', 'groupKeyVersion');
+      .leftJoinAndSelect('expense.groupKeyVersion', 'groupKeyVersion')
+      .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember');
 
     if (params.groupId) {
       if (params.groupId === 'personal') {
