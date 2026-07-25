@@ -17,10 +17,10 @@ sufficient here.
 Attachment records split across two completely separate storage tiers, and this split is the
 source of every risk below:
 
-| What | Where | Persisted? | Syncs across devices? |
-| --- | --- | --- | --- |
-| Metadata (`storageKey`, `mimeType`, `sizeBytes`, `checksumSha256`, `encryptedFileKey`, `encryptedOriginalName`) | Postgres, `attachments` table (`shared/data-models/src/lib/attachment.entity.ts`) | ✅ Yes | ✅ Yes |
-| The actual encrypted file bytes | Browser `localStorage`, key `sim_storage:<storageKey>` | ❌ No — device-and-browser-profile local only | ❌ No |
+| What                                                                                                            | Where                                                                             | Persisted?                                    | Syncs across devices? |
+| --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------- | --------------------- |
+| Metadata (`storageKey`, `mimeType`, `sizeBytes`, `checksumSha256`, `encryptedFileKey`, `encryptedOriginalName`) | Postgres, `attachments` table (`shared/data-models/src/lib/attachment.entity.ts`) | ✅ Yes                                        | ✅ Yes                |
+| The actual encrypted file bytes                                                                                 | Browser `localStorage`, key `sim_storage:<storageKey>`                            | ❌ No — device-and-browser-profile local only | ❌ No                 |
 
 The `storageKey` column name is misleading by itself — it reads like a pointer into real object
 storage (S3/Supabase-style), but it only ever resolves to a `localStorage` key on whichever single
@@ -33,7 +33,7 @@ browser wrote it.
   `localStorage.setItem('sim_storage:' + storageKey, encryptedBytes)`, **no `try/catch` around this
   specific call**. It sits inside the same `try` block as the rest of `saveExpense`'s encryption
   and HTTP-save logic, which does have an outer `catch` (`:599-602`) — so a thrown
-  `QuotaExceededError` here does **not** silently drop just the attachment; it aborts the *entire*
+  `QuotaExceededError` here does **not** silently drop just the attachment; it aborts the _entire_
   expense save (the HTTP request to persist the expense hasn't been made yet at this point in the
   function), surfacing as a generic `'Failed to encrypt and save expense.'` message that gives the
   user no indication the real cause is browser storage being full.
@@ -43,7 +43,7 @@ browser wrote it.
   no visible filename (`group-detail.component.html:1207-1229`) that only decrypts and renders
   content when clicked.
 - **Storage**: `localStorage`, encrypted-at-rest (the bytes written are already AES-GCM ciphertext
-  — this part is genuinely zero-knowledge-compliant; the problem is the storage *tier*, not a
+  — this part is genuinely zero-knowledge-compliant; the problem is the storage _tier_, not a
   crypto weakness). Browser/profile-scoped, subject to the browser's per-origin `localStorage`
   quota (commonly 5–10MB total, shared with everything else the app puts in `localStorage`,
   including auth tokens).
@@ -92,18 +92,18 @@ a follow-up ticket.
 
 ## Risks
 
-| Risk | Severity | Trigger |
-| --- | --- | --- |
-| Receipts silently and permanently unrecoverable if browser data is cleared | High | Any "clear browsing data," private/incognito use, browser reinstall, or profile switch. No warning before it happens; nothing to recover from afterward. |
-| Receipts invisible on any device other than the one that uploaded them | High | Using the app from a second device (phone + laptop) — an extremely normal usage pattern, not an edge case. |
-| Storage exhaustion blocks *expense creation entirely* (not just the attachment) | Medium | Guaranteed to occur eventually given zero cleanup on delete/edit; timing depends on receipt volume/size, but the trend is one-directional. |
-| Confusing, internal-sounding error messages when either of the above occurs | Medium | Same triggers as above; makes the failure look like a bug rather than a known, permanent limitation. |
-| UI gives no indication receipts behave differently from every other synced, backed-up piece of data in the app | High (root cause of all of the above being *surprising*) | Always — there is currently no copy anywhere mentioning this. |
+| Risk                                                                                                           | Severity                                                 | Trigger                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Receipts silently and permanently unrecoverable if browser data is cleared                                     | High                                                     | Any "clear browsing data," private/incognito use, browser reinstall, or profile switch. No warning before it happens; nothing to recover from afterward. |
+| Receipts invisible on any device other than the one that uploaded them                                         | High                                                     | Using the app from a second device (phone + laptop) — an extremely normal usage pattern, not an edge case.                                               |
+| Storage exhaustion blocks _expense creation entirely_ (not just the attachment)                                | Medium                                                   | Guaranteed to occur eventually given zero cleanup on delete/edit; timing depends on receipt volume/size, but the trend is one-directional.               |
+| Confusing, internal-sounding error messages when either of the above occurs                                    | Medium                                                   | Same triggers as above; makes the failure look like a bug rather than a known, permanent limitation.                                                     |
+| UI gives no indication receipts behave differently from every other synced, backed-up piece of data in the app | High (root cause of all of the above being _surprising_) | Always — there is currently no copy anywhere mentioning this.                                                                                            |
 
 ## Evaluate
 
 - **Can users reasonably expect receipts to sync?** Yes, reasonably — everything else in the app
-  (expenses, splits, settlements, history) is genuinely end-to-end encrypted *and* synced across
+  (expenses, splits, settlements, history) is genuinely end-to-end encrypted _and_ synced across
   devices. Nothing distinguishes receipts as behaving differently until the moment sync fails.
 - **Can receipts be silently lost?** Clearing browser data: yes, fully silent, no warning, no
   recovery path. Cross-device access: not silent (an alert fires) but not helpful either — the

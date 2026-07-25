@@ -7,23 +7,23 @@ This audit reviews the current working tree for source-of-truth drift in the exp
 
 ## Source-of-Truth Map
 
-| Responsibility | Current owner | Notes |
-| --- | --- | --- |
-| Expense HTTP routes | `backend/src/app/expenses/expenses.controller.ts` | Thin controller, delegates to facades. |
-| Expense CRUD and persistence | `backend/src/app/expenses/expenses.service.ts` | Actual implementation owner. `ExpensesCrudService` is only a facade. |
-| Expense analytics | `backend/src/app/expenses/expenses.service.ts` | `ExpensesAnalyticsService` is only a facade. |
-| Split persistence and validation | `backend/src/app/expenses/expenses.service.ts` + `backend/src/app/expenses/split-calculator.util.ts` | Backend calculator is the active source of truth. |
-| Frontend expense encryption | `frontend/src/app/features/groups/services/expenses.service.ts` | Uses `ClientEncryptionService` and `GroupKeyService`; no separate crypto primitive. |
-| Expense decryption | `frontend/src/app/core/services/expense-decryption.service.ts` | Central pipeline for expense titles/descriptions and retryable state. |
-| Decryption orchestration | `frontend/src/app/core/services/expense-decrypt-coordinator.service.ts` | Owns provision/decrypt/retry loop. |
-| Group key resolution, rotation, cache | `frontend/src/app/core/services/group-key.service.ts` | Owns versioned key resolution and session-memory cache. |
-| Personal key resolution | `frontend/src/app/core/services/encryption.service.ts` | Master key load/derive lives here; expense pipeline calls it for personal scope. |
-| Expense version history | `backend/src/app/expenses/expenses.service.ts` | `recordExpenseVersion`, `recordSplitVersions`, and `getExpenseVersionHistory`. |
-| Group history feed | `backend/src/app/groups/groups.service.ts` + `frontend/src/app/features/groups/services/groups.service.ts` | Backend emits audit metadata; frontend decrypts selected metadata fields. |
-| Carry Forward | `backend/src/app/expenses/expenses.service.ts` via `ExpensesCarryForwardService` facade | Group controller owns HTTP surface. |
-| Group balances and settlement | `backend/src/app/settlements/settlements.service.ts` | `calculateGroupBalances`, `proposeSettlement`, `updateSettlement`. |
-| Frontend refresh/invalidation | `GroupDetailComponent` + `GroupKeyService` + coordinator | Component currently orchestrates manual refresh. |
-| Member/display-name resolution | Multiple local helpers | Repeated in backend expenses/settlements and frontend group components. |
+| Responsibility                        | Current owner                                                                                              | Notes                                                                               |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Expense HTTP routes                   | `backend/src/app/expenses/expenses.controller.ts`                                                          | Thin controller, delegates to facades.                                              |
+| Expense CRUD and persistence          | `backend/src/app/expenses/expenses.service.ts`                                                             | Actual implementation owner. `ExpensesCrudService` is only a facade.                |
+| Expense analytics                     | `backend/src/app/expenses/expenses.service.ts`                                                             | `ExpensesAnalyticsService` is only a facade.                                        |
+| Split persistence and validation      | `backend/src/app/expenses/expenses.service.ts` + `backend/src/app/expenses/split-calculator.util.ts`       | Backend calculator is the active source of truth.                                   |
+| Frontend expense encryption           | `frontend/src/app/features/groups/services/expenses.service.ts`                                            | Uses `ClientEncryptionService` and `GroupKeyService`; no separate crypto primitive. |
+| Expense decryption                    | `frontend/src/app/core/services/expense-decryption.service.ts`                                             | Central pipeline for expense titles/descriptions and retryable state.               |
+| Decryption orchestration              | `frontend/src/app/core/services/expense-decrypt-coordinator.service.ts`                                    | Owns provision/decrypt/retry loop.                                                  |
+| Group key resolution, rotation, cache | `frontend/src/app/core/services/group-key.service.ts`                                                      | Owns versioned key resolution and session-memory cache.                             |
+| Personal key resolution               | `frontend/src/app/core/services/encryption.service.ts`                                                     | Master key load/derive lives here; expense pipeline calls it for personal scope.    |
+| Expense version history               | `backend/src/app/expenses/expenses.service.ts`                                                             | `recordExpenseVersion`, `recordSplitVersions`, and `getExpenseVersionHistory`.      |
+| Group history feed                    | `backend/src/app/groups/groups.service.ts` + `frontend/src/app/features/groups/services/groups.service.ts` | Backend emits audit metadata; frontend decrypts selected metadata fields.           |
+| Carry Forward                         | `backend/src/app/expenses/expenses.service.ts` via `ExpensesCarryForwardService` facade                    | Group controller owns HTTP surface.                                                 |
+| Group balances and settlement         | `backend/src/app/settlements/settlements.service.ts`                                                       | `calculateGroupBalances`, `proposeSettlement`, `updateSettlement`.                  |
+| Frontend refresh/invalidation         | `GroupDetailComponent` + `GroupKeyService` + coordinator                                                   | Component currently orchestrates manual refresh.                                    |
+| Member/display-name resolution        | Multiple local helpers                                                                                     | Repeated in backend expenses/settlements and frontend group components.             |
 
 ## Findings
 
@@ -98,13 +98,13 @@ None found. I did not find a live path that stores plaintext expense titles/desc
 
 ## Duplicate Implementations
 
-| Area | Duplicates | Severity |
-| --- | --- | --- |
-| Split calculation | Backend `calculateDeterministicSplits` vs shared `SplitCalculator` | P1 |
-| Debt simplification | `SettlementsService.simplifyDebts` vs `ExpensesService.simplifyDebts` | P1 |
-| Expense response mapping | `mapExpenseResponse` vs `batchMapExpenseResponses` | P2 |
-| Display-name resolution | Backend and frontend local helper copies | P2 |
-| Group history decryption | Manual history decrypt vs central expense decryption style | P1 |
+| Area                     | Duplicates                                                            | Severity |
+| ------------------------ | --------------------------------------------------------------------- | -------- |
+| Split calculation        | Backend `calculateDeterministicSplits` vs shared `SplitCalculator`    | P1       |
+| Debt simplification      | `SettlementsService.simplifyDebts` vs `ExpensesService.simplifyDebts` | P1       |
+| Expense response mapping | `mapExpenseResponse` vs `batchMapExpenseResponses`                    | P2       |
+| Display-name resolution  | Backend and frontend local helper copies                              | P2       |
+| Group history decryption | Manual history decrypt vs central expense decryption style            | P1       |
 
 ## Dead or Legacy Code
 

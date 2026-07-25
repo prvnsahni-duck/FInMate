@@ -9,8 +9,8 @@ Ensure there is exactly one canonical expense response mapper in `ExpensesServic
 
 ## Files Changed
 
-| File | Change |
-| --- | --- |
+| File                                           | Change                                                                                                                                                                                                                                                  |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `backend/src/app/expenses/expenses.service.ts` | Extracted a pure `toExpenseResponse(expense, splits, attachments, wrappedContentKeys)` mapper. `mapExpenseResponse` and `batchMapExpenseResponses` now both call it after loading their relations; neither builds the response object directly anymore. |
 
 No DTOs, controller routes, or response shapes changed.
@@ -26,8 +26,8 @@ Both inline object literals emitted the exact same 21 top-level fields, in the s
 
 **Only intentional difference — data loading, not shape:**
 
-| Field | Single-item (`mapExpenseResponse`) | Batch (`batchMapExpenseResponses`) |
-| --- | --- | --- |
+| Field                | Single-item (`mapExpenseResponse`)                                                                                                                                                                                                        | Batch (`batchMapExpenseResponses`)                                                                                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `wrappedContentKeys` | `await this.getWrappedContentKeys(expense.id)`, which internally does `encryptedExpenseKeyRepository.find({ where: { expense: { id: expenseId } }, relations: ['user'] })` then maps to `{ userId: k.user.id, wrappedKey: k.wrappedKey }` | Loads all keys for the batch in one `IN (...)` query, groups by expense ID, then maps to the same `{ userId: k.user.id, wrappedKey: k.wrappedKey }` shape inline |
 
 The output shape (`{ userId, wrappedKey }[]`) is identical in both cases — the difference is purely in query strategy (per-item query vs. batch `IN`-query), which is exactly the batch-loading optimization the audit said to preserve. `splits` and `attachments` had the same per-item-vs-batch query difference with identical output shapes.
