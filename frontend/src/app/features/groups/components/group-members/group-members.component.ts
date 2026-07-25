@@ -114,6 +114,41 @@ export class GroupMembersComponent {
     return resolveMemberDisplayName(member);
   }
 
+  /**
+   * Resolves the group data key, self-healing inline if it isn't cached yet.
+   *
+   * GroupDetailComponent kicks off key resolution/minting/provisioning in
+   * the background as soon as the group loads (initializeGroupKeysAndSelfHeal,
+   * fire-and-forget — it does not block the UI). If a caller reaches Invite
+   * before that finishes (slow network, or first-ever RSA keypair generation
+   * for this browser), a bare `getGroupDataKey` can return null even though
+   * the caller genuinely has access — this repeats the same
+   * resolve-or-mint-then-provision sequence inline so Invite doesn't have to
+   * wait for, or race, that background pass.
+   */
+  private async ensureGroupKey(): Promise<CryptoKey | null> {
+    const groupId = this.groupId();
+    const cached = await this.groupKeyService.getGroupDataKey(groupId);
+    if (cached) return cached;
+
+    try {
+      await this.groupKeyService.getMyAsymmetricKeys();
+      const result = await this.groupKeyService.resolveGroupKey(groupId);
+      if (result.status === 'ready') {
+        return result.key;
+      }
+      if (result.status === 'pending' && this.isOwnerOrAdmin()) {
+        // No key resolvable and we're allowed to manage keys — this is a
+        // brand-new group whose key was never minted; mint it now rather
+        // than blocking Invite on a background pass that may not run again.
+        return await this.groupKeyService.createAndStoreGroupKey(groupId);
+      }
+    } catch (e) {
+      console.error('Group key self-heal failed', e);
+    }
+    return null;
+  }
+
   memberInitials(member: GroupMember): string {
     return this.memberDisplayName(member).substring(0, 2).toUpperCase();
   }
@@ -268,9 +303,7 @@ export class GroupMembersComponent {
     this.inviteSuccess = '';
 
     try {
-      const groupKey = await this.groupKeyService.getGroupDataKey(
-        this.groupId(),
-      );
+      const groupKey = await this.ensureGroupKey();
       if (!groupKey) {
         throw new Error('Group key not available. Please unlock your vault.');
       }
@@ -427,9 +460,7 @@ export class GroupMembersComponent {
       }
 
       // 1. Resolve Group Key
-      const groupKey = await this.groupKeyService.getGroupDataKey(
-        this.groupId(),
-      );
+      const groupKey = await this.ensureGroupKey();
       if (!groupKey) {
         throw new Error('Group key not available. Please unlock your vault.');
       }
