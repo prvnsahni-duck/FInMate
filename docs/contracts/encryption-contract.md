@@ -1,41 +1,46 @@
 # Encryption / Key Management Contract
 
-The security-critical boundary. Source: frontend `core/services/` crypto + backend key endpoints in `groups/`. Audit: [encryption-audit.md](../audits/encryption-audit.md)
+Security-critical boundary. Canonical lifecycle: [`../group-key-flow.md`](../group-key-flow.md).
 
 ## Responsibilities
 
-- ✔ Derive the master/UDK from password (PBKDF2 → AES-256-GCM), client-side.
-- ✔ Generate, wrap (RSA-OAEP / symmetric), and unwrap group keys client-side.
-- ✔ Maintain the version-keyed key cache (memory + IndexedDB vault), cleared on logout.
-- ✔ Persist `group_key_versions` (immutable state machine) and `member_wrapped_group_keys` (per-user per-version), server-side.
-- ✔ Serve wrapped keys to entitled members; provision on invite/join; rotate on demand.
-- ✔ Classify decryption failures, preserve ciphertext, retry.
-
-## Inputs
-
-- Password (client only) · wrapped key blobs uploaded by clients · rotation requests with `keys[]`.
-
-## Outputs
-
-- Wrapped key rows · the requesting member's wrapped key for a version · decrypted content keys (client-side only).
+- Derive the user master key client-side from password/email.
+- Generate, wrap, unwrap, cache, and rotate group keys client-side.
+- Keep group key caches version-keyed in session memory only.
+- Persist key metadata server-side in `group_key_versions` and `member_wrapped_group_keys`.
+- Serve only wrapped keys to entitled active members.
+- Preserve ciphertext and classify decryption failures for retryable UI states.
 
 ## Public APIs
 
-- `GET /groups/:id/keys/me[?versionId=]`, `POST /groups/:id/keys`, `POST /groups/:id/keys/rotate` (see `groups.controller.ts`).
+- `GET /groups/:id/keys/me?versionId=...`
+- `POST /groups/:id/keys`
+- `POST /groups/:id/keys/rotate`
+- `GET /groups/:id/keys/versions`
+- `GET /groups/:id/keys/missing`
+- `GET /users/:userId/public-key`
+- `GET /users/me/keys`
+- `POST /users/me/keys`
 
-## Events / side effects
+## Client Responsibilities
 
-- Should write an audit entry on rotation (currently missing — GRP-002).
+- Use `GroupKeyService.resolveGroupKey` for reads.
+- Use `GroupKeyService.getGroupKeyForEncryption` for writes so ciphertext and `groupKeyVersionId` are consistent.
+- Use `ExpenseDecryptionService` for all expense title/description decryption.
+- Clear in-memory key caches on logout/full reset and purge legacy IndexedDB key material.
 
-## Dependencies
+## Backend Responsibilities
 
-- Users (public wrapping keys) · Groups (membership entitlement).
+- Validate group membership before serving or writing wrapped keys.
+- Bind wrapped group keys to the ACTIVE key version, unless a specific historical version is requested for reads.
+- Reject revoked key versions and non-member access.
+- Treat provisioning as idempotent where duplicate client races occur.
+- Keep immutable version history on rotation.
 
-## Must NEVER
+## Must Never
 
-- ❌ Transmit the master/UDK or an unwrapped group key to the backend.
-- ❌ Decrypt user content server-side.
-- ❌ Fall back to a hardcoded `ENCRYPTION_KEY` — fail closed (see ENC-001).
-- ❌ Serve a wrapped key to a non-active / removed member.
-- ❌ Overwrite historical wrapped keys or mutate a SUPERSEDED/REVOKED version.
-- ❌ Mint a second group key on invite — always wrap the existing ACTIVE key.
+- Transmit or store plaintext master keys, group keys, or private wrapping keys server-side.
+- Decrypt user expense content server-side.
+- Mint a new group key for a member who is only missing provisioning.
+- Accept `groupKeyVersionId` for personal expenses.
+- Mutate a historical key version instead of creating a new version on rotation.
