@@ -198,37 +198,6 @@ export class GroupKeyService {
   }
 
   /**
-   * Bypasses all caches and reloads the group key from the backend.
-   * Intended for: post-provisioning, self-healing, key rotation.
-   * NOT exposed in the UI — call from services only.
-   */
-  async refreshGroupKey(
-    groupId: string,
-    groupKeyVersionId?: string,
-  ): Promise<CryptoKey | null> {
-    const requestKey = this.buildVersionedKey(groupId, groupKeyVersionId);
-
-    // Evict every cached entry for this group so we go all the way to the backend
-    for (const key of Array.from(this.groupKeysMemoryCache.keys())) {
-      if (key.startsWith(`${groupId}:`)) {
-        this.groupKeysMemoryCache.delete(key);
-      }
-    }
-    this.activeGroupKeyRequests.delete(requestKey);
-    this.activeGroupKeyVersionIds.delete(groupId);
-
-    const promise = this.fetchAndCacheGroupKey(groupId, groupKeyVersionId);
-    this.activeGroupKeyRequests.set(requestKey, promise);
-
-    try {
-      const result = await promise;
-      return result.status === 'ready' ? result.key : null;
-    } finally {
-      this.activeGroupKeyRequests.delete(requestKey);
-    }
-  }
-
-  /**
    * Clears the session-scoped in-memory key cache. Decrypted group keys are
    * never persisted, so this is a complete wipe for the current session.
    * Safe to call at any time (e.g., on route change or logout).
@@ -271,13 +240,6 @@ export class GroupKeyService {
       }
     }
     this.activeGroupKeyVersionIds.delete(groupId);
-  }
-
-  /**
-   * @deprecated Use clearCache() for in-memory reset or clearPersistentCache() for full reset.
-   */
-  clearLocalState(): void {
-    this.clearCache();
   }
 
   // ─────────────────────────────────────────────────────────────────────────

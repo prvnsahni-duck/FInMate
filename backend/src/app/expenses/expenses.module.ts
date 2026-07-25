@@ -22,7 +22,6 @@ import { RecurringExpensesController } from './recurring-expenses.controller';
 import { RecurringExpensesService } from './services/recurring-expenses.service';
 import { RecurringExpensesScheduler } from './services/recurring-expenses.scheduler';
 import {
-  ExpensesAccessService,
   ExpensesAnalyticsService,
   ExpensesCarryForwardService,
   ExpensesCrudService,
@@ -50,7 +49,6 @@ import {
   controllers: [ExpensesController, RecurringExpensesController],
   providers: [
     ExpensesService,
-    ExpensesAccessService,
     ExpensesAnalyticsService,
     ExpensesCarryForwardService,
     ExpensesCrudService,
@@ -59,7 +57,6 @@ import {
   ],
   exports: [
     ExpensesService,
-    ExpensesAccessService,
     ExpensesAnalyticsService,
     ExpensesCarryForwardService,
     ExpensesCrudService,

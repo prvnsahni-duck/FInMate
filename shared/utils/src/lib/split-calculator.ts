@@ -157,37 +157,3 @@ export const calculateDeterministicSplits = (
     amountOwed: fromCents(s.amountCents),
   }));
 };
-
-export interface SplitInput {
-  id: string;
-  type: SplitType;
-  value?: number;
-}
-
-export interface SplitResult {
-  id: string;
-  amount: number;
-}
-
-export class SplitCalculator {
-  static calculate(
-    totalAmount: number,
-    splits: SplitInput[],
-    payerId?: string,
-  ): SplitResult[] {
-    const canonicalSplits = splits.map((split) => ({
-      participantUserId: split.id,
-      splitType: split.type,
-      shareValue: split.type === 'equal' ? 1 : (split.value ?? 0),
-    }));
-
-    return calculateDeterministicSplits(
-      totalAmount,
-      canonicalSplits,
-      payerId,
-    ).map((split) => ({
-      id: split.participantUserId || split.participantGroupMemberId || '',
-      amount: split.amountOwed,
-    }));
-  }
-}

@@ -28,7 +28,7 @@ Group keys are cached by `${groupId}:${groupKeyVersionId ?? 'active'}`.
 1. Memory cache: fastest active-view lookup.
 2. Backend wrapped key fetch: final source when memory misses. Plaintext group keys are not persisted.
 
-`refreshGroupKey` evicts cached entries for a group and fetches from the backend. `clearCache` clears memory only. `clearPersistentCache` clears memory and removes any legacy IndexedDB key material written by older app versions.
+`invalidateGroupKey` evicts cached entries for a single group (the next `resolveGroupKey` call re-fetches from the backend). `clearCache` clears memory only, for every group. `clearPersistentCache` clears memory and removes any legacy IndexedDB key material written by older app versions.
 
 ## Canonical Key Resolution
 
