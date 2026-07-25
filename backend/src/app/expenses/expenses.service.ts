@@ -394,21 +394,19 @@ export class ExpensesService {
     }
   }
 
-  private async mapExpenseResponse(
+  /**
+   * Canonical, pure expense response shape. Takes already-loaded relations
+   * so both the single-item and batch mapping paths — which differ only in
+   * how they fetch splits/attachments/wrappedContentKeys — emit an
+   * identical response. See docs/audits/expense-architecture-audit.md
+   * (P2-1) for why this was extracted.
+   */
+  private toExpenseResponse(
     expense: Expense,
-  ): Promise<Record<string, unknown>> {
-    const splits = await this.expenseSplitRepository.find({
-      where: { expense: { id: expense.id } },
-      relations: ['participantUser', 'participantGroupMember'],
-      order: { createdAt: 'ASC' },
-    });
-
-    const attachments = await this.attachmentRepository.find({
-      where: { expense: { id: expense.id } },
-      relations: ['uploaderUser'],
-      order: { createdAt: 'ASC' },
-    });
-
+    splits: ExpenseSplit[],
+    attachments: Attachment[],
+    wrappedContentKeys: Array<{ userId: string; wrappedKey: string }>,
+  ): Record<string, unknown> {
     return {
       id: expense.id,
       title: expense.title,
@@ -456,12 +454,37 @@ export class ExpensesService {
         encryptedOriginalName: attachment.encryptedOriginalName ?? null,
         createdAt: attachment.createdAt,
       })),
-      wrappedContentKeys: await this.getWrappedContentKeys(expense.id),
+      wrappedContentKeys,
       version: expense.version,
       createdAt: expense.createdAt,
       updatedAt: expense.updatedAt,
       deletedAt: expense.deletedAt ?? null,
     };
+  }
+
+  private async mapExpenseResponse(
+    expense: Expense,
+  ): Promise<Record<string, unknown>> {
+    const splits = await this.expenseSplitRepository.find({
+      where: { expense: { id: expense.id } },
+      relations: ['participantUser', 'participantGroupMember'],
+      order: { createdAt: 'ASC' },
+    });
+
+    const attachments = await this.attachmentRepository.find({
+      where: { expense: { id: expense.id } },
+      relations: ['uploaderUser'],
+      order: { createdAt: 'ASC' },
+    });
+
+    const wrappedContentKeys = await this.getWrappedContentKeys(expense.id);
+
+    return this.toExpenseResponse(
+      expense,
+      splits,
+      attachments,
+      wrappedContentKeys,
+    );
   }
 
   /**
@@ -528,63 +551,17 @@ export class ExpensesService {
       const splits = splitsByExpId.get(expense.id) ?? [];
       const attachments = attachsByExpId.get(expense.id) ?? [];
       const wrappedKeys = keysByExpId.get(expense.id) ?? [];
+      const wrappedContentKeys = wrappedKeys.map((k) => ({
+        userId: k.user.id,
+        wrappedKey: k.wrappedKey,
+      }));
 
-      return {
-        id: expense.id,
-        title: expense.title,
-        description: expense.description ?? null,
-        amountTotal: Number(expense.amountTotal),
-        currency: expense.currency,
-        category: expense.category,
-        paidByUserId: expense.paidByUser?.id ?? null,
-        paidByGroupMemberId: expense.paidByGroupMember?.id ?? null,
-        ownerUserId: expense.ownerUser.id,
-        groupId: expense.group?.id ?? null,
-        groupKeyVersionId: expense.groupKeyVersion?.id ?? null,
-        groupKeyVersion: expense.groupKeyVersion?.version ?? null,
-        expenseDate: expense.expenseDate,
-        status: expense.status,
-        encryptionScope: expense.encryptionScope ?? 'personal',
-        ledgerMonth: expense.ledgerMonth ?? null,
-        isCarryForward: expense.isCarryForward,
-        splits: splits.map((split) => ({
-          id: split.id,
-          expenseId: expense.id,
-          participantUserId: split.participantUser?.id ?? null,
-          participantGroupMemberId: split.participantGroupMember?.id ?? null,
-          splitType: split.splitType,
-          shareValue: Number(split.shareValue),
-          amountOwed: Number(split.amountOwed),
-          isSettled: split.isSettled,
-          settledAt: split.settledAt ?? null,
-          createdAt: split.createdAt,
-          updatedAt: split.updatedAt,
-        })),
-        attachments: attachments.map((attachment) => ({
-          id: attachment.id,
-          uploaderUserId: attachment.uploaderUser.id,
-          expenseId: expense.id,
-          noteId: null,
-          goalId: null,
-          groupId: expense.group?.id ?? null,
-          storageKey: attachment.storageKey,
-          originalName: attachment.originalName,
-          mimeType: attachment.mimeType,
-          sizeBytes: Number(attachment.sizeBytes),
-          checksumSha256: attachment.checksumSha256 ?? null,
-          encryptedFileKey: attachment.encryptedFileKey ?? null,
-          encryptedOriginalName: attachment.encryptedOriginalName ?? null,
-          createdAt: attachment.createdAt,
-        })),
-        wrappedContentKeys: wrappedKeys.map((k) => ({
-          userId: k.user.id,
-          wrappedKey: k.wrappedKey,
-        })),
-        version: expense.version,
-        createdAt: expense.createdAt,
-        updatedAt: expense.updatedAt,
-        deletedAt: expense.deletedAt ?? null,
-      };
+      return this.toExpenseResponse(
+        expense,
+        splits,
+        attachments,
+        wrappedContentKeys,
+      );
     });
   }
 
