@@ -21,6 +21,7 @@ import {
 } from '@finmate/data-models';
 import { createHash } from 'crypto';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
+import { simplifyLedgerDebts } from '../common/ledger-debt-simplifier';
 
 export interface MemberBalance {
   userId: string;
@@ -156,78 +157,15 @@ export class SettlementsService {
     balances: MemberBalance[],
     currency: string,
   ): SimplifiedTransaction[] {
-    // 1. Filter out users with zero balances (within a 0.01 tolerance)
-    let activeBalances = balances
-      .map((b) => ({
-        userId: b.userId,
-        balance: Number(b.balance),
-      }))
-      .filter((b) => Math.abs(b.balance) >= 0.01);
-
-    const transactions: SimplifiedTransaction[] = [];
-
-    while (true) {
-      // 2. Separate and sort debtors and creditors
-      const debtors = activeBalances
-        .filter((b) => b.balance < 0)
-        .sort((a, b) => {
-          if (Math.abs(a.balance - b.balance) < 0.0001) {
-            return a.userId.localeCompare(b.userId); // Tie-break lexicographically
-          }
-          return a.balance - b.balance; // Most negative first (descending balance magnitude)
-        });
-
-      const creditors = activeBalances
-        .filter((b) => b.balance > 0)
-        .sort((a, b) => {
-          if (Math.abs(a.balance - b.balance) < 0.0001) {
-            return a.userId.localeCompare(b.userId); // Tie-break lexicographically
-          }
-          return b.balance - a.balance; // Largest positive first
-        });
-
-      // If either list is empty, we are done
-      if (debtors.length === 0 || creditors.length === 0) {
-        break;
-      }
-
-      const debtor = debtors[0];
-      const creditor = creditors[0];
-
-      // Calculate transfer amount
-      const debitAmount = Math.abs(debtor.balance);
-      const creditAmount = creditor.balance;
-      const transferAmount = Math.min(debitAmount, creditAmount);
-
-      // Round to 2 decimal places (standard financial rounding)
-      const roundedTransfer = Math.round(transferAmount * 100) / 100;
-
-      if (roundedTransfer > 0) {
-        transactions.push({
-          fromUserId: debtor.userId,
-          toUserId: creditor.userId,
-          amount: roundedTransfer,
-          currency: currency,
-        });
-      }
-
-      // Update balances
-      debtor.balance += transferAmount;
-      creditor.balance -= transferAmount;
-
-      // Refresh active balances list by filtering out settled users
-      activeBalances = activeBalances
-        .map((b) => {
-          if (b.userId === debtor.userId)
-            return { ...b, balance: debtor.balance };
-          if (b.userId === creditor.userId)
-            return { ...b, balance: creditor.balance };
-          return b;
-        })
-        .filter((b) => Math.abs(b.balance) >= 0.01);
-    }
-
-    return transactions;
+    return simplifyLedgerDebts(
+      balances.map((b) => ({ key: b.userId, balance: b.balance })),
+      currency,
+    ).map((t) => ({
+      fromUserId: t.fromKey,
+      toUserId: t.toKey,
+      amount: t.amount,
+      currency: t.currency,
+    }));
   }
 
   /** Resolves display info for a GroupMember, whichever identity backs it. */

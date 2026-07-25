@@ -24,6 +24,7 @@ import {
 } from '@finmate/data-models';
 import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
 import { paginate, PaginatedResponse } from '../common/pagination.util';
+import { simplifyLedgerDebts } from '../common/ledger-debt-simplifier';
 import { calculateDeterministicSplits } from './split-calculator.util';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto';
 
@@ -2259,75 +2260,15 @@ export class ExpensesService {
     amount: number;
     currency: string;
   }[] {
-    let activeBalances = balances
-      .map((b) => ({
-        groupMemberId: b.groupMemberId,
-        balance: Number(b.balance),
-      }))
-      .filter((b) => Math.abs(b.balance) >= 0.01);
-
-    const transactions: {
-      fromGroupMemberId: string;
-      toGroupMemberId: string;
-      amount: number;
-      currency: string;
-    }[] = [];
-
-    while (true) {
-      const debtors = activeBalances
-        .filter((b) => b.balance < 0)
-        .sort((a, b) => {
-          if (Math.abs(a.balance - b.balance) < 0.0001) {
-            return a.groupMemberId.localeCompare(b.groupMemberId);
-          }
-          return a.balance - b.balance;
-        });
-
-      const creditors = activeBalances
-        .filter((b) => b.balance > 0)
-        .sort((a, b) => {
-          if (Math.abs(a.balance - b.balance) < 0.0001) {
-            return a.groupMemberId.localeCompare(b.groupMemberId);
-          }
-          return b.balance - a.balance;
-        });
-
-      if (debtors.length === 0 || creditors.length === 0) {
-        break;
-      }
-
-      const debtor = debtors[0];
-      const creditor = creditors[0];
-
-      const debitAmount = Math.abs(debtor.balance);
-      const creditAmount = creditor.balance;
-      const transferAmount = Math.min(debitAmount, creditAmount);
-      const roundedTransfer = Math.round(transferAmount * 100) / 100;
-
-      if (roundedTransfer > 0) {
-        transactions.push({
-          fromGroupMemberId: debtor.groupMemberId,
-          toGroupMemberId: creditor.groupMemberId,
-          amount: roundedTransfer,
-          currency: currency,
-        });
-      }
-
-      debtor.balance += transferAmount;
-      creditor.balance -= transferAmount;
-
-      activeBalances = activeBalances
-        .map((b) => {
-          if (b.groupMemberId === debtor.groupMemberId)
-            return { ...b, balance: debtor.balance };
-          if (b.groupMemberId === creditor.groupMemberId)
-            return { ...b, balance: creditor.balance };
-          return b;
-        })
-        .filter((b) => Math.abs(b.balance) >= 0.01);
-    }
-
-    return transactions;
+    return simplifyLedgerDebts(
+      balances.map((b) => ({ key: b.groupMemberId, balance: b.balance })),
+      currency,
+    ).map((t) => ({
+      fromGroupMemberId: t.fromKey,
+      toGroupMemberId: t.toKey,
+      amount: t.amount,
+      currency: t.currency,
+    }));
   }
 
   async closeMonth(
