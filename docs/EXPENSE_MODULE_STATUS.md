@@ -42,6 +42,35 @@ Known Intentional Limitations).
 Full responsibility/input/output/must-never boundaries live in each contract, not here — this
 table is a map, not a restatement.
 
+## Module Boundaries
+
+Directional dependencies (who reads/depends on whom):
+
+- **Expense → Encryption/Key Management** (read-only key resolution; Expense never decrypts
+  server-side) **→ Groups** (membership + role authorization, currency base) **→ Settlements**
+  (reads Expense splits for balance/settlement math).
+- **Settlements → Expense** (splits are the balance source) **→ Groups** (currency-base rules).
+- **Groups → Encryption/Key Management** (provisioning/rotation) **→ Expense** (Carry Forward
+  delegates ledger math to `ExpensesCarryForwardService`/`ExpensesService`; deleted-expense and
+  version-history listing) **→ Audit logging** (operational history).
+- **Encryption/Key Management** has no dependency on the other three — every module holding
+  encrypted data depends on it, never the reverse.
+
+Boundary rules that most often get violated by accident (see each contract's "Must Never" for the
+full list):
+
+- Expense/Settlements must never decrypt title/note content server-side, or store a computed
+  balance/dashboard aggregate as its own source of truth (it's always re-derived from expenses +
+  splits + settlements).
+- Groups must never mint a duplicate group key on invite or missing-key recovery, or change base
+  currency after expenses/settlements exist.
+- Encryption/Key Management must never transmit or store plaintext master keys, group keys, or
+  private wrapping keys server-side, or mutate a historical key version instead of creating a new
+  one on rotation.
+
+These are enforced today (see the relevant contract for evidence anchors); this section only maps
+where the boundary lines are, not why each rule exists.
+
 ## Canonical Documentation Map
 
 | Topic | Canonical document |
@@ -49,8 +78,8 @@ table is a map, not a restatement.
 | Expense architecture | [`contracts/expense-contract.md`](contracts/expense-contract.md), [`architecture/architecture-inventory.md`](architecture/architecture-inventory.md) |
 | Encryption/decryption | [`group-key-flow.md`](group-key-flow.md) → "Expense Decryption"; [`contracts/encryption-contract.md`](contracts/encryption-contract.md) |
 | Group key lifecycle | [`group-key-flow.md`](group-key-flow.md) → "Current Lifecycle" |
-| Session key cache | [`group-key-flow.md`](group-key-flow.md) → "Cache Rules" |
-| Canonical key convergence | [`group-key-flow.md`](group-key-flow.md) → "Canonical Key Resolution" |
+| Session-memory group key cache | [`group-key-flow.md`](group-key-flow.md) → "Cache Rules" |
+| Canonical group key convergence | [`group-key-flow.md`](group-key-flow.md) → "Canonical Key Resolution" |
 | Expense lifecycle | [`contracts/expense-contract.md`](contracts/expense-contract.md); [`ARCHITECTURE.md`](../ARCHITECTURE.md) §4 "Critical Ledger Mechanics" |
 | Carry Forward | [`contracts/groups-contract.md`](contracts/groups-contract.md) → "Carry Forward Boundary" |
 | Settlement | [`contracts/settlements-contract.md`](contracts/settlements-contract.md) |

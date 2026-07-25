@@ -129,3 +129,98 @@ public API, DTO, or behavior) did not require edits to them.
 `docs/audits/expense-module-release-signoff.md`,
 `docs/audits/expense-module-architecture-verification.md`, `docs/product-decisions-v2-final.md`.
 
+## Documentation Audit Summary — Expense Module Finalization (Complete)
+
+Second, same-day follow-up pass closing out the "Expense Module Documentation Finalization" task.
+Extends the addendum above (still accurate) with one additional real finding — a factual
+contradiction, not just staleness — plus the explicit accounting below. No application code
+changed; no historical audit/decision document was rewritten.
+
+### Documents reviewed
+
+Every document `docs/architecture/canonical-sources.md` maps to a topic touching the expense
+module, plus every doc a repo-wide search for `simplifyDebts`, `ExpensesAccessService`,
+`refreshGroupKey`, `clearLocalState`, `storeGroupKey`/`loadGroupKey`/`deleteGroupKey`,
+`SplitCalculator`, `mapExpenseResponse`/`batchMapExpenseResponses`, `memberDisplay`, and
+`Carry Forward` returned: `ARCHITECTURE.md`, `docs/README.md`, `docs/KNOWN_ISSUES.md`,
+`docs/architecture/canonical-sources.md`, `docs/architecture/architecture-inventory.md`,
+`docs/group-key-flow.md`, `docs/contracts/expense-contract.md`,
+`docs/contracts/settlements-contract.md`, `docs/contracts/groups-contract.md`,
+`docs/contracts/encryption-contract.md`, `docs/audits/expense-audit.md`,
+`docs/audits/expense-architecture-audit.md`, `docs/audits/history-decryption-audit.md`,
+`docs/module-checklist.md`, `docs/file-map.md`, `docs/testing-matrix.md`, and the root planning
+docs (`expsnsis-module-plan.md`, `zk_group_key_provisioning_architecture.md`,
+`implementation_plan.md`, `PRD.md`, `TRD.md`).
+
+### Documents updated
+
+- `ARCHITECTURE.md` §2 — **corrected a factual contradiction, not just drift**: the doc claimed
+  "wrapped Group Keys are stored in a local IndexedDB cache via `ZkKeyVaultService`" in two places.
+  This is false — confirmed by `docs/group-key-flow.md` (session-memory-only cache), by
+  `GroupKeyService`'s actual implementation (a plain in-memory `Map`, never calling any
+  `ZkKeyVaultService` group-key method), and directly by the legacy-cleanup pass, which found
+  `ZkKeyVaultService.storeGroupKey`/`loadGroupKey`/`deleteGroupKey` had **zero callers** — i.e. the
+  IndexedDB group-key path this section described doesn't just no longer run, the code path never
+  ran in the current architecture. Rewrote to distinguish the personal master key (UDK — genuinely
+  IndexedDB-persisted) from group keys (session-memory only), and pointed the rotation/provisioning
+  narrative sections at `docs/group-key-flow.md` instead of restating its rules.
+- `docs/EXPENSE_MODULE_STATUS.md` — added a "Module Boundaries" section (dependency direction
+  between Expense/Settlements/Groups/Encryption and the most commonly-violated "must never" rules,
+  distinct from "Current Responsibilities" which describes what each module owns); renamed two
+  canonical-map rows to match this task's exact topic phrasing ("Session-memory group key cache",
+  "Canonical group key convergence").
+- All files listed in the prior addendum's "Files updated" remain accurate; see above.
+
+### Documents merged
+
+None. No two living (non-frozen) documents were found describing the same topic in conflicting or
+copy-pasted detail. Places that looked like candidates on a first pass turned out to be
+complementary, not duplicate, once read in full — same topic, different facet:
+
+- `ARCHITECTURE.md` §2's Flow A/B/C **diagrams** (message sequences) vs. `group-key-flow.md`'s
+  **prose rules** (Provisioning/Rotation sections) — kept both, but trimmed `ARCHITECTURE.md`'s
+  prose paragraphs that restated rules already fully specified in `group-key-flow.md`, replacing
+  them with pointers. This is the closest thing to a "merge" in this pass: convergence on one
+  prose source of truth while keeping the diagram as a different, non-duplicate representation.
+- `docs/contracts/expense-contract.md`'s one-line Settlements dependency mention vs.
+  `docs/contracts/settlements-contract.md`'s full contract — a dependency pointer, not duplicated
+  content.
+- `ARCHITECTURE.md` §4's one-sentence Carry Forward mechanics summary vs.
+  `docs/contracts/groups-contract.md`'s "Carry Forward Boundary" section — a one-line
+  system-overview mention, not a restatement.
+
+### Documents removed
+
+None. No expense-related document was found to be fully obsolete (superseded end-to-end by
+another document) as opposed to merely containing some stale references. Root planning docs
+(`expsnsis-module-plan.md`, etc.) were reclassified via indexing rather than deleted, consistent
+with how `PRD.md`/`TRD.md` are already handled — they retain historical planning value.
+
+### Canonical documents created or selected
+
+- **Created:** `docs/EXPENSE_MODULE_STATUS.md` — the expense-module rollup, with a canonical
+  documentation map naming exactly one primary document per topic for all twelve topics this task
+  lists.
+- **Selected (already existed, now explicitly the designated canonical source in
+  `canonical-sources.md`):** `docs/contracts/settlements-contract.md` for Settlement (the contract
+  file existed but the topic row was missing from the map — a real gap, now closed).
+
+### Obsolete references removed
+
+- `ExpensesAccessService` reference in `docs/architecture/architecture-inventory.md`'s Expense
+  source-files list (class deleted in `docs/changes/legacy-cleanup.md`).
+- The "ADR files (ADR-000…ADR-015) have not yet been committed to this repo" framing in
+  `architecture-inventory.md`, which contradicted `canonical-sources.md`'s own Authority Rules
+  (those placeholders were removed in the original 2026-07-25 documentation audit).
+- The false "wrapped Group Keys are stored in a local IndexedDB cache" claim in `ARCHITECTURE.md`
+  §2 (two occurrences) — see "Documents updated" above.
+
+### Verified again, no drift found
+
+`docs/contracts/expense-contract.md`, `docs/contracts/settlements-contract.md`,
+`docs/contracts/groups-contract.md`, `docs/contracts/encryption-contract.md`,
+`docs/group-key-flow.md`'s Provisioning/Rotation/Expense-Decryption/Security-Invariants sections
+(content, not the `ARCHITECTURE.md` cross-references into them), `docs/module-checklist.md`,
+`docs/file-map.md`, `docs/testing-matrix.md`. All internal cross-references in every file touched
+across both passes were checked to resolve to an existing file.
+
