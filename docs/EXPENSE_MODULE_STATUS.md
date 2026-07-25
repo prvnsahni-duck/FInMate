@@ -176,3 +176,6 @@ because it is reachable, validated code, not zero-caller dead code.
 - ✅ Ready for maintenance — remaining known gaps (History key-version limitation, dormant
   `direct_shared`) are documented, tracked (KI-1), and intentionally not blocking; the Future
   Prerequisites above tell a future maintainer exactly what must happen before rotation UI ships.
+
+Independently re-verified in [`EXPENSE_MODULE_FREEZE.md`](EXPENSE_MODULE_FREEZE.md) (2026-07-25):
+**FREEZE WITH KNOWN LIMITATIONS**.
