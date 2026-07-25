@@ -210,7 +210,11 @@ export class ClientEncryptionService {
 
     const subtle = this.getSubtleCrypto();
     const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
-    const ciphertextBuffer = base64ToArrayBuffer(parts[1]);
+    // Wrapped in Uint8Array for the same cross-realm reason as `iv` above —
+    // base64ToArrayBuffer returns a plain ArrayBuffer, which the native
+    // WebCrypto implementation's realm-sensitive instanceof check can
+    // reject under Jest/jsdom; a TypedArray view over the same bytes passes.
+    const ciphertextBuffer = new Uint8Array(base64ToArrayBuffer(parts[1]));
 
     const decryptedBuffer = await subtle.decrypt(
       {
@@ -429,7 +433,7 @@ export class ClientEncryptionService {
     }
     const subtle = this.getSubtleCrypto();
     if (unwrappingKey.type === 'private') {
-      const wrappedBuffer = base64ToArrayBuffer(wrappedStr);
+      const wrappedBuffer = new Uint8Array(base64ToArrayBuffer(wrappedStr));
       return await subtle.unwrapKey(
         'raw',
         wrappedBuffer,
@@ -454,7 +458,7 @@ export class ClientEncryptionService {
     }
 
     const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
-    const wrappedBuffer = base64ToArrayBuffer(parts[1]);
+    const wrappedBuffer = new Uint8Array(base64ToArrayBuffer(parts[1]));
 
     // Decrypt the wrapped key symmetrically and import it
     const rawKeyBuffer = await subtle.decrypt(
@@ -525,7 +529,7 @@ export class ClientEncryptionService {
 
     const subtle = this.getSubtleCrypto();
     const iv = new Uint8Array(base64ToArrayBuffer(parts[0]));
-    const ciphertextBuffer = base64ToArrayBuffer(parts[1]);
+    const ciphertextBuffer = new Uint8Array(base64ToArrayBuffer(parts[1]));
 
     return await subtle.decrypt(
       {
@@ -568,7 +572,7 @@ export class ClientEncryptionService {
    */
   async importPublicKey(spkiBase64: string): Promise<CryptoKey> {
     const subtle = this.getSubtleCrypto();
-    const buffer = base64ToArrayBuffer(spkiBase64);
+    const buffer = new Uint8Array(base64ToArrayBuffer(spkiBase64));
     return await subtle.importKey(
       'spki',
       buffer,
@@ -595,7 +599,7 @@ export class ClientEncryptionService {
    */
   async importPrivateKey(pkcs8Base64: string): Promise<CryptoKey> {
     const subtle = this.getSubtleCrypto();
-    const buffer = base64ToArrayBuffer(pkcs8Base64);
+    const buffer = new Uint8Array(base64ToArrayBuffer(pkcs8Base64));
     return await subtle.importKey(
       'pkcs8',
       buffer,
