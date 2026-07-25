@@ -85,3 +85,47 @@ Historical reasoning was preserved in `docs/PROJECT_DECISIONS.md`, `docs/frozen-
 - Some historical audit/planning docs still mention the removed placeholder ADR files. They were left intact as historical snapshots except where canonical docs were updated.
 - `openapi.yaml` and root API docs were not regenerated in this pass; endpoint contract updates were made in focused contract docs.
 
+## Addendum: Expense Module Documentation Finalization (2026-07-25, later same day)
+
+Follow-up pass scoped to the expense module, after a run of behavior-preserving internal
+consolidations (`docs/changes/debt-simplifier-consolidation.md`,
+`docs/changes/expense-response-mapper-consolidation.md`,
+`docs/changes/display-name-resolver-consolidation.md`, `docs/changes/legacy-cleanup.md`) and a
+design review (`docs/audits/history-decryption-audit.md`). No application code changed in this
+addendum pass — documentation only.
+
+**Files updated:**
+
+- `docs/architecture/architecture-inventory.md` — removed the stale "ADR files not yet committed"
+  framing (superseded by this file's Authority Rules), removed the deleted `ExpensesAccessService`
+  facade reference, and added `backend/src/app/common/ledger-debt-simplifier.ts` and
+  `member-display.util.ts` as shared implementation anchors for Expense and Settlements.
+- `docs/README.md` — added `expsnsis-module-plan.md`, `zk_group_key_provisioning_architecture.md`,
+  and `implementation_plan.md` to the Planning Docs list (previously present in the repo but not
+  indexed, so their "single source of truth" self-descriptions could mislead a reader into treating
+  them as current); added `EXPENSE_MODULE_STATUS.md` to Daily Drivers.
+- `docs/KNOWN_ISSUES.md` — cross-referenced `docs/audits/history-decryption-audit.md` from KI-1 as
+  independent architecture-level corroboration of the same root cause.
+- `docs/architecture/canonical-sources.md` — added a "Settlement" row (the contract existed but the
+  topic was missing from the map), added `EXPENSE_MODULE_STATUS.md` as the expense-module rollup,
+  and documented `docs/changes/*.md` as the recorded convention for behavior-preserving internal
+  consolidations.
+
+**File created:** `docs/EXPENSE_MODULE_STATUS.md` — expense module status rollup: architecture
+overview, current responsibilities, canonical documentation map, recent consolidations, known
+intentional limitations, future prerequisites, and module status.
+
+**Verified during this pass, no drift found:** `docs/contracts/expense-contract.md`,
+`docs/contracts/settlements-contract.md`, `docs/contracts/groups-contract.md`,
+`docs/contracts/encryption-contract.md`, `docs/group-key-flow.md` (Provisioning/Rotation/Expense
+Decryption/Security Invariants sections), `ARCHITECTURE.md` §4/§6, `docs/module-checklist.md`,
+`docs/file-map.md`, `docs/testing-matrix.md`. These describe responsibilities and boundaries, not
+internal implementation structure, so this session's internal consolidations (which changed no
+public API, DTO, or behavior) did not require edits to them.
+
+**Left untouched (frozen historical/evidence records, per Authority Rules):**
+`docs/audits/expense-architecture-audit.md`, `docs/audits/expense-audit.md`,
+`docs/audits/expense-module-final-signoff-post-grot.md`,
+`docs/audits/expense-module-release-signoff.md`,
+`docs/audits/expense-module-architecture-verification.md`, `docs/product-decisions-v2-final.md`.
+

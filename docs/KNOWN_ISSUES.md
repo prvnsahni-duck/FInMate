@@ -20,6 +20,12 @@ cycle, not before a freeze.
   stands for v2.1.
 - **Direction agreed:** Option 1 (neutral phrasing). Option 3 rejected as the
   _final_ design (see status note above for the shipped interim).
+- **Architecture review:** [`docs/audits/history-decryption-audit.md`](audits/history-decryption-audit.md)
+  (2026-07-25) independently confirms this root cause at the architecture level — audit-log
+  metadata carries no `groupKeyVersionId`, so history decryption is not rotation-safe — and
+  recommends keeping the dedicated history decryptor rather than merging it into
+  `ExpenseDecryptionService`/`ExpenseDecryptCoordinator`. That review treats this same gap as
+  currently latent, since group-key rotation has no UI entry point yet.
 
 ### Symptom
 

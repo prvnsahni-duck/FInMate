@@ -11,6 +11,7 @@ Start here when updating or auditing FinMate documentation. The canonical source
 | [`../DATABASE_SCHEMA.md`](../DATABASE_SCHEMA.md) | Data model and migration-backed schema reference. |
 | [`contracts/`](contracts/) | Module/API boundary contracts and non-negotiable invariants. |
 | [`group-key-flow.md`](group-key-flow.md) | Canonical group key lifecycle, cache, rotation, and expense decryption reference. |
+| [`EXPENSE_MODULE_STATUS.md`](EXPENSE_MODULE_STATUS.md) | Expense module status: architecture overview, canonical doc map, recent consolidations, known limitations. |
 | [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) | Known implementation limitations that remain current. |
 | [`PROJECT_DECISIONS.md`](PROJECT_DECISIONS.md) and [`frozen-decisions.md`](frozen-decisions.md) | Historical reasoning and approved decisions. |
 | [`coding-rules.md`](coding-rules.md), [`file-map.md`](file-map.md), [`testing-matrix.md`](testing-matrix.md) | Developer and AI-agent working rules. |
@@ -25,4 +26,4 @@ Files under [`audits/`](audits/) record point-in-time evidence. They are useful 
 
 ## Planning Docs
 
-Root planning files such as `PRD.md`, `TRD.md`, `APP_FLOW.md`, `UI_UX_BRIEF.md`, and `FinMate_Project_Specification.md` are product/planning references. They are not the source of truth for current implementation details.
+Root planning files such as `PRD.md`, `TRD.md`, `APP_FLOW.md`, `UI_UX_BRIEF.md`, `FinMate_Project_Specification.md`, `expsnsis-module-plan.md`, `zk_group_key_provisioning_architecture.md`, and `implementation_plan.md` are product/planning references. They are not the source of truth for current implementation details — where a planning doc's self-description ("single source of truth", "approved") conflicts with a canonical topic document under [`architecture/canonical-sources.md`](architecture/canonical-sources.md) or `docs/contracts/`, the canonical document and the current codebase win. See [`EXPENSE_MODULE_STATUS.md`](EXPENSE_MODULE_STATUS.md) for the expense module's current, implementation-driven status.

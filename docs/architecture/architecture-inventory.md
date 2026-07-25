@@ -2,10 +2,10 @@
 
 One-page map of the system. Use in prompts as: _"Audit `<Module>` using `docs/architecture/architecture-inventory.md`."_
 
-> **ADR status:** ADR files (ADR-000…ADR-015) have not yet been committed to this repo.
-> Until they are imported into `docs/architecture/`, the authoritative decision sources are
-> `docs/PROJECT_DECISIONS.md`, `docs/frozen-decisions.md`, and `ARCHITECTURE.md`.
-> The **ADRs** field below lists the on-disk source-of-truth sections instead.
+> **Documentation authority:** see [`canonical-sources.md`](canonical-sources.md) for the current
+> per-topic canonical-document map and authority rules. The **ADRs** field below lists the on-disk
+> source-of-truth sections for each module's decisions (ADR placeholder files were removed in the
+> 2026-07-25 documentation audit; see `canonical-sources.md` Authority Rules).
 
 ---
 
@@ -13,7 +13,7 @@ One-page map of the system. Use in prompts as: _"Audit `<Module>` using `docs/ar
 
 - **Owner:** praveen
 - **ADRs:** ARCHITECTURE.md §2 (ZK model), §4 (Ledger Design); PROJECT_DECISIONS.md (plaintext amounts, encrypted titles, no duplicate records)
-- **Source files:** `backend/src/app/expenses/` (controller, `expenses.service.ts`, `services/expenses-{crud,access,analytics,carry-forward}.service.ts`, `services/recurring-expenses.service.ts`, `split-calculator.util.ts`), `shared/data-models/src/lib/expense.entity.ts`, `expense-split.entity.ts`, `recurring-expense.entity.ts`, `recurring-expense-split.entity.ts`, `encrypted-expense-key.entity.ts`, `shared/data-models/src/lib/dto/expense.dto.ts`
+- **Source files:** `backend/src/app/expenses/` (controller, `expenses.service.ts`, `services/expenses-{crud,analytics,carry-forward}.service.ts`, `services/recurring-expenses.service.ts`, `split-calculator.util.ts`), `backend/src/app/common/ledger-debt-simplifier.ts` (shared with Settlements), `backend/src/app/common/member-display.util.ts` (shared with Settlements), `shared/data-models/src/lib/expense.entity.ts`, `expense-split.entity.ts`, `recurring-expense.entity.ts`, `recurring-expense-split.entity.ts`, `encrypted-expense-key.entity.ts`, `shared/data-models/src/lib/dto/expense.dto.ts`
 - **Related services:** Settlements, Encryption/Key Management, Groups (membership authz), frontend `expense-decryption.service.ts` + `expense-decrypt-coordinator.service.ts`
 - **Contract:** `docs/contracts/expense-contract.md`
 
@@ -21,7 +21,7 @@ One-page map of the system. Use in prompts as: _"Audit `<Module>` using `docs/ar
 
 - **Owner:** praveen
 - **ADRs:** ARCHITECTURE.md §4 (transactions), §5 (multi-currency, friends balances)
-- **Source files:** `backend/src/app/settlements/` (`settlements.service.ts`, `settlements.controller.ts`, `friends.controller.ts`), `shared/data-models/src/lib/settlement.entity.ts`, `dto/settlement.dto.ts`
+- **Source files:** `backend/src/app/settlements/` (`settlements.service.ts`, `settlements.controller.ts`, `friends.controller.ts`), `backend/src/app/common/ledger-debt-simplifier.ts` (canonical debt-simplification, shared with Expenses' Carry Forward), `backend/src/app/common/member-display.util.ts` (canonical member display resolution, shared with Expenses' Carry Forward), `shared/data-models/src/lib/settlement.entity.ts`, `dto/settlement.dto.ts`
 - **Related services:** Expense (balances), Groups (base currency rules)
 - **Contract:** `docs/contracts/settlements-contract.md`
 

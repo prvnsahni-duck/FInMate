@@ -11,17 +11,20 @@ This file is the source-of-truth map for FinMate documentation. Documentation is
 | API contracts | [`../contracts/`](../contracts/) and [`../../openapi.yaml`](../../openapi.yaml) | Nest controllers under `backend/src/app/**` |
 | Encryption and key lifecycle | [`../group-key-flow.md`](../group-key-flow.md), [`../contracts/encryption-contract.md`](../contracts/encryption-contract.md) | `frontend/src/app/core/services/encryption.service.ts`, `group-key.service.ts`, `zk-key-vault.service.ts`, backend group key endpoints |
 | Expense encryption/decryption | [`../contracts/expense-contract.md`](../contracts/expense-contract.md) | `frontend/src/app/core/services/expense-decryption.service.ts`, `expense-decrypt-coordinator.service.ts`, `backend/src/app/expenses/expenses.service.ts` |
-| Carry Forward | [`../contracts/groups-contract.md`](../contracts/groups-contract.md), [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) | `backend/src/app/expenses/services/expenses-carry-forward.service.ts`, `ExpensesService.closeMonth`, `ExpensesService.getCarryForwardSummary` |
-| History and audit model | [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md), [`../contracts/groups-contract.md`](../contracts/groups-contract.md) | `shared/data-models/src/lib/audit-log.entity.ts`, `expense-version.entity.ts`, `backend/src/app/groups/services/groups-audit.service.ts`, expense version methods |
+| Carry Forward | [`../contracts/groups-contract.md`](../contracts/groups-contract.md), [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md) | `backend/src/app/expenses/services/expenses-carry-forward.service.ts`, `ExpensesService.closeMonth`, `ExpensesService.getCarryForwardSummary`, `backend/src/app/common/ledger-debt-simplifier.ts` |
+| Settlement | [`../contracts/settlements-contract.md`](../contracts/settlements-contract.md) | `backend/src/app/settlements/settlements.service.ts`, `backend/src/app/common/ledger-debt-simplifier.ts` (canonical debt-simplification, shared with Carry Forward) |
+| History and audit model | [`../../ARCHITECTURE.md`](../../ARCHITECTURE.md), [`../contracts/groups-contract.md`](../contracts/groups-contract.md), [`../audits/history-decryption-audit.md`](../audits/history-decryption-audit.md) | `shared/data-models/src/lib/audit-log.entity.ts`, `expense-version.entity.ts`, `backend/src/app/groups/services/groups-audit.service.ts`, `frontend/src/app/features/groups/services/groups.service.ts` (`getHistoryLogs`), expense version methods |
 | Security operations | [`../SECURITY_VERIFICATION_CHECKLIST.md`](../SECURITY_VERIFICATION_CHECKLIST.md), [`../PRODUCTION_READINESS_CHECKLIST.md`](../PRODUCTION_READINESS_CHECKLIST.md) | Auth, throttling, Redis session, and encryption services |
 | Historical decisions | [`../PROJECT_DECISIONS.md`](../PROJECT_DECISIONS.md), [`../frozen-decisions.md`](../frozen-decisions.md) | Historical reasoning only; do not duplicate current behavior here |
 | AI/developer rules | [`../../AGENT_RULES.md`](../../AGENT_RULES.md), [`../coding-rules.md`](../coding-rules.md), [`../file-map.md`](../file-map.md) | Repo workflow and coding invariants |
+| Expense module status (overview + rollup) | [`../EXPENSE_MODULE_STATUS.md`](../EXPENSE_MODULE_STATUS.md) | Rolls up the rows above for the expense module specifically; not a replacement for the per-topic canonical documents |
 
 ## Authority Rules
 
 - Each major topic has one canonical document. Other docs should link to it instead of restating the same design.
 - Historical documents preserve why a decision was made, but current behavior belongs in the canonical topic document.
 - Audits under `docs/audits/` are evidence snapshots. They are not authoritative after the code changes unless refreshed.
+- Internal refactors that consolidate duplicate implementations without changing behavior or public APIs are recorded under `docs/changes/*.md` (files-changed / verification format), not by rewriting the canonical topic document — the canonical document already describes the resulting single implementation at the responsibility level and rarely needs to change for these.
 - Roadmaps, PRDs, TRDs, and project specifications are planning references. Treat implementation and canonical contracts as authoritative when they disagree.
 - ADR placeholder files were removed in the 2026-07-25 documentation audit because they contained no decisions. Future ADRs should be added only with real accepted content.
 
