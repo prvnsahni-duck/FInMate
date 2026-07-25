@@ -37,7 +37,10 @@ describe('GroupsService', () => {
   >;
   let userRepository: any;
   let dataSource: jest.Mocked<DataSource>;
-  let contactsService: { resolveOrCreateIdentity: jest.Mock };
+  let contactsService: {
+    resolveOrCreateIdentity: jest.Mock;
+    claimContactsForUser: jest.Mock;
+  };
 
   beforeEach(async () => {
     const mockGroupRepository = {
@@ -155,6 +158,12 @@ describe('GroupsService', () => {
 
     const mockContactsService = {
       resolveOrCreateIdentity: jest.fn(),
+      // Default: no pending Contact matches this user — a safe no-op so
+      // every existing test that reaches joinGroupByToken (which now always
+      // calls this before resolving membership) keeps working unchanged.
+      claimContactsForUser: jest
+        .fn()
+        .mockResolvedValue({ linkedGroupIds: [], claimedContactIds: [] }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -635,6 +644,176 @@ describe('GroupsService', () => {
       expect(groupInviteRepository.save).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'expired' }),
       );
+    });
+  });
+
+  describe('joinGroupByToken', () => {
+    // All these tests use the group.inviteToken fallback path (no durable
+    // GroupInvite row), which is the path GroupsService.inviteMember's
+    // Contact-backed branch actually sends invitees down (see
+    // docs/changes/invite-claim-fix.md) — this is where the duplicate-member
+    // bug lived and where the fix (claiming pending Contacts before
+    // resolving membership by user id) takes effect.
+    const registeredUser = {
+      id: 'joining-user-id',
+      email: 'joiner@example.com',
+    } as any;
+
+    beforeEach(() => {
+      // No durable GroupInvite — every test here falls back to group.inviteToken.
+      groupInviteRepository.findOne.mockResolvedValue(null);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        inviteToken: 'the-invite-token',
+      } as any);
+      userRepository.findOne.mockResolvedValue(registeredUser);
+    });
+
+    it('activates an already-active-track existing user membership in place — no duplicate, role preserved (regression: already-working path)', async () => {
+      const existingUserBackedMember = {
+        id: 'existing-member-id',
+        joinStatus: 'invited',
+        role: 'admin',
+        user: { id: registeredUser.id },
+      } as any;
+      groupMemberRepository.findOne.mockResolvedValueOnce(
+        existingUserBackedMember,
+      );
+
+      const result = await service.joinGroupByToken(
+        registeredUser.id,
+        'the-invite-token',
+      );
+
+      expect(contactsService.claimContactsForUser).toHaveBeenCalledWith(
+        registeredUser,
+      );
+      expect(groupMemberRepository.create).not.toHaveBeenCalled();
+      expect(existingUserBackedMember.joinStatus).toBe('active');
+      expect(existingUserBackedMember.role).toBe('admin');
+      expect((result as any).member.id).toBe('existing-member-id');
+    });
+
+    it('claims the existing Contact-backed membership instead of creating a duplicate, for an invitee who registered before accepting', async () => {
+      // Simulates ContactsService.claimContactsForUser (tested independently
+      // in contacts.service.spec.ts) having already linked the Contact-backed
+      // row to this user and activated it, by the time GroupsService's own
+      // existing-membership query runs.
+      const claimedMember = {
+        id: 'contact-backed-member-id',
+        joinStatus: 'active',
+        role: 'admin',
+        user: { id: registeredUser.id },
+        contact: { id: 'original-contact-id' },
+      } as any;
+      groupMemberRepository.findOne.mockResolvedValueOnce(claimedMember);
+
+      const result = await service.joinGroupByToken(
+        registeredUser.id,
+        'the-invite-token',
+      );
+
+      expect(contactsService.claimContactsForUser).toHaveBeenCalledWith(
+        registeredUser,
+      );
+      expect(groupMemberRepository.create).not.toHaveBeenCalled();
+      expect((result as any).member.id).toBe('contact-backed-member-id');
+      expect((result as any).member.role).toBe('admin');
+    });
+
+    it('calls claimContactsForUser before resolving existing membership, so a not-yet-linked Contact-backed row is claimed within the same join call (covers registering during acceptance)', async () => {
+      const claimedMember = {
+        id: 'contact-backed-member-id',
+        joinStatus: 'active',
+        role: 'member',
+        user: { id: registeredUser.id },
+      } as any;
+      groupMemberRepository.findOne.mockResolvedValueOnce(claimedMember);
+
+      await service.joinGroupByToken(registeredUser.id, 'the-invite-token');
+
+      const claimCallOrder =
+        contactsService.claimContactsForUser.mock.invocationCallOrder[0];
+      const existingMemberQueryOrder = (
+        groupMemberRepository.createQueryBuilder as jest.Mock
+      ).mock.invocationCallOrder[0];
+      expect(claimCallOrder).toBeLessThan(existingMemberQueryOrder);
+    });
+
+    it.each([
+      ['admin', 'admin'],
+      ['member', 'member'],
+      ['spectator', 'spectator'],
+    ])(
+      'preserves the %s role granted at invite time when a Contact-backed invitee joins',
+      async (invitedRole, expectedRole) => {
+        const claimedMember = {
+          id: 'contact-backed-member-id',
+          joinStatus: 'active',
+          role: invitedRole,
+          user: { id: registeredUser.id },
+        } as any;
+        groupMemberRepository.findOne.mockResolvedValueOnce(claimedMember);
+
+        const result = await service.joinGroupByToken(
+          registeredUser.id,
+          'the-invite-token',
+        );
+
+        expect(contactsService.claimContactsForUser).toHaveBeenCalledWith(
+          registeredUser,
+        );
+        expect((result as any).member.role).toBe(expectedRole);
+        expect(groupMemberRepository.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('preserves the original GroupMember id when claiming a Contact-backed invitee, so history already attached to it (expenses, splits, settlements) stays correctly linked', async () => {
+      const originalMemberId = 'member-id-with-expense-history';
+      const claimedMember = {
+        id: originalMemberId,
+        joinStatus: 'active',
+        role: 'member',
+        user: { id: registeredUser.id },
+      } as any;
+      groupMemberRepository.findOne.mockResolvedValueOnce(claimedMember);
+
+      const result = await service.joinGroupByToken(
+        registeredUser.id,
+        'the-invite-token',
+      );
+
+      // Same id as the pre-existing row — nothing was replaced, so any
+      // Expense/ExpenseSplit/Settlement row referencing this GroupMember.id
+      // still resolves to the same member, not an orphan.
+      expect(contactsService.claimContactsForUser).toHaveBeenCalledWith(
+        registeredUser,
+      );
+      expect((result as any).member.id).toBe(originalMemberId);
+      expect(groupMemberRepository.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a new active member only when no prior invite or contact claim resolves any membership for this group (regression: cold join via permanent link)', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce(null);
+      groupMemberRepository.save.mockResolvedValueOnce({
+        id: 'brand-new-member-id',
+        role: 'member',
+        joinStatus: 'active',
+        user: registeredUser,
+      } as any);
+
+      const result = await service.joinGroupByToken(
+        registeredUser.id,
+        'the-invite-token',
+      );
+
+      expect(contactsService.claimContactsForUser).toHaveBeenCalledWith(
+        registeredUser,
+      );
+      expect(groupMemberRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ role: 'member', joinStatus: 'active' }),
+      );
+      expect((result as any).member.id).toBe('brand-new-member-id');
     });
   });
 

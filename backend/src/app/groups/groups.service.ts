@@ -1216,6 +1216,19 @@ export class GroupsService {
       throw new NotFoundException('User not found');
     }
 
+    // Claim any pending Contact-backed membership(s) for this user's email/
+    // phone before resolving by user id. An invitee who was invited by
+    // email/phone before they had an account (GroupsService.inviteMember's
+    // Contact-backed path) has a GroupMember row with `contact` set and
+    // `user` still null — the user-id lookup below would miss it entirely
+    // and fall through to creating a brand-new row, duplicating the
+    // membership, resetting their role to 'member', and orphaning any
+    // history already attached to the Contact-backed row. This reuses the
+    // same claim ContactsService already runs on email verification
+    // (AuthService.verifyEmail) — idempotent (only touches 'pending'
+    // Contacts), safe to call unconditionally here.
+    await this.contactsService.claimContactsForUser(user);
+
     const existingMember = await this.groupMemberRepository
       .createQueryBuilder('member')
       .where('member.group_id = :groupId', { groupId: group.id })
