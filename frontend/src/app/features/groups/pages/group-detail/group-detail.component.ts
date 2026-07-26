@@ -5,6 +5,7 @@ import {
   DestroyRef,
   signal,
   computed,
+  effect,
   ViewChild,
   ElementRef,
   AfterViewInit,
@@ -33,6 +34,7 @@ import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../../core/constants/crypto
 import { ExpenseDecryptCoordinator } from '../../../../core/services/expense-decrypt-coordinator.service';
 import { ExpenseDecryptionService } from '../../../../core/services/expense-decryption.service';
 import { classifyDecryptionError } from '../../../../core/models/decryption-state';
+import { CryptoSessionManager } from '../../../../core/services/crypto-session-manager.service';
 
 import {
   BalanceEntry,
@@ -117,6 +119,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   private decryptCoordinator = inject(ExpenseDecryptCoordinator);
   private expenseDecryption = inject(ExpenseDecryptionService);
   private store = inject(Store);
+  private cryptoSession = inject(CryptoSessionManager);
   private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -127,6 +130,22 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       }
       // Cancel any in-flight decryption retry loop for this group.
       this.decryptCoordinator.stop();
+    });
+
+    // Cross-tab recovery: if this page's own master-key check previously
+    // failed (isMasterKeyLoaded false, showing the unlock banner) and
+    // another tab then established the crypto session — e.g. the user
+    // entered their password there — CryptoSessionManager picks that up via
+    // BroadcastChannel and transitions to Ready. Re-check here so the
+    // banner clears on its own instead of staying up until this page
+    // happens to run some unrelated fetch again.
+    effect(() => {
+      if (this.cryptoSession.isReady() && !this.isMasterKeyLoaded()) {
+        const g = this.group();
+        if (g?.id) {
+          this.initializeGroupKeysAndSelfHeal(g.id);
+        }
+      }
     });
   }
 

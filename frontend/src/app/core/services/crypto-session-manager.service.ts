@@ -295,6 +295,23 @@ export class CryptoSessionManager {
     if (event.type === 'recovery-blocked') {
       this.recoveryBlockedReasonSignal.set(event.reasonClass ?? null);
       this.transition('RecoveringBlocked');
+      return;
+    }
+
+    if (
+      event.type === 'crypto-session-ready' &&
+      this.stateSignal() !== 'Ready'
+    ) {
+      // Another tab just established its crypto session (e.g. the user
+      // entered their password there). The master key lives in the shared,
+      // origin-scoped IndexedDB vault, so this tab can very likely recover
+      // silently too — retry now instead of waiting for this tab's next
+      // unrelated crypto call to happen to notice. Fire-and-forget: if this
+      // tab's own session still can't resolve for some other reason, state
+      // is left as-is and normal recovery/escalation continues untouched.
+      void this.ensureCryptoContext('cross_tab_recovery').catch(() => {
+        /* no-op — see comment above */
+      });
     }
   }
 }

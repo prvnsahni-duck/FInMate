@@ -521,7 +521,7 @@ describe('CreateExpenseModalComponent', () => {
 
       expect(mockGroupKeyService.createAndStoreGroupKey).not.toHaveBeenCalled();
       expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
-      expect(component.errorMessage).toContain('session key is not loaded');
+      expect(component.errorMessage).toContain('session key is not unlocked');
     });
 
     it('scopeKeyBlocked/scopeKeyMessage reflect a no_session status', () => {
@@ -530,7 +530,7 @@ describe('CreateExpenseModalComponent', () => {
 
       expect(component.scopeKeyBlocked()).toBe(true);
       expect(component.scopeKeyMessage()).toContain(
-        'session key is not loaded',
+        'session key is not unlocked',
       );
     });
 

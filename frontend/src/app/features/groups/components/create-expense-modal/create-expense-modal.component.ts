@@ -124,7 +124,11 @@ export class CreateExpenseModalComponent implements OnChanges {
   scopeKeyMessage = computed(() => {
     switch (this.scopeKeyStatus()) {
       case 'no_session':
-        return 'Your session key is not loaded. Please refresh the page and log in again.';
+        // Refreshing/re-logging in doesn't fix this by itself — the vault
+        // has already been checked and confirmed empty on this device. The
+        // one thing that actually works is entering the password in the
+        // "Unlock Vault" banner on the group page (behind this modal).
+        return 'Your session key is not unlocked on this device. Enter your password in the "Unlock Vault" banner on the group page, then try again.';
       case 'pending':
         return "This group's encryption key isn't available on this device yet. Try refreshing, or ask the group owner to open the group once to share it.";
       case 'no_access':
@@ -250,8 +254,10 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
 
     if (result.status === 'no_session') {
+      // See scopeKeyMessage()'s no_session case: refreshing/re-login doesn't
+      // fix this — the vault is already confirmed empty on this device.
       throw new Error(
-        'Your session key is not loaded. Please refresh the page and log in again.',
+        'Your session key is not unlocked on this device. Enter your password in the "Unlock Vault" banner on the group page, then try again.',
       );
     }
 

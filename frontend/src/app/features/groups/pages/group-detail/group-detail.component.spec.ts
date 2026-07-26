@@ -14,6 +14,7 @@ import { ClientEncryptionService } from '../../../../core/services/encryption.se
 
 import { RecurringExpensesService } from '../../services/recurring-expenses.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { CryptoSessionManager } from '../../../../core/services/crypto-session-manager.service';
 import { signal } from '@angular/core';
 
 describe('GroupDetailComponent', () => {
@@ -206,6 +207,47 @@ describe('GroupDetailComponent', () => {
     expect(component.group()).toEqual(mockGroup);
     expect(component.members().length).toBe(4);
     expect(component.isOwnerOrAdmin()).toBe(true);
+  });
+
+  describe('cross-tab crypto recovery', () => {
+    it('re-runs initializeGroupKeysAndSelfHeal when CryptoSessionManager becomes Ready while the unlock banner is showing', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.isMasterKeyLoaded.set(false);
+      component.group.set(mockGroup as any);
+      const spy = jest.spyOn(component, 'initializeGroupKeysAndSelfHeal');
+
+      // Simulate the master key becoming available (e.g. another tab
+      // persisted it to the shared IndexedDB vault, and this tab's
+      // CryptoSessionManager picked that up via BroadcastChannel).
+      mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
+      const cryptoSession = TestBed.inject(CryptoSessionManager);
+      await cryptoSession.ensureCryptoContext();
+      expect(cryptoSession.isReady()).toBe(true);
+
+      fixture.detectChanges(); // let the effect observe the signal change
+
+      expect(spy).toHaveBeenCalledWith('group-1');
+    });
+
+    it('does not re-run initializeGroupKeysAndSelfHeal when the banner is not showing', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.isMasterKeyLoaded.set(true); // banner already hidden
+      component.group.set(mockGroup as any);
+      const spy = jest.spyOn(component, 'initializeGroupKeysAndSelfHeal');
+      spy.mockClear();
+
+      mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
+      const cryptoSession = TestBed.inject(CryptoSessionManager);
+      await cryptoSession.ensureCryptoContext();
+
+      fixture.detectChanges();
+
+      expect(spy).not.toHaveBeenCalled();
+    });
   });
 
   describe('progressive loading — parallel fetch (Phase 1)', () => {

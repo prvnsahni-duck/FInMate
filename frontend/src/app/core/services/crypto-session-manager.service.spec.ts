@@ -230,4 +230,53 @@ describe('CryptoSessionManager', () => {
       expect(service.fatalReason()).toBeNull();
     });
   });
+
+  describe('handleBroadcast — cross-tab crypto-session-ready recovery', () => {
+    it('re-attempts ensureCryptoContext when another tab reports ready and this tab is not Ready', async () => {
+      expect(service.state()).toBe('NoSession');
+
+      (service as any).handleBroadcast({
+        type: 'crypto-session-ready',
+        epoch: 0,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockEncryption.loadKeyFromSession).toHaveBeenCalled();
+    });
+
+    it('does nothing when this tab is already Ready (no redundant retry)', async () => {
+      await service.ensureCryptoContext();
+      expect(service.state()).toBe('Ready');
+      mockEncryption.loadKeyFromSession.mockClear();
+
+      (service as any).handleBroadcast({
+        type: 'crypto-session-ready',
+        epoch: 0,
+      });
+      await Promise.resolve();
+
+      expect(mockEncryption.loadKeyFromSession).not.toHaveBeenCalled();
+    });
+
+    it('recovers a tab stuck in NoSession once the master key becomes available', async () => {
+      mockEncryption.loadKeyFromSession.mockResolvedValueOnce(null);
+      await expect(service.ensureCryptoContext()).rejects.toThrow();
+      expect(service.state()).toBe('NoSession');
+
+      // The key becomes available (e.g. another tab persisted it to the
+      // shared IndexedDB vault) before the broadcast is handled.
+      mockEncryption.loadKeyFromSession.mockResolvedValue(mockMasterKey);
+
+      (service as any).handleBroadcast({
+        type: 'crypto-session-ready',
+        epoch: 0,
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(service.state()).toBe('Ready');
+    });
+  });
 });
