@@ -170,7 +170,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   expenses = signal<GroupExpense[]>([]);
   members = signal<GroupMember[]>([]);
   balances = signal<BalanceEntry[]>([]);
-  userBalance = signal<number>(0);
   suggestedSettlements = signal<SuggestedSettlement[]>([]);
   historyLogs = signal<GroupAuditLog[]>([]);
   deletedExpenses = signal<Expense[]>([]);
@@ -317,6 +316,22 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return member?.role === 'owner';
   });
 
+  /**
+   * Derived, not imperatively set — group() and balances() now resolve
+   * independently (they're fetched in parallel), so computing this reactively
+   * means it's always correct regardless of which one lands first, instead of
+   * being frozen at whatever group()'s value was at the moment balances
+   * happened to resolve.
+   */
+  userBalance = computed(() => {
+    const g = this.group();
+    const currentUserId = this.currentUserId();
+    const entry = this.balances().find(
+      (b) => b.userId === currentUserId && b.currency === g?.currency,
+    );
+    return entry ? entry.netBalance : 0;
+  });
+
   // Archive (Delete Group) dialog state
   isArchiveDialogOpen = signal<boolean>(false);
   archiveConfirmName = signal<string>('');
@@ -413,15 +428,23 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.filterStartDate.set(initialStart);
           this.filterEndDate.set(initialEnd);
 
+          // Fired independently of getGroup() — none of these need the Group
+          // response, only the groupId already available from the route.
+          // (docs/audits/group-detail-progressive-loading-audit.md §6.1)
+          this.fetchMembers(groupId);
+          this.fetchBalances(groupId);
+          this.fetchHistoryLogs(groupId);
+          this.fetchDeletedExpenses(groupId);
+          this.fetchRecurringExpenses(groupId);
+
           this.groupsService.getGroup(groupId).subscribe({
             next: (res) => {
               this.group.set(res);
+              // Stays gated on getGroup(): needs res.groupType to decide the
+              // household current-month date range before building its
+              // request (see fetchExpenses below), the same real exception
+              // already noted for fetchCarryForward in the audit.
               this.fetchExpenses(groupId);
-              this.fetchMembers(groupId);
-              this.fetchBalances(groupId);
-              this.fetchHistoryLogs(groupId);
-              this.fetchDeletedExpenses(groupId);
-              this.fetchRecurringExpenses(groupId);
               if (res.groupType === 'household') {
                 this.fetchCarryForward(groupId);
               }
@@ -800,19 +823,15 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   fetchBalances(groupId: string) {
-    const g = this.group();
-    if (!g) return;
+    // No group()-null early return here (removed): this now fires in
+    // parallel with getGroup() rather than after it. userBalance is a
+    // computed() derived from group()+balances(), so it's correct regardless
+    // of arrival order — see the userBalance computed() above.
     this.balancesError.set(false);
     this.groupsService.getBalances(groupId).subscribe({
       next: (res) => {
         this.balances.set(res.balances);
         this.suggestedSettlements.set(res.suggestedSettlements);
-
-        const currentUserId = this.currentUserId();
-        const myBalanceEntry = res.balances.find(
-          (b) => b.userId === currentUserId && b.currency === g.currency,
-        );
-        this.userBalance.set(myBalanceEntry ? myBalanceEntry.netBalance : 0);
       },
       error: (err) => {
         console.error('Failed to fetch balances', err);

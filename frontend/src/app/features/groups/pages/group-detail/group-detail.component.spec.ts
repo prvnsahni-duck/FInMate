@@ -3,7 +3,7 @@ import { GroupDetailComponent } from './group-detail.component';
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -206,6 +206,78 @@ describe('GroupDetailComponent', () => {
     expect(component.group()).toEqual(mockGroup);
     expect(component.members().length).toBe(4);
     expect(component.isOwnerOrAdmin()).toBe(true);
+  });
+
+  describe('progressive loading — parallel fetch (Phase 1)', () => {
+    it('fetches members, balances, history, trash, and recurring immediately, without waiting for getGroup() to resolve', () => {
+      const getGroupSubject = new Subject<typeof mockGroup>();
+      mockGroupsService.getGroup = jest
+        .fn()
+        .mockReturnValue(getGroupSubject.asObservable()) as any;
+
+      fixture.detectChanges(); // triggers ngOnInit; getGroup() is still pending
+
+      expect(component.group()).toBeNull();
+      expect(mockGroupsService.getMembers).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getBalances).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getHistoryLogs).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getDeletedExpenses).toHaveBeenCalledWith(
+        'group-1',
+      );
+      expect(
+        mockRecurringExpensesService.getRecurringExpenses,
+      ).toHaveBeenCalledWith('group-1');
+
+      getGroupSubject.next(mockGroup);
+      getGroupSubject.complete();
+      expect(component.group()).toEqual(mockGroup);
+    });
+
+    it('does not fetch expenses or carry-forward until getGroup() resolves (household month-scoping dependency)', () => {
+      const getGroupSubject = new Subject<typeof mockGroup>();
+      mockGroupsService.getGroup = jest
+        .fn()
+        .mockReturnValue(getGroupSubject.asObservable()) as any;
+
+      fixture.detectChanges();
+
+      expect(mockExpensesService.getExpenses).not.toHaveBeenCalled();
+      expect(mockGroupsService.getCarryForward).not.toHaveBeenCalled();
+
+      getGroupSubject.next(mockGroup); // household group
+      getGroupSubject.complete();
+
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledWith(
+        'group-1',
+        expect.anything(),
+      );
+      expect(mockGroupsService.getCarryForward).toHaveBeenCalled();
+    });
+
+    it('computes userBalance correctly when balances() resolves before group()', () => {
+      const getGroupSubject = new Subject<typeof mockGroup>();
+      mockGroupsService.getGroup = jest
+        .fn()
+        .mockReturnValue(getGroupSubject.asObservable()) as any;
+      mockGroupsService.getBalances = jest.fn().mockReturnValue(
+        of({
+          balances: [{ userId: 'user-owner', currency: 'USD', netBalance: 42 }],
+          suggestedSettlements: [],
+        }),
+      ) as any;
+
+      fixture.detectChanges(); // balances resolves synchronously here; group() is still null
+
+      expect(component.group()).toBeNull();
+      expect(component.userBalance()).toBe(0); // no currency to match against yet
+
+      getGroupSubject.next(mockGroup); // currency: 'USD'
+      getGroupSubject.complete();
+
+      // userBalance is a computed(), so it re-evaluates once group() is set —
+      // no stale value frozen from before group() existed.
+      expect(component.userBalance()).toBe(42);
+    });
   });
 
   it('should handle toggle of contribution mode', () => {
