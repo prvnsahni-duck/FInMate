@@ -1288,19 +1288,58 @@
 
         <!-- TAB: History -->
         @if (activeTab() === 'history') {
-          <app-group-history-log
-            [historyLogs]="historyLogs()"
-          ></app-group-history-log>
+          @if (isLoadingHistory()) {
+            <div class="animate-pulse space-y-3">
+              <div class="h-16 bg-surface rounded-2xl w-full"></div>
+              <div class="h-16 bg-surface rounded-2xl w-full"></div>
+              <div class="h-16 bg-surface rounded-2xl w-full"></div>
+            </div>
+          } @else if (historyError()) {
+            <div
+              class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg"
+            >
+              <p class="text-xs font-bold mb-3">Failed to load history</p>
+              <button
+                (click)="fetchHistoryLogs(group()!.id)"
+                class="py-1.5 px-4 bg-error hover:brightness-110 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          } @else {
+            <app-group-history-log
+              [historyLogs]="historyLogs()"
+            ></app-group-history-log>
+          }
         }
 
         <!-- TAB: Trash -->
         @if (activeTab() === 'trash') {
-          <app-group-trash
-            [deletedExpenses]="deletedExpenses()"
-            [groupCurrency]="group()!.currency"
-            [isViewer]="isViewer()"
-            (restore)="restoreExpense($event)"
-          ></app-group-trash>
+          @if (isLoadingTrash()) {
+            <div class="animate-pulse space-y-3">
+              <div class="h-16 bg-surface rounded-2xl w-full"></div>
+              <div class="h-16 bg-surface rounded-2xl w-full"></div>
+            </div>
+          } @else if (trashError()) {
+            <div
+              class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg"
+            >
+              <p class="text-xs font-bold mb-3">Failed to load trash</p>
+              <button
+                (click)="fetchDeletedExpenses(group()!.id)"
+                class="py-1.5 px-4 bg-error hover:brightness-110 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          } @else {
+            <app-group-trash
+              [deletedExpenses]="deletedExpenses()"
+              [groupCurrency]="group()!.currency"
+              [isViewer]="isViewer()"
+              (restore)="restoreExpense($event)"
+            ></app-group-trash>
+          }
         }
 
         <!-- TAB: Settings -->
@@ -2050,7 +2089,26 @@
               }
             </div>
 
-            @if (recurringExpenses().length === 0) {
+            @if (isLoadingRecurring()) {
+              <div class="animate-pulse space-y-3">
+                <div class="h-20 bg-surface rounded-2xl w-full"></div>
+                <div class="h-20 bg-surface rounded-2xl w-full"></div>
+              </div>
+            } @else if (recurringError()) {
+              <div
+                class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg"
+              >
+                <p class="text-xs font-bold mb-3">
+                  Failed to load recurring expenses
+                </p>
+                <button
+                  (click)="fetchRecurringExpenses(group()!.id)"
+                  class="py-1.5 px-4 bg-error hover:brightness-110 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                >
+                  Retry
+                </button>
+              </div>
+            } @else if (recurringExpenses().length === 0) {
               <div class="text-center py-12 text-muted">
                 No recurring expense schedules configured for this group.
               </div>
@@ -2209,7 +2267,15 @@
 
       <!-- Sidebar (Balances & Members) -->
       <div class="space-y-8">
-        @if (balancesError()) {
+        @if (isLoadingBalances()) {
+          <div
+            class="bg-finmate-card/70 dark:bg-finmate-card/70 rounded-3xl p-6 shadow-xl shadow-black/5 animate-pulse space-y-3"
+          >
+            <div class="h-4 bg-surface rounded-xl w-24"></div>
+            <div class="h-8 bg-surface rounded-xl w-32"></div>
+            <div class="h-20 bg-surface rounded-2xl w-full"></div>
+          </div>
+        } @else if (balancesError()) {
           <div
             class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg"
           >
@@ -2230,7 +2296,15 @@
           ></app-group-balances>
         }
 
-        @if (membersError()) {
+        @if (isLoadingMembers()) {
+          <div
+            class="bg-finmate-card/70 dark:bg-finmate-card/70 rounded-3xl p-6 shadow-xl shadow-black/5 animate-pulse space-y-3"
+          >
+            <div class="h-4 bg-surface rounded-xl w-24"></div>
+            <div class="h-10 bg-surface rounded-2xl w-full"></div>
+            <div class="h-10 bg-surface rounded-2xl w-full"></div>
+          </div>
+        } @else if (membersError()) {
           <div
             class="bg-error/15 border border-error/30 text-error rounded-3xl p-6 text-center animate-fade-in shadow-lg"
           >

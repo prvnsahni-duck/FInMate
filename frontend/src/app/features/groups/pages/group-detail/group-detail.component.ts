@@ -222,6 +222,17 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   balancesError = signal<boolean>(false);
   analyticsError = signal<boolean>(false);
 
+  // Per-section loading/error state (Phase 2 — each section owns its own,
+  // independent of the page shell and of every sibling section).
+  isLoadingMembers = signal<boolean>(false);
+  isLoadingBalances = signal<boolean>(false);
+  isLoadingHistory = signal<boolean>(false);
+  historyError = signal<boolean>(false);
+  isLoadingTrash = signal<boolean>(false);
+  trashError = signal<boolean>(false);
+  isLoadingRecurring = signal<boolean>(false);
+  recurringError = signal<boolean>(false);
+
   // Decryption lifecycle state (owned by the coordinator).
   decryptionPhase = this.decryptCoordinator.phase;
   decryptionSummary = this.decryptCoordinator.summary;
@@ -404,7 +415,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         const groupId = this.group()?.id;
         if (groupId && isFilterChanged) {
           this.currentPage.set(1);
-          this.fetchExpenses(groupId, true);
+          this.fetchExpenses(groupId);
         }
 
         this.scrollToActiveTab();
@@ -440,6 +451,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.groupsService.getGroup(groupId).subscribe({
             next: (res) => {
               this.group.set(res);
+              this.stopLoading();
               // Stays gated on getGroup(): needs res.groupType to decide the
               // household current-month date range before building its
               // request (see fetchExpenses below), the same real exception
@@ -581,7 +593,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     const groupId = this.group()?.id;
     if (groupId) {
       this.currentPage.set(1);
-      this.fetchExpenses(groupId, true);
+      this.fetchExpenses(groupId);
     }
   }
 
@@ -719,12 +731,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  fetchExpenses(groupId: string, silent = false) {
-    if (silent) {
-      this.isLoadingExpenses.set(true);
-    } else {
-      this.startLoading();
-    }
+  /**
+   * Owns its own section-scoped loading/error state (isLoadingExpenses /
+   * ledgerError) — it no longer touches the page-wide isLoading/showSkeleton
+   * gate, which now only covers the brief window until getGroup() resolves.
+   */
+  fetchExpenses(groupId: string) {
+    this.isLoadingExpenses.set(true);
     let start = this.filterStartDate();
     let end = this.filterEndDate();
     const g = this.group();
@@ -789,7 +802,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.expenses.set(mappedExpenses);
           this.totalExpenses.set(res.meta?.totalItems || 0);
           this.isLoadingExpenses.set(false);
-          this.stopLoading();
           this.ledgerError.set(false);
           // Hand the freshly-fetched list to the coordinator for
           // classification + automatic retry/recovery.
@@ -797,17 +809,18 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         },
         error: () => {
           this.isLoadingExpenses.set(false);
-          this.stopLoading();
           this.ledgerError.set(true);
         },
       });
   }
 
   fetchMembers(groupId: string) {
+    this.isLoadingMembers.set(true);
     this.membersError.set(false);
     this.groupsService.getMembers(groupId).subscribe({
       next: (res) => {
         this.members.set(res);
+        this.isLoadingMembers.set(false);
 
         const currentUserId = this.currentUserId();
         const myMember = res.find((m) => m.user?.id === currentUserId);
@@ -817,6 +830,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       },
       error: (err) => {
         console.error('Failed to fetch group members', err);
+        this.isLoadingMembers.set(false);
         this.membersError.set(true);
       },
     });
@@ -827,34 +841,51 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     // parallel with getGroup() rather than after it. userBalance is a
     // computed() derived from group()+balances(), so it's correct regardless
     // of arrival order — see the userBalance computed() above.
+    this.isLoadingBalances.set(true);
     this.balancesError.set(false);
     this.groupsService.getBalances(groupId).subscribe({
       next: (res) => {
         this.balances.set(res.balances);
         this.suggestedSettlements.set(res.suggestedSettlements);
+        this.isLoadingBalances.set(false);
       },
       error: (err) => {
         console.error('Failed to fetch balances', err);
+        this.isLoadingBalances.set(false);
         this.balancesError.set(true);
       },
     });
   }
 
   fetchHistoryLogs(groupId: string) {
+    this.isLoadingHistory.set(true);
+    this.historyError.set(false);
     this.groupsService.getHistoryLogs(groupId).subscribe({
       next: (res) => {
         this.historyLogs.set(res.data || []);
+        this.isLoadingHistory.set(false);
       },
-      error: (err) => console.error('Failed to fetch history logs', err),
+      error: (err) => {
+        console.error('Failed to fetch history logs', err);
+        this.isLoadingHistory.set(false);
+        this.historyError.set(true);
+      },
     });
   }
 
   fetchDeletedExpenses(groupId: string) {
+    this.isLoadingTrash.set(true);
+    this.trashError.set(false);
     this.groupsService.getDeletedExpenses(groupId).subscribe({
       next: (res) => {
         this.deletedExpenses.set(res.data || []);
+        this.isLoadingTrash.set(false);
       },
-      error: (err) => console.error('Failed to fetch deleted expenses', err),
+      error: (err) => {
+        console.error('Failed to fetch deleted expenses', err);
+        this.isLoadingTrash.set(false);
+        this.trashError.set(true);
+      },
     });
   }
 
@@ -1051,7 +1082,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.currentPage.update((val) => val + delta);
     const g = this.group();
     if (g?.id) {
-      this.fetchExpenses(g.id, true);
+      this.fetchExpenses(g.id);
     }
   }
 
@@ -1148,11 +1179,18 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   contributionSuccess = '';
 
   fetchRecurringExpenses(groupId: string) {
+    this.isLoadingRecurring.set(true);
+    this.recurringError.set(false);
     this.recurringExpensesService.getRecurringExpenses(groupId).subscribe({
       next: (res) => {
         this.recurringExpenses.set(res || []);
+        this.isLoadingRecurring.set(false);
       },
-      error: (err) => console.error('Failed to fetch recurring expenses', err),
+      error: (err) => {
+        console.error('Failed to fetch recurring expenses', err);
+        this.isLoadingRecurring.set(false);
+        this.recurringError.set(true);
+      },
     });
   }
 

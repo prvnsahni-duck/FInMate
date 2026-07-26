@@ -3,7 +3,7 @@ import { GroupDetailComponent } from './group-detail.component';
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { of, Subject } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -277,6 +277,69 @@ describe('GroupDetailComponent', () => {
       // userBalance is a computed(), so it re-evaluates once group() is set —
       // no stale value frozen from before group() existed.
       expect(component.userBalance()).toBe(42);
+    });
+  });
+
+  describe('progressive loading — per-section skeletons/errors (Phase 2)', () => {
+    it('clears the page shell skeleton once getGroup() resolves, not once expenses resolve', () => {
+      const getExpensesSubject = new Subject<{
+        data: unknown[];
+        meta: { totalItems: number };
+      }>();
+      mockExpensesService.getExpenses = jest
+        .fn()
+        .mockReturnValue(getExpensesSubject.asObservable()) as any;
+
+      fixture.detectChanges(); // getGroup() resolves synchronously via of(); getExpenses() is still pending
+
+      expect(component.group()).toEqual(mockGroup);
+      expect(component.showSkeleton()).toBe(false);
+      expect(component.isLoading()).toBe(false);
+
+      getExpensesSubject.next({ data: [], meta: { totalItems: 0 } });
+      getExpensesSubject.complete();
+    });
+
+    it('tracks balances loading independently via isLoadingBalances', () => {
+      const getBalancesSubject = new Subject<{
+        balances: unknown[];
+        suggestedSettlements: unknown[];
+      }>();
+      mockGroupsService.getBalances = jest
+        .fn()
+        .mockReturnValue(getBalancesSubject.asObservable()) as any;
+
+      fixture.detectChanges();
+      expect(component.isLoadingBalances()).toBe(true);
+
+      getBalancesSubject.next({ balances: [], suggestedSettlements: [] });
+      getBalancesSubject.complete();
+      expect(component.isLoadingBalances()).toBe(false);
+    });
+
+    it('sets historyError (not just a console.error) on a failed history fetch, independent of other sections', () => {
+      mockGroupsService.getHistoryLogs = jest
+        .fn()
+        .mockReturnValue(throwError(() => new Error('network error'))) as any;
+
+      fixture.detectChanges();
+
+      expect(component.historyError()).toBe(true);
+      expect(component.isLoadingHistory()).toBe(false);
+      // Sibling sections are unaffected by history's failure.
+      expect(component.membersError()).toBe(false);
+      expect(component.balancesError()).toBe(false);
+    });
+
+    it('sets trashError and recurringError independently on failure, without affecting each other', () => {
+      mockGroupsService.getDeletedExpenses = jest
+        .fn()
+        .mockReturnValue(throwError(() => new Error('boom'))) as any;
+
+      fixture.detectChanges();
+
+      expect(component.trashError()).toBe(true);
+      expect(component.recurringError()).toBe(false);
     });
   });
 
