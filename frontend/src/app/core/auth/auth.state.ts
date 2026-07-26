@@ -12,6 +12,7 @@ import {
 } from '@finmate/data-models';
 import { ClientEncryptionService } from '../services/encryption.service';
 import { GroupKeyService } from '../services/group-key.service';
+import { CryptoSessionManager } from '../services/crypto-session-manager.service';
 
 export class Login {
   static readonly type = '[Auth] Login';
@@ -63,6 +64,7 @@ export class AuthState {
   private authService = inject(AuthService);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
+  private cryptoSession = inject(CryptoSessionManager);
 
   @Selector()
   static isAuthenticated(state: AuthStateModel): boolean {
@@ -109,6 +111,7 @@ export class AuthState {
               );
             }
             try {
+              await this.cryptoSession.ensureCryptoContext('login');
               await this.groupKeyService.getMyAsymmetricKeys();
             } catch (err) {
               console.error(
@@ -144,6 +147,8 @@ export class AuthState {
     const logout$ = state.refreshToken
       ? this.authService.logout(state.refreshToken)
       : null;
+
+    this.cryptoSession.beginLogout();
 
     if (state.user?.email) {
       void this.encryptionService.clearKey(state.user.email);

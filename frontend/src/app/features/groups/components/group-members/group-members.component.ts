@@ -24,7 +24,9 @@ import {
   arrayBufferToBase64,
 } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { CryptoRecoveryQueueService } from '../../../../core/services/crypto-recovery-queue.service';
 import { environment } from '../../../../../environments/environment';
+import { CryptoRecoveryPanelComponent } from '../../../../shared/components/crypto-recovery-panel/crypto-recovery-panel.component';
 
 export interface StagedInvite {
   id: string;
@@ -44,7 +46,12 @@ interface FailedInviteResult {
 @Component({
   selector: 'app-group-members',
   standalone: true,
-  imports: [NgClass, FormsModule, DropdownComponent],
+  imports: [
+    NgClass,
+    FormsModule,
+    DropdownComponent,
+    CryptoRecoveryPanelComponent,
+  ],
   templateUrl: './group-members.component.html',
 })
 export class GroupMembersComponent {
@@ -53,6 +60,7 @@ export class GroupMembersComponent {
   private destroyRef = inject(DestroyRef);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
+  private recoveryQueue = inject(CryptoRecoveryQueueService);
   private http = inject(HttpClient);
 
   members = input.required<GroupMember[]>();
@@ -76,6 +84,14 @@ export class GroupMembersComponent {
     { value: 'viewer', label: 'Viewer' },
     { value: 'spectator', label: 'Spectator' },
   ];
+
+  /**
+   * True when the last ensureGroupKey() attempt failed specifically because
+   * the crypto session (master key) is unavailable — as opposed to a
+   * group-key-specific issue like "not shared yet". Drives showing the
+   * shared <app-crypto-recovery-panel> instead of the generic invite error.
+   */
+  isSessionBlocked = signal(false);
 
   stagedInvites = signal<StagedInvite[]>([]);
   isNewContactModalOpen = false;
@@ -112,6 +128,73 @@ export class GroupMembersComponent {
   /** Display name for a member, whichever identity backs it (registered or pending). */
   memberDisplayName(member: GroupMember): string {
     return resolveMemberDisplayName(member);
+  }
+
+  /**
+   * Resolves the group data key, self-healing inline if it isn't cached yet.
+   *
+   * GroupDetailComponent kicks off key resolution/minting/provisioning in
+   * the background as soon as the group loads (initializeGroupKeysAndSelfHeal,
+   * fire-and-forget — it does not block the UI). If a caller reaches Invite
+   * before that finishes (slow network, or first-ever RSA keypair generation
+   * for this browser), a bare `getGroupDataKey` can return null even though
+   * the caller genuinely has access — this repeats the same
+   * resolve-or-mint-then-provision sequence inline so Invite doesn't have to
+   * wait for, or race, that background pass.
+   */
+  private async ensureGroupKey(): Promise<CryptoKey | null> {
+    this.isSessionBlocked.set(false);
+    const groupId = this.groupId();
+    const cached = await this.groupKeyService.getGroupDataKey(groupId);
+    if (cached) return cached;
+
+    try {
+      await this.groupKeyService.getMyAsymmetricKeys();
+    } catch (e) {
+      // getMyAsymmetricKeys() needs the master key too — this is the same
+      // "crypto session unavailable" cause as a resolveGroupKey() 'no_session'
+      // below, just surfaced earlier in the sequence.
+      console.error('Failed to provision asymmetric keys', e);
+      this.isSessionBlocked.set(true);
+      return null;
+    }
+
+    try {
+      const result = await this.groupKeyService.resolveGroupKey(groupId);
+      if (result.status === 'ready') {
+        return result.key;
+      }
+      if (result.status === 'pending' && this.isOwnerOrAdmin()) {
+        // No key resolvable and we're allowed to manage keys — this is a
+        // brand-new group whose key was never minted; mint it now rather
+        // than blocking Invite on a background pass that may not run again.
+        return await this.groupKeyService.createAndStoreGroupKey(groupId);
+      }
+      if (result.status === 'no_session') {
+        this.isSessionBlocked.set(true);
+      }
+    } catch (e) {
+      console.error('Group key self-heal failed', e);
+    }
+    return null;
+  }
+
+  /**
+   * Throws instead of returning null so callers can wrap it in
+   * CryptoRecoveryQueueService.runWithRecovery() — a genuine session block
+   * then gets queued and auto-resumed once the shared recovery panel is
+   * unlocked, instead of leaving the user to click Invite again.
+   */
+  private async resolveGroupKeyOrThrow(): Promise<CryptoKey> {
+    const key = await this.ensureGroupKey();
+    if (!key) {
+      throw new Error(
+        this.isSessionBlocked()
+          ? 'Your session needs to be unlocked.'
+          : 'Group key not available. Try refreshing, or ask the group owner to share it.',
+      );
+    }
+    return key;
   }
 
   memberInitials(member: GroupMember): string {
@@ -268,11 +351,19 @@ export class GroupMembersComponent {
     this.inviteSuccess = '';
 
     try {
-      const groupKey = await this.groupKeyService.getGroupDataKey(
-        this.groupId(),
-      );
-      if (!groupKey) {
-        throw new Error('Group key not available. Please unlock your vault.');
+      let groupKey: CryptoKey;
+      try {
+        groupKey = await this.recoveryQueue.runWithRecovery(() =>
+          this.resolveGroupKeyOrThrow(),
+        );
+      } catch (err) {
+        if (this.isSessionBlocked()) {
+          // <app-crypto-recovery-panel> is already shown reactively;
+          // nothing more to say via inviteError.
+          this.isInviting = false;
+          return;
+        }
+        throw err;
       }
 
       const subtle = window.crypto.subtle || (globalThis as any).crypto?.subtle;
@@ -427,11 +518,17 @@ export class GroupMembersComponent {
       }
 
       // 1. Resolve Group Key
-      const groupKey = await this.groupKeyService.getGroupDataKey(
-        this.groupId(),
-      );
-      if (!groupKey) {
-        throw new Error('Group key not available. Please unlock your vault.');
+      let groupKey: CryptoKey;
+      try {
+        groupKey = await this.recoveryQueue.runWithRecovery(() =>
+          this.resolveGroupKeyOrThrow(),
+        );
+      } catch (err) {
+        if (this.isSessionBlocked()) {
+          // <app-crypto-recovery-panel> is already shown reactively.
+          return;
+        }
+        throw err;
       }
 
       // 2. Generate TIK (AES-GCM 256-bit)

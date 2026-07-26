@@ -3,7 +3,7 @@ import { GroupDetailComponent } from './group-detail.component';
 import { GroupsService } from '../../services/groups.service';
 import { ExpensesService } from '../../services/expenses.service';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject, throwError } from 'rxjs';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { CurrencyPipe, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -14,6 +14,7 @@ import { ClientEncryptionService } from '../../../../core/services/encryption.se
 
 import { RecurringExpensesService } from '../../services/recurring-expenses.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { CryptoSessionManager } from '../../../../core/services/crypto-session-manager.service';
 import { signal } from '@angular/core';
 
 describe('GroupDetailComponent', () => {
@@ -84,6 +85,12 @@ describe('GroupDetailComponent', () => {
   beforeEach(async () => {
     // Mock window.alert to prevent JSDOM errors
     jest.spyOn(window, 'alert').mockImplementation(() => undefined);
+    // jsdom doesn't implement scrollIntoView; the component calls it (via
+    // setTimeout) after tab-bar changes. Left unmocked, a queued call from
+    // an earlier test can fire mid-await in a later test (e.g. one that
+    // does several real microtask flushes) and crash as an uncaught
+    // exception unrelated to whatever that later test is actually checking.
+    Element.prototype.scrollIntoView = jest.fn();
 
     mockGroupsService = {
       getGroup: jest.fn().mockReturnValue(of(mockGroup)),
@@ -206,6 +213,266 @@ describe('GroupDetailComponent', () => {
     expect(component.group()).toEqual(mockGroup);
     expect(component.members().length).toBe(4);
     expect(component.isOwnerOrAdmin()).toBe(true);
+  });
+
+  describe('cross-tab crypto recovery', () => {
+    it('re-runs initializeGroupKeysAndSelfHeal whenever CryptoSessionManager reports Ready (this page unlocking, or another tab via BroadcastChannel)', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.group.set(mockGroup as any);
+      const spy = jest.spyOn(component, 'initializeGroupKeysAndSelfHeal');
+      spy.mockClear();
+
+      // Simulate the master key becoming available (e.g. the shared
+      // <app-crypto-recovery-panel> unlocked it, or another tab persisted
+      // it to the shared IndexedDB vault and this tab's CryptoSessionManager
+      // picked that up via BroadcastChannel).
+      mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
+      const cryptoSession = TestBed.inject(CryptoSessionManager);
+      await cryptoSession.ensureCryptoContext();
+      expect(cryptoSession.isReady()).toBe(true);
+
+      fixture.detectChanges(); // let the effect observe the signal change
+
+      expect(spy).toHaveBeenCalledWith('group-1');
+    });
+
+    it('does not re-run initializeGroupKeysAndSelfHeal while the session is not Ready', async () => {
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      component.group.set(mockGroup as any);
+      const spy = jest.spyOn(component, 'initializeGroupKeysAndSelfHeal');
+      spy.mockClear();
+
+      const cryptoSession = TestBed.inject(CryptoSessionManager);
+      expect(cryptoSession.isReady()).toBe(false);
+
+      fixture.detectChanges();
+
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('renders the shared <app-crypto-recovery-panel> in the template (structural — no component-local password prompt UI)', () => {
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector('app-crypto-recovery-panel'),
+      ).not.toBeNull();
+      // The old, component-local unlock input this replaced must be gone.
+      expect(
+        fixture.nativeElement.querySelector(
+          'input[placeholder="Enter password to unlock vault"]',
+        ),
+      ).toBeNull();
+    });
+  });
+
+  describe('downloadAttachment — crypto recovery wiring', () => {
+    const mockExpense = {
+      id: 'expense-1',
+      encryptionScope: 'personal' as const,
+    };
+    const mockFile = {
+      expenseId: 'expense-1',
+      encryptedFileKey: 'wrapped-file-key',
+      encryptedOriginalName: 'encrypted-name',
+      storageKey: 'file-1',
+      mimeType: 'text/plain',
+    };
+
+    async function flushMicrotasks(times = 15): Promise<void> {
+      for (let i = 0; i < times; i++) {
+        await Promise.resolve();
+      }
+    }
+
+    beforeEach(() => {
+      component.expenses.set([mockExpense as any]);
+      jest
+        .spyOn(Storage.prototype, 'getItem')
+        .mockImplementation((key) =>
+          key === 'sim_storage:file-1' ? 'encrypted-bytes' : null,
+        );
+      // jsdom doesn't implement these — define them rather than spyOn, which
+      // requires the property to already exist.
+      window.URL.createObjectURL = jest.fn().mockReturnValue('blob:mock-url');
+      window.URL.revokeObjectURL = jest.fn();
+    });
+
+    it('queues the download instead of alerting when the crypto session is genuinely not ready, then auto-resumes once unlocked', async () => {
+      // The outer beforeEach's default loadKeyFromSession already resolves
+      // null, so ensureCryptoContext() (and therefore resolveExpenseKey())
+      // fails until we unlock below.
+      const alertSpy = window.alert as jest.Mock;
+      alertSpy.mockClear();
+
+      const pending = component.downloadAttachment(mockFile);
+      await flushMicrotasks();
+
+      // Still paused, not failed — no premature alert to dismiss.
+      expect(alertSpy).not.toHaveBeenCalled();
+
+      mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
+      const cryptoSession = TestBed.inject(CryptoSessionManager);
+      await cryptoSession.ensureCryptoContext();
+      await pending;
+
+      expect(mockEncryptionService.unwrapKey).toHaveBeenCalledWith(
+        'wrapped-file-key',
+        expect.anything(),
+      );
+      expect(alertSpy).not.toHaveBeenCalled();
+    });
+
+    it('still alerts immediately for a real, non-recoverable failure (e.g. missing attachment bytes) when the session is fine', async () => {
+      mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
+      (Storage.prototype.getItem as jest.Mock).mockReturnValue(null);
+      const alertSpy = window.alert as jest.Mock;
+      alertSpy.mockClear();
+
+      await component.downloadAttachment(mockFile);
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Attachment file data not found'),
+      );
+    });
+  });
+
+  describe('progressive loading — parallel fetch (Phase 1)', () => {
+    it('fetches members, balances, history, trash, and recurring immediately, without waiting for getGroup() to resolve', () => {
+      const getGroupSubject = new Subject<typeof mockGroup>();
+      mockGroupsService.getGroup = jest
+        .fn()
+        .mockReturnValue(getGroupSubject.asObservable()) as any;
+
+      fixture.detectChanges(); // triggers ngOnInit; getGroup() is still pending
+
+      expect(component.group()).toBeNull();
+      expect(mockGroupsService.getMembers).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getBalances).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getHistoryLogs).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getDeletedExpenses).toHaveBeenCalledWith(
+        'group-1',
+      );
+      expect(
+        mockRecurringExpensesService.getRecurringExpenses,
+      ).toHaveBeenCalledWith('group-1');
+
+      getGroupSubject.next(mockGroup);
+      getGroupSubject.complete();
+      expect(component.group()).toEqual(mockGroup);
+    });
+
+    it('does not fetch expenses or carry-forward until getGroup() resolves (household month-scoping dependency)', () => {
+      const getGroupSubject = new Subject<typeof mockGroup>();
+      mockGroupsService.getGroup = jest
+        .fn()
+        .mockReturnValue(getGroupSubject.asObservable()) as any;
+
+      fixture.detectChanges();
+
+      expect(mockExpensesService.getExpenses).not.toHaveBeenCalled();
+      expect(mockGroupsService.getCarryForward).not.toHaveBeenCalled();
+
+      getGroupSubject.next(mockGroup); // household group
+      getGroupSubject.complete();
+
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledWith(
+        'group-1',
+        expect.anything(),
+      );
+      expect(mockGroupsService.getCarryForward).toHaveBeenCalled();
+    });
+
+    it('computes userBalance correctly when balances() resolves before group()', () => {
+      const getGroupSubject = new Subject<typeof mockGroup>();
+      mockGroupsService.getGroup = jest
+        .fn()
+        .mockReturnValue(getGroupSubject.asObservable()) as any;
+      mockGroupsService.getBalances = jest.fn().mockReturnValue(
+        of({
+          balances: [{ userId: 'user-owner', currency: 'USD', netBalance: 42 }],
+          suggestedSettlements: [],
+        }),
+      ) as any;
+
+      fixture.detectChanges(); // balances resolves synchronously here; group() is still null
+
+      expect(component.group()).toBeNull();
+      expect(component.userBalance()).toBe(0); // no currency to match against yet
+
+      getGroupSubject.next(mockGroup); // currency: 'USD'
+      getGroupSubject.complete();
+
+      // userBalance is a computed(), so it re-evaluates once group() is set —
+      // no stale value frozen from before group() existed.
+      expect(component.userBalance()).toBe(42);
+    });
+  });
+
+  describe('progressive loading — per-section skeletons/errors (Phase 2)', () => {
+    it('clears the page shell skeleton once getGroup() resolves, not once expenses resolve', () => {
+      const getExpensesSubject = new Subject<{
+        data: unknown[];
+        meta: { totalItems: number };
+      }>();
+      mockExpensesService.getExpenses = jest
+        .fn()
+        .mockReturnValue(getExpensesSubject.asObservable()) as any;
+
+      fixture.detectChanges(); // getGroup() resolves synchronously via of(); getExpenses() is still pending
+
+      expect(component.group()).toEqual(mockGroup);
+      expect(component.showSkeleton()).toBe(false);
+      expect(component.isLoading()).toBe(false);
+
+      getExpensesSubject.next({ data: [], meta: { totalItems: 0 } });
+      getExpensesSubject.complete();
+    });
+
+    it('tracks balances loading independently via isLoadingBalances', () => {
+      const getBalancesSubject = new Subject<{
+        balances: unknown[];
+        suggestedSettlements: unknown[];
+      }>();
+      mockGroupsService.getBalances = jest
+        .fn()
+        .mockReturnValue(getBalancesSubject.asObservable()) as any;
+
+      fixture.detectChanges();
+      expect(component.isLoadingBalances()).toBe(true);
+
+      getBalancesSubject.next({ balances: [], suggestedSettlements: [] });
+      getBalancesSubject.complete();
+      expect(component.isLoadingBalances()).toBe(false);
+    });
+
+    it('sets historyError (not just a console.error) on a failed history fetch, independent of other sections', () => {
+      mockGroupsService.getHistoryLogs = jest
+        .fn()
+        .mockReturnValue(throwError(() => new Error('network error'))) as any;
+
+      fixture.detectChanges();
+
+      expect(component.historyError()).toBe(true);
+      expect(component.isLoadingHistory()).toBe(false);
+      // Sibling sections are unaffected by history's failure.
+      expect(component.membersError()).toBe(false);
+      expect(component.balancesError()).toBe(false);
+    });
+
+    it('sets trashError and recurringError independently on failure, without affecting each other', () => {
+      mockGroupsService.getDeletedExpenses = jest
+        .fn()
+        .mockReturnValue(throwError(() => new Error('boom'))) as any;
+
+      fixture.detectChanges();
+
+      expect(component.trashError()).toBe(true);
+      expect(component.recurringError()).toBe(false);
+    });
   });
 
   it('should handle toggle of contribution mode', () => {

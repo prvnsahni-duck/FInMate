@@ -25,6 +25,7 @@ export * from './lib/encrypted-group-key.entity';
 export * from './lib/encrypted-expense-key.entity';
 export * from './lib/audit-log.entity';
 export * from './lib/encryption.transformer';
+export * from './lib/encrypted-envelope';
 export * from './lib/api-responses';
 
 // Shared validation DTOs

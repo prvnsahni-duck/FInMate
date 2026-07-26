@@ -5,6 +5,7 @@ import {
   DestroyRef,
   signal,
   computed,
+  effect,
   ViewChild,
   ElementRef,
   AfterViewInit,
@@ -33,6 +34,8 @@ import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../../core/constants/crypto
 import { ExpenseDecryptCoordinator } from '../../../../core/services/expense-decrypt-coordinator.service';
 import { ExpenseDecryptionService } from '../../../../core/services/expense-decryption.service';
 import { classifyDecryptionError } from '../../../../core/models/decryption-state';
+import { CryptoSessionManager } from '../../../../core/services/crypto-session-manager.service';
+import { CryptoRecoveryQueueService } from '../../../../core/services/crypto-recovery-queue.service';
 
 import {
   BalanceEntry,
@@ -55,6 +58,7 @@ import {
   SuggestedSettlement,
 } from '../../components/group-balances/group-balances.component';
 import { GroupMembersComponent } from '../../components/group-members/group-members.component';
+import { CryptoRecoveryPanelComponent } from '../../../../shared/components/crypto-recovery-panel/crypto-recovery-panel.component';
 import {
   resolveMemberDisplayName,
   resolveUserDisplayName,
@@ -101,6 +105,7 @@ export interface GroupExpense extends Expense {
     GroupBalancesComponent,
     GroupMembersComponent,
     DropdownComponent,
+    CryptoRecoveryPanelComponent,
   ],
   templateUrl: './group-detail.component.html',
   styleUrls: ['./group-detail.component.scss'],
@@ -117,6 +122,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   private decryptCoordinator = inject(ExpenseDecryptCoordinator);
   private expenseDecryption = inject(ExpenseDecryptionService);
   private store = inject(Store);
+  private cryptoSession = inject(CryptoSessionManager);
+  private recoveryQueue = inject(CryptoRecoveryQueueService);
   private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -127,6 +134,23 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       }
       // Cancel any in-flight decryption retry loop for this group.
       this.decryptCoordinator.stop();
+    });
+
+    // Whenever CryptoSessionManager reports the crypto session Ready —
+    // whether from this page's own <app-crypto-recovery-panel> unlock, or
+    // from another tab (BroadcastChannel) — re-run key provisioning and
+    // decryption. initializeGroupKeysAndSelfHeal()/startDecryption() are
+    // documented as safe to call repeatedly (cancel-and-restart, no server
+    // round-trip), so this also harmlessly re-fires on a normal first-load
+    // success; the alternative (tracking "already handled" state) isn't
+    // worth the extra complexity for an idempotent operation.
+    effect(() => {
+      if (this.cryptoSession.isReady()) {
+        const g = this.group();
+        if (g?.id) {
+          this.initializeGroupKeysAndSelfHeal(g.id);
+        }
+      }
     });
   }
 
@@ -170,7 +194,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   expenses = signal<GroupExpense[]>([]);
   members = signal<GroupMember[]>([]);
   balances = signal<BalanceEntry[]>([]);
-  userBalance = signal<number>(0);
   suggestedSettlements = signal<SuggestedSettlement[]>([]);
   historyLogs = signal<GroupAuditLog[]>([]);
   deletedExpenses = signal<Expense[]>([]);
@@ -204,7 +227,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   currentTimelineMonth = signal<Date>(new Date());
   isMonthLocked = signal<boolean>(false);
   isViewer = signal<boolean>(false);
-  isMasterKeyLoaded = signal<boolean>(true);
   rateLimitError = this.groupKeyService.rateLimitError;
   readonly DECRYPTION_FAILED_PLACEHOLDER = DECRYPTION_FAILED_PLACEHOLDER;
   isRefreshingKey = signal<boolean>(false);
@@ -222,6 +244,17 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   membersError = signal<boolean>(false);
   balancesError = signal<boolean>(false);
   analyticsError = signal<boolean>(false);
+
+  // Per-section loading/error state (Phase 2 — each section owns its own,
+  // independent of the page shell and of every sibling section).
+  isLoadingMembers = signal<boolean>(false);
+  isLoadingBalances = signal<boolean>(false);
+  isLoadingHistory = signal<boolean>(false);
+  historyError = signal<boolean>(false);
+  isLoadingTrash = signal<boolean>(false);
+  trashError = signal<boolean>(false);
+  isLoadingRecurring = signal<boolean>(false);
+  recurringError = signal<boolean>(false);
 
   // Decryption lifecycle state (owned by the coordinator).
   decryptionPhase = this.decryptCoordinator.phase;
@@ -317,6 +350,22 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return member?.role === 'owner';
   });
 
+  /**
+   * Derived, not imperatively set — group() and balances() now resolve
+   * independently (they're fetched in parallel), so computing this reactively
+   * means it's always correct regardless of which one lands first, instead of
+   * being frozen at whatever group()'s value was at the moment balances
+   * happened to resolve.
+   */
+  userBalance = computed(() => {
+    const g = this.group();
+    const currentUserId = this.currentUserId();
+    const entry = this.balances().find(
+      (b) => b.userId === currentUserId && b.currency === g?.currency,
+    );
+    return entry ? entry.netBalance : 0;
+  });
+
   // Archive (Delete Group) dialog state
   isArchiveDialogOpen = signal<boolean>(false);
   archiveConfirmName = signal<string>('');
@@ -389,7 +438,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         const groupId = this.group()?.id;
         if (groupId && isFilterChanged) {
           this.currentPage.set(1);
-          this.fetchExpenses(groupId, true);
+          this.fetchExpenses(groupId);
         }
 
         this.scrollToActiveTab();
@@ -413,15 +462,24 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.filterStartDate.set(initialStart);
           this.filterEndDate.set(initialEnd);
 
+          // Fired independently of getGroup() — none of these need the Group
+          // response, only the groupId already available from the route.
+          // (docs/audits/group-detail-progressive-loading-audit.md §6.1)
+          this.fetchMembers(groupId);
+          this.fetchBalances(groupId);
+          this.fetchHistoryLogs(groupId);
+          this.fetchDeletedExpenses(groupId);
+          this.fetchRecurringExpenses(groupId);
+
           this.groupsService.getGroup(groupId).subscribe({
             next: (res) => {
               this.group.set(res);
+              this.stopLoading();
+              // Stays gated on getGroup(): needs res.groupType to decide the
+              // household current-month date range before building its
+              // request (see fetchExpenses below), the same real exception
+              // already noted for fetchCarryForward in the audit.
               this.fetchExpenses(groupId);
-              this.fetchMembers(groupId);
-              this.fetchBalances(groupId);
-              this.fetchHistoryLogs(groupId);
-              this.fetchDeletedExpenses(groupId);
-              this.fetchRecurringExpenses(groupId);
               if (res.groupType === 'household') {
                 this.fetchCarryForward(groupId);
               }
@@ -436,15 +494,23 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
    * Called once membership (and therefore the caller's role) is known.
    * Proactively provisions key material, then hands the expense list to the
    * decryption coordinator which owns the decrypt → retry → success lifecycle.
+   *
+   * Routes the master-key check through CryptoSessionManager.
+   * ensureCryptoContext() rather than calling encryptionService directly —
+   * this keeps CryptoSessionManager.state accurate even for a brand-new or
+   * empty group with nothing yet to decrypt (which would otherwise never
+   * exercise the crypto session at all), so the shared
+   * <app-crypto-recovery-panel> always reflects reality.
    */
   async initializeGroupKeysAndSelfHeal(groupId: string) {
-    const email = this.store.selectSnapshot(
-      (state: any) => state.auth?.user?.email,
-    );
-    const masterKey = await this.encryptionService.loadKeyFromSession(
-      email || undefined,
-    );
-    this.isMasterKeyLoaded.set(!!masterKey);
+    try {
+      await this.cryptoSession.ensureCryptoContext('group_detail_init');
+    } catch {
+      // CryptoSessionManager.state already reflects the failure; the
+      // shared recovery panel picks it up. Key provisioning below still
+      // needs an attempt so an owner/admin's background self-heal keeps
+      // working once their own session recovers.
+    }
 
     const role = this.getCallerRole();
     // Proactively ensure keys exist / are provisioned for all members, even
@@ -558,7 +624,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     const groupId = this.group()?.id;
     if (groupId) {
       this.currentPage.set(1);
-      this.fetchExpenses(groupId, true);
+      this.fetchExpenses(groupId);
     }
   }
 
@@ -639,27 +705,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.isOffline.set(true);
   }
 
-  async unlockVault(password: string) {
-    if (!password) return;
-    try {
-      const email = this.store.selectSnapshot(
-        (state: any) => state.auth?.user?.email,
-      );
-      if (!email) throw new Error('User email not found');
-
-      await this.encryptionService.deriveAndStoreKey(password, email);
-      this.isMasterKeyLoaded.set(true);
-
-      const g = this.group();
-      if (g?.id) {
-        await this.initializeGroupKeysAndSelfHeal(g.id);
-        this.fetchExpenses(g.id);
-        this.fetchBalances(g.id);
-      }
-    } catch (e: any) {
-      alert('Failed to unlock vault: ' + (e.message || e));
-    }
-  }
+  // unlockVault() removed — superseded by <app-crypto-recovery-panel>,
+  // which owns the unlock action for every encrypted feature. The
+  // constructor's isReady() effect above re-runs
+  // initializeGroupKeysAndSelfHeal (and therefore re-fetches nothing extra
+  // beyond what that already retriggers) once the panel restores the
+  // session, so this page doesn't need its own copy of that flow anymore.
 
   getCurrentMonthString(): string {
     const d = this.currentTimelineMonth();
@@ -696,12 +747,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  fetchExpenses(groupId: string, silent = false) {
-    if (silent) {
-      this.isLoadingExpenses.set(true);
-    } else {
-      this.startLoading();
-    }
+  /**
+   * Owns its own section-scoped loading/error state (isLoadingExpenses /
+   * ledgerError) — it no longer touches the page-wide isLoading/showSkeleton
+   * gate, which now only covers the brief window until getGroup() resolves.
+   */
+  fetchExpenses(groupId: string) {
+    this.isLoadingExpenses.set(true);
     let start = this.filterStartDate();
     let end = this.filterEndDate();
     const g = this.group();
@@ -766,7 +818,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.expenses.set(mappedExpenses);
           this.totalExpenses.set(res.meta?.totalItems || 0);
           this.isLoadingExpenses.set(false);
-          this.stopLoading();
           this.ledgerError.set(false);
           // Hand the freshly-fetched list to the coordinator for
           // classification + automatic retry/recovery.
@@ -774,17 +825,18 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         },
         error: () => {
           this.isLoadingExpenses.set(false);
-          this.stopLoading();
           this.ledgerError.set(true);
         },
       });
   }
 
   fetchMembers(groupId: string) {
+    this.isLoadingMembers.set(true);
     this.membersError.set(false);
     this.groupsService.getMembers(groupId).subscribe({
       next: (res) => {
         this.members.set(res);
+        this.isLoadingMembers.set(false);
 
         const currentUserId = this.currentUserId();
         const myMember = res.find((m) => m.user?.id === currentUserId);
@@ -794,48 +846,62 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       },
       error: (err) => {
         console.error('Failed to fetch group members', err);
+        this.isLoadingMembers.set(false);
         this.membersError.set(true);
       },
     });
   }
 
   fetchBalances(groupId: string) {
-    const g = this.group();
-    if (!g) return;
+    // No group()-null early return here (removed): this now fires in
+    // parallel with getGroup() rather than after it. userBalance is a
+    // computed() derived from group()+balances(), so it's correct regardless
+    // of arrival order — see the userBalance computed() above.
+    this.isLoadingBalances.set(true);
     this.balancesError.set(false);
     this.groupsService.getBalances(groupId).subscribe({
       next: (res) => {
         this.balances.set(res.balances);
         this.suggestedSettlements.set(res.suggestedSettlements);
-
-        const currentUserId = this.currentUserId();
-        const myBalanceEntry = res.balances.find(
-          (b) => b.userId === currentUserId && b.currency === g.currency,
-        );
-        this.userBalance.set(myBalanceEntry ? myBalanceEntry.netBalance : 0);
+        this.isLoadingBalances.set(false);
       },
       error: (err) => {
         console.error('Failed to fetch balances', err);
+        this.isLoadingBalances.set(false);
         this.balancesError.set(true);
       },
     });
   }
 
   fetchHistoryLogs(groupId: string) {
+    this.isLoadingHistory.set(true);
+    this.historyError.set(false);
     this.groupsService.getHistoryLogs(groupId).subscribe({
       next: (res) => {
         this.historyLogs.set(res.data || []);
+        this.isLoadingHistory.set(false);
       },
-      error: (err) => console.error('Failed to fetch history logs', err),
+      error: (err) => {
+        console.error('Failed to fetch history logs', err);
+        this.isLoadingHistory.set(false);
+        this.historyError.set(true);
+      },
     });
   }
 
   fetchDeletedExpenses(groupId: string) {
+    this.isLoadingTrash.set(true);
+    this.trashError.set(false);
     this.groupsService.getDeletedExpenses(groupId).subscribe({
       next: (res) => {
         this.deletedExpenses.set(res.data || []);
+        this.isLoadingTrash.set(false);
       },
-      error: (err) => console.error('Failed to fetch deleted expenses', err),
+      error: (err) => {
+        console.error('Failed to fetch deleted expenses', err);
+        this.isLoadingTrash.set(false);
+        this.trashError.set(true);
+      },
     });
   }
 
@@ -1032,7 +1098,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.currentPage.update((val) => val + delta);
     const g = this.group();
     if (g?.id) {
-      this.fetchExpenses(g.id, true);
+      this.fetchExpenses(g.id);
     }
   }
 
@@ -1045,13 +1111,24 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         }
 
         // Reuse the central pipeline's scope-key resolution + classification
-        // instead of re-implementing it here.
-        const { key: scopeKey, keyStatus } =
-          await this.expenseDecryption.resolveExpenseKey(expense as any);
-
-        if (!scopeKey) {
-          throw new Error(classifyDecryptionError({ keyStatus }).message);
-        }
+        // instead of re-implementing it here. resolveExpenseKey() never
+        // rejects (it swallows session failures into keyStatus:'no_session'),
+        // so the null-key check has to throw *inside* the operation passed to
+        // runWithRecovery — only then can its catch see the failure, verify
+        // it's a genuine session block, and queue+auto-resume the whole
+        // decrypt-and-save flow once unlocked, instead of failing with an
+        // alert the user has to dismiss before clicking download again.
+        const scopeKey = await this.recoveryQueue.runWithRecovery(async () => {
+          const result = await this.expenseDecryption.resolveExpenseKey(
+            expense as any,
+          );
+          if (!result.key) {
+            throw new Error(
+              classifyDecryptionError({ keyStatus: result.keyStatus }).message,
+            );
+          }
+          return result.key;
+        });
 
         const fileKey = await this.encryptionService.unwrapKey(
           file.encryptedFileKey,
@@ -1129,11 +1206,18 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   contributionSuccess = '';
 
   fetchRecurringExpenses(groupId: string) {
+    this.isLoadingRecurring.set(true);
+    this.recurringError.set(false);
     this.recurringExpensesService.getRecurringExpenses(groupId).subscribe({
       next: (res) => {
         this.recurringExpenses.set(res || []);
+        this.isLoadingRecurring.set(false);
       },
-      error: (err) => console.error('Failed to fetch recurring expenses', err),
+      error: (err) => {
+        console.error('Failed to fetch recurring expenses', err);
+        this.isLoadingRecurring.set(false);
+        this.recurringError.set(true);
+      },
     });
   }
 
