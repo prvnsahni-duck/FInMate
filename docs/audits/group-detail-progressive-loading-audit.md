@@ -45,8 +45,11 @@ sequenceDiagram
 **The single template gate is the whole story:**
 
 ```html
-@if (showSkeleton()) { <!-- one full-page skeleton --> }
-@if (!showSkeleton() && group()) { <!-- header, tab bar, ALL tab content --> }
+@if (showSkeleton()) {
+<!-- one full-page skeleton -->
+} @if (!showSkeleton() && group()) {
+<!-- header, tab bar, ALL tab content -->
+}
 ```
 
 `showSkeleton` is only cleared inside `fetchExpenses()`'s `next`/`error` handlers (`group-detail.component.ts:769,777`). So:
@@ -56,21 +59,21 @@ sequenceDiagram
 
 ## 2. Component → Required API(s) → Can Render Before? Dependency Table
 
-| Component / section | Actually requires | Currently waits for | Can render independently? |
-| --- | --- | --- | --- |
-| Header (group name, currency badge, offline/key-status banners) | `group()` only | `showSkeleton()` (⟶ expenses) | **Yes** — needs only `GET /groups/:id` |
-| Tab bar | `group()` only | `showSkeleton()` (⟶ expenses) | **Yes** — same |
-| Balance summary cards (top of ledger tab) | `balances()` | `showSkeleton()` (⟶ expenses) | **Yes** — needs only `GET .../settlements/balances`, already fetched in parallel, just gated behind the wrong flag |
-| Expense list (ledger tab) | `expenses()`, `members()` for split display names | `getGroup()` → itself | Genuinely needs `expenses`; `members` dependency is soft (falls back gracefully if absent — see `fetchExpenses`'s mapping code, which only backfills from `members()` if the API response didn't already include display names) |
-| Expense decryption (title/description text) | master key session, `members()` (for role), group key resolution, then per-expense ciphertext | `fetchMembers()` success → `initializeGroupKeysAndSelfHeal()` | Already decoupled from the page shell via `decryptCoordinator`'s own phase/summary signals (`decryptionPhase`, `showKeysWaitingBanner`) — genuinely good existing pattern, per-expense progressive reveal already works once the shell is visible |
-| `GroupBalancesComponent` (rendered inside ledger tab) | `balances`, `suggestedSettlements`, `members`, `userBalance` — all passed as `input.required<>()` | Parent's `balances()`/`members()` signals | Already correctly receives data via Input, does not re-fetch — no duplicate-request problem here |
-| `GroupMembersComponent` (settings tab) | `members`, `groupId`, `isOwnerOrAdmin` — all `input.required<>()` | Parent's `members()` signal | Same — correctly Input-driven, no re-fetch |
-| `AnalyticsChartsComponent` (analytics tab) | `groupId`, `currency` inputs only | Fetches its **own** data via its own injected `ExpensesService` call | **Already fully independent** — doesn't mount until `activeTab() === 'analytics'`, doesn't share the parent's `expenses()` signal at all. This is the best existing example of the pattern the rest of the page should copy. |
-| History tab (`GroupHistoryLogComponent`) | `historyLogs()` | Eagerly fetched on page load, gated by `showSkeleton` | Data fetch could be deferred to first tab visit; template mount is already deferred (`@if (activeTab() === 'history')`) |
-| Trash tab (`GroupTrashComponent`) | `deletedExpenses()` | Same as history | Same |
-| Recurring tab | `recurringExpenses()` | Same | Same |
-| Settings tab (contributions section) | Contributions, fetched via `loadContributionsForMonth()` | **Already** deferred — only called when `tab === 'settings'` via the queryParams subscriber | This is the second good existing example — the pattern just isn't applied consistently to the other tabs |
-| "Add Expense" trigger button | `groupId`, `members()` (for participant list) | Physically inside the `showSkeleton` gate — button doesn't exist in the DOM until the whole page unblocks | **Yes**, trivially — needs nothing the header doesn't already have |
+| Component / section                                             | Actually requires                                                                                 | Currently waits for                                                                                       | Can render independently?                                                                                                                                                                                                                         |
+| --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Header (group name, currency badge, offline/key-status banners) | `group()` only                                                                                    | `showSkeleton()` (⟶ expenses)                                                                             | **Yes** — needs only `GET /groups/:id`                                                                                                                                                                                                            |
+| Tab bar                                                         | `group()` only                                                                                    | `showSkeleton()` (⟶ expenses)                                                                             | **Yes** — same                                                                                                                                                                                                                                    |
+| Balance summary cards (top of ledger tab)                       | `balances()`                                                                                      | `showSkeleton()` (⟶ expenses)                                                                             | **Yes** — needs only `GET .../settlements/balances`, already fetched in parallel, just gated behind the wrong flag                                                                                                                                |
+| Expense list (ledger tab)                                       | `expenses()`, `members()` for split display names                                                 | `getGroup()` → itself                                                                                     | Genuinely needs `expenses`; `members` dependency is soft (falls back gracefully if absent — see `fetchExpenses`'s mapping code, which only backfills from `members()` if the API response didn't already include display names)                   |
+| Expense decryption (title/description text)                     | master key session, `members()` (for role), group key resolution, then per-expense ciphertext     | `fetchMembers()` success → `initializeGroupKeysAndSelfHeal()`                                             | Already decoupled from the page shell via `decryptCoordinator`'s own phase/summary signals (`decryptionPhase`, `showKeysWaitingBanner`) — genuinely good existing pattern, per-expense progressive reveal already works once the shell is visible |
+| `GroupBalancesComponent` (rendered inside ledger tab)           | `balances`, `suggestedSettlements`, `members`, `userBalance` — all passed as `input.required<>()` | Parent's `balances()`/`members()` signals                                                                 | Already correctly receives data via Input, does not re-fetch — no duplicate-request problem here                                                                                                                                                  |
+| `GroupMembersComponent` (settings tab)                          | `members`, `groupId`, `isOwnerOrAdmin` — all `input.required<>()`                                 | Parent's `members()` signal                                                                               | Same — correctly Input-driven, no re-fetch                                                                                                                                                                                                        |
+| `AnalyticsChartsComponent` (analytics tab)                      | `groupId`, `currency` inputs only                                                                 | Fetches its **own** data via its own injected `ExpensesService` call                                      | **Already fully independent** — doesn't mount until `activeTab() === 'analytics'`, doesn't share the parent's `expenses()` signal at all. This is the best existing example of the pattern the rest of the page should copy.                      |
+| History tab (`GroupHistoryLogComponent`)                        | `historyLogs()`                                                                                   | Eagerly fetched on page load, gated by `showSkeleton`                                                     | Data fetch could be deferred to first tab visit; template mount is already deferred (`@if (activeTab() === 'history')`)                                                                                                                           |
+| Trash tab (`GroupTrashComponent`)                               | `deletedExpenses()`                                                                               | Same as history                                                                                           | Same                                                                                                                                                                                                                                              |
+| Recurring tab                                                   | `recurringExpenses()`                                                                             | Same                                                                                                      | Same                                                                                                                                                                                                                                              |
+| Settings tab (contributions section)                            | Contributions, fetched via `loadContributionsForMonth()`                                          | **Already** deferred — only called when `tab === 'settings'` via the queryParams subscriber               | This is the second good existing example — the pattern just isn't applied consistently to the other tabs                                                                                                                                          |
+| "Add Expense" trigger button                                    | `groupId`, `members()` (for participant list)                                                     | Physically inside the `showSkeleton` gate — button doesn't exist in the DOM until the whole page unblocks | **Yes**, trivially — needs nothing the header doesn't already have                                                                                                                                                                                |
 
 ## 3. API Dependency Graph
 
@@ -106,7 +109,7 @@ flowchart TD
     class GetGroup unnecessary
 ```
 
-The only edges that should actually exist as *hard* dependencies are `GetMembers → KeyProvision → Decrypt` and `GetExpenses → Decrypt`. Every dotted "hard-blocks" edge from `GetGroup` is an artifact of the current code structure (all six calls living inside `getGroup()`'s `next` callback), not a real data dependency — `groupId` is all any of them need.
+The only edges that should actually exist as _hard_ dependencies are `GetMembers → KeyProvision → Decrypt` and `GetExpenses → Decrypt`. Every dotted "hard-blocks" edge from `GetGroup` is an artifact of the current code structure (all six calls living inside `getGroup()`'s `next` callback), not a real data dependency — `groupId` is all any of them need.
 
 ## 4. UX Pain Points (in priority order, by how often a real user hits them)
 
@@ -136,14 +139,14 @@ Fire all seven initial requests (`group`, `expenses`, `members`, `balances`, `hi
 
 Replace the two-branch `showSkeleton()` / `!showSkeleton() && group()` template gate with independent gates per section, each backed by its own trio of signals (already the established naming convention — extend it):
 
-| Section | Loading signal (add if missing) | Error signal (exists / add) | Data signal (exists) |
-| --- | --- | --- | --- |
-| Header | `isLoadingGroup` (new) | `groupError` (new) | `group` |
-| Balance cards | `isLoadingBalances` (new) | `balancesError` (exists) | `balances` |
-| Ledger list | `isLoadingExpenses` (exists — reuse for initial load too) | `ledgerError` (exists) | `expenses` |
-| History tab | `isLoadingHistory` (new) | `historyError` (new) | `historyLogs` |
-| Trash tab | `isLoadingTrash` (new) | `trashError` (new) | `deletedExpenses` |
-| Recurring tab | `isLoadingRecurring` (new) | `recurringError` (new) | `recurringExpenses` |
+| Section       | Loading signal (add if missing)                           | Error signal (exists / add) | Data signal (exists) |
+| ------------- | --------------------------------------------------------- | --------------------------- | -------------------- |
+| Header        | `isLoadingGroup` (new)                                    | `groupError` (new)          | `group`              |
+| Balance cards | `isLoadingBalances` (new)                                 | `balancesError` (exists)    | `balances`           |
+| Ledger list   | `isLoadingExpenses` (exists — reuse for initial load too) | `ledgerError` (exists)      | `expenses`           |
+| History tab   | `isLoadingHistory` (new)                                  | `historyError` (new)        | `historyLogs`        |
+| Trash tab     | `isLoadingTrash` (new)                                    | `trashError` (new)          | `deletedExpenses`    |
+| Recurring tab | `isLoadingRecurring` (new)                                | `recurringError` (new)      | `recurringExpenses`  |
 
 Each section's template renders one of three states independently: its own skeleton, its own error banner with a retry button calling the same `fetch*` method, or its data — never blocked by a sibling section's state.
 
@@ -164,23 +167,23 @@ This requires an actual cache, which doesn't exist today (§ groups.service.ts h
 
 ### 6.6 Parallelization already exists where it matters — don't add ceremony
 
-The six/seven calls are already fired without `forkJoin`/sequential chaining relative to each other (§1's `par` block) — the only serialization to remove is the `getGroup()` prefix. Resist the urge to introduce `forkJoin` or Angular route resolvers here: a resolver would reintroduce a single blocking gate before the route even activates, which is the opposite of this brief's goal ("Do not... use route resolvers... only where justified" — none of these calls justify one, since the whole point is *not* to block navigation on any of them).
+The six/seven calls are already fired without `forkJoin`/sequential chaining relative to each other (§1's `par` block) — the only serialization to remove is the `getGroup()` prefix. Resist the urge to introduce `forkJoin` or Angular route resolvers here: a resolver would reintroduce a single blocking gate before the route even activates, which is the opposite of this brief's goal ("Do not... use route resolvers... only where justified" — none of these calls justify one, since the whole point is _not_ to block navigation on any of them).
 
 ### 6.7 Loading priority model
 
 Explicit priority tiers, so future changes to this page have a rule to check against instead of relying on tribal knowledge: **a higher-priority section must never be made to wait on a lower-priority one.**
 
-| Priority | Section | Rationale |
-| --- | --- | --- |
-| P0 | Route shell, tab bar, "Add Expense" trigger | Needs only `group()`; must be interactive before any other data arrives |
-| P1 | Group header (name, currency, offline/key-status banners) | Same data as P0, grouped separately only because it's a distinct visual region |
-| P1 | Expense list (ledger tab) | The primary reason a user opens this page |
-| P2 | Balance cards | Important, but secondary to seeing what was actually spent |
-| P2 | Members (avatars, roles) | Needed for split display names and the Add Expense participant list, but tolerant of arriving slightly after the ledger |
-| P3 | History (on tab visit) | Not needed until explicitly requested |
-| P3 | Trash (on tab visit) | Same |
-| P3 | Recurring (on tab visit) | Same |
-| P4 | Analytics (on tab visit) | Heaviest computation, least time-sensitive, already correctly deferred today |
+| Priority | Section                                                   | Rationale                                                                                                               |
+| -------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| P0       | Route shell, tab bar, "Add Expense" trigger               | Needs only `group()`; must be interactive before any other data arrives                                                 |
+| P1       | Group header (name, currency, offline/key-status banners) | Same data as P0, grouped separately only because it's a distinct visual region                                          |
+| P1       | Expense list (ledger tab)                                 | The primary reason a user opens this page                                                                               |
+| P2       | Balance cards                                             | Important, but secondary to seeing what was actually spent                                                              |
+| P2       | Members (avatars, roles)                                  | Needed for split display names and the Add Expense participant list, but tolerant of arriving slightly after the ledger |
+| P3       | History (on tab visit)                                    | Not needed until explicitly requested                                                                                   |
+| P3       | Trash (on tab visit)                                      | Same                                                                                                                    |
+| P3       | Recurring (on tab visit)                                  | Same                                                                                                                    |
+| P4       | Analytics (on tab visit)                                  | Heaviest computation, least time-sensitive, already correctly deferred today                                            |
 
 This directly motivates §6.4 (P0/P1 must not sit behind the same gate as P2 data) and §6.3 (P3/P4 must not fire until requested at all). Any future addition to this page should be slotted into this table before deciding how eagerly to fetch it.
 
@@ -188,12 +191,12 @@ This directly motivates §6.4 (P0/P1 must not sit behind the same gate as P2 dat
 
 API response time alone doesn't capture what this audit is trying to fix — the problem was never "an API is slow," it was "the user is blocked by a request that has nothing to do with what they're looking at." Track perceived performance directly:
 
-| Metric | Definition | Today (estimated from code, not measured) | Target |
-| --- | --- | --- | --- |
-| Time to first meaningful paint | Header + tab bar visible | `getGroup()` + `getExpenses()` in series (§1) | `getGroup()` alone (§6.1) |
-| Time until "Add Expense" is usable | Trigger button exists and is clickable | Same as above — trapped behind the same gate | Same as first meaningful paint |
-| Time until expense list appears | `expenses()` populated and rendered | `getGroup()` + `getExpenses()` in series | `max(getGroup(), getExpenses())` in parallel |
-| Time until page is fully hydrated | Every P0–P2 section has data or a settled error state | All seven calls, since three of them (history/trash/recurring) are on the critical path today even though nothing displays them | `max(group, expenses, members, balances)` only — P3/P4 excluded, since they're not fetched until requested |
+| Metric                             | Definition                                            | Today (estimated from code, not measured)                                                                                       | Target                                                                                                     |
+| ---------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Time to first meaningful paint     | Header + tab bar visible                              | `getGroup()` + `getExpenses()` in series (§1)                                                                                   | `getGroup()` alone (§6.1)                                                                                  |
+| Time until "Add Expense" is usable | Trigger button exists and is clickable                | Same as above — trapped behind the same gate                                                                                    | Same as first meaningful paint                                                                             |
+| Time until expense list appears    | `expenses()` populated and rendered                   | `getGroup()` + `getExpenses()` in series                                                                                        | `max(getGroup(), getExpenses())` in parallel                                                               |
+| Time until page is fully hydrated  | Every P0–P2 section has data or a settled error state | All seven calls, since three of them (history/trash/recurring) are on the critical path today even though nothing displays them | `max(group, expenses, members, balances)` only — P3/P4 excluded, since they're not fetched until requested |
 
 These aren't currently instrumented anywhere in the codebase (no RUM/perf-mark calls found in `group-detail.component.ts`); adding them (e.g. `performance.mark()` at each milestone) should be a small, early implementation step so the phased rollout in §8 can be checked against real numbers instead of code-reading estimates.
 

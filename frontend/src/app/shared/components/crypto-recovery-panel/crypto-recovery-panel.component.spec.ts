@@ -131,9 +131,7 @@ describe('CryptoRecoveryPanelComponent', () => {
     fixture.detectChanges();
 
     expect(
-      fixture.nativeElement.querySelector(
-        'input[aria-label="Custom Secret"]',
-      ),
+      fixture.nativeElement.querySelector('input[aria-label="Custom Secret"]'),
     ).not.toBeNull();
   });
 

@@ -24,13 +24,13 @@ The in-memory check and the IndexedDB check are the **only** two recovery attemp
 
 ## 2. Every Location a Password Prompt Can Occur
 
-| Location | Trigger | Message shown |
-| --- | --- | --- |
-| `group-detail.component.ts` — amber banner (`!isMasterKeyLoaded()`) | `initializeGroupKeysAndSelfHeal()`, called from `fetchMembers()` success, `refreshGroupKey()`, `unlockVault()` | "Enter password to unlock vault" + password input + button — the **only** place in the app with an actual password input |
-| `create-expense-modal.component.ts` — `scopeKeyMessage()` for `no_session` | `resolveGroupScopeKey()`/`refreshScopeKeyStatus()` when `ensureGroupKey` reports `no_session` | "Your session key is not loaded. Please refresh the page and log in again." — **no password input**, and the advice is wrong (see §4.2) |
-| `group-members.component.ts` — generic invite-error message | `ensureGroupKey()`'s catch-all `return null` path in `sendBulkInvites`/`generateSecureInviteLink` | "Group key not available. Please unlock your vault." — **no password input**, just a thrown error surfaced as `inviteError` |
+| Location                                                                   | Trigger                                                                                                        | Message shown                                                                                                                           |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `group-detail.component.ts` — amber banner (`!isMasterKeyLoaded()`)        | `initializeGroupKeysAndSelfHeal()`, called from `fetchMembers()` success, `refreshGroupKey()`, `unlockVault()` | "Enter password to unlock vault" + password input + button — the **only** place in the app with an actual password input                |
+| `create-expense-modal.component.ts` — `scopeKeyMessage()` for `no_session` | `resolveGroupScopeKey()`/`refreshScopeKeyStatus()` when `ensureGroupKey` reports `no_session`                  | "Your session key is not loaded. Please refresh the page and log in again." — **no password input**, and the advice is wrong (see §4.2) |
+| `group-members.component.ts` — generic invite-error message                | `ensureGroupKey()`'s catch-all `return null` path in `sendBulkInvites`/`generateSecureInviteLink`              | "Group key not available. Please unlock your vault." — **no password input**, just a thrown error surfaced as `inviteError`             |
 
-Three different components, three different messages, only one of which actually lets the user do anything about it. This is itself a finding (§4.3), independent of *how often* any of them fire.
+Three different components, three different messages, only one of which actually lets the user do anything about it. This is itself a finding (§4.3), independent of _how often_ any of them fire.
 
 ## 3. Per-Investigation-Point Findings
 
@@ -49,12 +49,13 @@ Three different components, three different messages, only one of which actually
 ### 3.4 Browser Refresh
 
 **Partially recoverable, and this is already handled as well as it can be.** A full page reload always destroys `ClientEncryptionService.key` (in-memory) — no code can prevent that, it's how JS heaps work. Recovery after that depends entirely on the IndexedDB vault:
+
 - If `deriveAndStoreKey()` successfully persisted the key at login (`storeKey()` returned `true`), refresh is fully silent — `loadKeyFromSession()` finds it and no banner appears. **This is already the common case and needs no fix.**
-- If persistence failed at login time (`storeKey()` fell back to its in-memory-only `fallbackMap`, e.g. IndexedDB unavailable in that browser/mode), the user is **already told at login** via `SetPersistenceWarning`, rendered app-wide in `main-layout.component.html`: *"you'll need to sign in again after refreshing or reopening the app."* This is an honest, already-good disclosure for a genuinely un-fixable environment constraint — nothing to silently recover here, since there's no key to recover.
+- If persistence failed at login time (`storeKey()` fell back to its in-memory-only `fallbackMap`, e.g. IndexedDB unavailable in that browser/mode), the user is **already told at login** via `SetPersistenceWarning`, rendered app-wide in `main-layout.component.html`: _"you'll need to sign in again after refreshing or reopening the app."_ This is an honest, already-good disclosure for a genuinely un-fixable environment constraint — nothing to silently recover here, since there's no key to recover.
 
 ### 3.5 Multiple Tabs — real gap found
 
-`CryptoSessionManager.broadcast()` **does** send a `crypto-session-ready` event on every successful `ensureCryptoContext()`. But `handleBroadcast()` (the receiving side) only acts on `crypto-session-ended` and `recovery-blocked` — `crypto-session-ready` is broadcast and never listened for. Concretely: if Tab A is showing the unlock banner and the user types their password there, Tab A calls `deriveAndStoreKey()`, which persists the key to the (origin-shared) IndexedDB vault and broadcasts `crypto-session-ready`. Tab B, which may be showing its *own* unlock banner for the same underlying cause, does nothing with that event — B's banner stays up until B happens to run its own `loadKeyFromSession()` again for an unrelated reason (a manual refresh, a new fetch). **This is the multi-tab duplicate-prompt gap** — fixed in §6.1.
+`CryptoSessionManager.broadcast()` **does** send a `crypto-session-ready` event on every successful `ensureCryptoContext()`. But `handleBroadcast()` (the receiving side) only acts on `crypto-session-ended` and `recovery-blocked` — `crypto-session-ready` is broadcast and never listened for. Concretely: if Tab A is showing the unlock banner and the user types their password there, Tab A calls `deriveAndStoreKey()`, which persists the key to the (origin-shared) IndexedDB vault and broadcasts `crypto-session-ready`. Tab B, which may be showing its _own_ unlock banner for the same underlying cause, does nothing with that event — B's banner stays up until B happens to run its own `loadKeyFromSession()` again for an unrelated reason (a manual refresh, a new fetch). **This is the multi-tab duplicate-prompt gap** — fixed in §6.1.
 
 ### 3.6 Service Lifetime
 
@@ -62,7 +63,7 @@ Confirmed via `@Injectable({ providedIn: 'root' })` on all three (`CryptoSession
 
 ### 3.7 Duplicate Recovery
 
-No duplicate **prompts** — the banner is driven by a single `isMasterKeyLoaded` signal on `GroupDetailComponent`, so however many concurrent operations independently call `ensureCryptoContext()`, only one banner can ever be shown at a time on that page. What *is* fragmented: `CryptoSessionManager`'s attempt-counting in `handleRecoverableFailure` is keyed by `{userId, groupId, operationType, failureClass}` — different callers pass different `operationType` strings (`'expense_encrypt'`, `'expense_decrypt'`, `'login'`, etc.), so concurrent failures from the same root cause (no master key) are tracked as separate scopes rather than converging. This doesn't cause extra prompts, but it means the "two silent attempts then escalate" policy never actually converges across call sites for this specific failure class — a design inconsistency worth knowing about, not urgent to fix (documented, not implemented, per the low-risk-only constraint).
+No duplicate **prompts** — the banner is driven by a single `isMasterKeyLoaded` signal on `GroupDetailComponent`, so however many concurrent operations independently call `ensureCryptoContext()`, only one banner can ever be shown at a time on that page. What _is_ fragmented: `CryptoSessionManager`'s attempt-counting in `handleRecoverableFailure` is keyed by `{userId, groupId, operationType, failureClass}` — different callers pass different `operationType` strings (`'expense_encrypt'`, `'expense_decrypt'`, `'login'`, etc.), so concurrent failures from the same root cause (no master key) are tracked as separate scopes rather than converging. This doesn't cause extra prompts, but it means the "two silent attempts then escalate" policy never actually converges across call sites for this specific failure class — a design inconsistency worth knowing about, not urgent to fix (documented, not implemented, per the low-risk-only constraint).
 
 ### 3.8 Idle Timeout
 

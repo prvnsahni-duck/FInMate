@@ -40,6 +40,10 @@ export const appConfig: ApplicationConfig = {
     ),
     // Extension point for future unlock methods (PIN, biometric): register
     // another CRYPTO_UNLOCK_PROVIDERS entry here, no panel changes needed.
-    { provide: CRYPTO_UNLOCK_PROVIDERS, useClass: PasswordUnlockProvider, multi: true },
+    {
+      provide: CRYPTO_UNLOCK_PROVIDERS,
+      useClass: PasswordUnlockProvider,
+      multi: true,
+    },
   ],
 };

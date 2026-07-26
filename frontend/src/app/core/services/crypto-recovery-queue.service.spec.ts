@@ -66,9 +66,7 @@ describe('CryptoRecoveryQueueService', () => {
     await cryptoSession.ensureCryptoContext();
 
     const op = jest.fn().mockRejectedValue(new Error('network error'));
-    await expect(service.runWithRecovery(op)).rejects.toThrow(
-      'network error',
-    );
+    await expect(service.runWithRecovery(op)).rejects.toThrow('network error');
     expect(service.pendingCount).toBe(0);
   });
 

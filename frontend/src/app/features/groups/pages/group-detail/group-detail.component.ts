@@ -1118,20 +1118,17 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         // it's a genuine session block, and queue+auto-resume the whole
         // decrypt-and-save flow once unlocked, instead of failing with an
         // alert the user has to dismiss before clicking download again.
-        const scopeKey = await this.recoveryQueue.runWithRecovery(
-          async () => {
-            const result = await this.expenseDecryption.resolveExpenseKey(
-              expense as any,
+        const scopeKey = await this.recoveryQueue.runWithRecovery(async () => {
+          const result = await this.expenseDecryption.resolveExpenseKey(
+            expense as any,
+          );
+          if (!result.key) {
+            throw new Error(
+              classifyDecryptionError({ keyStatus: result.keyStatus }).message,
             );
-            if (!result.key) {
-              throw new Error(
-                classifyDecryptionError({ keyStatus: result.keyStatus })
-                  .message,
-              );
-            }
-            return result.key;
-          },
-        );
+          }
+          return result.key;
+        });
 
         const fileKey = await this.encryptionService.unwrapKey(
           file.encryptedFileKey,

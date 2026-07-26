@@ -19,9 +19,7 @@ describe('PasswordUnlockProvider', () => {
       loadKeyFromSession: jest.fn().mockResolvedValue({}),
     };
     mockStore = {
-      selectSnapshot: jest
-        .fn()
-        .mockReturnValue({ email: 'test@example.com' }),
+      selectSnapshot: jest.fn().mockReturnValue({ email: 'test@example.com' }),
     };
 
     TestBed.configureTestingModule({

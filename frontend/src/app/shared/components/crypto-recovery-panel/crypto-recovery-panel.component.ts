@@ -1,10 +1,4 @@
-import {
-  Component,
-  DestroyRef,
-  computed,
-  inject,
-  signal,
-} from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { Store } from '@ngxs/store';
 import { CryptoSessionManager } from '../../../core/services/crypto-session-manager.service';
 import { Logout } from '../../../core/auth/auth.state';
