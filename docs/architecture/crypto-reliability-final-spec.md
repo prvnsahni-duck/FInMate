@@ -6,7 +6,7 @@ Date: 2026-07-26.
 
 Scope: FinMate collaborative expense encryption, group-key reliability, recovery behavior, multi-tab consistency, and lost-key recovery policy.
 
-This document resolves the remaining crypto architecture open items. It supersedes prior planning notes that allowed plaintext amounts or server-computed financial aggregates for encrypted group expenses.
+This document resolves the remaining crypto reliability architecture open items: session lifecycle, recovery, race conditions, and lost-key policy. It does **not** change encryption scope — FinMate's hybrid model (freeform/sensitive fields encrypted end-to-end; structured financial data plaintext for server-side computation) remains as-is and is restated in §1 below. An earlier revision of this document proposed encrypting amounts/balances/splits end-to-end and moving all aggregate computation client-side; that proposal is rejected and superseded by the hybrid decision in §1.
 
 ## Baseline
 
@@ -22,11 +22,11 @@ This document resolves the remaining crypto architecture open items. It supersed
 
 ## 1. E2E Encryption Scope
 
-Decision: Encrypt all user financial content end-to-end, including amounts, balances, splits, settlement values, descriptions, notes, attachments, participant shares, and currency metadata that can reveal expense meaning.
+Decision: FinMate uses **hybrid** end-to-end encryption. Sensitive, user-authored content — titles, descriptions, notes, and attachments — is encrypted end-to-end and never readable by the server. Structured financial data required for ledger computation — amounts, currencies, splits, balances, settlements, member IDs, and related metadata — remains plaintext so the server can perform calculations, synchronization, and reporting efficiently.
 
-The server must not be able to compute authoritative totals or balances from plaintext expense data. Amounts and splits are sensitive financial content; keeping them server-readable would expose rent, medical bills, trips, relationship patterns, income signals, and debt behavior even if titles and notes were encrypted. Clients decrypt group data locally and compute totals, balances, settlement suggestions, and dashboard views on-device. The backend stores opaque ciphertext plus non-sensitive sync metadata such as record ids, group ids, actor ids, timestamps, schema versions, ciphertext key versions, and idempotency keys.
+This is the existing, shipped model (`docs/EXPENSE_MODULE_STATUS.md`, `docs/frozen-decisions.md`) and is retained deliberately, not as an interim step toward full-payload encryption. Encrypting amounts/splits/balances end-to-end would require the server to stop computing `simplifyLedgerDebts`, carry-forward, settlements, and all analytics — moving that entire surface to client-side computation — for a privacy gain (hiding numeric amounts, not their existence or the fact that a shared expense occurred) that was assessed as not worth that cost and the accompanying migration risk to already-shipped, tested ledger logic.
 
-Explicit tradeoff: server-side aggregation, plaintext search, fraud analytics, support inspection, and simple reporting are intentionally limited. Future aggregate features must be client-computed, privacy-preserving, or backed by a separately approved cryptographic protocol.
+Explicit tradeoff, accepted: the server can read amounts, currencies, splits, balances, and settlement values. Titles, descriptions, notes, and attachment content cannot be read by the server under any circumstance.
 
 ## 2. CryptoKey Persistence Policy
 
@@ -135,9 +135,12 @@ CryptoService
   - no lifecycle, retry, storage, or recovery policy
         |
         v
-Encrypted expense records and encrypted settlement records
-  ciphertext authenticates group id, record id, key id,
-  group key version, schema version, algorithm, and creator metadata
+Expense/settlement records
+  title, description, notes, attachment content: ciphertext,
+    authenticating group id, record id, key id, group key version,
+    schema version, and algorithm
+  amount, currency, splits, balances, settlement values,
+    member ids: plaintext, server-computed
 ```
 
 ## State Machine
@@ -168,19 +171,19 @@ Recovering
 2. `ExpenseService` calls `ensureCryptoContext()`.
 3. `ExpenseService` calls `GroupKeyService.ensureGroupKey(groupId, "write")`.
 4. `GroupKeyService` returns a concrete write-authorized group key and version.
-5. `CryptoService` encrypts the full financial payload client-side.
+5. `CryptoService` encrypts only the record's sensitive/freeform fields (title, description, notes, attachment content) client-side. Amount, currency, splits, and other structured financial fields are sent plaintext.
 6. Ciphertext is stamped with `groupKeyVersionId` and authenticated metadata.
-7. The backend stores opaque ciphertext and sync metadata only.
+7. The backend stores the ciphertext fields plus the plaintext structured/financial fields and sync metadata; it computes/persists split amounts, balances, and settlement math from the plaintext fields as it does today.
 8. If the backend rejects a stale key version, the client re-resolves, re-encrypts, and retries under the same idempotency key.
-9. Draft data clears only after durable encrypted write acknowledgement.
+9. Draft data clears only after durable write acknowledgement.
 
 ## Read Path
 
-1. Client receives encrypted records and sync metadata.
-2. The record's `groupKeyVersionId` determines which wrapped group key is needed.
+1. Client receives records: ciphertext for sensitive/freeform fields, plaintext for structured financial fields.
+2. The record's `groupKeyVersionId` determines which wrapped group key is needed to decrypt the sensitive fields.
 3. `GroupKeyService` resolves and unwraps that exact version.
-4. `CryptoService` decrypts locally.
-5. Client computes balances, totals, settlements, dashboard projections, and display state locally.
+4. `CryptoService` decrypts the sensitive fields locally, for display.
+5. Balances, totals, and settlement suggestions are computed server-side, as today, and returned directly — no client-side ledger computation is required or planned.
 
 ## Multi-Tab Events
 
@@ -198,9 +201,9 @@ Receivers compare event epoch, key version, and rotation id before mutating loca
 
 ## Implementation-Ready Invariants
 
-- Plaintext financial content never reaches the backend.
+- Plaintext title/description/notes/attachment content never reaches the backend. Amounts, currencies, splits, balances, settlement values, and member ids are intentionally plaintext server-side and are out of scope for this invariant.
 - No unwrapped Master Key, private key, group key, or per-record key is persisted.
-- Ciphertext is always version-stamped and decrypts through the stamped version.
+- Ciphertext (sensitive/freeform fields) is always version-stamped and decrypts through the stamped version.
 - Reads are backward-compatible across group key rotations.
 - Writes tolerate rotation races through grace-window acceptance or stale-version retry.
 - Recovery is bounded, classified, idempotent, and visible after repeated failure.
@@ -209,9 +212,7 @@ Receivers compare event epoch, key version, and rotation id before mutating loca
 
 ## Risks Accepted
 
-- Server-side plaintext totals, balances, splits, reports, search, and support inspection are unavailable by design.
-- Losing all authorized devices and all user-owned recovery material makes encrypted data unrecoverable.
-- Large groups or long histories may require client-side pagination, local indexing, or background computation for balance views.
+- The server can read amounts, currencies, splits, balances, and settlement values by design (§1). Only titles, descriptions, notes, and attachment content are protected from server access.
+- Losing all authorized devices and all user-owned recovery material makes titles/descriptions/notes/attachment content unrecoverable (structured financial data is unaffected, since it isn't encrypted).
 - Users may occasionally see recovery-blocked prompts after repeated transient failures.
-- Key rotation implementation must support version-aware read/write semantics and stale-write retry.
-- Existing docs and code that assume plaintext amounts require migration or explicit deprecation.
+- Key rotation implementation must support version-aware read/write semantics and stale-write retry, for the fields that are encrypted.

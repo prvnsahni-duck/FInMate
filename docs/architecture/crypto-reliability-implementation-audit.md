@@ -1,22 +1,22 @@
 # Crypto Reliability Implementation Audit
 
-Status: Implementation planning audit.
+Status: Implementation planning audit — **corrected 2026-07-26** to match the accepted hybrid encryption scope (see `crypto-reliability-final-spec.md` §1). An earlier revision of this document assumed a "full financial payload E2E encryption" scope decision that has since been rejected; sections that depended on that assumption are struck through/corrected below rather than silently rewritten, so the reasoning trail stays visible.
 
 Date: 2026-07-26.
 
 Parent spec: [`crypto-reliability-final-spec.md`](crypto-reliability-final-spec.md).
 
-Purpose: identify the current implementation gaps between FinMate's codebase and the accepted crypto reliability architecture, then define the next implementation sequence. This is not implementation code.
+Purpose: identify the current implementation gaps between FinMate's codebase and the accepted crypto **reliability** architecture (session lifecycle, recovery, race conditions — not encryption scope), then define the next implementation sequence. This is not implementation code.
 
 ## Executive Summary
 
-The repository is still on the older hybrid encryption model. Expense titles/descriptions are encrypted client-side, but amounts, currency, category, dates, splits, settlement amounts, settlement currencies, balance math, analytics, carry-forward, and dashboard totals are plaintext/server-computed. The new accepted architecture requires full financial payload E2E encryption and client-side aggregate computation, so the migration is a schema/API/service boundary change, not only a frontend crypto wrapper change.
+FinMate uses hybrid encryption: expense titles/descriptions are encrypted client-side; amounts, currency, category, dates, splits, settlement amounts, settlement currencies, balance math, analytics, carry-forward, and dashboard totals are plaintext/server-computed. **This is correct, accepted, shipped behavior — not a gap.** The reliability spec changes session lifecycle, recovery, and ciphertext-versioning behavior around that existing scope; it does not require migrating amounts/splits/balances to ciphertext or moving aggregate computation to the client. Sections 1, 2, 3, 8, and Phases 2–5/7 below were written under the rejected full-payload assumption and are corrected accordingly.
 
-The strongest existing foundations are versioned group keys, per-member wrapped group keys, in-memory group-key caching, de-duped group-key resolution, and title/description decryption classification. The largest missing pieces are `CryptoSessionManager`, `ensureCryptoContext()`, encrypted full-payload DTO/entity contracts, client-side balance/settlement computation, bounded recovery state, session epoch cancellation, BroadcastChannel coordination, and migration away from plaintext amount/split columns as authoritative data.
+The strongest existing foundations are versioned group keys, per-member wrapped group keys, in-memory group-key caching, de-duped group-key resolution, and title/description decryption classification. The reliability gaps actually worth closing are `CryptoSessionManager`/`ensureCryptoContext()` (now implemented — see Phase 1 status), session epoch cancellation, bounded recovery state, BroadcastChannel coordination, and the master-key persistence policy mismatch (§6 below). There is no plaintext-amount/split migration to do.
 
 ## Confirmed Current-State Findings
 
-### 1. Expense rows still expose financial content as plaintext
+### 1. Expense rows expose structured financial content as plaintext — **by design, not a gap**
 
 Evidence:
 
@@ -25,13 +25,9 @@ Evidence:
 - `shared/data-models/src/lib/dto/expense.dto.ts` exposes the same plaintext fields to shared client/server contracts.
 - `backend/src/app/expenses/expenses.service.ts` writes `dto.amountTotal`, `dto.currency`, and `dto.category` directly to `Expense`, and serializes them back in responses.
 
-Required migration:
+~~Required migration: introduce a full encrypted expense payload envelope...~~ **No migration required.** This is exactly the accepted hybrid model (`crypto-reliability-final-spec.md` §1): `title`/`description` are ciphertext (correct, already implemented); `amount_total`/`currency`/`category`/`expenseDate`/splits are intentionally plaintext so the server can compute ledger math. No entity/DTO change follows from the reliability spec.
 
-- Introduce a full encrypted expense payload envelope. The encrypted payload must contain amount, currency, category, date where sensitive, split algorithm inputs, split computed shares, title, description, attachment metadata, and any other financial content.
-- Retain only server-needed metadata in plaintext: ids, group id, owner/actor ids, payer/member identity references, status, ledger/sync cursors if accepted as metadata, timestamps, optimistic version, encryption scope, `groupKeyVersionId`, schema version, algorithm, and idempotency key.
-- Treat existing plaintext financial columns as legacy/backfill-only during migration, then remove or de-authoritize them.
-
-### 2. Expense splits are authoritative plaintext ledger rows
+### 2. Expense splits are authoritative plaintext ledger rows — **by design, not a gap**
 
 Evidence:
 
@@ -39,13 +35,9 @@ Evidence:
 - `backend/src/app/expenses/expenses.service.ts` calls `calculateDeterministicSplits(dto.amountTotal, dto.splits)` and persists calculated `amountOwed` rows.
 - `backend/src/app/settlements/settlements.service.ts` reads `ExpenseSplit.amountOwed` to compute balances and suggested settlements.
 
-Required migration:
+~~Required migration: move split math to the client crypto pipeline...~~ **No migration required.** Server-side split/balance computation from plaintext `ExpenseSplit` rows is the accepted design; moving it client-side was the rejected proposal.
 
-- Move split math to the client crypto pipeline. The client builds the full encrypted expense payload with split details and computed amounts.
-- The server may retain participant membership references for access control and sync fan-out, but must not retain plaintext owed amounts/share values as authoritative financial data.
-- If server-side participant validation remains, it should validate only identity/membership constraints, not financial totals.
-
-### 3. Backend analytics, dashboard, carry-forward, and settlement math depend on plaintext
+### 3. Backend analytics, dashboard, carry-forward, and settlement math depend on plaintext — **by design, not a gap**
 
 Evidence:
 
@@ -53,14 +45,9 @@ Evidence:
 - `backend/src/app/settlements/settlements.service.ts` computes group balances, suggested settlements, and friends balances from plaintext expenses, splits, and settlements.
 - `frontend/src/app/features/groups/services/expenses.service.ts` calls backend analytics endpoints and reduces plaintext amounts returned by `/expenses/analytics/all-monthly`.
 
-Required migration:
+~~Required migration: move aggregate computation to frontend/domain code...~~ **No migration required.** Server-computed analytics/carry-forward/settlements are correct as shipped and verified this session (`docs/EXPENSE_MODULE_FREEZE.md`, `docs/releases/BETA_1.0.md`). No client-side ledger calculator is planned.
 
-- Move aggregate computation to frontend/domain code after decrypting records.
-- Keep backend endpoints for encrypted record listing/sync only, or replace analytics endpoints with metadata-only stubs that clearly cannot return plaintext totals.
-- Introduce a shared client-side ledger calculator for balances, suggested settlements, carry-forward projections, monthly totals, and category totals.
-- Decide whether carry-forward remains a product feature in full E2E mode. If yes, carry-forward records must be generated client-side as normal encrypted expense/settlement records.
-
-### 4. Frontend encrypts only title/description today
+### 4. Frontend encrypts only title/description today — **correct scope, not a gap**
 
 Evidence:
 
@@ -68,27 +55,15 @@ Evidence:
 - `frontend/src/app/core/services/expense-decryption.service.ts` decrypts only `title` and `description`, preserving `encryptedTitle` and `encryptedDescription`.
 - `frontend/src/app/core/services/encryption.service.ts` has `encryptExpense()` and `decryptExpense()` wrappers limited to title/description.
 
-Required migration:
+~~Required migration: replace field-by-field encryption with full-payload envelope encryption...~~ **No migration required for scope.** Encrypting only title/description (plus notes/attachments elsewhere) is correct per §1. What's optionally still worth doing: `ClientEncryptionService.encryptEnvelope()`/`decryptEnvelope()` (added — see `encryption.service.ts`) is a reusable, version-stamped, AAD-authenticated primitive that title/description *could* migrate onto instead of the current plain `iv:ciphertext` format, for the write/read race-condition closures in §4 of the final spec. That migration is optional, lower-risk (same fields, better-authenticated format) and unrelated to the rejected full-payload proposal — not yet started.
 
-- Replace field-by-field title/description encryption with full-payload envelope encryption.
-- Decryption should return a typed decrypted domain object plus preserved ciphertext envelope for retry.
-- Associated data must authenticate `groupId`, `recordId`, `keyId`, `groupKeyVersionId`, `recordSchemaVersion`, `algorithm`, `creatorUserId`, and `creatorDeviceId` where available.
-- The existing `ExpenseDecryptionService` can evolve into envelope decryption, but retry/session orchestration must move to `CryptoSessionManager`.
+### 5. CryptoSessionManager — **done, partially wired**
 
-### 5. CryptoSessionManager does not exist yet
+Evidence at the time of the original audit: no `CryptoSessionManager`, `ensureCryptoContext`, `sessionEpoch`, `RecoveringBlocked`, or BroadcastChannel session state implementation existed; callers invoked `ClientEncryptionService.loadKeyFromSession()` and `GroupKeyService` directly.
 
-Evidence:
+Current state: `CryptoSessionManager` exists and owns session lifecycle, bounded recovery, epoch cancellation, and BroadcastChannel session events (see Phase 1 below). `auth.state.ts`, `expenses.service.ts`, and `expense-decryption.service.ts` route through it. `CryptoBootstrapService` (asymmetric-key bootstrap after login/refresh) is unchanged and still separate — it isn't a session lifecycle concern in the same sense and doesn't need to move.
 
-- Search found no `CryptoSessionManager`, `ensureCryptoContext`, `sessionEpoch`, `RecoveringBlocked`, or BroadcastChannel session state implementation.
-- Current callers invoke `ClientEncryptionService.loadKeyFromSession()` and `GroupKeyService` directly from services/components.
-- `CryptoBootstrapService` bootstraps asymmetric keys after login/refresh, but it is not a session lifecycle state machine.
-
-Required migration:
-
-- Add `CryptoSessionManager` as the only owner of crypto session lifecycle.
-- Add `ensureCryptoContext()` and route all application crypto entry points through it.
-- Move recovery, bounded retry, session state, logout cancellation epoch, telemetry, and BroadcastChannel events into this manager.
-- Gradually remove direct component/service calls to `loadKeyFromSession()` where they are performing lifecycle decisions.
+Remaining: recurring-expense service, group-detail key actions (`initializeGroupKeysAndSelfHeal`, `refreshGroupKey`), and the join-group flow (`JoinGroupComponent.onJoin()`) still call `GroupKeyService`/`ClientEncryptionService` directly rather than through `CryptoSessionManager`. Migrating them isn't required for correctness — they already work — but would centralize epoch cancellation/recovery classification for those paths too.
 
 ### 6. Master key persistence currently conflicts with the final policy
 
@@ -121,151 +96,68 @@ Required migration:
 - Connect group-key resolution to session epoch cancellation and recovery classification.
 - Add BroadcastChannel invalidation/update handling through `CryptoSessionManager`, not ad hoc component logic.
 
-### 8. Settlement records are plaintext financial content
+### 8. Settlement records are plaintext financial content — **by design, not a gap**
 
 Evidence:
 
 - `shared/data-models/src/lib/settlement.entity.ts` stores `amount`, `currency`, `status`, `settledOn`, and `note` directly.
 - `backend/src/app/settlements/settlements.service.ts` writes and snapshots plaintext settlement amount/currency/note and includes amount/currency in audit metadata.
-- `ClientEncryptionService.encryptSettlement()` only encrypts `note`, not amount/currency.
+- `ClientEncryptionService.encryptSettlement()` encrypts `note` (sensitive/freeform), leaves `amount`/`currency` plaintext (structured financial data).
 
-Required migration:
+~~Required migration: settlement amount/currency must become encrypted...~~ **No migration required.** This is correct per §1 — `note` is the only sensitive field on a settlement; amount/currency are structured financial data the server needs to compute against. `Settlement.note` lacking `@IsCiphertext` validation is a real, separate, already-tracked gap (`docs/audits/expense-audit.md` EXP-008, `docs/releases/BETA_BACKLOG.md`), unrelated to this spec.
 
-- Settlement proposals/confirmations must become encrypted financial records or encrypted fields inside a settlement envelope.
-- Server may retain status and participant references as metadata if product/security accepts that status leakage.
-- Amount and currency must be client-encrypted and client-computed from decrypted balances.
-- Audit logs must not store plaintext amount/currency/title metadata.
-
-### 9. Historical documentation still conflicts with the accepted spec
+### 9. Historical documentation — **was correct; this audit's original claim was wrong**
 
 Evidence:
 
 - `docs/frozen-decisions.md` says amounts remain plaintext and backend aggregation is intentional.
 - `docs/EXPENSE_MODULE_STATUS.md` says title/description ciphertext only and amounts/dates/categories are plaintext.
 - `docs/file-map.md` describes the expense row as ciphertext title/description plus plaintext amount/currency/category/date.
-- `docs/group-key-flow.md` still says zero-knowledge encryption for sensitive expense fields rather than full financial payloads.
+- `docs/group-key-flow.md` says zero-knowledge encryption for sensitive expense fields (not full financial payloads).
 
-Required migration:
-
-- Do not rewrite all docs until implementation starts, but mark the conflict explicitly.
-- During implementation PRs, update canonical docs alongside code changes.
-- Treat `crypto-reliability-final-spec.md` as the accepted source of truth for new crypto work.
+These documents accurately describe the accepted, shipped architecture. The original version of this audit called them conflicting with "the accepted spec" — that was backwards; the full-payload proposal was the outlier, and it has been rejected (`crypto-reliability-final-spec.md` §1). No doc updates are needed here as a result of the reliability spec.
 
 ## Proposed Implementation Phases
 
-### Phase 0 - Compatibility Guardrails
+The original Phase 0 (compatibility guardrails for a plaintext→ciphertext migration) and Phases 3, 4, 5, 7 (encrypted payload columns, client-side ledger calculators, settlement encryption, legacy data migration) depended entirely on the rejected full-payload proposal and are removed. What remains is the actual reliability work — session lifecycle, ciphertext versioning for the fields that are already encrypted, and storage/recovery hardening — none of which touches the data model.
 
-Goal: prevent more code from deepening the old plaintext model while migration proceeds.
+### Phase 1 - CryptoSessionManager Foundation — **done**
 
-Tasks:
+Goal: implement the agreed lifecycle boundary without changing the data model.
 
-- Add a short note to expense/settlement contracts pointing to the final crypto spec.
-- Define an `EncryptedRecordEnvelope` TypeScript contract in shared models.
-- Define what plaintext metadata remains allowed for expense and settlement records.
-- Add tests that fail if new DTOs require plaintext `amountTotal`/`amountOwed` for encrypted group expenses after the migration flag is enabled.
+- `CryptoSessionManager` with states `NoSession`, `Loading`, `Ready`, `Recovering`, `RecoveringBlocked`, `Fatal` — implemented (`frontend/src/app/core/services/crypto-session-manager.service.ts`).
+- `ensureCryptoContext()` as the app-facing session entry point — implemented, wired into `auth.state.ts`, `expenses.service.ts`, `expense-decryption.service.ts`.
+- Session epoch cancellation — implemented (`assertCurrentEpoch`, checked around resolve/decrypt calls).
+- Bounded recovery counters (two silent attempts, third → `RecoveringBlocked`; a real tamper/integrity signal → `Fatal`, not yet wired since no such signal exists yet — see Phase 2 note below) — implemented.
+- BroadcastChannel session-end/recovery-blocked sync — implemented.
+- Not yet done: routing recurring-expense service, group-detail key actions, and the join-group flow through `CryptoSessionManager` (they still call `GroupKeyService`/`ClientEncryptionService` directly).
 
-### Phase 1 - CryptoSessionManager Foundation
+### Phase 2 - Envelope Crypto Primitive — **done, optional to wire anywhere**
 
-Goal: implement the agreed lifecycle boundary without changing the data model yet.
+Goal (revised): provide a reusable, version-stamped, AAD-authenticated ciphertext primitive for the write/read race-condition closures in the final spec §4 — not a full-payload migration.
 
-Tasks:
+- `EncryptedEnvelope` contract added to `shared/data-models` (`groupId`/`keyVersion`/`keyId`/`schemaVersion`/`algorithm`).
+- `ClientEncryptionService.encryptEnvelope()`/`decryptEnvelope()` implemented, with metadata as AES-GCM additional authenticated data (tamper-evident) and a distinct `EnvelopeMetadataMismatchError` for caller-side version/group checks.
+- Nothing currently uses it. Migrating title/description from the plain `iv:ciphertext` format onto this envelope is optional future work — same encrypted fields, better-authenticated ciphertext-versioning — and should be scoped as its own small change if pursued, not bundled with anything data-model-related.
 
-- Create frontend `CryptoSessionManager` with states `NoSession`, `Loading`, `Ready`, `Recovering`, `RecoveringBlocked`, and `Fatal`.
-- Implement `ensureCryptoContext()` as the only app-facing session entry point.
-- Add session epoch cancellation and require crypto operations to capture/check epoch.
-- Add bounded recovery counters: two silent attempts, third visible `RecoveringBlocked`; integrity failures go `Fatal`.
-- Add BroadcastChannel event handling for session ready/end, key rotation, wrapped key update, recovery start/complete/block.
-- Route `ExpensesService`, recurring expense service, group detail key actions, join group flow, and decrypt pipe away from direct lifecycle decisions.
+### Phase 3 (was Phase 6) - Storage, Recovery, and Multi-Tab Hardening — **not started**
 
-### Phase 2 - Envelope Crypto Primitives
-
-Goal: replace field-only encryption with authenticated full-payload encryption.
+Goal: close the remaining reliability races from the final spec §4.
 
 Tasks:
 
-- Add envelope encrypt/decrypt helpers to `CryptoService`/client crypto primitives.
-- Include algorithm, schema version, key id/version, and authenticated associated data.
-- Extend `ExpenseDecryptionService` to decrypt full payloads and return typed decrypted expense objects.
-- Preserve ciphertext envelope for retry just as title/description ciphertext is preserved today.
-- Add tamper/integrity tests that verify AAD mismatch fails and escalates through `CryptoSessionManager`.
-
-### Phase 3 - Expense Write/Read Contract Migration
-
-Goal: make expenses store full encrypted financial payloads while keeping old columns temporarily readable for migration.
-
-Tasks:
-
-- Add encrypted payload columns/DTO fields for expense records.
-- Make new client writes send encrypted payload plus allowed metadata only.
-- Stamp every group expense ciphertext with `groupKeyVersionId` returned by write-key resolution.
-- Add stale-key-version backend rejection and client retry/re-encrypt behavior.
-- Keep legacy plaintext amount/split fields read-only or nullable during transition.
-- Ensure draft data remains saved outside the crypto pipeline and clears only after encrypted write acknowledgement.
-
-### Phase 4 - Client-Side Ledger Calculators
-
-Goal: replace backend financial computation with decrypted client computation.
-
-Tasks:
-
-- Move deterministic split calculation into shared frontend-safe code or reuse `shared/utils` from the frontend build if appropriate.
-- Build client ledger calculators for group balances, suggested settlements, monthly totals, category totals, carry-forward projections, and dashboard `myShare`.
-- Update UI services/components to request encrypted records, decrypt locally, then compute views.
-- Convert backend analytics endpoints to metadata/sync endpoints or deprecate them.
-
-### Phase 5 - Settlement Encryption Migration
-
-Goal: prevent settlement amounts/currencies/notes from being server-readable.
-
-Tasks:
-
-- Add encrypted settlement payload envelope.
-- Move settlement proposal construction to the client after decrypted balance computation.
-- Keep server-side participant/status/version validation only.
-- Remove plaintext amount/currency from audit metadata and settlement snapshots.
-- Add version-stamped settlement encryption with group key resolution.
-
-### Phase 6 - Storage, Recovery, and Multi-Tab Hardening
-
-Goal: close the reliability races from the final spec.
-
-Tasks:
-
-- Remove unwrapped master key persistence from IndexedDB.
+- Remove unwrapped master key persistence from IndexedDB (§2 of the final spec; audit finding §6 above).
 - Add IndexedDB journal states for crypto metadata writes: `pending -> committed`.
-- Add startup recovery scan before entering `Ready`.
-- Wire logout cancellation to reject stale crypto results and prevent cache repopulation.
-- Add idempotent recovery promises keyed by `{sessionEpoch, recoveryReason}`.
-- Add BroadcastChannel tests for session end, key rotation, stale event ignore, and recovery re-entry.
-
-### Phase 7 - Legacy Data Migration And Cleanup
-
-Goal: complete the move away from plaintext financial columns.
-
-Tasks:
-
-- Define a migration story for existing plaintext records: client-side re-encryption on next access, explicit migration flow, or accepted dev reset if this is pre-production data.
-- Remove or de-authorize plaintext amount/split/settlement columns as authoritative sources.
-- Update `docs/frozen-decisions.md`, `docs/EXPENSE_MODULE_STATUS.md`, `docs/file-map.md`, `docs/group-key-flow.md`, contracts, OpenAPI, and tests to the final model.
-- Add regression tests that assert backend responses do not expose plaintext financial content for group expenses/settlements.
+- Add a startup recovery scan before entering `Ready`.
+- Wire logout cancellation to reject stale crypto results and prevent cache repopulation (partially covered by `CryptoSessionManager.beginLogout()`'s epoch bump — verify no caller still repopulates `GroupKeyService`'s cache with a result captured under a stale epoch).
+- Add idempotent recovery promises keyed by `{sessionEpoch, recoveryReason}` (`handleRecoverableFailure`'s in-flight map already does this; the recovery step itself — `runIdempotentRecovery` — is currently a bookkeeping stub for every failure class except `no_master_key`, i.e. it tracks attempts but doesn't retry anything yet for group-key failures).
+- Add BroadcastChannel tests for session end, key rotation, stale event ignore, and recovery re-entry (session-end/recovery-blocked have coverage; key-rotation/wrapped-key-update event types are declared in the final spec's Multi-Tab Events list but not yet implemented in `CryptoSessionManager`).
 
 ## High-Risk Decisions Still Needing Product Sign-Off
 
-These are implementation tradeoffs, not unresolved architecture choices:
+- Whether `GroupKeyService`'s group-key-rotation/wrapped-key-update BroadcastChannel events (declared in the final spec, not yet implemented) are worth building now, given key rotation still has no UI entry point (`docs/KNOWN_ISSUES.md` KI-1).
+- Whether removing unwrapped master-key IndexedDB persistence (Phase 3) should ship before or after a platform-bound wrapped-session-key alternative exists — removing it outright means every refresh requires re-entering the password, a real UX regression from today's behavior.
 
-- Whether `expenseDate`, `ledgerMonth`, and settlement `status` are allowed plaintext metadata. The final spec says currency metadata that reveals meaning must be encrypted; date/status leakage should be explicitly accepted or moved inside the encrypted payload.
-- Whether carry-forward survives in full E2E mode. If retained, it becomes a client-generated encrypted workflow rather than a backend monthly close calculation.
-- Whether existing development data can be reset, or whether a real legacy plaintext-to-encrypted migration flow is required.
-- Whether refresh should always require unlock after removing persisted master keys, or whether a platform-bound wrapped session key is acceptable later.
+## Suggested Next Implementation Slice
 
-## Suggested First Implementation Slice
-
-Start with Phase 1 only: add `CryptoSessionManager`, `ensureCryptoContext()`, session epoch cancellation, bounded recovery states, and BroadcastChannel session events while preserving current field-level encryption behavior. This creates the reliability boundary first and reduces blast radius before changing the data model.
-
-Acceptance criteria for the first slice:
-
-- No component or feature service performs crypto session lifecycle decisions directly.
-- Existing expense create/read/update flows still pass with title/description encryption.
-- Logout during an in-flight encrypt/decrypt cannot repopulate key caches or commit stale results.
-- Repeated recoverable session failure reaches `RecoveringBlocked` on the third failure.
-- Integrity/decrypt authentication failure is classified as fatal, not silently retried.
+Phase 3 (storage/recovery/multi-tab hardening) is the only remaining item from this audit. It's a real, scoped reliability improvement, independent of encryption scope — start with the master-key IndexedDB removal only if the UX tradeoff above is explicitly accepted; otherwise start with the IndexedDB write-journal and BroadcastChannel key-rotation event work, which have no user-facing tradeoff.
