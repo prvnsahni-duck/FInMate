@@ -64,7 +64,14 @@
     }
 
     <!-- Group Encryption Key Warning -->
-    @if (scopeKeyBlocked()) {
+    @if (scopeKeyStatus() === 'no_session') {
+      <!-- Master key / crypto session unavailable: the shared recovery
+           experience, not a component-local message. -->
+      <app-crypto-recovery-panel />
+    } @else if (scopeKeyBlocked()) {
+      <!-- Every other blocked status (pending/no_access/rate_limited/error)
+           is about this specific group's key, not the crypto session —
+           a different concern with its own message, kept as-is. -->
       <div
         class="mb-4 p-4 bg-amber-500/10 border border-amber-500/25 text-amber-600 dark:text-amber-400 rounded-2xl text-sm font-semibold flex items-center space-x-2 flex-shrink-0"
       >

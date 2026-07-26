@@ -57,6 +57,7 @@ import {
   SuggestedSettlement,
 } from '../../components/group-balances/group-balances.component';
 import { GroupMembersComponent } from '../../components/group-members/group-members.component';
+import { CryptoRecoveryPanelComponent } from '../../../../shared/components/crypto-recovery-panel/crypto-recovery-panel.component';
 import {
   resolveMemberDisplayName,
   resolveUserDisplayName,
@@ -103,6 +104,7 @@ export interface GroupExpense extends Expense {
     GroupBalancesComponent,
     GroupMembersComponent,
     DropdownComponent,
+    CryptoRecoveryPanelComponent,
   ],
   templateUrl: './group-detail.component.html',
   styleUrls: ['./group-detail.component.scss'],
@@ -132,15 +134,16 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       this.decryptCoordinator.stop();
     });
 
-    // Cross-tab recovery: if this page's own master-key check previously
-    // failed (isMasterKeyLoaded false, showing the unlock banner) and
-    // another tab then established the crypto session — e.g. the user
-    // entered their password there — CryptoSessionManager picks that up via
-    // BroadcastChannel and transitions to Ready. Re-check here so the
-    // banner clears on its own instead of staying up until this page
-    // happens to run some unrelated fetch again.
+    // Whenever CryptoSessionManager reports the crypto session Ready —
+    // whether from this page's own <app-crypto-recovery-panel> unlock, or
+    // from another tab (BroadcastChannel) — re-run key provisioning and
+    // decryption. initializeGroupKeysAndSelfHeal()/startDecryption() are
+    // documented as safe to call repeatedly (cancel-and-restart, no server
+    // round-trip), so this also harmlessly re-fires on a normal first-load
+    // success; the alternative (tracking "already handled" state) isn't
+    // worth the extra complexity for an idempotent operation.
     effect(() => {
-      if (this.cryptoSession.isReady() && !this.isMasterKeyLoaded()) {
+      if (this.cryptoSession.isReady()) {
         const g = this.group();
         if (g?.id) {
           this.initializeGroupKeysAndSelfHeal(g.id);
@@ -222,7 +225,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   currentTimelineMonth = signal<Date>(new Date());
   isMonthLocked = signal<boolean>(false);
   isViewer = signal<boolean>(false);
-  isMasterKeyLoaded = signal<boolean>(true);
   rateLimitError = this.groupKeyService.rateLimitError;
   readonly DECRYPTION_FAILED_PLACEHOLDER = DECRYPTION_FAILED_PLACEHOLDER;
   isRefreshingKey = signal<boolean>(false);
@@ -490,15 +492,23 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
    * Called once membership (and therefore the caller's role) is known.
    * Proactively provisions key material, then hands the expense list to the
    * decryption coordinator which owns the decrypt → retry → success lifecycle.
+   *
+   * Routes the master-key check through CryptoSessionManager.
+   * ensureCryptoContext() rather than calling encryptionService directly —
+   * this keeps CryptoSessionManager.state accurate even for a brand-new or
+   * empty group with nothing yet to decrypt (which would otherwise never
+   * exercise the crypto session at all), so the shared
+   * <app-crypto-recovery-panel> always reflects reality.
    */
   async initializeGroupKeysAndSelfHeal(groupId: string) {
-    const email = this.store.selectSnapshot(
-      (state: any) => state.auth?.user?.email,
-    );
-    const masterKey = await this.encryptionService.loadKeyFromSession(
-      email || undefined,
-    );
-    this.isMasterKeyLoaded.set(!!masterKey);
+    try {
+      await this.cryptoSession.ensureCryptoContext('group_detail_init');
+    } catch {
+      // CryptoSessionManager.state already reflects the failure; the
+      // shared recovery panel picks it up. Key provisioning below still
+      // needs an attempt so an owner/admin's background self-heal keeps
+      // working once their own session recovers.
+    }
 
     const role = this.getCallerRole();
     // Proactively ensure keys exist / are provisioned for all members, even
@@ -693,27 +703,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.isOffline.set(true);
   }
 
-  async unlockVault(password: string) {
-    if (!password) return;
-    try {
-      const email = this.store.selectSnapshot(
-        (state: any) => state.auth?.user?.email,
-      );
-      if (!email) throw new Error('User email not found');
-
-      await this.encryptionService.deriveAndStoreKey(password, email);
-      this.isMasterKeyLoaded.set(true);
-
-      const g = this.group();
-      if (g?.id) {
-        await this.initializeGroupKeysAndSelfHeal(g.id);
-        this.fetchExpenses(g.id);
-        this.fetchBalances(g.id);
-      }
-    } catch (e: any) {
-      alert('Failed to unlock vault: ' + (e.message || e));
-    }
-  }
+  // unlockVault() removed — superseded by <app-crypto-recovery-panel>,
+  // which owns the unlock action for every encrypted feature. The
+  // constructor's isReady() effect above re-runs
+  // initializeGroupKeysAndSelfHeal (and therefore re-fetches nothing extra
+  // beyond what that already retriggers) once the panel restores the
+  // session, so this page doesn't need its own copy of that flow anymore.
 
   getCurrentMonthString(): string {
     const d = this.currentTimelineMonth();

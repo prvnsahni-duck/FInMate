@@ -521,17 +521,25 @@ describe('CreateExpenseModalComponent', () => {
 
       expect(mockGroupKeyService.createAndStoreGroupKey).not.toHaveBeenCalled();
       expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
-      expect(component.errorMessage).toContain('session key is not unlocked');
+      expect(component.errorMessage).toContain('session needs to be unlocked');
     });
 
-    it('scopeKeyBlocked/scopeKeyMessage reflect a no_session status', () => {
+    it('scopeKeyBlocked is true for no_session, but scopeKeyMessage is empty — the shared CryptoRecoveryPanel handles it instead of a local message', () => {
       component.groupId = 'group-1';
       component.scopeKeyStatus.set('no_session');
 
       expect(component.scopeKeyBlocked()).toBe(true);
-      expect(component.scopeKeyMessage()).toContain(
-        'session key is not unlocked',
-      );
+      expect(component.scopeKeyMessage()).toBe('');
+    });
+
+    it('renders the shared <app-crypto-recovery-panel> in the template for no_session, not a local banner', () => {
+      component.groupId = 'group-1';
+      component.scopeKeyStatus.set('no_session');
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector('app-crypto-recovery-panel'),
+      ).not.toBeNull();
     });
 
     it('owner/admin facing pending is NOT blocked from submitting', () => {

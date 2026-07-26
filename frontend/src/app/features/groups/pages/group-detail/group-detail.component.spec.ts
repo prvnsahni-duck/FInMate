@@ -210,17 +210,18 @@ describe('GroupDetailComponent', () => {
   });
 
   describe('cross-tab crypto recovery', () => {
-    it('re-runs initializeGroupKeysAndSelfHeal when CryptoSessionManager becomes Ready while the unlock banner is showing', async () => {
+    it('re-runs initializeGroupKeysAndSelfHeal whenever CryptoSessionManager reports Ready (this page unlocking, or another tab via BroadcastChannel)', async () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      component.isMasterKeyLoaded.set(false);
       component.group.set(mockGroup as any);
       const spy = jest.spyOn(component, 'initializeGroupKeysAndSelfHeal');
+      spy.mockClear();
 
-      // Simulate the master key becoming available (e.g. another tab
-      // persisted it to the shared IndexedDB vault, and this tab's
-      // CryptoSessionManager picked that up via BroadcastChannel).
+      // Simulate the master key becoming available (e.g. the shared
+      // <app-crypto-recovery-panel> unlocked it, or another tab persisted
+      // it to the shared IndexedDB vault and this tab's CryptoSessionManager
+      // picked that up via BroadcastChannel).
       mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
       const cryptoSession = TestBed.inject(CryptoSessionManager);
       await cryptoSession.ensureCryptoContext();
@@ -231,22 +232,34 @@ describe('GroupDetailComponent', () => {
       expect(spy).toHaveBeenCalledWith('group-1');
     });
 
-    it('does not re-run initializeGroupKeysAndSelfHeal when the banner is not showing', async () => {
+    it('does not re-run initializeGroupKeysAndSelfHeal while the session is not Ready', async () => {
       fixture.detectChanges();
       await fixture.whenStable();
 
-      component.isMasterKeyLoaded.set(true); // banner already hidden
       component.group.set(mockGroup as any);
       const spy = jest.spyOn(component, 'initializeGroupKeysAndSelfHeal');
       spy.mockClear();
 
-      mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
       const cryptoSession = TestBed.inject(CryptoSessionManager);
-      await cryptoSession.ensureCryptoContext();
+      expect(cryptoSession.isReady()).toBe(false);
 
       fixture.detectChanges();
 
       expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('renders the shared <app-crypto-recovery-panel> in the template (structural — no component-local password prompt UI)', () => {
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector('app-crypto-recovery-panel'),
+      ).not.toBeNull();
+      // The old, component-local unlock input this replaced must be gone.
+      expect(
+        fixture.nativeElement.querySelector(
+          'input[placeholder="Enter password to unlock vault"]',
+        ),
+      ).toBeNull();
     });
   });
 

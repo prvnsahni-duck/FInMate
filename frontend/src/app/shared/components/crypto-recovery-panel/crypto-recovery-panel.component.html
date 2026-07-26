@@ -1,0 +1,94 @@
+@if (visible()) {
+  @if (isTransient()) {
+    <!-- Loading / Recovering: informational only, no action needed or possible. -->
+    <div
+      role="status"
+      aria-live="polite"
+      data-testid="crypto-recovery-panel"
+      data-crypto-recovery-state="transient"
+      class="bg-primary/10 border border-primary/20 text-secondary rounded-3xl p-4 mb-6 flex items-center gap-3 shadow-lg animate-fade-in"
+    >
+      <span
+        class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin shrink-0"
+        aria-hidden="true"
+      ></span>
+      <span class="text-xs font-bold">{{ headline() }}</span>
+    </div>
+  } @else {
+    <!-- NoSession / RecoveringBlocked / Fatal: needs the user's attention. -->
+    <div
+      role="alert"
+      [attr.aria-live]="'assertive'"
+      data-testid="crypto-recovery-panel"
+      [attr.data-crypto-recovery-state]="state()"
+      [class]="
+        isFatal()
+          ? 'bg-error/15 border border-error/30 text-error rounded-3xl p-6 mb-6 shadow-lg animate-fade-in'
+          : 'bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 rounded-3xl p-6 mb-6 shadow-lg animate-fade-in'
+      "
+    >
+      <h4 class="font-bold text-sm">{{ headline() }}</h4>
+      <p class="text-xs opacity-90 font-medium mt-1">{{ description() }}</p>
+
+      @if (needsCredential()) {
+        <form
+          class="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 max-w-md"
+          (ngSubmit)="unlock()"
+        >
+          @if (unlockMethod() === 'password') {
+            <label for="crypto-recovery-credential" class="sr-only"
+              >Password</label
+            >
+            <input
+              id="crypto-recovery-credential"
+              type="password"
+              autocomplete="current-password"
+              autofocus
+              [attr.aria-label]="'Password'"
+              [attr.aria-busy]="isBusy()"
+              placeholder="Enter your password"
+              [value]="credential()"
+              (input)="credential.set($any($event.target).value)"
+              class="bg-white/10 rounded-xl px-3 py-1.5 text-xs outline-none border border-white/20 focus:border-white/40 placeholder-white/50 w-full"
+            />
+          }
+          <button
+            type="submit"
+            data-testid="crypto-recovery-unlock-button"
+            [disabled]="isBusy() || !credential()"
+            [attr.aria-busy]="isBusy()"
+            class="bg-amber-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs hover:bg-amber-700 transition shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {{ isBusy() ? 'Unlocking…' : 'Unlock' }}
+          </button>
+        </form>
+      }
+
+      @if (actionError()) {
+        <p class="text-xs font-bold mt-2" role="alert">{{ actionError() }}</p>
+      }
+
+      <div class="mt-3 flex items-center gap-3">
+        @if (state() === 'RecoveringBlocked') {
+          <button
+            type="button"
+            data-testid="crypto-recovery-retry-button"
+            [disabled]="isBusy()"
+            (click)="retry()"
+            class="text-xs font-bold underline hover:no-underline disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Retry automatically
+          </button>
+        }
+        <button
+          type="button"
+          data-testid="crypto-recovery-signout-button"
+          (click)="signOut()"
+          class="text-xs font-bold underline hover:no-underline"
+        >
+          Sign Out
+        </button>
+      </div>
+    </div>
+  }
+}

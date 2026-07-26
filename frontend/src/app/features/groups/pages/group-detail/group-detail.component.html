@@ -43,6 +43,9 @@
         <div class="text-xs font-bold">Offline - Showing cached data.</div>
       </div>
     }
+
+    <app-crypto-recovery-panel />
+
     @if (rateLimitError()) {
       <div
         class="bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400 rounded-3xl p-6 mb-6 flex items-center space-x-3 shadow-lg"
@@ -100,26 +103,6 @@
               encryption key is unavailable or you no longer have access to
               them.
             </p>
-          }
-
-          @if (!isMasterKeyLoaded()) {
-            <div
-              class="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 max-w-md"
-            >
-              <input
-                #passInput
-                type="password"
-                placeholder="Enter password to unlock vault"
-                (keyup.enter)="unlockVault(passInput.value)"
-                class="bg-white/10 text-white rounded-xl px-3 py-1.5 text-xs outline-none border border-white/20 focus:border-white/40 placeholder-white/50 w-full"
-              />
-              <button
-                (click)="unlockVault(passInput.value)"
-                class="bg-amber-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs hover:bg-amber-700 transition shrink-0"
-              >
-                Unlock Vault
-              </button>
-            </div>
           }
         </div>
       </div>

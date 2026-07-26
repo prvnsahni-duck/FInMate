@@ -138,7 +138,9 @@
         Invite Member
       </h3>
 
-      @if (inviteError) {
+      @if (isSessionBlocked()) {
+        <app-crypto-recovery-panel />
+      } @else if (inviteError) {
         <p class="text-[11px] text-red-500 font-semibold mb-2">
           {{ inviteError }}
         </p>
