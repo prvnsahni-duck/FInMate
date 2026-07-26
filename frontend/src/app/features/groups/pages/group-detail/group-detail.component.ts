@@ -35,6 +35,7 @@ import { ExpenseDecryptCoordinator } from '../../../../core/services/expense-dec
 import { ExpenseDecryptionService } from '../../../../core/services/expense-decryption.service';
 import { classifyDecryptionError } from '../../../../core/models/decryption-state';
 import { CryptoSessionManager } from '../../../../core/services/crypto-session-manager.service';
+import { CryptoRecoveryQueueService } from '../../../../core/services/crypto-recovery-queue.service';
 
 import {
   BalanceEntry,
@@ -122,6 +123,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   private expenseDecryption = inject(ExpenseDecryptionService);
   private store = inject(Store);
   private cryptoSession = inject(CryptoSessionManager);
+  private recoveryQueue = inject(CryptoRecoveryQueueService);
   private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -1109,13 +1111,27 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         }
 
         // Reuse the central pipeline's scope-key resolution + classification
-        // instead of re-implementing it here.
-        const { key: scopeKey, keyStatus } =
-          await this.expenseDecryption.resolveExpenseKey(expense as any);
-
-        if (!scopeKey) {
-          throw new Error(classifyDecryptionError({ keyStatus }).message);
-        }
+        // instead of re-implementing it here. resolveExpenseKey() never
+        // rejects (it swallows session failures into keyStatus:'no_session'),
+        // so the null-key check has to throw *inside* the operation passed to
+        // runWithRecovery — only then can its catch see the failure, verify
+        // it's a genuine session block, and queue+auto-resume the whole
+        // decrypt-and-save flow once unlocked, instead of failing with an
+        // alert the user has to dismiss before clicking download again.
+        const scopeKey = await this.recoveryQueue.runWithRecovery(
+          async () => {
+            const result = await this.expenseDecryption.resolveExpenseKey(
+              expense as any,
+            );
+            if (!result.key) {
+              throw new Error(
+                classifyDecryptionError({ keyStatus: result.keyStatus })
+                  .message,
+              );
+            }
+            return result.key;
+          },
+        );
 
         const fileKey = await this.encryptionService.unwrapKey(
           file.encryptedFileKey,

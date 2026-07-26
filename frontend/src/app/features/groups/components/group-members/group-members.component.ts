@@ -24,6 +24,7 @@ import {
   arrayBufferToBase64,
 } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
+import { CryptoRecoveryQueueService } from '../../../../core/services/crypto-recovery-queue.service';
 import { environment } from '../../../../../environments/environment';
 import { CryptoRecoveryPanelComponent } from '../../../../shared/components/crypto-recovery-panel/crypto-recovery-panel.component';
 
@@ -59,6 +60,7 @@ export class GroupMembersComponent {
   private destroyRef = inject(DestroyRef);
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
+  private recoveryQueue = inject(CryptoRecoveryQueueService);
   private http = inject(HttpClient);
 
   members = input.required<GroupMember[]>();
@@ -175,6 +177,24 @@ export class GroupMembersComponent {
       console.error('Group key self-heal failed', e);
     }
     return null;
+  }
+
+  /**
+   * Throws instead of returning null so callers can wrap it in
+   * CryptoRecoveryQueueService.runWithRecovery() — a genuine session block
+   * then gets queued and auto-resumed once the shared recovery panel is
+   * unlocked, instead of leaving the user to click Invite again.
+   */
+  private async resolveGroupKeyOrThrow(): Promise<CryptoKey> {
+    const key = await this.ensureGroupKey();
+    if (!key) {
+      throw new Error(
+        this.isSessionBlocked()
+          ? 'Your session needs to be unlocked.'
+          : 'Group key not available. Try refreshing, or ask the group owner to share it.',
+      );
+    }
+    return key;
   }
 
   memberInitials(member: GroupMember): string {
@@ -331,17 +351,19 @@ export class GroupMembersComponent {
     this.inviteSuccess = '';
 
     try {
-      const groupKey = await this.ensureGroupKey();
-      if (!groupKey) {
+      let groupKey: CryptoKey;
+      try {
+        groupKey = await this.recoveryQueue.runWithRecovery(() =>
+          this.resolveGroupKeyOrThrow(),
+        );
+      } catch (err) {
         if (this.isSessionBlocked()) {
           // <app-crypto-recovery-panel> is already shown reactively;
           // nothing more to say via inviteError.
           this.isInviting = false;
           return;
         }
-        throw new Error(
-          'Group key not available. Try refreshing, or ask the group owner to share it.',
-        );
+        throw err;
       }
 
       const subtle = window.crypto.subtle || (globalThis as any).crypto?.subtle;
@@ -496,15 +518,17 @@ export class GroupMembersComponent {
       }
 
       // 1. Resolve Group Key
-      const groupKey = await this.ensureGroupKey();
-      if (!groupKey) {
+      let groupKey: CryptoKey;
+      try {
+        groupKey = await this.recoveryQueue.runWithRecovery(() =>
+          this.resolveGroupKeyOrThrow(),
+        );
+      } catch (err) {
         if (this.isSessionBlocked()) {
           // <app-crypto-recovery-panel> is already shown reactively.
           return;
         }
-        throw new Error(
-          'Group key not available. Try refreshing, or ask the group owner to share it.',
-        );
+        throw err;
       }
 
       // 2. Generate TIK (AES-GCM 256-bit)

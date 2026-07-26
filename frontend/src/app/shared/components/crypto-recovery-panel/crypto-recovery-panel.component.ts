@@ -1,8 +1,18 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { Store } from '@ngxs/store';
 import { CryptoSessionManager } from '../../../core/services/crypto-session-manager.service';
-import { ClientEncryptionService } from '../../../core/services/encryption.service';
-import { AuthState, Logout } from '../../../core/auth/auth.state';
+import { Logout } from '../../../core/auth/auth.state';
+import { CryptoRecoveryVisibilityService } from '../../../core/services/crypto-recovery-visibility.service';
+import {
+  CRYPTO_UNLOCK_PROVIDERS,
+  CryptoUnlockProvider,
+} from '../../../core/services/crypto-unlock-provider';
 
 /**
  * The single, app-wide crypto recovery experience. Every encrypted feature
@@ -17,6 +27,15 @@ import { AuthState, Logout } from '../../../core/auth/auth.state';
  * unavailable — not about a specific group's key being unshared/pending,
  * which is a different, per-group concern with its own existing messaging
  * (see create-expense-modal's scopeKeyMessage for 'pending'/'no_access').
+ *
+ * If several instances are mounted at once (e.g. this page's own panel plus
+ * a modal's, opened on top of it), only the most-recently-mounted one
+ * actually renders — see CryptoRecoveryVisibilityService — so a user only
+ * ever sees one recovery prompt for one recovery event, not one per surface.
+ *
+ * The unlock action itself is delegated to whichever CryptoUnlockProvider(s)
+ * are registered (today: password only) rather than hard-coded here, so a
+ * future method plugs in via DI, not a redesign of this panel.
  */
 @Component({
   selector: 'app-crypto-recovery-panel',
@@ -26,34 +45,46 @@ import { AuthState, Logout } from '../../../core/auth/auth.state';
 })
 export class CryptoRecoveryPanelComponent {
   private cryptoSession = inject(CryptoSessionManager);
-  private encryptionService = inject(ClientEncryptionService);
   private store = inject(Store);
+  private visibilityService = inject(CryptoRecoveryVisibilityService);
+  private providers = inject(CRYPTO_UNLOCK_PROVIDERS, { optional: true }) ?? [];
+
+  private readonly instanceId = this.visibilityService.register();
+  private readonly isTopmostInstance = this.visibilityService.isTopmost(
+    this.instanceId,
+  );
 
   readonly state = this.cryptoSession.state;
   readonly fatalReason = this.cryptoSession.fatalReason;
   readonly recoveryBlockedReason = this.cryptoSession.recoveryBlockedReason;
 
   /**
-   * Only one unlock method exists today. Kept as an explicit discriminator
-   * — rather than the template hard-coding "password" throughout — so a
-   * future method (PIN, biometric/WebAuthn) is a new case added here and in
-   * the template's method-specific block, not a redesign of this panel.
+   * Every registered method, and the one currently selected. There's only
+   * ever one today — user-facing method *selection* (e.g. "use PIN
+   * instead") is future work, not something this phase needs since only one
+   * provider is registered — but the panel already reads this generically
+   * rather than assuming which provider it is.
    */
-  readonly unlockMethod = signal<'password'>('password');
+  readonly availableProviders: readonly CryptoUnlockProvider[] = this.providers;
+  readonly activeProvider = signal<CryptoUnlockProvider | null>(
+    this.providers[0] ?? null,
+  );
 
   readonly credential = signal('');
   readonly isBusy = signal(false);
   readonly actionError = signal<string | null>(null);
 
-  /** Nothing to show once the session is genuinely ready. */
-  readonly visible = computed(() => this.state() !== 'Ready');
+  /** Nothing to show once the session is genuinely ready, or another mounted instance is topmost. */
+  readonly visible = computed(
+    () => this.state() !== 'Ready' && this.isTopmostInstance(),
+  );
 
   /** Transient, non-actionable states — informational only, no buttons. */
   readonly isTransient = computed(
     () => this.state() === 'Loading' || this.state() === 'Recovering',
   );
 
-  /** States where entering a credential can actually help. */
+  /** States where an unlock action can actually help. */
   readonly needsCredential = computed(
     () => this.state() === 'NoSession' || this.state() === 'RecoveringBlocked',
   );
@@ -93,20 +124,26 @@ export class CryptoRecoveryPanelComponent {
     }
   });
 
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.visibilityService.unregister(this.instanceId);
+    });
+  }
+
   async unlock(): Promise<void> {
-    const password = this.credential();
-    if (!password) return;
+    const provider = this.activeProvider();
+    if (!provider) {
+      this.actionError.set('No unlock method is available on this device.');
+      return;
+    }
+    if (provider.inputType === 'text-secret' && !this.credential()) return;
 
     this.isBusy.set(true);
     this.actionError.set(null);
     try {
-      const user = this.store.selectSnapshot(AuthState.getUser);
-      const email = user?.email;
-      if (!email) {
-        throw new Error('No signed-in user found.');
-      }
-      await this.encryptionService.deriveAndStoreKey(password, email);
-      await this.cryptoSession.ensureCryptoContext('crypto_recovery_panel');
+      await provider.unlock(
+        provider.inputType === 'text-secret' ? this.credential() : undefined,
+      );
       this.credential.set('');
     } catch {
       this.actionError.set("Couldn't restore your session. Please try again.");

@@ -5,6 +5,11 @@ import { CryptoSessionManager } from '../../../core/services/crypto-session-mana
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../core/services/group-key.service';
 import { Logout } from '../../../core/auth/auth.state';
+import {
+  CRYPTO_UNLOCK_PROVIDERS,
+  CryptoUnlockProvider,
+} from '../../../core/services/crypto-unlock-provider';
+import { CryptoRecoveryVisibilityService } from '../../../core/services/crypto-recovery-visibility.service';
 
 describe('CryptoRecoveryPanelComponent', () => {
   let fixture: ComponentFixture<CryptoRecoveryPanelComponent>;
@@ -16,6 +21,7 @@ describe('CryptoRecoveryPanelComponent', () => {
     deriveAndStoreKey: jest.Mock;
   };
   let mockGroupKeys: { resolveGroupKey: jest.Mock; clearCache: jest.Mock };
+  let mockPasswordProvider: CryptoUnlockProvider;
 
   beforeEach(() => {
     mockStore = {
@@ -32,20 +38,36 @@ describe('CryptoRecoveryPanelComponent', () => {
       resolveGroupKey: jest.fn().mockResolvedValue({ status: 'ready' }),
       clearCache: jest.fn(),
     };
+    mockPasswordProvider = {
+      id: 'password',
+      label: 'Password',
+      inputType: 'text-secret',
+      unlock: jest.fn().mockImplementation(async (credential?: string) => {
+        // Mirrors PasswordUnlockProvider's real contract for these tests.
+        await mockEncryption.deriveAndStoreKey(credential, 'test@example.com');
+        await cryptoSession.ensureCryptoContext();
+      }),
+    };
 
     TestBed.configureTestingModule({
       imports: [CryptoRecoveryPanelComponent],
       providers: [
         CryptoSessionManager,
+        CryptoRecoveryVisibilityService,
         { provide: Store, useValue: mockStore },
         { provide: ClientEncryptionService, useValue: mockEncryption },
         { provide: GroupKeyService, useValue: mockGroupKeys },
+        {
+          provide: CRYPTO_UNLOCK_PROVIDERS,
+          useValue: mockPasswordProvider,
+          multi: true,
+        },
       ],
     });
 
+    cryptoSession = TestBed.inject(CryptoSessionManager);
     fixture = TestBed.createComponent(CryptoRecoveryPanelComponent);
     component = fixture.componentInstance;
-    cryptoSession = TestBed.inject(CryptoSessionManager);
   });
 
   function panelEl(): HTMLElement | null {
@@ -88,7 +110,7 @@ describe('CryptoRecoveryPanelComponent', () => {
     ).toBeNull();
   });
 
-  it('unlock() derives and stores the key, then re-establishes the session', async () => {
+  it('unlock() delegates to the active CryptoUnlockProvider instead of calling encryption services directly', async () => {
     await expect(cryptoSession.ensureCryptoContext()).rejects.toThrow();
     fixture.detectChanges();
 
@@ -96,12 +118,23 @@ describe('CryptoRecoveryPanelComponent', () => {
     component.credential.set('correct horse battery staple');
     await component.unlock();
 
-    expect(mockEncryption.deriveAndStoreKey).toHaveBeenCalledWith(
+    expect(mockPasswordProvider.unlock).toHaveBeenCalledWith(
       'correct horse battery staple',
-      'test@example.com',
     );
     expect(cryptoSession.state()).toBe('Ready');
     expect(component.credential()).toBe('');
+  });
+
+  it('renders the provider label rather than a hard-coded "password" string', async () => {
+    mockPasswordProvider.label = 'Custom Secret';
+    await expect(cryptoSession.ensureCryptoContext()).rejects.toThrow();
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement.querySelector(
+        'input[aria-label="Custom Secret"]',
+      ),
+    ).not.toBeNull();
   });
 
   it('retry() re-attempts ensureCryptoContext without requiring a credential', async () => {
@@ -163,5 +196,41 @@ describe('CryptoRecoveryPanelComponent', () => {
     (cryptoSession as any).transition('Loading');
     fixture.detectChanges();
     expect(panelEl()?.getAttribute('role')).toBe('status');
+  });
+
+  describe('single-panel visibility across multiple mounted instances', () => {
+    it('suppresses an earlier-mounted instance once a second one mounts on top of it (e.g. a modal)', async () => {
+      await expect(cryptoSession.ensureCryptoContext()).rejects.toThrow();
+      fixture.detectChanges();
+      expect(panelEl()).not.toBeNull(); // the only instance so far
+
+      const fixture2 = TestBed.createComponent(CryptoRecoveryPanelComponent);
+      fixture2.detectChanges();
+      fixture.detectChanges();
+
+      // The first (page-level) instance suppresses itself...
+      expect(panelEl()).toBeNull();
+      // ...while the second (modal-level) instance is the one showing.
+      expect(
+        fixture2.nativeElement.querySelector(
+          '[data-testid="crypto-recovery-panel"]',
+        ),
+      ).not.toBeNull();
+    });
+
+    it('the underlying instance reappears once the topmost one is destroyed (modal closed)', async () => {
+      await expect(cryptoSession.ensureCryptoContext()).rejects.toThrow();
+      fixture.detectChanges();
+
+      const fixture2 = TestBed.createComponent(CryptoRecoveryPanelComponent);
+      fixture2.detectChanges();
+      fixture.detectChanges();
+      expect(panelEl()).toBeNull();
+
+      fixture2.destroy();
+      fixture.detectChanges();
+
+      expect(panelEl()).not.toBeNull();
+    });
   });
 });

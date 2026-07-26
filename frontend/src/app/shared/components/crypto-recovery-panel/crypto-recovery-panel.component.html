@@ -30,23 +30,22 @@
       <h4 class="font-bold text-sm">{{ headline() }}</h4>
       <p class="text-xs opacity-90 font-medium mt-1">{{ description() }}</p>
 
-      @if (needsCredential()) {
+      @if (needsCredential() && activeProvider(); as provider) {
         <form
           class="mt-4 flex flex-col sm:flex-row sm:items-center gap-2 max-w-md"
           (ngSubmit)="unlock()"
         >
-          @if (unlockMethod() === 'password') {
-            <label for="crypto-recovery-credential" class="sr-only"
-              >Password</label
-            >
+          @if (provider.inputType === 'text-secret') {
+            <label for="crypto-recovery-credential" class="sr-only">{{
+              provider.label
+            }}</label>
             <input
               id="crypto-recovery-credential"
               type="password"
               autocomplete="current-password"
-              autofocus
-              [attr.aria-label]="'Password'"
+              [attr.aria-label]="provider.label"
               [attr.aria-busy]="isBusy()"
-              placeholder="Enter your password"
+              [placeholder]="'Enter your ' + provider.label.toLowerCase()"
               [value]="credential()"
               (input)="credential.set($any($event.target).value)"
               class="bg-white/10 rounded-xl px-3 py-1.5 text-xs outline-none border border-white/20 focus:border-white/40 placeholder-white/50 w-full"
@@ -55,7 +54,10 @@
           <button
             type="submit"
             data-testid="crypto-recovery-unlock-button"
-            [disabled]="isBusy() || !credential()"
+            [disabled]="
+              isBusy() ||
+              (provider.inputType === 'text-secret' && !credential())
+            "
             [attr.aria-busy]="isBusy()"
             class="bg-amber-600 text-white font-bold px-4 py-1.5 rounded-xl text-xs hover:bg-amber-700 transition shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >

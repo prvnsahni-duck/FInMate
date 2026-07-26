@@ -16,6 +16,8 @@ import { withNgxsLoggerPlugin } from '@ngxs/logger-plugin';
 import { AuthState } from './core/auth/auth.state';
 import { RecurringExpensesState } from './core/recurring-expenses/recurring-expenses.state';
 import { environment } from '../environments/environment';
+import { CRYPTO_UNLOCK_PROVIDERS } from './core/services/crypto-unlock-provider';
+import { PasswordUnlockProvider } from './core/services/password-unlock-provider.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -36,5 +38,8 @@ export const appConfig: ApplicationConfig = {
         ? []
         : [withNgxsReduxDevtoolsPlugin(), withNgxsLoggerPlugin()]),
     ),
+    // Extension point for future unlock methods (PIN, biometric): register
+    // another CRYPTO_UNLOCK_PROVIDERS entry here, no panel changes needed.
+    { provide: CRYPTO_UNLOCK_PROVIDERS, useClass: PasswordUnlockProvider, multi: true },
   ],
 };

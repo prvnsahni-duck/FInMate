@@ -47,6 +47,7 @@ import {
   CURRENCY_OPTIONS,
 } from '../../../../core/constants/app.constants';
 import { CryptoRecoveryPanelComponent } from '../../../../shared/components/crypto-recovery-panel/crypto-recovery-panel.component';
+import { CryptoRecoveryQueueService } from '../../../../core/services/crypto-recovery-queue.service';
 
 @Component({
   selector: 'app-create-expense-modal',
@@ -69,6 +70,7 @@ export class CreateExpenseModalComponent implements OnChanges {
   private groupKeyService = inject(GroupKeyService);
   private store = inject(Store);
   private http = inject(HttpClient);
+  private recoveryQueue = inject(CryptoRecoveryQueueService);
   private baseUrl = environment.apiBaseUrl;
 
   currencyOptions: DropdownOption[] = CURRENCY_OPTIONS;
@@ -585,7 +587,18 @@ export class CreateExpenseModalComponent implements OnChanges {
 
         if (this.groupId) {
           scope = 'group';
-          scopeKey = await this.resolveGroupScopeKey(this.groupId);
+          // Wrapped so a no_session failure here doesn't abandon the
+          // submit: it's queued and this call (and everything after it —
+          // encrypt, POST) automatically resumes once the crypto session
+          // recovers, instead of the user needing to unlock and click Save
+          // again. Non-session failures (pending/no_access/rate_limited)
+          // are unaffected — runWithRecovery only queues when
+          // CryptoSessionManager itself isn't Ready; a group-key-specific
+          // block with a Ready session re-throws immediately, same as
+          // before.
+          scopeKey = await this.recoveryQueue.runWithRecovery(() =>
+            this.resolveGroupScopeKey(this.groupId!),
+          );
         } else {
           const otherParticipants = splits.filter(
             (s) => s.participantUserId && s.participantUserId !== user,
@@ -724,25 +737,39 @@ export class CreateExpenseModalComponent implements OnChanges {
           ],
         };
 
-        const request$ = this.expense
-          ? this.expensesService.updateExpense(this.expense.id, {
-              ...payload,
-              version: this.expense.version,
-            } satisfies UpdateExpenseDto)
-          : this.expensesService.createExpense(payload);
+        // ExpensesService.createExpense()/updateExpense() do their own,
+        // separate ensureCryptoContext()/ensureGroupKey('write') resolution
+        // internally (encryptPayload()) — a different check than
+        // resolveGroupScopeKey() above, which only informs scopeKeyStatus/UI.
+        // Wrapped in runWithRecovery too so a session recovery that happens
+        // to land between that check and this one still auto-resumes the
+        // save, instead of surfacing a one-off failure the user has to retry
+        // by hand. Calling createExpense()/updateExpense() fresh inside the
+        // operation (rather than subscribing to an already-built Observable)
+        // matters here: encryptPayload() runs as soon as it's called, so a
+        // requeued retry must re-invoke it, not re-subscribe to the first,
+        // already-failed attempt.
+        try {
+          await this.recoveryQueue.runWithRecovery(() =>
+            firstValueFrom(
+              this.expense
+                ? this.expensesService.updateExpense(this.expense.id, {
+                    ...payload,
+                    version: this.expense.version,
+                  } satisfies UpdateExpenseDto)
+                : this.expensesService.createExpense(payload),
+            ),
+          );
+        } catch (err: any) {
+          this.isSubmitting = false;
+          this.errorMessage =
+            err.error?.message || 'Failed to save expense. Please try again.';
+          return;
+        }
 
-        request$.subscribe({
-          next: () => {
-            this.isSubmitting = false;
-            this.expenseCreated.emit();
-            this.closeModal();
-          },
-          error: (err) => {
-            this.isSubmitting = false;
-            this.errorMessage =
-              err.error?.message || 'Failed to save expense. Please try again.';
-          },
-        });
+        this.isSubmitting = false;
+        this.expenseCreated.emit();
+        this.closeModal();
       } catch (err: any) {
         this.isSubmitting = false;
         this.errorMessage =

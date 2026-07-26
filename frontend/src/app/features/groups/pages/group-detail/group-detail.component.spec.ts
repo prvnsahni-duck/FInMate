@@ -85,6 +85,12 @@ describe('GroupDetailComponent', () => {
   beforeEach(async () => {
     // Mock window.alert to prevent JSDOM errors
     jest.spyOn(window, 'alert').mockImplementation(() => undefined);
+    // jsdom doesn't implement scrollIntoView; the component calls it (via
+    // setTimeout) after tab-bar changes. Left unmocked, a queued call from
+    // an earlier test can fire mid-await in a later test (e.g. one that
+    // does several real microtask flushes) and crash as an uncaught
+    // exception unrelated to whatever that later test is actually checking.
+    Element.prototype.scrollIntoView = jest.fn();
 
     mockGroupsService = {
       getGroup: jest.fn().mockReturnValue(of(mockGroup)),
@@ -260,6 +266,77 @@ describe('GroupDetailComponent', () => {
           'input[placeholder="Enter password to unlock vault"]',
         ),
       ).toBeNull();
+    });
+  });
+
+  describe('downloadAttachment — crypto recovery wiring', () => {
+    const mockExpense = {
+      id: 'expense-1',
+      encryptionScope: 'personal' as const,
+    };
+    const mockFile = {
+      expenseId: 'expense-1',
+      encryptedFileKey: 'wrapped-file-key',
+      encryptedOriginalName: 'encrypted-name',
+      storageKey: 'file-1',
+      mimeType: 'text/plain',
+    };
+
+    async function flushMicrotasks(times = 15): Promise<void> {
+      for (let i = 0; i < times; i++) {
+        await Promise.resolve();
+      }
+    }
+
+    beforeEach(() => {
+      component.expenses.set([mockExpense as any]);
+      jest
+        .spyOn(Storage.prototype, 'getItem')
+        .mockImplementation((key) =>
+          key === 'sim_storage:file-1' ? 'encrypted-bytes' : null,
+        );
+      // jsdom doesn't implement these — define them rather than spyOn, which
+      // requires the property to already exist.
+      window.URL.createObjectURL = jest.fn().mockReturnValue('blob:mock-url');
+      window.URL.revokeObjectURL = jest.fn();
+    });
+
+    it('queues the download instead of alerting when the crypto session is genuinely not ready, then auto-resumes once unlocked', async () => {
+      // The outer beforeEach's default loadKeyFromSession already resolves
+      // null, so ensureCryptoContext() (and therefore resolveExpenseKey())
+      // fails until we unlock below.
+      const alertSpy = window.alert as jest.Mock;
+      alertSpy.mockClear();
+
+      const pending = component.downloadAttachment(mockFile);
+      await flushMicrotasks();
+
+      // Still paused, not failed — no premature alert to dismiss.
+      expect(alertSpy).not.toHaveBeenCalled();
+
+      mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
+      const cryptoSession = TestBed.inject(CryptoSessionManager);
+      await cryptoSession.ensureCryptoContext();
+      await pending;
+
+      expect(mockEncryptionService.unwrapKey).toHaveBeenCalledWith(
+        'wrapped-file-key',
+        expect.anything(),
+      );
+      expect(alertSpy).not.toHaveBeenCalled();
+    });
+
+    it('still alerts immediately for a real, non-recoverable failure (e.g. missing attachment bytes) when the session is fine', async () => {
+      mockEncryptionService.loadKeyFromSession.mockResolvedValue({});
+      (Storage.prototype.getItem as jest.Mock).mockReturnValue(null);
+      const alertSpy = window.alert as jest.Mock;
+      alertSpy.mockClear();
+
+      await component.downloadAttachment(mockFile);
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Attachment file data not found'),
+      );
     });
   });
 

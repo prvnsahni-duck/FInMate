@@ -10,6 +10,17 @@ import { Store } from '@ngxs/store';
 import { of } from 'rxjs';
 import { GroupMember } from '@finmate/data-models';
 
+/**
+ * runWithRecovery's catch does an authoritative ensureCryptoContext() check
+ * that is itself several microtask ticks deep — flush generously rather than
+ * guessing the exact count (see crypto-recovery-queue.service.spec.ts).
+ */
+async function flushMicrotasks(times = 15): Promise<void> {
+  for (let i = 0; i < times; i++) {
+    await Promise.resolve();
+  }
+}
+
 // generateSecureInviteLink()/sendBulkInvites() check for
 // window.crypto.subtle before touching group-key logic; jsdom doesn't
 // implement SubtleCrypto, so polyfill it (same pattern as
@@ -65,6 +76,14 @@ describe('GroupMembersComponent — crypto recovery wiring', () => {
     };
 
     mockEncryptionService = {
+      // CryptoRecoveryQueueService's runWithRecovery() now does its own
+      // ensureCryptoContext() check on every failure (via CryptoSessionManager,
+      // which calls this), independent of GroupKeyService's classification
+      // these tests exercise below. Without a resolved key here, that check
+      // would always fail and every queued operation would wait forever for
+      // a Ready transition that never comes, timing out every test in this
+      // file rather than exercising the no_session/pending scenarios below.
+      loadKeyFromSession: jest.fn().mockResolvedValue({}),
       generateDataKey: jest.fn().mockResolvedValue({}),
       wrapKey: jest.fn().mockResolvedValue('wrapped'),
       decrypt: jest.fn().mockResolvedValue(''),
@@ -108,10 +127,15 @@ describe('GroupMembersComponent — crypto recovery wiring', () => {
     );
   }
 
-  it('sendBulkInvites: sets isSessionBlocked and shows the shared panel when the cause is no_session, without an inviteError string', async () => {
+  it('sendBulkInvites: sets isSessionBlocked and shows the shared panel when the cause is no_session, without an inviteError string — and queues rather than failing, ready to auto-resume once unlocked', async () => {
     mockGroupKeyService.resolveGroupKey.mockResolvedValue({
       status: 'no_session',
     });
+    // A real no_session classification from GroupKeyService means the master
+    // key genuinely isn't available — mock CryptoSessionManager's own check
+    // to agree, so runWithRecovery queues (rather than treating this as an
+    // unrelated failure with a session that's actually fine).
+    mockEncryptionService.loadKeyFromSession.mockResolvedValue(null);
     component.stageUser({
       name: 'Jane',
       identifier: 'jane@example.com',
@@ -119,12 +143,20 @@ describe('GroupMembersComponent — crypto recovery wiring', () => {
       isRegisteredUser: false,
     });
 
-    await component.sendBulkInvites();
+    // Don't await to completion — a genuine session block queues and pauses
+    // the whole invite send until unlock, it doesn't reject. Full
+    // resume-then-complete behavior (including the HTTP round-trip this
+    // would go on to make) is exercised generically in
+    // crypto-recovery-queue.service.spec.ts; this test only covers the
+    // isSessionBlocked/panel wiring at the moment of the pause.
+    void component.sendBulkInvites();
+    await flushMicrotasks();
     fixture.detectChanges();
 
     expect(component.isSessionBlocked()).toBe(true);
     expect(component.inviteError).toBe('');
     expect(panelEl()).not.toBeNull();
+    expect(component.isInviting).toBe(true);
   });
 
   it('sendBulkInvites: a non-session block (e.g. pending, non-owner) still uses the existing inviteError message, not the panel', async () => {
@@ -147,17 +179,22 @@ describe('GroupMembersComponent — crypto recovery wiring', () => {
     expect(panelEl()).toBeNull();
   });
 
-  it('generateSecureInviteLink: sets isSessionBlocked on no_session and returns without throwing', async () => {
+  it('generateSecureInviteLink: sets isSessionBlocked on no_session, shows the panel, and stays paused (not failed) rather than returning immediately', async () => {
     mockGroupKeyService.resolveGroupKey.mockResolvedValue({
       status: 'no_session',
     });
+    mockEncryptionService.loadKeyFromSession.mockResolvedValue(null);
 
-    await component.generateSecureInviteLink();
+    void component.generateSecureInviteLink();
+    await flushMicrotasks();
     fixture.detectChanges();
 
     expect(component.isSessionBlocked()).toBe(true);
     expect(panelEl()).not.toBeNull();
-    expect(component.isGeneratingLink).toBe(false);
+    // Still busy/paused, not failed — isGeneratingLink only clears once the
+    // queued attempt resumes and the operation's own finally runs (covered
+    // generically by crypto-recovery-queue.service.spec.ts).
+    expect(component.isGeneratingLink).toBe(true);
   });
 
   it('ensureGroupKey resets isSessionBlocked on a fresh attempt that succeeds', async () => {
