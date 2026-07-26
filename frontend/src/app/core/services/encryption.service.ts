@@ -1,5 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { ZkKeyVaultService } from './zk-key-vault.service';
+import {
+  EncryptedEnvelope,
+  EncryptedEnvelopeInput,
+  ENVELOPE_SCHEMA_VERSION,
+} from '@finmate/data-models';
 
 export function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -18,6 +23,47 @@ export function base64ToArrayBuffer(base64: string): ArrayBuffer {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes.buffer;
+}
+
+/**
+ * Thrown by decryptEnvelope() when the envelope's own stamped metadata
+ * doesn't match what the caller expected — distinct from a generic AEAD
+ * failure so callers can tell "wrong key version requested" apart from
+ * "ciphertext/tag genuinely didn't verify".
+ */
+export class EnvelopeMetadataMismatchError extends Error {
+  constructor(
+    public readonly field: 'groupId' | 'keyVersion',
+    public readonly expected: string | undefined,
+    public readonly actual: string | undefined,
+  ) {
+    super(
+      `Encrypted envelope ${field} mismatch: expected "${expected}", got "${actual}"`,
+    );
+    this.name = 'EnvelopeMetadataMismatchError';
+  }
+}
+
+/**
+ * Deterministic byte serialization of an envelope's metadata fields for use
+ * as AES-GCM additional authenticated data (AAD). Fixed key order and
+ * explicit `null` for absent fields keep encrypt/decrypt byte-identical.
+ */
+function canonicalEnvelopeAad(meta: {
+  schemaVersion: number;
+  algorithm: string;
+  groupId?: string;
+  keyVersion?: string;
+  keyId?: string;
+}): Uint8Array<ArrayBuffer> {
+  const ordered = {
+    schemaVersion: meta.schemaVersion,
+    algorithm: meta.algorithm,
+    groupId: meta.groupId ?? null,
+    keyVersion: meta.keyVersion ?? null,
+    keyId: meta.keyId ?? null,
+  };
+  return new TextEncoder().encode(JSON.stringify(ordered));
 }
 
 @Injectable({
@@ -539,6 +585,111 @@ export class ClientEncryptionService {
       key,
       ciphertextBuffer,
     );
+  }
+
+  /**
+   * Encrypts a plaintext string into a version-stamped envelope whose
+   * metadata (groupId/keyVersion/keyId/schemaVersion/algorithm) is passed to
+   * AES-GCM as authenticated associated data (AAD): tampering with any of
+   * those fields — e.g. relabeling which group or key version a ciphertext
+   * claims to belong to — fails decryption's auth-tag check, not just a
+   * structural comparison. See shared/data-models/src/lib/encrypted-envelope.ts.
+   */
+  async encryptEnvelope(
+    plaintext: string,
+    key: CryptoKey,
+    metadata: EncryptedEnvelopeInput = {},
+  ): Promise<EncryptedEnvelope> {
+    const subtle = this.getSubtleCrypto();
+    const encoder = new TextEncoder();
+    const encodedPlaintext = encoder.encode(plaintext);
+
+    let iv: Uint8Array<ArrayBuffer>;
+    if (typeof window !== 'undefined' && window.crypto) {
+      iv = window.crypto.getRandomValues(new Uint8Array(12));
+    } else if (typeof globalThis !== 'undefined' && globalThis.crypto) {
+      iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+    } else {
+      throw new Error('Web Cryptography API (SubtleCrypto) is not available');
+    }
+
+    const envelopeMeta: Pick<
+      EncryptedEnvelope,
+      'groupId' | 'keyVersion' | 'keyId' | 'schemaVersion' | 'algorithm'
+    > = {
+      groupId: metadata.groupId,
+      keyVersion: metadata.keyVersion,
+      keyId: metadata.keyId,
+      schemaVersion: ENVELOPE_SCHEMA_VERSION,
+      algorithm: 'AES-256-GCM',
+    };
+    const additionalData = canonicalEnvelopeAad(envelopeMeta);
+
+    const ciphertextBuffer = await subtle.encrypt(
+      { name: 'AES-GCM', iv, additionalData },
+      key,
+      encodedPlaintext,
+    );
+
+    return {
+      ...envelopeMeta,
+      iv: arrayBufferToBase64(iv.buffer as ArrayBuffer),
+      ciphertext: arrayBufferToBase64(ciphertextBuffer),
+    };
+  }
+
+  /**
+   * Decrypts a version-stamped envelope. If `expected` is given, the
+   * envelope's own groupId/keyVersion are checked against it *before*
+   * attempting decryption, so a mismatch surfaces as a clear
+   * EnvelopeMetadataMismatchError rather than an opaque AEAD failure —
+   * useful when a caller already knows which group/version it asked for.
+   * Even without `expected`, the metadata is still authenticated: any
+   * tampering with it fails the AES-GCM auth tag check inside subtle.decrypt.
+   */
+  async decryptEnvelope(
+    envelope: EncryptedEnvelope,
+    key: CryptoKey,
+    expected?: { groupId?: string; keyVersion?: string },
+  ): Promise<string> {
+    if (envelope.algorithm !== 'AES-256-GCM') {
+      throw new Error(`Unsupported envelope algorithm: ${envelope.algorithm}`);
+    }
+    if (
+      expected?.groupId !== undefined &&
+      envelope.groupId !== expected.groupId
+    ) {
+      throw new EnvelopeMetadataMismatchError(
+        'groupId',
+        expected.groupId,
+        envelope.groupId,
+      );
+    }
+    if (
+      expected?.keyVersion !== undefined &&
+      envelope.keyVersion !== expected.keyVersion
+    ) {
+      throw new EnvelopeMetadataMismatchError(
+        'keyVersion',
+        expected.keyVersion,
+        envelope.keyVersion,
+      );
+    }
+
+    const subtle = this.getSubtleCrypto();
+    const iv = new Uint8Array(base64ToArrayBuffer(envelope.iv));
+    const ciphertextBuffer = new Uint8Array(
+      base64ToArrayBuffer(envelope.ciphertext),
+    );
+    const additionalData = canonicalEnvelopeAad(envelope);
+
+    const plaintextBuffer = await subtle.decrypt(
+      { name: 'AES-GCM', iv, additionalData },
+      key,
+      ciphertextBuffer,
+    );
+
+    return new TextDecoder().decode(plaintextBuffer);
   }
 
   /**

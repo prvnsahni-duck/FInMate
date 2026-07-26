@@ -284,4 +284,117 @@ describe('ClientEncryptionService', () => {
     const decrypted = await service.decrypt(encrypted, unwrappedKey);
     expect(decrypted).toBe(plaintext);
   });
+
+  describe('encryptEnvelope / decryptEnvelope', () => {
+    it('round-trips plaintext and stamps the given metadata', async () => {
+      const key = await service.generateDataKey();
+      const plaintext = 'Rent for July';
+
+      const envelope = await service.encryptEnvelope(plaintext, key, {
+        groupId: 'group-1',
+        keyVersion: 'v3',
+        keyId: 'key-abc',
+      });
+
+      expect(envelope.groupId).toBe('group-1');
+      expect(envelope.keyVersion).toBe('v3');
+      expect(envelope.keyId).toBe('key-abc');
+      expect(envelope.algorithm).toBe('AES-256-GCM');
+      expect(envelope.schemaVersion).toBe(1);
+      expect(envelope.ciphertext).not.toContain(plaintext);
+
+      const decrypted = await service.decryptEnvelope(envelope, key);
+      expect(decrypted).toBe(plaintext);
+    });
+
+    it('rejects when the wrong key is used to decrypt', async () => {
+      const key = await service.generateDataKey();
+      const otherKey = await service.generateDataKey();
+      const envelope = await service.encryptEnvelope('secret', key, {
+        groupId: 'group-1',
+      });
+
+      await expect(
+        service.decryptEnvelope(envelope, otherKey),
+      ).rejects.toThrow();
+    });
+
+    it('detects tampering with the authenticated groupId metadata', async () => {
+      const key = await service.generateDataKey();
+      const envelope = await service.encryptEnvelope('secret', key, {
+        groupId: 'group-1',
+      });
+
+      const tampered = { ...envelope, groupId: 'group-2' };
+
+      // groupId is authenticated (AAD), not encrypted — mutating it changes
+      // what subtle.decrypt verifies against, so the auth tag check fails.
+      await expect(service.decryptEnvelope(tampered, key)).rejects.toThrow();
+    });
+
+    it('detects tampering with the authenticated keyVersion metadata', async () => {
+      const key = await service.generateDataKey();
+      const envelope = await service.encryptEnvelope('secret', key, {
+        groupId: 'group-1',
+        keyVersion: 'v1',
+      });
+
+      const tampered = { ...envelope, keyVersion: 'v2' };
+
+      await expect(service.decryptEnvelope(tampered, key)).rejects.toThrow();
+    });
+
+    it('rejects a groupId mismatch against the caller-expected value before attempting decryption', async () => {
+      const key = await service.generateDataKey();
+      const envelope = await service.encryptEnvelope('secret', key, {
+        groupId: 'group-1',
+      });
+
+      await expect(
+        service.decryptEnvelope(envelope, key, { groupId: 'group-2' }),
+      ).rejects.toMatchObject({
+        name: 'EnvelopeMetadataMismatchError',
+        field: 'groupId',
+      });
+    });
+
+    it('rejects a keyVersion mismatch against the caller-expected value before attempting decryption', async () => {
+      const key = await service.generateDataKey();
+      const envelope = await service.encryptEnvelope('secret', key, {
+        groupId: 'group-1',
+        keyVersion: 'v1',
+      });
+
+      await expect(
+        service.decryptEnvelope(envelope, key, { keyVersion: 'v2' }),
+      ).rejects.toMatchObject({
+        name: 'EnvelopeMetadataMismatchError',
+        field: 'keyVersion',
+      });
+    });
+
+    it('succeeds when the expected groupId/keyVersion match the envelope', async () => {
+      const key = await service.generateDataKey();
+      const envelope = await service.encryptEnvelope('secret', key, {
+        groupId: 'group-1',
+        keyVersion: 'v1',
+      });
+
+      const decrypted = await service.decryptEnvelope(envelope, key, {
+        groupId: 'group-1',
+        keyVersion: 'v1',
+      });
+
+      expect(decrypted).toBe('secret');
+    });
+
+    it('supports omitted groupId/keyVersion for personal-scope envelopes', async () => {
+      const key = await service.generateDataKey();
+      const envelope = await service.encryptEnvelope('personal note', key);
+
+      expect(envelope.groupId).toBeUndefined();
+      const decrypted = await service.decryptEnvelope(envelope, key);
+      expect(decrypted).toBe('personal note');
+    });
+  });
 });
