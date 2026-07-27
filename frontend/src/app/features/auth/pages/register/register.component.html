@@ -63,33 +63,18 @@
     <label for="registerPassword" class="block text-sm font-medium mb-1"
       >Password</label
     >
-    <div class="relative">
-      <input
-        id="registerPassword"
-        data-testid="register-password-input"
-        [type]="showPassword ? 'text' : 'password'"
-        autocomplete="new-password"
-        formControlName="password"
-        (keyup)="updateCapsLock($event)"
-        (keydown)="updateCapsLock($event)"
-        aria-describedby="registerPasswordHelp"
-        class="w-full px-4 py-3 pr-12 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
-        placeholder="••••••••"
-      />
-      <button
-        type="button"
-        (click)="togglePassword()"
-        [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
-        [attr.aria-pressed]="showPassword"
-        data-testid="register-password-toggle"
-        class="absolute inset-y-0 right-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-      >
-        <app-icon
-          [path]="showPassword ? eyeOffIconPath : eyeIconPath"
-          className="w-5 h-5"
-        ></app-icon>
-      </button>
-    </div>
+    <app-password-input
+      inputId="registerPassword"
+      testId="register-password-input"
+      toggleTestId="register-password-toggle"
+      autocomplete="new-password"
+      describedById="registerPasswordHelp"
+      [inputClass]="
+        'w-full px-4 py-3 pr-12 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all'
+      "
+      formControlName="password"
+      (keyEvent)="updateCapsLock($event)"
+    ></app-password-input>
     <p id="registerPasswordHelp" class="text-xs text-slate-500 mt-1">
       Must be at least 8 characters, with 1 uppercase, 1 lowercase, 1 number,
       and 1 special character.
@@ -113,35 +98,18 @@
     <label for="registerConfirmPassword" class="block text-sm font-medium mb-1"
       >Confirm Password</label
     >
-    <div class="relative">
-      <input
-        id="registerConfirmPassword"
-        data-testid="register-confirm-password-input"
-        [type]="showConfirmPassword ? 'text' : 'password'"
-        autocomplete="new-password"
-        formControlName="confirmPassword"
-        (keyup)="updateCapsLock($event)"
-        (keydown)="updateCapsLock($event)"
-        [class.border-red-500]="passwordMismatch"
-        class="w-full px-4 py-3 pr-12 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all"
-        placeholder="••••••••"
-      />
-      <button
-        type="button"
-        (click)="toggleConfirmPassword()"
-        [attr.aria-label]="
-          showConfirmPassword ? 'Hide password' : 'Show password'
-        "
-        [attr.aria-pressed]="showConfirmPassword"
-        data-testid="register-confirm-password-toggle"
-        class="absolute inset-y-0 right-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-      >
-        <app-icon
-          [path]="showConfirmPassword ? eyeOffIconPath : eyeIconPath"
-          className="w-5 h-5"
-        ></app-icon>
-      </button>
-    </div>
+    <app-password-input
+      inputId="registerConfirmPassword"
+      testId="register-confirm-password-input"
+      toggleTestId="register-confirm-password-toggle"
+      autocomplete="new-password"
+      [invalid]="passwordMismatch"
+      [inputClass]="
+        'w-full px-4 py-3 pr-12 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all'
+      "
+      formControlName="confirmPassword"
+      (keyEvent)="updateCapsLock($event)"
+    ></app-password-input>
     @if (passwordMismatch) {
       <span
         class="text-xs text-red-500 mt-1 block"

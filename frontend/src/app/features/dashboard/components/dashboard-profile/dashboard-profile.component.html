@@ -193,18 +193,21 @@
         <div class="mt-4 space-y-3 bg-surface/40 rounded-2xl p-4 border border-border/10">
           <div class="space-y-1">
             <label class="text-label" for="current-password">Current Password</label>
-            <input id="current-password" type="password" [(ngModel)]="currentPassword"
-              autocomplete="current-password" class="input-base" />
+            <app-password-input inputId="current-password" [(ngModel)]="currentPassword"
+              autocomplete="current-password" [inputClass]="'input-base pr-12'"
+              testId="current-password-input" toggleTestId="current-password-toggle"></app-password-input>
           </div>
           <div class="space-y-1">
             <label class="text-label" for="new-password">New Password</label>
-            <input id="new-password" type="password" [(ngModel)]="newPassword"
-              autocomplete="new-password" class="input-base" />
+            <app-password-input inputId="new-password" [(ngModel)]="newPassword"
+              autocomplete="new-password" [inputClass]="'input-base pr-12'"
+              testId="new-password-input" toggleTestId="new-password-toggle"></app-password-input>
           </div>
           <div class="space-y-1">
             <label class="text-label" for="confirm-password">Confirm New Password</label>
-            <input id="confirm-password" type="password" [(ngModel)]="confirmPassword"
-              autocomplete="new-password" class="input-base" />
+            <app-password-input inputId="confirm-password" [(ngModel)]="confirmPassword"
+              autocomplete="new-password" [inputClass]="'input-base pr-12'"
+              testId="confirm-password-input" toggleTestId="confirm-password-toggle"></app-password-input>
           </div>
 
           <p class="text-[11px] text-muted">

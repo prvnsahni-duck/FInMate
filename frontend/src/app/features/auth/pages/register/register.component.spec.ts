@@ -88,16 +88,6 @@ describe('RegisterComponent', () => {
     expect(component.passwordMismatch).toBe(true);
   });
 
-  it('should toggle password visibility flags', () => {
-    expect(component.showPassword).toBe(false);
-    component.togglePassword();
-    expect(component.showPassword).toBe(true);
-
-    expect(component.showConfirmPassword).toBe(false);
-    component.toggleConfirmPassword();
-    expect(component.showConfirmPassword).toBe(true);
-  });
-
   it('should detect Caps Lock state from keyboard events', () => {
     component.updateCapsLock({
       getModifierState: () => true,

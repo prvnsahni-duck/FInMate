@@ -8,6 +8,7 @@ import {
   inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { PasswordInputComponent } from '../../../../shared/components/password-input/password-input.component';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
 import { Store } from '@ngxs/store';
@@ -51,7 +52,7 @@ export const LOCALE_OPTIONS = [
 @Component({
   selector: 'app-dashboard-profile',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, PasswordInputComponent],
   templateUrl: './dashboard-profile.component.html',
 })
 export class DashboardProfileComponent implements OnChanges {

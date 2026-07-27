@@ -1,5 +1,7 @@
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Store } from '@ngxs/store';
+import { PasswordInputComponent } from '../password-input/password-input.component';
 import { CryptoSessionManager } from '../../../core/services/crypto-session-manager.service';
 import { Logout } from '../../../core/auth/auth.state';
 import { CryptoRecoveryVisibilityService } from '../../../core/services/crypto-recovery-visibility.service';
@@ -34,7 +36,7 @@ import {
 @Component({
   selector: 'app-crypto-recovery-panel',
   standalone: true,
-  imports: [],
+  imports: [FormsModule, PasswordInputComponent],
   templateUrl: './crypto-recovery-panel.component.html',
 })
 export class CryptoRecoveryPanelComponent {
