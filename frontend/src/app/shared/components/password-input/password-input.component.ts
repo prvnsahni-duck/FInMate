@@ -1,10 +1,4 @@
-import {
-  Component,
-  forwardRef,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { Component, forwardRef, input, output, signal } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { IconComponent } from '../icon/icon.component';
 import {

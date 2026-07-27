@@ -6,7 +6,8 @@ import { PasswordInputComponent } from './password-input.component';
 describe('PasswordInputComponent', () => {
   let fixture: ComponentFixture<PasswordInputComponent>;
   let component: PasswordInputComponent;
-  const input = () => fixture.nativeElement.querySelector('input') as HTMLInputElement;
+  const input = () =>
+    fixture.nativeElement.querySelector('input') as HTMLInputElement;
   const toggle = () =>
     fixture.nativeElement.querySelector('button') as HTMLButtonElement;
 
@@ -80,7 +81,9 @@ describe('PasswordInputComponent', () => {
     const el = host.nativeElement as HTMLElement;
     const inputA = el.querySelector('[data-testid="a"]') as HTMLInputElement;
     const inputB = el.querySelector('[data-testid="b"]') as HTMLInputElement;
-    const toggleA = el.querySelector('[data-testid="a-t"]') as HTMLButtonElement;
+    const toggleA = el.querySelector(
+      '[data-testid="a-t"]',
+    ) as HTMLButtonElement;
 
     expect(inputA.getAttribute('type')).toBe('password');
     expect(inputB.getAttribute('type')).toBe('password');

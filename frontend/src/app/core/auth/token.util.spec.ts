@@ -53,7 +53,9 @@ describe('token.util', () => {
 
   describe('decodeToken', () => {
     it('returns payload for a valid token and null otherwise', () => {
-      expect(decodeToken<{ sub: string }>(jwt({ sub: 'abc' }))?.sub).toBe('abc');
+      expect(decodeToken<{ sub: string }>(jwt({ sub: 'abc' }))?.sub).toBe(
+        'abc',
+      );
       expect(decodeToken('garbage')).toBeNull();
       expect(decodeToken(null)).toBeNull();
     });
