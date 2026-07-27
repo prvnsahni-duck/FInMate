@@ -38,6 +38,7 @@ describe('RegisterComponent', () => {
     const nameControl = component.registerForm.controls['displayName'];
     const emailControl = component.registerForm.controls['email'];
     const passwordControl = component.registerForm.controls['password'];
+    const confirmControl = component.registerForm.controls['confirmPassword'];
 
     nameControl.setValue('');
     emailControl.setValue('');
@@ -58,7 +59,62 @@ describe('RegisterComponent', () => {
     nameControl.setValue('John Doe');
     emailControl.setValue('john@example.com');
     passwordControl.setValue('SecurePassword123!'); // Meets pattern: lower, upper, digit, special char, length >= 8
+    confirmControl.setValue('SecurePassword123!');
     expect(component.registerForm.valid).toBe(true);
+  });
+
+  it('should be invalid when confirm password does not match', () => {
+    component.registerForm.controls['displayName'].setValue('John Doe');
+    component.registerForm.controls['email'].setValue('john@example.com');
+    component.registerForm.controls['password'].setValue('SecurePassword123!');
+    component.registerForm.controls['confirmPassword'].setValue('Different123!');
+
+    expect(component.registerForm.hasError('passwordMismatch')).toBe(true);
+    expect(component.registerForm.valid).toBe(false);
+  });
+
+  it('should expose passwordMismatch only after the confirm field is touched', () => {
+    component.registerForm.controls['password'].setValue('SecurePassword123!');
+    component.registerForm.controls['confirmPassword'].setValue('Different123!');
+
+    // Not touched/dirty yet — do not surface the inline error.
+    expect(component.passwordMismatch).toBe(false);
+
+    component.registerForm.controls['confirmPassword'].markAsTouched();
+    expect(component.passwordMismatch).toBe(true);
+  });
+
+  it('should toggle password visibility flags', () => {
+    expect(component.showPassword).toBe(false);
+    component.togglePassword();
+    expect(component.showPassword).toBe(true);
+
+    expect(component.showConfirmPassword).toBe(false);
+    component.toggleConfirmPassword();
+    expect(component.showConfirmPassword).toBe(true);
+  });
+
+  it('should detect Caps Lock state from keyboard events', () => {
+    component.updateCapsLock({
+      getModifierState: () => true,
+    } as unknown as KeyboardEvent);
+    expect(component.capsLockOn).toBe(true);
+
+    component.updateCapsLock({
+      getModifierState: () => false,
+    } as unknown as KeyboardEvent);
+    expect(component.capsLockOn).toBe(false);
+  });
+
+  it('should not submit when passwords do not match', () => {
+    component.registerForm.controls['displayName'].setValue('John Doe');
+    component.registerForm.controls['email'].setValue('john@example.com');
+    component.registerForm.controls['password'].setValue('SecurePassword123!');
+    component.registerForm.controls['confirmPassword'].setValue('Mismatch1!');
+
+    component.onSubmit();
+
+    expect(mockStore.dispatch).not.toHaveBeenCalled();
   });
 
   it('should dispatch Register action and show success message on successful onSubmit', () => {
@@ -66,6 +122,9 @@ describe('RegisterComponent', () => {
     component.registerForm.controls['displayName'].setValue('John Doe');
     component.registerForm.controls['email'].setValue('john@example.com');
     component.registerForm.controls['password'].setValue('SecurePassword123!');
+    component.registerForm.controls['confirmPassword'].setValue(
+      'SecurePassword123!',
+    );
 
     component.onSubmit();
 
@@ -84,6 +143,9 @@ describe('RegisterComponent', () => {
     component.registerForm.controls['displayName'].setValue('John Doe');
     component.registerForm.controls['email'].setValue('john@example.com');
     component.registerForm.controls['password'].setValue('SecurePassword123!');
+    component.registerForm.controls['confirmPassword'].setValue(
+      'SecurePassword123!',
+    );
     mockStore.dispatch.mockReturnValue(
       throwError(() => ({ error: { message: 'Email already exists' } })),
     );
