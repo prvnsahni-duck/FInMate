@@ -299,11 +299,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return budget ? Math.min((this.monthlyExpenses / budget) * 100, 100) : 0;
   }
 
-  get isBudgetExceeded(): boolean {
-    const budget = this.userProfile?.monthlyBudget;
-    return !!budget && this.monthlyExpenses > budget;
-  }
-
   toggleEditIncome() {
     this.isEditingIncome = !this.isEditingIncome;
     if (this.isEditingIncome && this.userProfile) {

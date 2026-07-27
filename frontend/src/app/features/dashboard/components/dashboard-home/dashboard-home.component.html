@@ -67,17 +67,23 @@
     <div class="space-y-2.5">
       <div class="flex justify-between items-center text-xs font-semibold">
         <span class="text-muted font-medium">Income Spent</span>
-        <span class="text-secondary font-bold">
+        <span class="text-secondary font-bold flex items-center gap-1.5">
           {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyIncome ||
           0) | currency:(userProfile?.defaultCurrency || 'USD') }}
-          <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary/10 text-secondary/85 font-extrabold">{{
-            incomePercentage }}%</span>
+          <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-muted">
+            <span class="w-1.5 h-1.5 rounded-full" [style.background]="getUtilizationColor(incomePercentage)"></span>
+            {{ getUtilizationStatus(incomePercentage) }}
+          </span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-extrabold"
+            [style.background]="getUtilizationColor(incomePercentage)"
+            [style.color]="getContrastText(getUtilizationColor(incomePercentage))">{{ incomePercentage }}%</span>
         </span>
       </div>
       <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
         <div
-          class="bg-gradient-to-r from-primary to-accent h-3 rounded-full transition-all duration-500 shadow-sm shadow-primary/20"
-          [style.width.%]="incomeProgressWidth">
+          class="h-3 rounded-full transition-all duration-500 shadow-sm"
+          [style.width.%]="incomeProgressWidth"
+          [style.background]="getUtilizationColor(incomePercentage)">
         </div>
       </div>
     </div>
@@ -86,21 +92,22 @@
     <div class="space-y-2.5">
       <div class="flex justify-between items-center text-xs font-semibold">
         <span class="text-muted font-medium">Budget Limits</span>
-        <span class="text-secondary font-bold">
+        <span class="text-secondary font-bold flex items-center gap-1.5">
           {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyBudget ||
           0) | currency:(userProfile?.defaultCurrency || 'USD') }}
-          <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded font-extrabold" [class.bg-error/15]="isBudgetExceeded"
-            [class.text-error]="isBudgetExceeded" [class.bg-success/15]="!isBudgetExceeded"
-            [class.text-success]="!isBudgetExceeded">
-            {{ budgetPercentage }}%
+          <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-muted">
+            <span class="w-1.5 h-1.5 rounded-full" [style.background]="getUtilizationColor(budgetPercentage)"></span>
+            {{ getUtilizationStatus(budgetPercentage) }}
           </span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-extrabold"
+            [style.background]="getUtilizationColor(budgetPercentage)"
+            [style.color]="getContrastText(getUtilizationColor(budgetPercentage))">{{ budgetPercentage }}%</span>
         </span>
       </div>
       <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
-        <div class="h-3 rounded-full transition-all duration-500 shadow-sm" [class.bg-error]="isBudgetExceeded"
-          [class.shadow-error/20]="isBudgetExceeded" [class.bg-gradient-to-r]="!isBudgetExceeded"
-          [class.from-primary]="!isBudgetExceeded" [class.to-success]="!isBudgetExceeded"
-          [class.shadow-primary/20]="!isBudgetExceeded" [style.width.%]="budgetProgressWidth">
+        <div class="h-3 rounded-full transition-all duration-500 shadow-sm"
+          [style.width.%]="budgetProgressWidth"
+          [style.background]="getUtilizationColor(budgetPercentage)">
         </div>
       </div>
     </div>
