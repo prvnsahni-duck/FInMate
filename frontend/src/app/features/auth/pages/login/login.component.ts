@@ -4,12 +4,22 @@ import { Router, RouterLink } from '@angular/router';
 import { Store } from '@ngxs/store';
 import { Login } from '../../../../core/auth/auth.state';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
+import { IconComponent } from '../../../../shared/components/icon/icon.component';
+import {
+  EYE_ICON_PATH,
+  EYE_OFF_ICON_PATH,
+} from '../../../../core/constants/app.constants';
 import { LoginDto } from '@finmate/data-models';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, SubmitButtonComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    SubmitButtonComponent,
+    IconComponent,
+  ],
   templateUrl: './login.component.html',
 })
 export class LoginComponent {
@@ -24,6 +34,16 @@ export class LoginComponent {
 
   isLoading = false;
   errorMessage = '';
+
+  showPassword = false;
+
+  // Eye / eye-off icon paths (shared with the register page).
+  readonly eyeIconPath = EYE_ICON_PATH;
+  readonly eyeOffIconPath = EYE_OFF_ICON_PATH;
+
+  togglePassword(): void {
+    this.showPassword = !this.showPassword;
+  }
 
   onSubmit() {
     if (this.loginForm.valid) {

@@ -19,12 +19,13 @@ describe('DashboardGoalsComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should display goals cards', () => {
+  it('should render a Coming Soon state without placeholder financial data', () => {
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelectorAll('.card-glass').length).toBe(3);
-    expect(compiled.querySelector('h1')?.textContent).toContain(
-      'Personal Savings Goals',
-    );
+    // Single informational card, not the old 3 fake goal cards.
+    expect(compiled.querySelectorAll('.card-glass').length).toBe(1);
+    expect(compiled.textContent).toContain('Coming Soon');
+    // No fabricated currency figures should appear.
+    expect(compiled.textContent).not.toMatch(/\$\d/);
   });
 });

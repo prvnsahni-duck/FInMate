@@ -40,12 +40,10 @@ export const NAV_ITEMS: NavItem[] = [
     mobileLabel: 'Stats',
     icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10a2 2 0 01-2 2h-2a2 2 0 01-2-2zm9-6V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
   },
-  {
-    path: '/dashboard',
-    label: 'Goals',
-    mobileLabel: 'Goals',
-    icon: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M12 17a5 5 0 100-10 5 5 0 000 10z M12 14a2 2 0 100-4 2 2 0 000 4z',
-  },
+  // NOTE: The "Goals" tab is intentionally omitted for Beta — the feature is
+  // unfinished and previously rendered placeholder data. The DashboardGoals
+  // component and its `activeTab === 'Goals'` wiring remain in place (see
+  // dashboard-goals.component) but are unreachable from normal navigation.
   {
     path: '/groups',
     label: 'Groups',
