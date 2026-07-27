@@ -80,14 +80,22 @@ describe('ExpenseSplit query mapping (participant filter)', () => {
   }
 
   function buildUserSplitsQuery(userId: string, month: string) {
+    // Mirrors ExpensesService.getCombinedMonthlyAnalytics' userSplits query.
+    // Uses a half-open date range rather than `LIKE :monthPrefix` — the latter
+    // is invalid on PostgreSQL against a `date` column (see regression test
+    // below).
+    const monthStart = `${month}-01`;
+    const monthEnd = `${month.slice(0, 4)}-${String(
+      Number(month.slice(5, 7)) + 1,
+    ).padStart(2, '0')}-01`;
     return dataSource
       .createQueryBuilder(ExpenseSplit, 'split')
       .innerJoinAndSelect('split.expense', 'expense')
       .leftJoin('split.participantGroupMember', 'groupMember')
       .where('expense.status = :status', { status: 'posted' })
       .andWhere(
-        '(expense.ledgerMonth = :month OR expense.expenseDate LIKE :monthPrefix)',
-        { month, monthPrefix: `${month}%` },
+        '(expense.ledgerMonth = :month OR (expense.expenseDate >= :monthStart AND expense.expenseDate < :monthEnd))',
+        { month, monthStart, monthEnd },
       )
       .andWhere(
         '(split.participantUser = :userId OR groupMember.user_id = :userId)',
@@ -112,6 +120,23 @@ describe('ExpenseSplit query mapping (participant filter)', () => {
     expect(sql).not.toMatch(/[^"]\bparticipantUserId\b/);
     expect(sql).toContain('"split"."participant_user_id"');
     expect(sql).toContain('"groupMember"."user_id"');
+  });
+
+  it('filters the analytics month with a portable date range, not LIKE on the date column', () => {
+    // Regression guard for the PostgreSQL-only 500
+    // (`operator does not exist: date ~~ unknown`): `expenseDate` is a `date`
+    // column, so `LIKE 'YYYY-MM%'` is rejected by PostgreSQL even though SQLite
+    // tolerates it. A behaviour test on SQLite would NOT catch this — only real
+    // PostgreSQL (or, as here, PostgreSQL SQL generation) surfaces it. The fix
+    // uses a half-open [monthStart, monthEnd) range instead.
+    const sql = buildUserSplitsQuery('user-1', '2026-07').getSql();
+
+    // No LIKE against the date column.
+    expect(sql).not.toMatch(/expense_date"?\s+LIKE/i);
+    // Half-open range on the real physical column, quoted like every other
+    // resolved identifier.
+    expect(sql).toContain('"expense"."expense_date" >=');
+    expect(sql).toContain('"expense"."expense_date" <');
   });
 
   it('would have failed on the pre-fix condition string (documents the exact failure mode)', () => {

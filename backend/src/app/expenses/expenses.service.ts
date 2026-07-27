@@ -2604,11 +2604,36 @@ export class ExpensesService {
     return paginate(pageItems, total, p, l, '/api/v1/expenses/me', {});
   }
 
+  /**
+   * Half-open [monthStart, monthEnd) date range for a `YYYY-MM` month string,
+   * as `YYYY-MM-DD` strings. Portable across PostgreSQL (`date`) and SQLite
+   * (text dates) — unlike a `LIKE 'YYYY-MM%'` filter, which PostgreSQL rejects
+   * against a `date` column.
+   */
+  private monthDateRange(month: string): {
+    monthStart: string;
+    monthEnd: string;
+  } {
+    const [year, mon] = month.split('-').map(Number);
+    const nextYear = mon === 12 ? year + 1 : year;
+    const nextMon = mon === 12 ? 1 : mon + 1;
+    return {
+      monthStart: `${month}-01`,
+      monthEnd: `${nextYear}-${String(nextMon).padStart(2, '0')}-01`,
+    };
+  }
+
   /** Combined category-level aggregated monthly expenditures (personal + group splits) */
   async getCombinedMonthlyAnalytics(
     userId: string,
     month: string,
   ): Promise<{ category: string; amount: number; currency: string }[]> {
+    // `expenseDate` is a real `date` column, so a `LIKE 'YYYY-MM%'` filter is
+    // invalid on PostgreSQL (`operator does not exist: date ~~ unknown`) even
+    // though SQLite tolerates it. Use a half-open date range instead, which is
+    // portable across both and index-friendly on the (…, expenseDate) index.
+    const { monthStart, monthEnd } = this.monthDateRange(month);
+
     // 1. Get all group-less posted expenses paid by the user in this month
     const paidPersonalExpenses = await this.expenseRepository
       .createQueryBuilder('expense')
@@ -2616,9 +2641,10 @@ export class ExpensesService {
       .where('expense.group IS NULL')
       .andWhere('paidByUser.id = :userId', { userId })
       .andWhere('expense.status = :status', { status: 'posted' })
-      .andWhere('expense.expenseDate LIKE :monthPrefix', {
-        monthPrefix: `${month}%`,
-      })
+      .andWhere(
+        'expense.expenseDate >= :monthStart AND expense.expenseDate < :monthEnd',
+        { monthStart, monthEnd },
+      )
       .getMany();
 
     // 2. Fetch splits for those personal expenses to identify which are 100% personal vs direct splits
@@ -2640,8 +2666,8 @@ export class ExpensesService {
       .leftJoin('split.participantGroupMember', 'groupMember')
       .where('expense.status = :status', { status: 'posted' })
       .andWhere(
-        '(expense.ledgerMonth = :month OR expense.expenseDate LIKE :monthPrefix)',
-        { month, monthPrefix: `${month}%` },
+        '(expense.ledgerMonth = :month OR (expense.expenseDate >= :monthStart AND expense.expenseDate < :monthEnd))',
+        { month, monthStart, monthEnd },
       )
       .andWhere(
         '(split.participantUser = :userId OR groupMember.user_id = :userId)',
