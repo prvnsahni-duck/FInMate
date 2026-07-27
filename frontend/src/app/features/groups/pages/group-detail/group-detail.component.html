@@ -837,7 +837,7 @@
                     class="flex flex-col p-4 rounded-2xl bg-surface border border-border/5 hover:border-primary/30 hover:bg-surface-alt transition-colors group/row"
                   >
                     <div class="flex items-center justify-between w-full">
-                      <div class="flex items-center space-x-4">
+                      <div class="flex items-center space-x-4 min-w-0 flex-1">
                         <button
                           (click)="toggleExpenseExpand(expense.id)"
                           [attr.data-testid]="
@@ -965,9 +965,9 @@
                             </svg>
                           }
                         </div>
-                        <div>
+                        <div class="min-w-0">
                           <h4
-                            class="font-bold flex items-center gap-2"
+                            class="font-bold flex items-center gap-2 min-w-0"
                             data-testid="expense-title"
                           >
                             @if (
@@ -1038,14 +1038,14 @@
                               >
                             }
                           </h4>
-                          <p class="text-xs text-muted">
+                          <p class="text-xs text-muted truncate">
                             {{ expense.expenseDate | date }} •
                             {{ expense.category }}
                           </p>
                         </div>
                       </div>
 
-                      <div class="flex items-center space-x-4">
+                      <div class="flex items-center space-x-4 shrink-0">
                         <div class="text-right">
                           <p
                             class="font-bold text-lg"
