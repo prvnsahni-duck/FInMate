@@ -7,6 +7,7 @@ export default class RegisterPage {
   readonly displayName: Locator;
   readonly email: Locator;
   readonly password: Locator;
+  readonly confirmPassword: Locator;
   readonly submit: Locator;
 
   constructor(page: Page) {
@@ -15,6 +16,9 @@ export default class RegisterPage {
     this.displayName = page.getByTestId(testIds.auth.registerDisplayName);
     this.email = page.getByTestId(testIds.auth.registerEmail);
     this.password = page.getByTestId(testIds.auth.registerPassword);
+    this.confirmPassword = page.getByTestId(
+      testIds.auth.registerConfirmPassword,
+    );
     this.submit = page.getByTestId(testIds.auth.registerSubmit);
   }
 }

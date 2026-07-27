@@ -36,7 +36,12 @@ function passwordsMatchValidator(
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, SubmitButtonComponent, IconComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    SubmitButtonComponent,
+    IconComponent,
+  ],
   templateUrl: './register.component.html',
 })
 export class RegisterComponent {

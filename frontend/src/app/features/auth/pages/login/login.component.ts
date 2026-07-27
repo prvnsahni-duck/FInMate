@@ -14,7 +14,12 @@ import { LoginDto } from '@finmate/data-models';
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [ReactiveFormsModule, RouterLink, SubmitButtonComponent, IconComponent],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    SubmitButtonComponent,
+    IconComponent,
+  ],
   templateUrl: './login.component.html',
 })
 export class LoginComponent {

@@ -67,7 +67,9 @@ describe('RegisterComponent', () => {
     component.registerForm.controls['displayName'].setValue('John Doe');
     component.registerForm.controls['email'].setValue('john@example.com');
     component.registerForm.controls['password'].setValue('SecurePassword123!');
-    component.registerForm.controls['confirmPassword'].setValue('Different123!');
+    component.registerForm.controls['confirmPassword'].setValue(
+      'Different123!',
+    );
 
     expect(component.registerForm.hasError('passwordMismatch')).toBe(true);
     expect(component.registerForm.valid).toBe(false);
@@ -75,7 +77,9 @@ describe('RegisterComponent', () => {
 
   it('should expose passwordMismatch only after the confirm field is touched', () => {
     component.registerForm.controls['password'].setValue('SecurePassword123!');
-    component.registerForm.controls['confirmPassword'].setValue('Different123!');
+    component.registerForm.controls['confirmPassword'].setValue(
+      'Different123!',
+    );
 
     // Not touched/dirty yet — do not surface the inline error.
     expect(component.passwordMismatch).toBe(false);

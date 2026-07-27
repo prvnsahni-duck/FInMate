@@ -8,6 +8,7 @@ export const testIds = {
     registerDisplayName: 'register-display-name-input',
     registerEmail: 'register-email-input',
     registerPassword: 'register-password-input',
+    registerConfirmPassword: 'register-confirm-password-input',
     registerSubmit: 'register-submit-button',
   },
   expense: {

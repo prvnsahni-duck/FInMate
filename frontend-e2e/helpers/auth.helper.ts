@@ -21,6 +21,7 @@ export const auth = {
     await register.displayName.fill(displayName);
     await register.email.fill(email);
     await register.password.fill(password);
+    await register.confirmPassword.fill(password);
 
     const { response, body } = await waitForPageApi(page, {
       method: 'POST',
