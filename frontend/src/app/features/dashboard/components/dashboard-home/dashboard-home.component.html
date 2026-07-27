@@ -223,8 +223,8 @@
           <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm border border-primary/20 group-hover:scale-105 transition-all shrink-0">
             <app-icon [path]="categoryOptions.find(opt => opt.value === expense.category)?.iconPath || categoryOptions[0].iconPath" className="w-5 h-5"></app-icon>
           </div>
-          <div class="min-w-0">
-            <h4 class="font-extrabold text-secondary text-sm flex items-center gap-2 min-w-0" data-testid="expense-title">
+          <div class="w-full min-w-0">
+            <h4 class="font-extrabold text-secondary text-sm flex items-center gap-2 min-w-0 justify-between pr-3" data-testid="expense-title">
               <span class="truncate">{{ expense.title }}</span>
               <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider shrink-0 hidden sm:inline-flex">Group Share</span>
             </h4>
