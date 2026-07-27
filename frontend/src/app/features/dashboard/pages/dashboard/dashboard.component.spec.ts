@@ -113,7 +113,8 @@ describe('DashboardComponent', () => {
 
     expect(mockStore.selectSnapshot).toHaveBeenCalled();
     expect(component.userName).toBe('john');
-    expect(component.totalBalance).toBe(1350);
+    // Total Personal Balance = monthly income − monthly spend (5000 − 1350).
+    expect(component.totalBalance).toBe(3650);
     expect(component.monthlyExpenses).toBe(1350);
     expect(component.activeGroupsCount).toBe(3);
     expect(component.incomePercentage).toBe(27); // 1350/5000 * 100
