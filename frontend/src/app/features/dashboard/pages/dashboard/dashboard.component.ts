@@ -440,15 +440,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // The Logout action clears the session and redirects to Login centrally
+    // (see AuthState) — no navigation needed here.
     this.isLoggingOut = true;
-    this.store.dispatch(new Logout()).subscribe({
-      next: () => {
-        this.router.navigate(['/auth/login']);
-      },
-      error: () => {
-        this.router.navigate(['/auth/login']);
-      },
-    });
+    this.store.dispatch(new Logout());
   }
 
   // AI Chat Bot Methods

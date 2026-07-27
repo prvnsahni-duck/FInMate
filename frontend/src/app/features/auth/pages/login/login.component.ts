@@ -1,14 +1,10 @@
 import { Component, inject } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Store } from '@ngxs/store';
 import { Login } from '../../../../core/auth/auth.state';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
-import { IconComponent } from '../../../../shared/components/icon/icon.component';
-import {
-  EYE_ICON_PATH,
-  EYE_OFF_ICON_PATH,
-} from '../../../../core/constants/app.constants';
+import { PasswordInputComponent } from '../../../../shared/components/password-input/password-input.component';
 import { LoginDto } from '@finmate/data-models';
 
 @Component({
@@ -18,7 +14,7 @@ import { LoginDto } from '@finmate/data-models';
     ReactiveFormsModule,
     RouterLink,
     SubmitButtonComponent,
-    IconComponent,
+    PasswordInputComponent,
   ],
   templateUrl: './login.component.html',
 })
@@ -26,6 +22,25 @@ export class LoginComponent {
   private fb = inject(FormBuilder);
   private store = inject(Store);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  /**
+   * Resolve where to go after login: the guard-supplied returnUrl when it is a
+   * safe internal path, otherwise the dashboard. Rejecting `/auth/*` and
+   * absolute URLs avoids open-redirects and bouncing back to Login.
+   */
+  private resolveReturnUrl(): string {
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
+    if (
+      returnUrl &&
+      returnUrl.startsWith('/') &&
+      !returnUrl.startsWith('//') &&
+      !returnUrl.startsWith('/auth')
+    ) {
+      return returnUrl;
+    }
+    return '/dashboard';
+  }
 
   loginForm = this.fb.group({
     email: ['', [Validators.required, Validators.email]],
@@ -34,16 +49,6 @@ export class LoginComponent {
 
   isLoading = false;
   errorMessage = '';
-
-  showPassword = false;
-
-  // Eye / eye-off icon paths (shared with the register page).
-  readonly eyeIconPath = EYE_ICON_PATH;
-  readonly eyeOffIconPath = EYE_OFF_ICON_PATH;
-
-  togglePassword(): void {
-    this.showPassword = !this.showPassword;
-  }
 
   onSubmit() {
     if (this.loginForm.valid) {
@@ -58,7 +63,8 @@ export class LoginComponent {
 
       this.store.dispatch(new Login(payload)).subscribe({
         next: () => {
-          this.router.navigate(['/dashboard']);
+          // replaceUrl so the Back button cannot return to the Login screen.
+          this.router.navigate([this.resolveReturnUrl()], { replaceUrl: true });
         },
         error: (err) => {
           this.isLoading = false;

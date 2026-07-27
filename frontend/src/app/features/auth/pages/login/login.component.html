@@ -39,30 +39,16 @@
     <label for="loginPassword" class="block text-sm font-medium mb-2"
       >Password</label
     >
-    <div class="relative">
-      <input
-        id="loginPassword"
-        data-testid="login-password-input"
-        [type]="showPassword ? 'text' : 'password'"
-        autocomplete="current-password"
-        formControlName="password"
-        class="w-full px-4 py-3 pr-12 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all placeholder-slate-400"
-        placeholder="••••••••"
-      />
-      <button
-        type="button"
-        (click)="togglePassword()"
-        [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
-        [attr.aria-pressed]="showPassword"
-        data-testid="login-password-toggle"
-        class="absolute inset-y-0 right-0 flex items-center px-4 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-      >
-        <app-icon
-          [path]="showPassword ? eyeOffIconPath : eyeIconPath"
-          className="w-5 h-5"
-        ></app-icon>
-      </button>
-    </div>
+    <app-password-input
+      inputId="loginPassword"
+      testId="login-password-input"
+      toggleTestId="login-password-toggle"
+      autocomplete="current-password"
+      [inputClass]="
+        'w-full px-4 py-3 pr-12 rounded-xl bg-white/50 dark:bg-black/20 border border-slate-200 dark:border-white/10 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all placeholder-slate-400'
+      "
+      formControlName="password"
+    ></app-password-input>
   </div>
 
   <app-submit-button
