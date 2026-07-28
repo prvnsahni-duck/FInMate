@@ -41,4 +41,24 @@ describe('RecurringExpenseFormComponent', () => {
     component.cancelled.emit();
     expect(component.cancelled.emit).toHaveBeenCalled();
   });
+
+  it('flags the form invalid when the end date is before the start date', () => {
+    component.form.patchValue({
+      startDate: '2026-07-10',
+      endDate: '2026-07-05',
+    });
+    expect(component.form.hasError('endBeforeStart')).toBe(true);
+    expect(component.form.valid).toBe(false);
+  });
+
+  it('accepts an end date on or after the start date (and an empty end date)', () => {
+    component.form.patchValue({
+      startDate: '2026-07-10',
+      endDate: '2026-07-10',
+    });
+    expect(component.form.hasError('endBeforeStart')).toBe(false);
+
+    component.form.patchValue({ endDate: '' });
+    expect(component.form.hasError('endBeforeStart')).toBe(false);
+  });
 });
