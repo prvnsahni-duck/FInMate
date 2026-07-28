@@ -122,10 +122,21 @@ export class RecurringExpensesScheduler {
   async generateDueOccurrences(template: RecurringExpense, todayStr: string) {
     // Process all occurrences up to today (handles missed runs)
     let currentOccurrenceDate = template.nextOccurrenceDate;
+    // Anchor month-end recurrence to the template's original day-of-month so
+    // e.g. a "31st" schedule recovers to 31 in long months instead of sticking
+    // at 28 after the first February clamp. startDate is NOT NULL, but stay
+    // defensive so a malformed row can never crash the whole cron sweep.
+    const anchorDay = template.startDate
+      ? Number(template.startDate.split('-')[2])
+      : undefined;
 
     while (currentOccurrenceDate <= todayStr && template.status === 'active') {
       const occurrenceDateStr = currentOccurrenceDate;
-      const nextDate = this.advanceDate(occurrenceDateStr, template.frequency);
+      const nextDate = this.advanceDate(
+        occurrenceDateStr,
+        template.frequency,
+        anchorDay,
+      );
 
       await this.dataSource.transaction(async (manager) => {
         let groupKeyVersion: GroupKeyVersion | undefined;
@@ -234,25 +245,51 @@ export class RecurringExpensesScheduler {
    * All arithmetic goes through `Date.UTC(...)` so the result never depends on
    * the server's local timezone or DST — parsing with `new Date(dateStr)` then
    * mutating via local `setDate/setMonth` (the previous approach) shifts by a
-   * day on negative-offset servers and around DST, worst for monthly. Day/week
-   * overflow is handled by `Date.UTC` normalization (e.g. Dec 31 + 1d → Jan 1).
-   * Month-end clamping for monthly/yearly is layered on separately.
+   * day on negative-offset servers and around DST. Day/week overflow is handled
+   * by `Date.UTC` normalization (e.g. Dec 31 + 1d → Jan 1).
+   *
+   * Month-end convention (monthly/yearly): if the anchor day does not exist in
+   * the target month, land on that month's **last valid day** — and recover the
+   * anchor day whenever a later month is long enough. `anchorDay` (the template
+   * start date's day-of-month) is what makes "31st of every month" produce
+   * Jan 31 → Feb 28 → Mar 31 → Apr 30 → May 31 instead of drifting to the 28th.
+   * Without it (defaulting to the current day) each month would stick at the
+   * clamped day.
    */
   advanceDate(
     dateStr: string,
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    anchorDay?: number,
   ): string {
     const [y, m, d] = dateStr.split('-').map(Number);
-    let dt: Date;
     if (frequency === 'daily') {
-      dt = new Date(Date.UTC(y, m - 1, d + 1));
-    } else if (frequency === 'weekly') {
-      dt = new Date(Date.UTC(y, m - 1, d + 7));
-    } else if (frequency === 'monthly') {
-      dt = new Date(Date.UTC(y, m, d));
-    } else {
-      dt = new Date(Date.UTC(y + 1, m - 1, d));
+      return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
     }
-    return dt.toISOString().slice(0, 10);
+    if (frequency === 'weekly') {
+      return new Date(Date.UTC(y, m - 1, d + 7)).toISOString().slice(0, 10);
+    }
+    const anchor = anchorDay ?? d;
+    // monthly → next month (0-indexed m); yearly → same month next year.
+    return frequency === 'monthly'
+      ? this.clampToMonth(y, m, anchor)
+      : this.clampToMonth(y + 1, m - 1, anchor);
+  }
+
+  /**
+   * Build a `YYYY-MM-DD` for the given (possibly out-of-range) month index,
+   * clamping the day to the target month's last valid day. `monthIdx0` may be
+   * 12 (December + 1) and is normalized into the next year.
+   */
+  private clampToMonth(year: number, monthIdx0: number, day: number): string {
+    const targetYear = year + Math.floor(monthIdx0 / 12);
+    const targetMonth = ((monthIdx0 % 12) + 12) % 12;
+    // Day 0 of the following month = the last day of the target month.
+    const lastDay = new Date(
+      Date.UTC(targetYear, targetMonth + 1, 0),
+    ).getUTCDate();
+    const clampedDay = Math.min(day, lastDay);
+    return new Date(Date.UTC(targetYear, targetMonth, clampedDay))
+      .toISOString()
+      .slice(0, 10);
   }
 }

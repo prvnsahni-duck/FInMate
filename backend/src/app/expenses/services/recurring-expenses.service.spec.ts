@@ -487,6 +487,64 @@ describe('RecurringExpenses Service & Scheduler', () => {
     });
   });
 
+  describe('month-end recurrence (last valid day, anchor-preserving)', () => {
+    it('clamps a monthly day that does not exist in the target month', () => {
+      // anchor 31
+      expect(scheduler.advanceDate('2026-01-31', 'monthly', 31)).toBe(
+        '2026-02-28',
+      ); // non-leap Feb
+      expect(scheduler.advanceDate('2028-01-31', 'monthly', 31)).toBe(
+        '2028-02-29',
+      ); // leap Feb
+      expect(scheduler.advanceDate('2026-03-31', 'monthly', 31)).toBe(
+        '2026-04-30',
+      );
+      expect(scheduler.advanceDate('2026-05-31', 'monthly', 31)).toBe(
+        '2026-06-30',
+      );
+      // anchors 29 / 30 also clamp into a non-leap February
+      expect(scheduler.advanceDate('2026-01-29', 'monthly', 29)).toBe(
+        '2026-02-28',
+      );
+      expect(scheduler.advanceDate('2026-01-30', 'monthly', 30)).toBe(
+        '2026-02-28',
+      );
+    });
+
+    it('recovers the anchor day in long-enough months (does not stick at 28)', () => {
+      let d = '2026-01-31';
+      const seq: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        d = scheduler.advanceDate(d, 'monthly', 31);
+        seq.push(d);
+      }
+      expect(seq).toEqual([
+        '2026-02-28',
+        '2026-03-31',
+        '2026-04-30',
+        '2026-05-31',
+        '2026-06-30',
+        '2026-07-31',
+      ]);
+    });
+
+    it('crosses the year boundary and keeps the anchor', () => {
+      expect(scheduler.advanceDate('2026-12-31', 'monthly', 31)).toBe(
+        '2027-01-31',
+      );
+    });
+
+    it('handles yearly Feb 29 → Feb 28, recovering on the next leap year', () => {
+      expect(scheduler.advanceDate('2028-02-29', 'yearly', 29)).toBe(
+        '2029-02-28',
+      );
+      // 2031 → 2032 (leap) recovers to the 29th
+      expect(scheduler.advanceDate('2031-02-28', 'yearly', 29)).toBe(
+        '2032-02-29',
+      );
+    });
+  });
+
   describe('RecurringExpensesScheduler Cron Engine', () => {
     it('generateDueOccurrences is idempotent per day — a re-run generates no duplicate', async () => {
       const template: any = {
@@ -498,6 +556,7 @@ describe('RecurringExpenses Service & Scheduler', () => {
         paidByUser: { id: 'user-1' },
         ownerUser: { id: 'user-1' },
         frequency: 'daily' as const,
+        startDate: '2026-06-20',
         nextOccurrenceDate: '2026-06-20',
         status: 'active' as const,
       };
