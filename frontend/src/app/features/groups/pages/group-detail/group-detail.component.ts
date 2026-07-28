@@ -36,6 +36,8 @@ import { ExpenseDecryptionService } from '../../../../core/services/expense-decr
 import { classifyDecryptionError } from '../../../../core/models/decryption-state';
 import { CryptoSessionManager } from '../../../../core/services/crypto-session-manager.service';
 import { CryptoRecoveryQueueService } from '../../../../core/services/crypto-recovery-queue.service';
+import { ExpenseExportService } from '../../../dashboard/services/expense-export.service';
+import { ExportFilter } from '../../../dashboard/services/export/expense-export.types';
 
 import {
   BalanceEntry,
@@ -125,6 +127,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   private store = inject(Store);
   private cryptoSession = inject(CryptoSessionManager);
   private recoveryQueue = inject(CryptoRecoveryQueueService);
+  private expenseExportService = inject(ExpenseExportService);
   private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -234,7 +237,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   requiresKeyProvisioning = this.groupKeyService.requiresKeyProvisioning;
   showLeftScrollCue = signal<boolean>(false);
   showRightScrollCue = signal<boolean>(false);
-  isExportDropdownOpen = signal<boolean>(false);
+  isExporting = signal<boolean>(false);
   isFilterBottomSheetOpen = signal<boolean>(false);
   showSkeleton = signal<boolean>(false);
   isLoadingExpenses = signal<boolean>(false);
@@ -1053,25 +1056,58 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
-  exportLedger(format: 'csv' | 'xlsx') {
+  /**
+   * Export the full group ledger to Excel.
+   *
+   * The backend returns every expense in the group as ciphertext (it can't
+   * decrypt — zero-knowledge); this client fetches those rows, decrypts the
+   * title/description with the group key, and builds the .xlsx locally. That's
+   * why the old server-side CSV/xlsx export is gone: it wrote ciphertext into
+   * the file. Respects the ledger's active category/date filters.
+   */
+  async exportLedger() {
     const g = this.group();
-    if (!g) return;
-    this.expensesService.exportExpenses(g.id, format).subscribe({
-      next: (blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `ledger-${g.name}-${new Date().toISOString().slice(0, 10)}.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      },
-      error: (err) =>
-        alert(
-          'Failed to export ledger: ' + (err.error?.message || err.message),
-        ),
-    });
+    if (!g || this.isExporting()) return;
+
+    this.isExporting.set(true);
+    try {
+      const filter: ExportFilter = {
+        groupId: g.id,
+        type: 'group',
+        from: this.filterStartDate() || '',
+        to: this.filterEndDate() || '',
+        category: this.filterCategory() || undefined,
+      };
+      const datePart = new Date().toISOString().slice(0, 10);
+      await this.expenseExportService.exportExpenses(
+        filter,
+        'xlsx',
+        `ledger-${this.sanitizeForFilename(g.name)}-${datePart}`,
+      );
+    } catch (err: any) {
+      alert(
+        'Failed to export ledger: ' +
+          (err?.error?.message || err?.message || 'Unknown error'),
+      );
+    } finally {
+      this.isExporting.set(false);
+    }
+  }
+
+  /**
+   * Make a group name safe to drop into a download filename: strip characters
+   * that are invalid on Windows/macOS filesystems (`< > : " / \ | ? *` and
+   * control chars), collapse whitespace, and trim trailing dots/spaces
+   * (which Windows also rejects). Falls back to `group` when nothing is left.
+   */
+  private sanitizeForFilename(name: string): string {
+    const cleaned = (name ?? '')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '-')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[. ]+$/, '');
+    return cleaned || 'group';
   }
 
   onImportFileSelected(event: Event) {

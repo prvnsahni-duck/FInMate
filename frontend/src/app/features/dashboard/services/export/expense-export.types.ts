@@ -16,6 +16,12 @@ export interface ExportFilter {
   category?: string;
   status?: 'settled' | 'pending';
   currency?: string;
+  /**
+   * When set, switches to group-ledger mode: the export contains every expense
+   * in this group (with the caller's own share surfaced per row), not just the
+   * caller's share. Used by the group-detail export.
+   */
+  groupId?: string;
 }
 
 /**

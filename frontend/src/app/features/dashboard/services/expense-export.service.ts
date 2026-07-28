@@ -36,15 +36,19 @@ export class ExpenseExportService {
    * wrappedContentKeys), so this reuses it directly with no special-casing.
    */
   async fetchRows(filter: ExportFilter): Promise<ExportRow[]> {
-    let params = new HttpParams()
-      .set('from', filter.from)
-      .set('to', filter.to);
+    let params = new HttpParams();
+    // Only send bounds that are actually set — an empty date string would fail
+    // the backend's date validation (the group ledger export leaves them blank
+    // to mean "no bound").
+    if (filter.from) params = params.set('from', filter.from);
+    if (filter.to) params = params.set('to', filter.to);
     if (filter.type && filter.type !== 'all') {
       params = params.set('type', filter.type);
     }
     if (filter.category) params = params.set('category', filter.category);
     if (filter.status) params = params.set('status', filter.status);
     if (filter.currency) params = params.set('currency', filter.currency);
+    if (filter.groupId) params = params.set('groupId', filter.groupId);
 
     const res = await firstValueFrom(
       this.http.get<{ rows?: ExportRow[]; data?: { rows?: ExportRow[] } }>(
@@ -80,6 +84,7 @@ export class ExpenseExportService {
   async exportExpenses(
     filter: ExportFilter,
     format: ExportFormat = 'xlsx',
+    filename?: string,
   ): Promise<string> {
     const rows = await this.fetchRows(filter);
     const builder = createWorkbookBuilder(format);
@@ -88,9 +93,11 @@ export class ExpenseExportService {
       total: rows.length,
       exportedOn: new Date(),
     });
-    const filename = buildExportFilename(filter, builder.extension);
-    this.triggerDownload(blob, filename);
-    return filename;
+    const resolvedName = filename
+      ? `${filename}.${builder.extension}`
+      : buildExportFilename(filter, builder.extension);
+    this.triggerDownload(blob, resolvedName);
+    return resolvedName;
   }
 
   /** Download a blob by simulating an anchor click. */

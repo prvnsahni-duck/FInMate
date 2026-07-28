@@ -497,75 +497,27 @@
           >
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-xl font-bold">Expenses Ledger</h2>
-              <!-- Desktop Export Buttons -->
-              <div class="hidden sm:flex space-x-2">
-                <button
-                  (click)="exportLedger('csv')"
-                  class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted cursor-pointer"
+              <!-- Export the full ledger to Excel (decrypted client-side). -->
+              <button
+                (click)="exportLedger()"
+                [disabled]="isExporting()"
+                class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted flex items-center space-x-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <svg
+                  class="w-3.5 h-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
                 >
-                  Export CSV
-                </button>
-                <button
-                  (click)="exportLedger('xlsx')"
-                  class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted cursor-pointer"
-                >
-                  Export Excel
-                </button>
-              </div>
-
-              <!-- Mobile Export Menu -->
-              <div class="relative sm:hidden">
-                <button
-                  (click)="isExportDropdownOpen.set(!isExportDropdownOpen())"
-                  class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted flex items-center space-x-1 cursor-pointer"
-                >
-                  <span>Export</span>
-                  <svg
-                    class="w-3.5 h-3.5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M19 9l-7 7-7-7"
-                    ></path>
-                  </svg>
-                </button>
-
-                @if (isExportDropdownOpen()) {
-                  <!-- Backdrop to dismiss dropdown -->
-                  <div
-                    (click)="isExportDropdownOpen.set(false)"
-                    (keydown.escape)="isExportDropdownOpen.set(false)"
-                    role="presentation"
-                    class="fixed inset-0 z-40 bg-transparent"
-                  ></div>
-
-                  <div
-                    class="absolute right-0 mt-2 w-32 bg-finmate-card dark:bg-finmate-card border border-border/10 rounded-xl shadow-xl z-50 p-1 py-1.5 animate-fade-in"
-                  >
-                    <button
-                      (click)="
-                        exportLedger('csv'); isExportDropdownOpen.set(false)
-                      "
-                      class="w-full text-left text-xs font-bold text-secondary hover:bg-surface p-2 px-3 rounded-lg transition cursor-pointer"
-                    >
-                      Export CSV
-                    </button>
-                    <button
-                      (click)="
-                        exportLedger('xlsx'); isExportDropdownOpen.set(false)
-                      "
-                      class="w-full text-left text-xs font-bold text-secondary hover:bg-surface p-2 px-3 rounded-lg transition cursor-pointer"
-                    >
-                      Export Excel
-                    </button>
-                  </div>
-                }
-              </div>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+                  ></path>
+                </svg>
+                <span>{{ isExporting() ? 'Exporting…' : 'Export Excel' }}</span>
+              </button>
             </div>
 
             <!-- Filters Toggle / Info Row (Visible only on Mobile, hides on Desktop) -->

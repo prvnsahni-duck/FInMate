@@ -1,10 +1,11 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import {
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  GroupMember,
 } from '@finmate/data-models';
 import {
   ExpenseExportQueryService,
@@ -79,16 +80,41 @@ const groupSplit = (over: Partial<Record<string, unknown>> = {}) => ({
   ...over,
 });
 
+/** A group-ledger expense row as returned by the ledger query (not a split). */
+const ledgerExpense = (over: Partial<Record<string, unknown>> = {}) => ({
+  id: 'g-1',
+  title: 'enc:Dinner',
+  description: null,
+  amountTotal: 900,
+  currency: 'USD',
+  category: 'Food & Drinks',
+  expenseDate: '2026-07-02',
+  createdAt: new Date('2026-07-02T10:00:00Z'),
+  status: 'posted',
+  encryptionScope: 'group',
+  group: { id: 'grp-1', name: 'House' },
+  groupKeyVersion: { id: 'gkv-1' },
+  paidByUser: null,
+  paidByGroupMember: {
+    id: 'gm-2',
+    user: { id: 'user-2', displayName: 'Bob', email: 'bob@e.com' },
+    contact: null,
+  },
+  ...over,
+});
+
 describe('ExpenseExportQueryService', () => {
   let service: ExpenseExportQueryService;
   let expenseRepo: { createQueryBuilder: jest.Mock };
   let splitRepo: { createQueryBuilder: jest.Mock };
   let keyRepo: { find: jest.Mock };
+  let memberRepo: { findOne: jest.Mock };
 
   beforeEach(async () => {
     expenseRepo = { createQueryBuilder: jest.fn() };
     splitRepo = { createQueryBuilder: jest.fn() };
     keyRepo = { find: jest.fn().mockResolvedValue([]) };
+    memberRepo = { findOne: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -99,6 +125,7 @@ describe('ExpenseExportQueryService', () => {
           provide: getRepositoryToken(EncryptedExpenseKey),
           useValue: keyRepo,
         },
+        { provide: getRepositoryToken(GroupMember), useValue: memberRepo },
       ],
     }).compile();
 
@@ -280,5 +307,56 @@ describe('ExpenseExportQueryService', () => {
     expect(rows[0].wrappedContentKeys).toEqual([
       { userId: 'user-9', wrappedKey: 'wk' },
     ]);
+  });
+
+  describe('group-ledger mode (groupId set)', () => {
+    it('returns the whole ledger with the caller share, without the per-caller queries', async () => {
+      memberRepo.findOne.mockResolvedValue({ id: 'gm-1' });
+      // Ledger has two expenses; the caller participates in only one.
+      expenseRepo.createQueryBuilder.mockReturnValue(
+        makeQb([
+          ledgerExpense({ id: 'g-1' }),
+          ledgerExpense({
+            id: 'g-2',
+            expenseDate: '2026-07-05',
+            createdAt: new Date('2026-07-05T10:00:00Z'),
+          }),
+        ]),
+      );
+      splitRepo.createQueryBuilder.mockReturnValue(
+        makeQb([
+          {
+            amountOwed: 300,
+            isSettled: true,
+            splitType: 'equal',
+            expense: { id: 'g-1' },
+          },
+        ]),
+      );
+
+      const rows = await service.getExportRows('user-1', { groupId: 'grp-1' });
+
+      expect(rows).toHaveLength(2);
+      // Newest first: g-2 (no caller split → share 0), then g-1 (caller's split).
+      expect(rows[0]).toMatchObject({ id: 'g-2', myShare: 0, isSettled: false });
+      expect(rows[1]).toMatchObject({
+        id: 'g-1',
+        myShare: 300,
+        isSettled: true,
+        splitType: 'equal',
+        expenseType: 'GROUP_SHARE',
+        groupName: 'House',
+        groupId: 'grp-1',
+      });
+    });
+
+    it('rejects a caller who is not a member of the group', async () => {
+      memberRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.getExportRows('user-1', { groupId: 'grp-1' }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(expenseRepo.createQueryBuilder).not.toHaveBeenCalled();
+    });
   });
 });

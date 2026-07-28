@@ -10,6 +10,15 @@ import { IsDateString, IsIn, IsOptional, IsString, Length } from 'class-validato
  * guarantee. See ExpenseExportQueryService.
  */
 export class ExportExpensesQueryDto {
+  /**
+   * When set, switches to group-ledger mode: the endpoint returns every
+   * expense in this group (not just the caller's share), provided the caller
+   * is a member. Used by the group-detail export.
+   */
+  @IsOptional()
+  @IsString()
+  groupId?: string;
+
   /** Inclusive lower bound on expense date (YYYY-MM-DD). */
   @IsOptional()
   @IsDateString()

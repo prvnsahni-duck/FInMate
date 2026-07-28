@@ -1,9 +1,14 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  GroupMember,
 } from '@finmate/data-models';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 
@@ -17,6 +22,12 @@ export interface ExportFilter {
   category?: string;
   status?: 'settled' | 'pending';
   currency?: string;
+  /**
+   * When set, the export switches to group-ledger mode: every expense in this
+   * group (subject to the other filters), not just the caller's share. The
+   * caller must be a member of the group.
+   */
+  groupId?: string;
 }
 
 /**
@@ -68,6 +79,8 @@ export class ExpenseExportQueryService {
     private readonly expenseSplitRepository: Repository<ExpenseSplit>,
     @InjectRepository(EncryptedExpenseKey)
     private readonly encryptedExpenseKeyRepository: Repository<EncryptedExpenseKey>,
+    @InjectRepository(GroupMember)
+    private readonly groupMemberRepository: Repository<GroupMember>,
   ) {}
 
   private static readonly DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -97,6 +110,19 @@ export class ExpenseExportQueryService {
 
     const type = filter.type ?? 'all';
     const currency = filter.currency?.toUpperCase();
+
+    // Group-ledger mode: return the whole group's ledger (all members'
+    // expenses), not just the caller's share. Everything else — personal +
+    // the caller's own group shares — flows through the per-caller queries.
+    if (filter.groupId) {
+      const rows = await this.buildGroupLedgerRows(
+        userId,
+        filter.groupId,
+        filter,
+        currency,
+      );
+      return this.finalizeRows(rows);
+    }
 
     // A specific settlement status only applies to group shares — personal
     // expenses have no settlement concept, so exclude them when it's set.
@@ -184,6 +210,14 @@ export class ExpenseExportQueryService {
       }
     }
 
+    return this.finalizeRows(rows);
+  }
+
+  /**
+   * Shared tail for every export path: enforce the row cap, attach wrapped
+   * content keys for direct-shared rows, and sort newest-first.
+   */
+  private async finalizeRows(rows: ExportRow[]): Promise<ExportRow[]> {
     if (rows.length > MAX_EXPORT_ROWS) {
       throw new BadRequestException({
         errorCode: 'EXP_EXPORT_TOO_LARGE',
@@ -203,6 +237,125 @@ export class ExpenseExportQueryService {
     });
 
     return rows;
+  }
+
+  /**
+   * Build the full group ledger: every non-deleted expense in the group
+   * (subject to date/category/currency filters), with the caller's own split
+   * amount surfaced as `myShare`. Requires the caller to be a group member.
+   */
+  private async buildGroupLedgerRows(
+    userId: string,
+    groupId: string,
+    filter: ExportFilter,
+    currency: string | undefined,
+  ): Promise<ExportRow[]> {
+    const membership = await this.groupMemberRepository.findOne({
+      where: {
+        group: { id: groupId },
+        user: { id: userId },
+        joinStatus: In(['active', 'invited']),
+      },
+    });
+    if (!membership) {
+      throw new ForbiddenException({
+        errorCode: 'GRP_FORBIDDEN',
+        message: 'You do not have access to this group',
+      });
+    }
+
+    const qb = this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember')
+      .leftJoinAndSelect('paidByGroupMember.user', 'paidByGroupMemberUser')
+      .leftJoinAndSelect('paidByGroupMember.contact', 'paidByGroupMemberContact')
+      .leftJoinAndSelect('expense.group', 'group')
+      .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
+      .where('group.id = :groupId', { groupId })
+      .andWhere('expense.deletedAt IS NULL');
+
+    this.applyExpenseFilters(qb, filter, currency);
+    const expenses = await qb.take(MAX_EXPORT_ROWS + 1).getMany();
+
+    const myShareByExpense = await this.loadCallerShares(
+      userId,
+      expenses.map((e) => e.id),
+    );
+
+    return expenses.map((exp) => {
+      const mine = myShareByExpense.get(exp.id);
+      return {
+        id: exp.id,
+        expenseDate: exp.expenseDate,
+        createdAt: exp.createdAt,
+        title: exp.title,
+        description: exp.description ?? null,
+        encryptionScope: exp.encryptionScope ?? 'group',
+        groupId: exp.group?.id ?? groupId,
+        groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
+        wrappedContentKeys: [],
+        amountTotal: Number(exp.amountTotal),
+        myShare: mine ? mine.amount : 0,
+        currency: exp.currency,
+        category: exp.category,
+        expenseType: 'GROUP_SHARE',
+        groupName: exp.group?.name ?? null,
+        // Frozen rule: a group expense's payer resolves via paidByGroupMember;
+        // paidByUser is only ever populated for legacy, pre-migration rows.
+        paidByDisplayName:
+          exp.paidByUser?.displayName ??
+          exp.paidByUser?.email ??
+          exp.paidByGroupMember?.user?.displayName ??
+          exp.paidByGroupMember?.user?.email ??
+          exp.paidByGroupMember?.contact?.displayName ??
+          exp.paidByGroupMember?.contact?.email ??
+          null,
+        splitType: mine?.splitType ?? null,
+        isSettled: mine?.isSettled ?? false,
+        status: exp.status,
+      };
+    });
+  }
+
+  /**
+   * Map of expenseId → the caller's own split (amount owed, settlement,
+   * split type) for the given expenses. Expenses the caller does not
+   * participate in are simply absent from the map.
+   */
+  private async loadCallerShares(
+    userId: string,
+    expenseIds: string[],
+  ): Promise<
+    Map<string, { amount: number; isSettled: boolean; splitType: string | null }>
+  > {
+    const byExpense = new Map<
+      string,
+      { amount: number; isSettled: boolean; splitType: string | null }
+    >();
+    if (expenseIds.length === 0) return byExpense;
+
+    const splits = await this.expenseSplitRepository
+      .createQueryBuilder('split')
+      .innerJoinAndSelect('split.expense', 'expense')
+      .leftJoin('split.participantGroupMember', 'groupMember')
+      .where('expense.id IN (:...expenseIds)', { expenseIds })
+      .andWhere(
+        '(split.participantUser = :userId OR groupMember.user_id = :userId)',
+        { userId },
+      )
+      .getMany();
+
+    for (const split of splits) {
+      const eid = split.expense?.id;
+      if (!eid) continue;
+      byExpense.set(eid, {
+        amount: Number(split.amountOwed),
+        isSettled: split.isSettled ?? false,
+        splitType: split.splitType ?? null,
+      });
+    }
+    return byExpense;
   }
 
   private buildPersonalQuery(
