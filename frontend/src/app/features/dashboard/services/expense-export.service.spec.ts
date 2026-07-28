@@ -40,7 +40,11 @@ describe('ExpenseExportService', () => {
     decryptor = {
       decryptExpenses: jest.fn((rows: ExportRow[]) =>
         Promise.resolve(
-          rows.map((r) => ({ ...r, title: 'Groceries', description: 'weekly' })),
+          rows.map((r) => ({
+            ...r,
+            title: 'Groceries',
+            description: 'weekly',
+          })),
         ),
       ),
     };
@@ -58,7 +62,10 @@ describe('ExpenseExportService', () => {
   it('fetches rows and decrypts them', async () => {
     http.get.mockReturnValue(of({ rows: [serverRow()], count: 1 }));
 
-    const rows = await service.fetchRows({ from: '2026-07-01', to: '2026-07-31' });
+    const rows = await service.fetchRows({
+      from: '2026-07-01',
+      to: '2026-07-31',
+    });
 
     expect(http.get).toHaveBeenCalledWith(
       expect.stringContaining('/expenses/export'),
@@ -105,7 +112,10 @@ describe('ExpenseExportService', () => {
   it('tolerates a nested { data: { rows } } response shape', async () => {
     http.get.mockReturnValue(of({ data: { rows: [serverRow()] } }));
 
-    const rows = await service.fetchRows({ from: '2026-07-01', to: '2026-07-31' });
+    const rows = await service.fetchRows({
+      from: '2026-07-01',
+      to: '2026-07-31',
+    });
 
     expect(rows).toHaveLength(1);
   });
@@ -114,8 +124,10 @@ describe('ExpenseExportService', () => {
     http.get.mockReturnValue(of({ rows: [serverRow()] }));
     const createUrl = jest.fn(() => 'blob:mock');
     const revokeUrl = jest.fn();
-    (URL as unknown as { createObjectURL: unknown }).createObjectURL = createUrl;
-    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL = revokeUrl;
+    (URL as unknown as { createObjectURL: unknown }).createObjectURL =
+      createUrl;
+    (URL as unknown as { revokeObjectURL: unknown }).revokeObjectURL =
+      revokeUrl;
     const clickSpy = jest
       .spyOn(HTMLAnchorElement.prototype, 'click')
       .mockImplementation(() => undefined);

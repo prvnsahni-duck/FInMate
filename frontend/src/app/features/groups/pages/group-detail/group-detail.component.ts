@@ -108,7 +108,7 @@ export interface GroupExpense extends Expense {
     GroupMembersComponent,
     DropdownComponent,
     CryptoRecoveryPanelComponent,
-    DecimalPipe
+    DecimalPipe,
   ],
   templateUrl: './group-detail.component.html',
   styleUrls: ['./group-detail.component.scss'],

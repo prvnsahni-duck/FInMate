@@ -1,9 +1,17 @@
 import * as XLSX from 'xlsx';
-import { XlsxWorkbookBuilder, createWorkbookBuilder } from './xlsx-workbook.builder';
+import {
+  XlsxWorkbookBuilder,
+  createWorkbookBuilder,
+} from './xlsx-workbook.builder';
 import { EXPORT_COLUMNS, ExportMeta, ExportRow } from './expense-export.types';
 
 const meta: ExportMeta = {
-  filter: { from: '2026-01-01', to: '2026-07-28', type: 'all', status: 'settled' },
+  filter: {
+    from: '2026-01-01',
+    to: '2026-07-28',
+    type: 'all',
+    status: 'settled',
+  },
   total: 2,
   exportedOn: new Date('2026-07-28T14:35:00Z'),
 };
@@ -93,9 +101,7 @@ describe('XlsxWorkbookBuilder', () => {
       'Export Information',
     );
     const flat = new Map(
-      info
-        .filter((r) => r.length >= 2)
-        .map((r) => [String(r[0]), r[1]]),
+      info.filter((r) => r.length >= 2).map((r) => [String(r[0]), r[1]]),
     );
 
     expect(info[0][0]).toBe('Export Information');

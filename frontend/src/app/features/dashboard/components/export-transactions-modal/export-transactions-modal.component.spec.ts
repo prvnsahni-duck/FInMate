@@ -7,13 +7,13 @@ describe('ExportTransactionsModalComponent', () => {
   let exportService: { exportExpenses: jest.Mock };
 
   beforeEach(() => {
-    exportService = { exportExpenses: jest.fn().mockResolvedValue('file.xlsx') };
+    exportService = {
+      exportExpenses: jest.fn().mockResolvedValue('file.xlsx'),
+    };
 
     TestBed.configureTestingModule({
       imports: [ExportTransactionsModalComponent],
-      providers: [
-        { provide: ExpenseExportService, useValue: exportService },
-      ],
+      providers: [{ provide: ExpenseExportService, useValue: exportService }],
     });
 
     const fixture = TestBed.createComponent(ExportTransactionsModalComponent);

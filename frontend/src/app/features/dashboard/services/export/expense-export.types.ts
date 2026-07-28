@@ -104,7 +104,11 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { header: 'Your Share', type: 'number', value: (r) => r.myShare },
   { header: 'Status', type: 'text', value: statusLabel },
   { header: 'Notes', type: 'text', value: (r) => r.description ?? '' },
-  { header: 'Created At', type: 'date', value: (r) => formatDateTime(r.createdAt) },
+  {
+    header: 'Created At',
+    type: 'date',
+    value: (r) => formatDateTime(r.createdAt),
+  },
 ];
 
 /**
@@ -147,9 +151,7 @@ const TYPE_LABELS: Record<NonNullable<ExportFilter['type']>, string> = {
  * Format-agnostic so any builder can render it — a second worksheet for xlsx,
  * a header block or sidecar for a future CSV/PDF builder.
  */
-export function buildExportInfoMatrix(
-  meta: ExportMeta,
-): (string | number)[][] {
+export function buildExportInfoMatrix(meta: ExportMeta): (string | number)[][] {
   const { filter, total, exportedOn } = meta;
   const statusLabel = filter.status
     ? filter.status === 'settled'

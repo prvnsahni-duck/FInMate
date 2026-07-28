@@ -98,7 +98,10 @@ export class ExpenseExportQueryService {
    * Resolve the filtered export rows for a user. Newest expense first.
    * Throws EXP_EXPORT_TOO_LARGE if the result would exceed MAX_EXPORT_ROWS.
    */
-  async getExportRows(userId: string, filter: ExportFilter): Promise<ExportRow[]> {
+  async getExportRows(
+    userId: string,
+    filter: ExportFilter,
+  ): Promise<ExportRow[]> {
     this.assertValidDate(filter.from, 'from');
     this.assertValidDate(filter.to, 'to');
     if (filter.from && filter.to && filter.from > filter.to) {
@@ -269,7 +272,10 @@ export class ExpenseExportQueryService {
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
       .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember')
       .leftJoinAndSelect('paidByGroupMember.user', 'paidByGroupMemberUser')
-      .leftJoinAndSelect('paidByGroupMember.contact', 'paidByGroupMemberContact')
+      .leftJoinAndSelect(
+        'paidByGroupMember.contact',
+        'paidByGroupMemberContact',
+      )
       .leftJoinAndSelect('expense.group', 'group')
       .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
       .where('group.id = :groupId', { groupId })
@@ -327,7 +333,10 @@ export class ExpenseExportQueryService {
     userId: string,
     expenseIds: string[],
   ): Promise<
-    Map<string, { amount: number; isSettled: boolean; splitType: string | null }>
+    Map<
+      string,
+      { amount: number; isSettled: boolean; splitType: string | null }
+    >
   > {
     const byExpense = new Map<
       string,
@@ -387,15 +396,21 @@ export class ExpenseExportQueryService {
       .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
       .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember')
       .leftJoinAndSelect('paidByGroupMember.user', 'paidByGroupMemberUser')
-      .leftJoinAndSelect('paidByGroupMember.contact', 'paidByGroupMemberContact')
+      .leftJoinAndSelect(
+        'paidByGroupMember.contact',
+        'paidByGroupMemberContact',
+      )
       .leftJoinAndSelect('expense.group', 'group')
       .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
       .leftJoin('split.participantGroupMember', 'groupMember')
       .where('expense.deletedAt IS NULL')
       .andWhere('expense.group IS NOT NULL')
-      .andWhere('(split.participantUser = :userId OR groupMember.user_id = :userId)', {
-        userId,
-      });
+      .andWhere(
+        '(split.participantUser = :userId OR groupMember.user_id = :userId)',
+        {
+          userId,
+        },
+      );
 
     this.applyExpenseFilters(qb, filter, currency);
 
@@ -421,7 +436,9 @@ export class ExpenseExportQueryService {
       qb.andWhere('expense.expenseDate <= :to', { to: filter.to });
     }
     if (filter.category) {
-      qb.andWhere('expense.category = :category', { category: filter.category });
+      qb.andWhere('expense.category = :category', {
+        category: filter.category,
+      });
     }
     if (currency) {
       qb.andWhere('UPPER(expense.currency) = :currency', { currency });

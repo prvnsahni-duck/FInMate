@@ -204,8 +204,8 @@ describe('ExpenseExportQueryService', () => {
     expect(rows.every((r) => r.expenseType === 'GROUP_SHARE')).toBe(true);
     // status pushed to SQL on the split query
     expect(
-      (sQb as any).andWhereCalls.some(
-        ([clause]: [string]) => clause.includes('split.isSettled'),
+      (sQb as any).andWhereCalls.some(([clause]: [string]) =>
+        clause.includes('split.isSettled'),
       ),
     ).toBe(true);
   });
@@ -338,7 +338,11 @@ describe('ExpenseExportQueryService', () => {
 
       expect(rows).toHaveLength(2);
       // Newest first: g-2 (no caller split → share 0), then g-1 (caller's split).
-      expect(rows[0]).toMatchObject({ id: 'g-2', myShare: 0, isSettled: false });
+      expect(rows[0]).toMatchObject({
+        id: 'g-2',
+        myShare: 0,
+        isSettled: false,
+      });
       expect(rows[1]).toMatchObject({
         id: 'g-1',
         myShare: 300,
