@@ -467,6 +467,26 @@ describe('RecurringExpenses Service & Scheduler', () => {
     });
   });
 
+  describe('advanceDate (UTC, timezone-independent)', () => {
+    // Date.UTC-based arithmetic → results do not depend on the runner's TZ.
+    it('advances daily, including across month/year boundaries', () => {
+      expect(scheduler.advanceDate('2026-06-20', 'daily')).toBe('2026-06-21');
+      expect(scheduler.advanceDate('2026-06-30', 'daily')).toBe('2026-07-01');
+      expect(scheduler.advanceDate('2026-12-31', 'daily')).toBe('2027-01-01');
+    });
+
+    it('advances weekly, including across a month boundary', () => {
+      expect(scheduler.advanceDate('2026-06-20', 'weekly')).toBe('2026-06-27');
+      expect(scheduler.advanceDate('2026-06-28', 'weekly')).toBe('2026-07-05');
+    });
+
+    it('advances monthly and yearly for non-month-end days', () => {
+      expect(scheduler.advanceDate('2026-01-15', 'monthly')).toBe('2026-02-15');
+      expect(scheduler.advanceDate('2026-12-10', 'monthly')).toBe('2027-01-10');
+      expect(scheduler.advanceDate('2026-03-10', 'yearly')).toBe('2027-03-10');
+    });
+  });
+
   describe('RecurringExpensesScheduler Cron Engine', () => {
     it('generateDueOccurrences is idempotent per day — a re-run generates no duplicate', async () => {
       const template: any = {

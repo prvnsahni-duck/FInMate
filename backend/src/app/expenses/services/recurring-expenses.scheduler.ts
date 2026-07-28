@@ -228,20 +228,31 @@ export class RecurringExpensesScheduler {
     }
   }
 
-  private advanceDate(
+  /**
+   * Advance a `YYYY-MM-DD` date by one frequency step, in **UTC**.
+   *
+   * All arithmetic goes through `Date.UTC(...)` so the result never depends on
+   * the server's local timezone or DST — parsing with `new Date(dateStr)` then
+   * mutating via local `setDate/setMonth` (the previous approach) shifts by a
+   * day on negative-offset servers and around DST, worst for monthly. Day/week
+   * overflow is handled by `Date.UTC` normalization (e.g. Dec 31 + 1d → Jan 1).
+   * Month-end clamping for monthly/yearly is layered on separately.
+   */
+  advanceDate(
     dateStr: string,
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly',
   ): string {
-    const d = new Date(dateStr);
+    const [y, m, d] = dateStr.split('-').map(Number);
+    let dt: Date;
     if (frequency === 'daily') {
-      d.setDate(d.getDate() + 1);
+      dt = new Date(Date.UTC(y, m - 1, d + 1));
     } else if (frequency === 'weekly') {
-      d.setDate(d.getDate() + 7);
+      dt = new Date(Date.UTC(y, m - 1, d + 7));
     } else if (frequency === 'monthly') {
-      d.setMonth(d.getMonth() + 1);
-    } else if (frequency === 'yearly') {
-      d.setFullYear(d.getFullYear() + 1);
+      dt = new Date(Date.UTC(y, m, d));
+    } else {
+      dt = new Date(Date.UTC(y + 1, m - 1, d));
     }
-    return d.toISOString().slice(0, 10);
+    return dt.toISOString().slice(0, 10);
   }
 }
