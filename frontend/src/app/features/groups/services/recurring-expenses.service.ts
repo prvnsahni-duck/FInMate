@@ -105,7 +105,10 @@ export class RecurringExpensesService {
     return this.http
       .get<any>(`${this.baseUrl}/recurring-expenses`, { params })
       .pipe(
-        map((res) => res.data || []),
+        // responseInterceptor already unwraps { success, data } → the payload,
+        // so `res` is the array itself. Don't unwrap `.data` again (that yields
+        // undefined → an always-empty list).
+        map((res) => (Array.isArray(res) ? res : [])),
         mapDecryptExpenses(this.decryptor),
       );
   }
@@ -118,7 +121,9 @@ export class RecurringExpensesService {
           encryptedPayload,
         ),
       ),
-      map((res) => res.data),
+      // responseInterceptor already unwrapped { success, data } → the template
+      // object; decrypt it directly. A stray `map(res => res.data)` here would
+      // hand `undefined` to the decryptor and reject the whole save.
       mapDecryptExpense(this.decryptor),
     );
   }
@@ -134,7 +139,6 @@ export class RecurringExpensesService {
           encryptedPayload,
         ),
       ),
-      map((res) => res.data),
       mapDecryptExpense(this.decryptor),
     );
   }
