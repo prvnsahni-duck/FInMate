@@ -261,6 +261,9 @@ describe('RecurringExpenses Service & Scheduler', () => {
       expect(result.id).toBe('template-id');
       expect(result.paidByGroupMemberId).toBe('gm-payer');
       expect(result.paidByUserId).toBeNull();
+      // Group templates report group scope so the client picks the group key
+      // to decrypt the title/description ciphertext.
+      expect(result.encryptionScope).toBe('group');
       expect(mockRecurringExpenseRepo.save).toHaveBeenCalled();
       const createCallArgs = mockRecurringExpenseRepo.create.mock.calls[0][0];
       expect(createCallArgs.paidByGroupMember).toBe(paidByGroupMember);

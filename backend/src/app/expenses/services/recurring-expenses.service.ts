@@ -443,7 +443,10 @@ export class RecurringExpensesService {
       .leftJoinAndSelect('template.paidByUser', 'paidByUser')
       .leftJoinAndSelect('template.paidByGroupMember', 'paidByGroupMember')
       .leftJoinAndSelect('template.ownerUser', 'ownerUser')
-      .leftJoinAndSelect('template.group', 'group');
+      .leftJoinAndSelect('template.group', 'group')
+      // Needed so the response carries groupKeyVersionId — the client resolves
+      // the group decryption key by version to decrypt the title/description.
+      .leftJoinAndSelect('template.groupKeyVersion', 'groupKeyVersion');
 
     if (groupId) {
       if (groupId === 'personal') {
@@ -479,6 +482,7 @@ export class RecurringExpensesService {
         'paidByGroupMember.user',
         'ownerUser',
         'group',
+        'groupKeyVersion',
       ],
     });
     if (!template) {
@@ -684,6 +688,10 @@ export class RecurringExpensesService {
       ownerUserId: template.ownerUser.id,
       groupId: template.group?.id ?? null,
       groupKeyVersionId: template.groupKeyVersion?.id ?? null,
+      // Derived (no column): group templates are group-encrypted, the rest are
+      // personal-scoped. The client needs this to pick the right decryption key
+      // for the title/description ciphertext.
+      encryptionScope: template.group ? 'group' : 'personal',
       frequency: template.frequency,
       startDate: template.startDate,
       endDate: template.endDate ?? null,
