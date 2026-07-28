@@ -11,10 +11,7 @@ import { Store } from '@ngxs/store';
 import { Register } from '../../../../core/auth/auth.state';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 import { IconComponent } from '../../../../shared/components/icon/icon.component';
-import {
-  EYE_ICON_PATH,
-  EYE_OFF_ICON_PATH,
-} from '../../../../core/constants/app.constants';
+import { PasswordInputComponent } from '../../../../shared/components/password-input/password-input.component';
 import { RegisterDto } from '@finmate/data-models';
 
 /**
@@ -41,6 +38,7 @@ function passwordsMatchValidator(
     RouterLink,
     SubmitButtonComponent,
     IconComponent,
+    PasswordInputComponent,
   ],
   templateUrl: './register.component.html',
 })
@@ -72,21 +70,7 @@ export class RegisterComponent {
   errorMessage = '';
   successMessage = '';
 
-  showPassword = false;
-  showConfirmPassword = false;
   capsLockOn = false;
-
-  // Eye / eye-off icon paths (shared with the login page).
-  readonly eyeIconPath = EYE_ICON_PATH;
-  readonly eyeOffIconPath = EYE_OFF_ICON_PATH;
-
-  togglePassword(): void {
-    this.showPassword = !this.showPassword;
-  }
-
-  toggleConfirmPassword(): void {
-    this.showConfirmPassword = !this.showConfirmPassword;
-  }
 
   /** Track Caps Lock so we can warn the user before they set a password they can't retype. */
   updateCapsLock(event: KeyboardEvent): void {

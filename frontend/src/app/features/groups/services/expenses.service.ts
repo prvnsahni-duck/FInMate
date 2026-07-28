@@ -286,11 +286,15 @@ export class ExpensesService {
       .get<any>(`${this.baseUrl}/expenses/analytics/all-monthly?month=${m}`)
       .pipe(
         mergeMap(async (res) => {
+          // The response interceptor unwraps `{ success, data }` → `data`, so
+          // `res` is already the array here. Tolerate both shapes.
           const items: { category: string; amount: number }[] = Array.isArray(
-            res.data,
+            res,
           )
-            ? res.data
-            : [];
+            ? res
+            : Array.isArray(res?.data)
+              ? res.data
+              : [];
           return items.reduce((sum, i) => sum + Number(i.amount), 0);
         }),
         shareReplay({ bufferSize: 1, refCount: true }),

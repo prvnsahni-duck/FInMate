@@ -39,17 +39,24 @@
             <label for="crypto-recovery-credential" class="sr-only">{{
               provider.label
             }}</label>
-            <input
-              id="crypto-recovery-credential"
-              type="password"
+            <app-password-input
+              inputId="crypto-recovery-credential"
+              testId="crypto-recovery-credential-input"
+              toggleTestId="crypto-recovery-credential-toggle"
               autocomplete="current-password"
-              [attr.aria-label]="provider.label"
-              [attr.aria-busy]="isBusy()"
+              [ariaLabel]="provider.label"
+              [busy]="isBusy()"
               [placeholder]="'Enter your ' + provider.label.toLowerCase()"
-              [value]="credential()"
-              (input)="credential.set($any($event.target).value)"
-              class="bg-white/10 rounded-xl px-3 py-1.5 text-xs outline-none border border-white/20 focus:border-white/40 placeholder-white/50 w-full"
-            />
+              [ngModel]="credential()"
+              (ngModelChange)="credential.set($event)"
+              [ngModelOptions]="{ standalone: true }"
+              [inputClass]="
+                'bg-white/10 rounded-xl px-3 py-1.5 pr-9 text-xs outline-none border border-white/20 focus:border-white/40 placeholder-white/50 w-full'
+              "
+              [toggleClass]="
+                'absolute inset-y-0 right-0 flex items-center px-2.5 text-white/60 hover:text-white transition-colors'
+              "
+            ></app-password-input>
           }
           <button
             type="submit"

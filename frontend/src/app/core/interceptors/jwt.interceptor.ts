@@ -1,56 +1,47 @@
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { Store } from '@ngxs/store';
 import { catchError, switchMap, throwError } from 'rxjs';
-import { AuthService } from '../auth/auth.service';
-import { Logout, RefreshTokenSuccess } from '../auth/auth.state';
-import { RefreshTokenResponse } from '@finmate/data-models';
+import { TokenRefreshService } from '../auth/token-refresh.service';
 
+/**
+ * Attaches the access token to outgoing requests and transparently recovers
+ * from an expired one: on a 401 (other than the auth endpoints themselves) it
+ * asks {@link TokenRefreshService} for a fresh token — a single shared refresh
+ * across all concurrent 401s — then retries the original request. If the
+ * refresh fails, that service clears the session and redirects to Login, so
+ * here we simply propagate the error.
+ */
 export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
-  const store = inject(Store);
-  const authService = inject(AuthService);
+  const tokenRefresh = inject(TokenRefreshService);
   const token = localStorage.getItem('finmate_token');
 
-  let authReq = req;
-  if (token) {
-    authReq = req.clone({
-      setHeaders: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-  }
+  const authReq = token
+    ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+    : req;
 
   return next(authReq).pipe(
     catchError((error) => {
+      const isAuthEndpoint =
+        req.url.includes('/auth/login') ||
+        req.url.includes('/auth/register') ||
+        req.url.includes('/auth/refresh');
+
       if (
         error instanceof HttpErrorResponse &&
         error.status === 401 &&
-        !req.url.includes('/auth/login') &&
-        !req.url.includes('/auth/refresh')
+        !isAuthEndpoint
       ) {
-        const refreshToken = localStorage.getItem('finmate_refresh_token');
-        if (refreshToken) {
-          return authService.refresh(refreshToken).pipe(
-            switchMap((res: RefreshTokenResponse) => {
-              store.dispatch(
-                new RefreshTokenSuccess(res.accessToken, res.refreshToken),
-              );
-              const retryReq = req.clone({
-                setHeaders: {
-                  Authorization: `Bearer ${res.accessToken}`,
-                },
-              });
-              return next(retryReq);
-            }),
-            catchError((refreshErr) => {
-              store.dispatch(new Logout());
-              return throwError(() => refreshErr);
-            }),
-          );
-        } else {
-          store.dispatch(new Logout());
-        }
+        return tokenRefresh.refresh().pipe(
+          switchMap((accessToken) =>
+            next(
+              req.clone({
+                setHeaders: { Authorization: `Bearer ${accessToken}` },
+              }),
+            ),
+          ),
+        );
       }
+
       return throwError(() => error);
     }),
   );

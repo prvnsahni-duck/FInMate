@@ -51,14 +51,6 @@ describe('LoginComponent', () => {
     expect(component.loginForm.valid).toBe(true);
   });
 
-  it('should default to a hidden password and toggle visibility', () => {
-    expect(component.showPassword).toBe(false);
-    component.togglePassword();
-    expect(component.showPassword).toBe(true);
-    component.togglePassword();
-    expect(component.showPassword).toBe(false);
-  });
-
   it('should render a hidden password with accessible toggle + password-manager attributes by default', () => {
     fixture.detectChanges();
     const toggle: HTMLButtonElement = fixture.nativeElement.querySelector(
@@ -77,21 +69,6 @@ describe('LoginComponent', () => {
     expect(emailInput.getAttribute('autocomplete')).toBe('email');
   });
 
-  it('should reveal the password and flip the toggle a11y state when showPassword is set', () => {
-    // Set state before the only change-detection pass to reflect the toggled render.
-    component.showPassword = true;
-    fixture.detectChanges();
-    const toggle: HTMLButtonElement = fixture.nativeElement.querySelector(
-      '[data-testid="login-password-toggle"]',
-    );
-    const passwordInput: HTMLInputElement =
-      fixture.nativeElement.querySelector('#loginPassword');
-
-    expect(passwordInput.getAttribute('type')).toBe('text');
-    expect(toggle.getAttribute('aria-label')).toBe('Hide password');
-    expect(toggle.getAttribute('aria-pressed')).toBe('true');
-  });
-
   it('should dispatch Login action and navigate to dashboard on successful onSubmit', () => {
     component.loginForm.controls['email'].setValue('test@example.com');
     component.loginForm.controls['password'].setValue('password123');
@@ -100,7 +77,10 @@ describe('LoginComponent', () => {
 
     expect(component.isLoading).toBe(true);
     expect(mockStore.dispatch).toHaveBeenCalled();
-    expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
+    // replaceUrl so the Back button cannot return to Login after a successful login.
+    expect(router.navigate).toHaveBeenCalledWith(['/dashboard'], {
+      replaceUrl: true,
+    });
   });
 
   it('should set error message on failed onSubmit', () => {

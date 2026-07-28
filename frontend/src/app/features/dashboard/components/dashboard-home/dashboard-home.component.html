@@ -67,17 +67,23 @@
     <div class="space-y-2.5">
       <div class="flex justify-between items-center text-xs font-semibold">
         <span class="text-muted font-medium">Income Spent</span>
-        <span class="text-secondary font-bold">
+        <span class="text-secondary font-bold flex items-center gap-1.5">
           {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyIncome ||
           0) | currency:(userProfile?.defaultCurrency || 'USD') }}
-          <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-secondary/10 text-secondary/85 font-extrabold">{{
-            incomePercentage }}%</span>
+          <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-muted">
+            <span class="w-1.5 h-1.5 rounded-full" [style.background]="getUtilizationColor(incomePercentage)"></span>
+            {{ getUtilizationStatus(incomePercentage) }}
+          </span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-extrabold"
+            [style.background]="getUtilizationColor(incomePercentage)"
+            [style.color]="getContrastText(getUtilizationColor(incomePercentage))">{{ incomePercentage }}%</span>
         </span>
       </div>
       <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
         <div
-          class="bg-gradient-to-r from-primary to-accent h-3 rounded-full transition-all duration-500 shadow-sm shadow-primary/20"
-          [style.width.%]="incomeProgressWidth">
+          class="h-3 rounded-full transition-all duration-500 shadow-sm"
+          [style.width.%]="incomeProgressWidth"
+          [style.background]="getUtilizationColor(incomePercentage)">
         </div>
       </div>
     </div>
@@ -86,21 +92,22 @@
     <div class="space-y-2.5">
       <div class="flex justify-between items-center text-xs font-semibold">
         <span class="text-muted font-medium">Budget Limits</span>
-        <span class="text-secondary font-bold">
+        <span class="text-secondary font-bold flex items-center gap-1.5">
           {{ monthlyExpenses | currency:(userProfile?.defaultCurrency || 'USD') }} / {{ (userProfile?.monthlyBudget ||
           0) | currency:(userProfile?.defaultCurrency || 'USD') }}
-          <span class="ml-1 text-[10px] px-1.5 py-0.5 rounded font-extrabold" [class.bg-error/15]="isBudgetExceeded"
-            [class.text-error]="isBudgetExceeded" [class.bg-success/15]="!isBudgetExceeded"
-            [class.text-success]="!isBudgetExceeded">
-            {{ budgetPercentage }}%
+          <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-muted">
+            <span class="w-1.5 h-1.5 rounded-full" [style.background]="getUtilizationColor(budgetPercentage)"></span>
+            {{ getUtilizationStatus(budgetPercentage) }}
           </span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded font-extrabold"
+            [style.background]="getUtilizationColor(budgetPercentage)"
+            [style.color]="getContrastText(getUtilizationColor(budgetPercentage))">{{ budgetPercentage }}%</span>
         </span>
       </div>
       <div class="w-full bg-secondary/10 rounded-full h-4 p-0.5 border border-secondary/5 relative flex items-center">
-        <div class="h-3 rounded-full transition-all duration-500 shadow-sm" [class.bg-error]="isBudgetExceeded"
-          [class.shadow-error/20]="isBudgetExceeded" [class.bg-gradient-to-r]="!isBudgetExceeded"
-          [class.from-primary]="!isBudgetExceeded" [class.to-success]="!isBudgetExceeded"
-          [class.shadow-primary/20]="!isBudgetExceeded" [style.width.%]="budgetProgressWidth">
+        <div class="h-3 rounded-full transition-all duration-500 shadow-sm"
+          [style.width.%]="budgetProgressWidth"
+          [style.background]="getUtilizationColor(budgetPercentage)">
         </div>
       </div>
     </div>
@@ -219,16 +226,16 @@
         (click)="openGroupExpenseEvent.emit({ groupId: expense.groupId, expenseId: expense.id })"
         (keydown.enter)="openGroupExpenseEvent.emit({ groupId: expense.groupId, expenseId: expense.id })"
       >
-        <div class="flex items-center space-x-4">
-          <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm border border-primary/20 group-hover:scale-105 transition-all">
+        <div class="flex items-center space-x-4 min-w-0 flex-1">
+          <div class="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary shadow-sm border border-primary/20 group-hover:scale-105 transition-all shrink-0">
             <app-icon [path]="categoryOptions.find(opt => opt.value === expense.category)?.iconPath || categoryOptions[0].iconPath" className="w-5 h-5"></app-icon>
           </div>
-          <div>
-            <h4 class="font-extrabold text-secondary text-sm flex items-center gap-2" data-testid="expense-title">
-              <span>{{ expense.title }}</span>
-              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider">Group Share</span>
+          <div class="w-full min-w-0">
+            <h4 class="font-extrabold text-secondary text-sm flex items-center gap-2 min-w-0 justify-between pr-3" data-testid="expense-title">
+              <span class="truncate">{{ expense.title }}</span>
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary uppercase tracking-wider shrink-0 hidden sm:inline-flex">Group Share</span>
             </h4>
-            <p class="text-[10px] text-muted mt-0.5 font-medium">
+            <p class="text-[10px] text-muted mt-0.5 font-medium truncate">
               {{ expense.groupName }} · {{ expense.expenseDate | date:'mediumDate' }} ·
               @if (expense.isSettled) {
                 <span class="text-success font-bold">Settled</span>
@@ -238,7 +245,7 @@
             </p>
           </div>
         </div>
-        <div class="text-right">
+        <div class="text-right shrink-0">
           <p class="font-extrabold text-base text-secondary tracking-tight" data-testid="expense-amount">
             {{ expense.myShare | currency:expense.currency }}
           </p>
@@ -252,28 +259,34 @@
         data-testid="expense-card"
         data-expense-type="PERSONAL"
         class="flex items-center justify-between p-4 rounded-2xl bg-secondary/5 border border-secondary/5 hover:border-primary/25 hover:bg-secondary/10 transition-all duration-300 group">
-        <div class="flex items-center space-x-4">
-          <div class="w-10 h-10 rounded-xl bg-surface flex items-center justify-center text-primary shadow-sm border border-border/10 group-hover:scale-105 transition-all">
+        <div class="flex items-center space-x-4 min-w-0 flex-1">
+          <div class="w-10 h-10 rounded-xl bg-surface flex items-center justify-center text-primary shadow-sm border border-border/10 group-hover:scale-105 transition-all shrink-0">
             <app-icon [path]="categoryOptions.find(option => option.value === expense.category)?.iconPath || categoryOptions[0].iconPath" className="w-5 h-5"></app-icon>
           </div>
-          <div>
-            <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2" data-testid="expense-title">
-              <span>{{ expense.title }}</span>
-              <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider"
+          <div class="min-w-0">
+            <h4 class="font-extrabold text-secondary text-sm flex items-center space-x-2 min-w-0" data-testid="expense-title">
+              <span class="truncate">{{ expense.title }}</span>
+              <span class="text-[9px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 hidden sm:inline-flex"
                 [class]="categoryOptions.find(option => option.value === expense.category)?.class || categoryOptions[0].class">
                 {{ expense.category }}
               </span>
             </h4>
-            <p class="text-[10px] text-muted mt-0.5 font-medium">{{ expense.expenseDate | date:'mediumDate' }}</p>
+            <p class="text-[10px] text-muted mt-0.5 font-medium truncate">{{ expense.expenseDate | date:'mediumDate' }}</p>
           </div>
         </div>
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-4 shrink-0">
           <p class="font-extrabold text-base text-secondary tracking-tight" data-testid="expense-amount">{{ expense.myShare ?? expense.amountTotal | currency:expense.currency }}</p>
-          <div class="flex space-x-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-250">
+          <div class="flex items-center space-x-0.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-250">
             <button data-action="edit" [attr.data-testid]="'expense-edit-button-' + expense.id" (click)="openExpenseModalEvent.emit({ expense })"
-              class="p-2 text-secondary/40 hover:text-primary hover:bg-secondary/15 rounded-xl transition-all cursor-pointer">✏️</button>
+              aria-label="Edit expense" title="Edit"
+              class="p-1.5 text-secondary/40 hover:text-primary hover:bg-secondary/15 rounded-lg transition-all cursor-pointer">
+              <app-icon path="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" className="w-4 h-4"></app-icon>
+            </button>
             <button data-action="delete" [attr.data-testid]="'expense-delete-button-' + expense.id" (click)="confirmDeleteExpenseEvent.emit(expense.id)"
-              class="p-2 text-secondary/40 hover:text-error hover:bg-error/15 rounded-xl transition-all cursor-pointer">🗑️</button>
+              aria-label="Delete expense" title="Delete"
+              class="p-1.5 text-secondary/40 hover:text-error hover:bg-error/15 rounded-lg transition-all cursor-pointer">
+              <app-icon path="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" className="w-4 h-4"></app-icon>
+            </button>
           </div>
         </div>
       </div>

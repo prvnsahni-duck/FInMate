@@ -2,6 +2,7 @@ import { Route } from '@angular/router';
 import { AuthLayoutComponent } from './shared/layouts/auth-layout.component';
 import { MainLayoutComponent } from './shared/layouts/main-layout.component';
 import { authGuard } from './core/auth/auth.guard';
+import { guestGuard } from './core/auth/guest.guard';
 
 export const appRoutes: Route[] = [
   {
@@ -34,6 +35,7 @@ export const appRoutes: Route[] = [
   {
     path: 'auth',
     component: AuthLayoutComponent,
+    canActivate: [guestGuard],
     loadChildren: () =>
       import('./features/auth/auth.routes').then((m) => m.authRoutes),
   },

@@ -1,9 +1,11 @@
 import { Injectable, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { State, Action, StateContext, Selector } from '@ngxs/store';
 import { jwtDecode } from 'jwt-decode';
 import { AuthService } from './auth.service';
-import { from } from 'rxjs';
-import { mergeMap, tap } from 'rxjs/operators';
+import { decodeToken } from './token.util';
+import { from, of } from 'rxjs';
+import { mergeMap } from 'rxjs/operators';
 import {
   JwtPayload,
   LoginDto,
@@ -53,9 +55,7 @@ export interface AuthStateModel {
   defaults: {
     token: localStorage.getItem('finmate_token'),
     refreshToken: localStorage.getItem('finmate_refresh_token'),
-    user: localStorage.getItem('finmate_token')
-      ? jwtDecode<JwtPayload>(localStorage.getItem('finmate_token') as string)
-      : null,
+    user: decodeToken<JwtPayload>(localStorage.getItem('finmate_token')),
     persistenceWarning: null,
   },
 })
@@ -65,10 +65,21 @@ export class AuthState {
   private encryptionService = inject(ClientEncryptionService);
   private groupKeyService = inject(GroupKeyService);
   private cryptoSession = inject(CryptoSessionManager);
+  private router = inject(Router);
 
   @Selector()
   static isAuthenticated(state: AuthStateModel): boolean {
     return !!state.token;
+  }
+
+  @Selector()
+  static getToken(state: AuthStateModel): string | null {
+    return state.token;
+  }
+
+  @Selector()
+  static getRefreshToken(state: AuthStateModel): string | null {
+    return state.refreshToken;
   }
 
   @Selector()
@@ -165,7 +176,13 @@ export class AuthState {
       persistenceWarning: null,
     });
 
-    return logout$;
+    // Centralized redirect: every logout path — the logout button, an account
+    // deletion, a password change, a crypto-recovery failure, or a failed token
+    // refresh in the HTTP interceptor — lands on Login. `replaceUrl` plus the
+    // route guards means the user cannot navigate back into a protected screen.
+    void this.router.navigate(['/auth/login'], { replaceUrl: true });
+
+    return logout$ ?? of(void 0);
   }
 
   @Action(RefreshTokenSuccess)

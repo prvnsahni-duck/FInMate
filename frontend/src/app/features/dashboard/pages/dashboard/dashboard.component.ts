@@ -75,8 +75,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
   userName = 'User';
   userEmail = 'N/A';
   userDisplayName = '';
-  totalBalance = 0;
   monthlyExpenses = 0;
+
+  /**
+   * "Total Personal Balance" = money the user has left this month: their monthly
+   * income minus what they've spent this month. It is NOT a running sum of
+   * expenses. Negative means they have spent more than their income.
+   */
+  get totalBalance(): number {
+    return (this.userProfile?.monthlyIncome || 0) - this.monthlyExpenses;
+  }
   activeGroupsCount = 0;
   personalExpenses: GroupExpense[] = [];
   myExpenses: any[] = []; // personal + group shares
@@ -167,11 +175,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.personalExpenses = items.filter(
           (e) => e.expenseType === 'PERSONAL' || !e.expenseType,
         ) as GroupExpense[];
-        // Total balance = sum of myShare across all items
-        this.totalBalance = items.reduce(
-          (sum, e) => sum + Number(e.myShare ?? e.amountTotal),
-          0,
-        );
+        // Note: "Total Personal Balance" is derived (income − monthly spend) via
+        // the totalBalance getter — no longer a running sum of expenses here.
         this.isLoading = false;
       },
       error: () => (this.isLoading = false),
@@ -292,11 +297,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   get budgetProgressWidth(): number {
     const budget = this.userProfile?.monthlyBudget;
     return budget ? Math.min((this.monthlyExpenses / budget) * 100, 100) : 0;
-  }
-
-  get isBudgetExceeded(): boolean {
-    const budget = this.userProfile?.monthlyBudget;
-    return !!budget && this.monthlyExpenses > budget;
   }
 
   toggleEditIncome() {
@@ -440,15 +440,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // The Logout action clears the session and redirects to Login centrally
+    // (see AuthState) — no navigation needed here.
     this.isLoggingOut = true;
-    this.store.dispatch(new Logout()).subscribe({
-      next: () => {
-        this.router.navigate(['/auth/login']);
-      },
-      error: () => {
-        this.router.navigate(['/auth/login']);
-      },
-    });
+    this.store.dispatch(new Logout());
   }
 
   // AI Chat Bot Methods
@@ -504,7 +499,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const systemInstruction =
       `You are FinMate's personal financial AI companion. The current user is ${this.userName}. ` +
       `Their current monthly personal spending is ${this.monthlyExpenses} USD, relative to a monthly budget of ${budget} USD (${this.budgetPercentage}% utilization) and a monthly salary of ${income} USD. ` +
-      `Their current total balance of personal logged expenses is ${this.totalBalance} USD. ` +
+      `Their remaining balance this month (income minus spending) is ${this.totalBalance} USD. ` +
       `Answer in a concise, friendly, and professional tone (max 3-4 sentences). Do not mention database IDs, keys, or technical jargon. Give actionable financial tips.`;
 
     this.aiService.sendMessage(prompt, systemInstruction).subscribe({
