@@ -305,7 +305,7 @@
                   <span class="text-secondary font-bold">{{
                     m.expected | currency: group()!.currency
                   }}</span>
-                  ({{ m.percentage }}%)
+                  ({{ m.percentage | number:'1.2-2' }}%)
                 </span>
               </div>
 

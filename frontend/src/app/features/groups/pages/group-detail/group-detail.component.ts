@@ -11,7 +11,7 @@ import {
   AfterViewInit,
   HostListener,
 } from '@angular/core';
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CreateExpenseModalComponent } from '../../components/create-expense-modal/create-expense-modal.component';
 import { RecurringExpenseFormComponent } from '../../components/recurring-expense-form/recurring-expense-form.component';
@@ -106,6 +106,7 @@ export interface GroupExpense extends Expense {
     GroupMembersComponent,
     DropdownComponent,
     CryptoRecoveryPanelComponent,
+    DecimalPipe
   ],
   templateUrl: './group-detail.component.html',
   styleUrls: ['./group-detail.component.scss'],
