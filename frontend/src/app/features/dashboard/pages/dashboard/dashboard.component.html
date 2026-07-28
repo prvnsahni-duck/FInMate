@@ -21,6 +21,7 @@
       [incomeProgressWidth]="incomeProgressWidth"
       [budgetProgressWidth]="budgetProgressWidth"
       (openExpenseModalEvent)="openExpenseModal($event.expense, $event.category)"
+      (openExportModalEvent)="openExportModal()"
       (toggleEditIncomeEvent)="toggleEditIncome()"
       (saveIncomeEvent)="saveIncome()"
       (acceptInvitationEvent)="acceptInvitation($event)"
@@ -83,6 +84,13 @@
     (closeModalEvent)="closeExpenseModal()"
     (expenseCreated)="onExpenseCreated()"
   ></app-create-expense-modal>
+}
+
+@if (isExportModalOpen) {
+  <app-export-transactions-modal
+    [defaultCurrency]="userProfile?.defaultCurrency || 'USD'"
+    (closeModalEvent)="closeExportModal()"
+  ></app-export-transactions-modal>
 }
 
 @if (isDeleteConfirmOpen) {

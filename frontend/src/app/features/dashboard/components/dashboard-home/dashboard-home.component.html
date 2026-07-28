@@ -7,11 +7,20 @@
     <p class="text-muted mt-1 font-medium">Here is an overview of your personal finance space.</p>
   </div>
 
-  <button (click)="openExpenseModalEvent.emit({})"
-    data-testid="dashboard-log-expense-button"
-    class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-2xl flex items-center space-x-2 text-sm cursor-pointer">
-    <span>+ Log Expense</span>
-  </button>
+  <div class="flex items-center gap-2">
+    <button (click)="openExportModalEvent.emit()"
+      data-testid="dashboard-export-button"
+      class="bg-surface hover:bg-surface-alt text-secondary font-semibold border border-border/10 transition-all duration-200 hover:-translate-y-[1px] active:scale-95 py-2.5 px-5 rounded-2xl flex items-center space-x-2 text-sm cursor-pointer">
+      <app-icon path="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" className="w-4 h-4"></app-icon>
+      <span>Export</span>
+    </button>
+
+    <button (click)="openExpenseModalEvent.emit({})"
+      data-testid="dashboard-log-expense-button"
+      class="bg-primary text-white font-semibold transition-all duration-200 hover:-translate-y-[1px] hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 px-6 rounded-2xl flex items-center space-x-2 text-sm cursor-pointer">
+      <span>+ Log Expense</span>
+    </button>
+  </div>
 </div>
 
 <!-- Key Statistics Summary Cards -->
@@ -118,7 +127,7 @@
 <!-- Quick Log Expense (Category grid) -->
 <div class="card-glass p-6 mt-4">
   <h3 class="text-secondary font-extrabold text-lg tracking-tight mb-4">Quick Log Expense</h3>
-  <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4">
+  <div class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-7 gap-4">
 
     @for (category of categoryOptions; track category.value) {
       <button (click)="openExpenseModalEvent.emit({ category: category.value })"
