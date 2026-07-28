@@ -45,6 +45,7 @@ export class DashboardHomeComponent {
     expense?: any;
     category?: string;
   }>();
+  @Output() openExportModalEvent = new EventEmitter<void>();
   @Output() toggleEditIncomeEvent = new EventEmitter<void>();
   @Output() saveIncomeEvent = new EventEmitter<void>();
   @Output() acceptInvitationEvent = new EventEmitter<any>();

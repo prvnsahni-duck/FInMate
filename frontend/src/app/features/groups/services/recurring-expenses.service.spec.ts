@@ -7,6 +7,7 @@ import { RecurringExpensesService } from './recurring-expenses.service';
 import { ClientEncryptionService } from '../../../core/services/encryption.service';
 import { Store } from '@ngxs/store';
 import { GroupKeyService } from '../../../core/services/group-key.service';
+import { firstValueFrom } from 'rxjs';
 
 describe('RecurringExpensesService', () => {
   let service: RecurringExpensesService;
@@ -72,6 +73,38 @@ describe('RecurringExpensesService', () => {
 
     const req = httpMock.expectOne('/api/recurring-expenses?groupId=group-1');
     expect(req.request.method).toBe('GET');
-    req.flush({ data: mockData });
+    // responseInterceptor unwraps { success, data } → the array before the
+    // service sees it, so the service receives the bare array (not { data }).
+    req.flush(mockData);
+  });
+
+  it('creates a recurring expense from the interceptor-unwrapped body without erroring the save', async () => {
+    const created = { id: '1', title: 'enc:title', description: 'enc:desc' };
+
+    const result = firstValueFrom(
+      service.createRecurringExpense({
+        title: 'Rent',
+        amountTotal: 100,
+        currency: 'USD',
+        category: 'Housing & Rent',
+        frequency: 'monthly',
+        startDate: '2026-07-28',
+        splits: [],
+      } as any),
+    );
+
+    // encryptPayload is async, so the POST is dispatched on a later microtask —
+    // let those settle before asserting the request.
+    await new Promise((r) => setTimeout(r, 0));
+
+    const req = httpMock.expectOne('/api/recurring-expenses');
+    expect(req.request.method).toBe('POST');
+    // Interceptor-unwrapped body is the template object itself. The old
+    // `map(res => res.data)` turned this into undefined and rejected the save.
+    req.flush(created);
+
+    const res = await result;
+    expect(res.id).toBe('1');
+    expect(encryptionServiceSpy.decryptExpense).toHaveBeenCalled();
   });
 });

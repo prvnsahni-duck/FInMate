@@ -88,7 +88,32 @@ export class ExpenseDecryptionService {
       (expense.description as string | undefined);
 
     const scope = expense.encryptionScope || 'personal';
-    const { key, keyStatus } = await this.resolveKey(expense, context);
+    // Key resolution can reject (transient session/network error, group-key
+    // lookup failure). Guard it so a failure is classified and annotated like
+    // any other — never thrown. An unguarded throw here rejects the whole
+    // decryptExpenses() batch, which surfaces as a failed save (the server
+    // already persisted the record) or an empty list, rather than a per-item
+    // placeholder the coordinator can retry.
+    let key: CryptoKey | null;
+    let keyStatus: GroupKeyStatus | undefined;
+    try {
+      ({ key, keyStatus } = await this.resolveKey(expense, context));
+    } catch (keyError) {
+      return this.fail(
+        {
+          ...expense,
+          encryptedTitle: cipherTitle,
+          encryptedDescription: cipherDescription,
+        },
+        {
+          scope,
+          expenseId: expense.id,
+          groupId: expense.groupId,
+          decryptError: keyError,
+        },
+        'error',
+      );
+    }
 
     if (!key) {
       return this.fail(

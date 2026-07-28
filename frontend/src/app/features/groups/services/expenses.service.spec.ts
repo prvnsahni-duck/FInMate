@@ -413,19 +413,7 @@ describe('ExpensesService', () => {
     });
   });
 
-  // --- Export / Import ---
-  describe('exportExpenses', () => {
-    it('should request blob for CSV export', (done) => {
-      service.exportExpenses('group-1', 'csv').subscribe(() => done());
-
-      const req = httpMock.expectOne(
-        '/api/export/expenses?groupId=group-1&format=csv',
-      );
-      expect(req.request.responseType).toBe('blob');
-      req.flush(new Blob());
-    });
-  });
-
+  // --- Import ---
   describe('importExpenses', () => {
     it('should POST FormData', (done) => {
       const formData = new FormData();

@@ -305,7 +305,7 @@
                   <span class="text-secondary font-bold">{{
                     m.expected | currency: group()!.currency
                   }}</span>
-                  ({{ m.percentage }}%)
+                  ({{ m.percentage | number: '1.2-2' }}%)
                 </span>
               </div>
 
@@ -497,29 +497,14 @@
           >
             <div class="flex items-center justify-between mb-6">
               <h2 class="text-xl font-bold">Expenses Ledger</h2>
-              <!-- Desktop Export Buttons -->
-              <div class="hidden sm:flex space-x-2">
+              <!-- Export the full ledger to Excel (decrypted client-side).
+                   Hidden when the ledger is empty — nothing to export. -->
+              @if (totalExpenses() > 0) {
                 <button
-                  (click)="exportLedger('csv')"
-                  class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted cursor-pointer"
+                  (click)="exportLedger()"
+                  [disabled]="isExporting()"
+                  class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted flex items-center space-x-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Export CSV
-                </button>
-                <button
-                  (click)="exportLedger('xlsx')"
-                  class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted cursor-pointer"
-                >
-                  Export Excel
-                </button>
-              </div>
-
-              <!-- Mobile Export Menu -->
-              <div class="relative sm:hidden">
-                <button
-                  (click)="isExportDropdownOpen.set(!isExportDropdownOpen())"
-                  class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted flex items-center space-x-1 cursor-pointer"
-                >
-                  <span>Export</span>
                   <svg
                     class="w-3.5 h-3.5"
                     fill="none"
@@ -530,42 +515,14 @@
                       stroke-linecap="round"
                       stroke-linejoin="round"
                       stroke-width="2"
-                      d="M19 9l-7 7-7-7"
+                      d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"
                     ></path>
                   </svg>
+                  <span>{{
+                    isExporting() ? 'Exporting…' : 'Export Excel'
+                  }}</span>
                 </button>
-
-                @if (isExportDropdownOpen()) {
-                  <!-- Backdrop to dismiss dropdown -->
-                  <div
-                    (click)="isExportDropdownOpen.set(false)"
-                    (keydown.escape)="isExportDropdownOpen.set(false)"
-                    role="presentation"
-                    class="fixed inset-0 z-40 bg-transparent"
-                  ></div>
-
-                  <div
-                    class="absolute right-0 mt-2 w-32 bg-finmate-card dark:bg-finmate-card border border-border/10 rounded-xl shadow-xl z-50 p-1 py-1.5 animate-fade-in"
-                  >
-                    <button
-                      (click)="
-                        exportLedger('csv'); isExportDropdownOpen.set(false)
-                      "
-                      class="w-full text-left text-xs font-bold text-secondary hover:bg-surface p-2 px-3 rounded-lg transition cursor-pointer"
-                    >
-                      Export CSV
-                    </button>
-                    <button
-                      (click)="
-                        exportLedger('xlsx'); isExportDropdownOpen.set(false)
-                      "
-                      class="w-full text-left text-xs font-bold text-secondary hover:bg-surface p-2 px-3 rounded-lg transition cursor-pointer"
-                    >
-                      Export Excel
-                    </button>
-                  </div>
-                }
-              </div>
+              }
             </div>
 
             <!-- Filters Toggle / Info Row (Visible only on Mobile, hides on Desktop) -->
@@ -1090,13 +1047,25 @@
                           ) {
                             <button
                               data-action="history"
-                              [attr.data-testid]="'expense-history-button-' + expense.id"
+                              [attr.data-testid]="
+                                'expense-history-button-' + expense.id
+                              "
                               (click)="openExpenseHistory(expense)"
                               class="p-2 text-muted hover:text-secondary hover:bg-surface rounded-xl transition-all"
                               title="View version history"
                             >
-                              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                              <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                                />
                               </svg>
                             </button>
                             <button
@@ -1873,7 +1842,9 @@
                         class="w-8 h-8 rounded-full bg-surface flex items-center justify-center font-bold text-xs flex-shrink-0"
                       >
                         {{
-                          memberDisplayName(member).substring(0, 2).toUpperCase()
+                          memberDisplayName(member)
+                            .substring(0, 2)
+                            .toUpperCase()
                         }}
                       </div>
                       <div>
@@ -1947,10 +1918,13 @@
             @if (isOwner()) {
               <div class="border-t border-error/20 pt-8 mt-8">
                 <div class="rounded-2xl border border-error/30 bg-error/5 p-6">
-                  <h3 class="text-base font-bold text-error mb-1">Danger Zone</h3>
+                  <h3 class="text-base font-bold text-error mb-1">
+                    Danger Zone
+                  </h3>
                   <p class="text-xs text-muted mb-4">
-                    Deleting this group will archive it permanently. No financial
-                    history will be removed. The group will become read-only.
+                    Deleting this group will archive it permanently. No
+                    financial history will be removed. The group will become
+                    read-only.
                   </p>
                   <button
                     type="button"
@@ -1984,7 +1958,12 @@
               (click)="$event.stopPropagation()"
               (keydown)="$event.stopPropagation()"
             >
-              <h2 id="archive-dialog-title" class="text-lg font-bold text-error mb-2">Delete Group</h2>
+              <h2
+                id="archive-dialog-title"
+                class="text-lg font-bold text-error mb-2"
+              >
+                Delete Group
+              </h2>
               <p class="text-sm text-secondary mb-1">
                 Deleting this group will archive it.
                 <strong>No financial history will be removed.</strong>
@@ -2128,10 +2107,7 @@
                       <div
                         class="flex items-center gap-4 text-xs text-muted mt-2"
                       >
-                        <span
-                          >Payer:
-                          {{ payerDisplayName(template) }}</span
-                        >
+                        <span>Payer: {{ payerDisplayName(template) }}</span>
                         <span>Starts: {{ template.startDate }}</span>
                         @if (template.endDate) {
                           <span>Ends: {{ template.endDate }}</span>
@@ -2363,7 +2339,7 @@
         [groupCurrency]="group()!.currency"
         [members]="members()"
         [template]="selectedRecurringExpenseForEdit()"
-        (saveSuccess)="onRecurringExpenseSaved()"
+        (saveSuccess)="onRecurringExpenseSaved($event)"
         (cancelled)="closeRecurringExpenseForm()"
       ></app-recurring-expense-form>
     </div>
@@ -2390,10 +2366,14 @@
       (keydown)="$event.stopPropagation()"
     >
       <!-- Header -->
-      <div class="flex items-center justify-between p-5 border-b border-border/10">
+      <div
+        class="flex items-center justify-between p-5 border-b border-border/10"
+      >
         <div>
           <h2 class="text-base font-bold text-secondary">Version History</h2>
-          <p class="text-xs text-muted mt-0.5 truncate max-w-[260px]">{{ historyExpenseTitle() || 'Expense' }}</p>
+          <p class="text-xs text-muted mt-0.5 truncate max-w-[260px]">
+            {{ historyExpenseTitle() || 'Expense' }}
+          </p>
         </div>
         <button
           type="button"
@@ -2401,23 +2381,36 @@
           class="p-2 rounded-xl text-muted hover:text-secondary hover:bg-surface/50 transition-all"
           aria-label="Close history panel"
         >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          <svg
+            class="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </div>
 
       <!-- Body -->
       <div class="flex-1 overflow-y-auto p-5 space-y-4">
-
         @if (isLoadingVersions()) {
-          @for (i of [1,2,3]; track i) {
+          @for (i of [1, 2, 3]; track i) {
             <div class="h-20 rounded-2xl bg-surface animate-pulse"></div>
           }
         } @else if (historyLoadError()) {
-          <p class="text-sm text-error text-center py-8">{{ historyLoadError() }}</p>
+          <p class="text-sm text-error text-center py-8">
+            {{ historyLoadError() }}
+          </p>
         } @else if (expenseVersions().length === 0) {
-          <div class="flex flex-col items-center justify-center py-16 text-center">
+          <div
+            class="flex flex-col items-center justify-center py-16 text-center"
+          >
             <p class="text-sm text-muted">No version history available.</p>
           </div>
         } @else {
@@ -2426,30 +2419,74 @@
             @for (v of expenseVersions(); track v.id) {
               <li class="ml-6">
                 <!-- Dot -->
-                <span class="absolute -left-[9px] flex items-center justify-center w-4 h-4 rounded-full ring-2 ring-finmate-card"
-                  [class]="v.action === 'created' ? 'bg-success' : v.action === 'deleted' ? 'bg-error' : v.action === 'restored' ? 'bg-primary' : 'bg-warning'"
+                <span
+                  class="absolute -left-[9px] flex items-center justify-center w-4 h-4 rounded-full ring-2 ring-finmate-card"
+                  [class]="
+                    v.action === 'created'
+                      ? 'bg-success'
+                      : v.action === 'deleted'
+                        ? 'bg-error'
+                        : v.action === 'restored'
+                          ? 'bg-primary'
+                          : 'bg-warning'
+                  "
                 ></span>
 
-                <div class="bg-surface/60 border border-border/10 rounded-2xl p-4 space-y-2">
+                <div
+                  class="bg-surface/60 border border-border/10 rounded-2xl p-4 space-y-2"
+                >
                   <!-- Action badge + version -->
                   <div class="flex items-center justify-between">
-                    <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
-                      [class]="v.action === 'created' ? 'bg-success/15 text-success' : v.action === 'deleted' ? 'bg-error/15 text-error' : v.action === 'restored' ? 'bg-primary/15 text-primary' : 'bg-warning/15 text-warning'"
-                    >{{ v.action }}</span>
-                    <span class="text-[10px] text-muted">v{{ v.versionNumber }}</span>
+                    <span
+                      class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      [class]="
+                        v.action === 'created'
+                          ? 'bg-success/15 text-success'
+                          : v.action === 'deleted'
+                            ? 'bg-error/15 text-error'
+                            : v.action === 'restored'
+                              ? 'bg-primary/15 text-primary'
+                              : 'bg-warning/15 text-warning'
+                      "
+                      >{{ v.action }}</span
+                    >
+                    <span class="text-[10px] text-muted"
+                      >v{{ v.versionNumber }}</span
+                    >
                   </div>
 
                   <!-- Actor + timestamp -->
-                  <p class="text-xs text-secondary font-semibold">{{ v.actorDisplayName }}</p>
-                  <p class="text-[10px] text-muted">{{ v.createdAt | date:'medium' }}</p>
+                  <p class="text-xs text-secondary font-semibold">
+                    {{ v.actorDisplayName }}
+                  </p>
+                  <p class="text-[10px] text-muted">
+                    {{ v.createdAt | date: 'medium' }}
+                  </p>
 
                   <!-- Snapshot summary (plaintext fields only) -->
                   @if (v.snapshot) {
-                    <div class="pt-1 border-t border-border/10 text-[10px] text-muted space-y-0.5">
-                      <p><span class="text-secondary/60">Amount:</span> {{ v.snapshot['amountTotal'] | currency:v.snapshot['currency'] }}</p>
-                      <p><span class="text-secondary/60">Category:</span> {{ v.snapshot['category'] }}</p>
-                      <p><span class="text-secondary/60">Date:</span> {{ v.snapshot['expenseDate'] | date:'mediumDate' }}</p>
-                      <p><span class="text-secondary/60">Status:</span> {{ v.snapshot['status'] }}</p>
+                    <div
+                      class="pt-1 border-t border-border/10 text-[10px] text-muted space-y-0.5"
+                    >
+                      <p>
+                        <span class="text-secondary/60">Amount:</span>
+                        {{
+                          v.snapshot['amountTotal']
+                            | currency: v.snapshot['currency']
+                        }}
+                      </p>
+                      <p>
+                        <span class="text-secondary/60">Category:</span>
+                        {{ v.snapshot['category'] }}
+                      </p>
+                      <p>
+                        <span class="text-secondary/60">Date:</span>
+                        {{ v.snapshot['expenseDate'] | date: 'mediumDate' }}
+                      </p>
+                      <p>
+                        <span class="text-secondary/60">Status:</span>
+                        {{ v.snapshot['status'] }}
+                      </p>
                     </div>
                   }
                 </div>
@@ -2457,13 +2494,13 @@
             }
           </ol>
         }
-
       </div>
 
       <!-- Footer note -->
       <div class="p-4 border-t border-border/10">
         <p class="text-[10px] text-muted text-center">
-          History is read-only. Encrypted fields (title, description) are not shown.
+          History is read-only. Encrypted fields (title, description) are not
+          shown.
         </p>
       </div>
     </div>

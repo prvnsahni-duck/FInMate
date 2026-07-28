@@ -7,6 +7,7 @@ import { AuthState, Logout } from '../../../../core/auth/auth.state';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { CreateExpenseModalComponent } from '../../../groups/components/create-expense-modal/create-expense-modal.component';
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
+import { ExportTransactionsModalComponent } from '../../components/export-transactions-modal/export-transactions-modal.component';
 
 import { GroupsService } from '../../../groups/services/groups.service';
 import { ExpensesService } from '../../../groups/services/expenses.service';
@@ -29,6 +30,7 @@ import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
     FormsModule,
     CreateExpenseModalComponent,
     ConfirmModalComponent,
+    ExportTransactionsModalComponent,
     DashboardHomeComponent,
     DashboardAnalyticsComponent,
     DashboardGoalsComponent,
@@ -133,6 +135,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // Confirm delete modal state
   isDeleteConfirmOpen = false;
   deleteExpenseId: string | null = null;
+
+  // Export transactions modal state
+  isExportModalOpen = false;
 
   ngOnInit() {
     const user = this.store.selectSnapshot(AuthState.getUser);
@@ -406,6 +411,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   onExpenseCreated() {
     this.refreshExpenseData();
+  }
+
+  openExportModal() {
+    this.isExportModalOpen = true;
+  }
+
+  closeExportModal() {
+    this.isExportModalOpen = false;
   }
 
   confirmDeleteExpense(expenseId: string) {

@@ -95,7 +95,7 @@ export class RecurringExpensesScheduler {
 
     for (const template of dueTemplates) {
       try {
-        await this.processSingleTemplate(template, todayStr);
+        await this.generateDueOccurrences(template, todayStr);
       } catch (err: any) {
         this.logger.error(
           {
@@ -111,16 +111,49 @@ export class RecurringExpensesScheduler {
     }
   }
 
-  private async processSingleTemplate(
-    template: RecurringExpense,
-    todayStr: string,
-  ) {
+  /**
+   * Materialize every occurrence of a template that is due on or before
+   * `todayStr`, advancing `nextOccurrenceDate` and completing the template past
+   * its end date. This is the single generation path — the daily cron calls it
+   * for each due template, and `RecurringExpensesService.createRecurringExpense`
+   * calls it once for a template whose first occurrence is already due (start
+   * date today), so immediate and scheduled generation produce identical rows.
+   */
+  async generateDueOccurrences(template: RecurringExpense, todayStr: string) {
+    // Never materialize expenses against an invalid target. A template whose
+    // group has been archived, or whose group payer has left/been removed,
+    // is skipped (not advanced, not failed) so it neither creates stale rows
+    // nor blocks the rest of the cron sweep. It resumes automatically if the
+    // condition clears (e.g. the group is un-archived).
+    const skip = this.generationBlockedReason(template);
+    if (skip) {
+      this.logger.log({
+        event: 'scheduler_template_skipped',
+        scheduler: 'recurring_expenses',
+        templateId: template.id,
+        reason: skip,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
     // Process all occurrences up to today (handles missed runs)
     let currentOccurrenceDate = template.nextOccurrenceDate;
+    // Anchor month-end recurrence to the template's original day-of-month so
+    // e.g. a "31st" schedule recovers to 31 in long months instead of sticking
+    // at 28 after the first February clamp. startDate is NOT NULL, but stay
+    // defensive so a malformed row can never crash the whole cron sweep.
+    const anchorDay = template.startDate
+      ? Number(template.startDate.split('-')[2])
+      : undefined;
 
     while (currentOccurrenceDate <= todayStr && template.status === 'active') {
       const occurrenceDateStr = currentOccurrenceDate;
-      const nextDate = this.advanceDate(occurrenceDateStr, template.frequency);
+      const nextDate = this.advanceDate(
+        occurrenceDateStr,
+        template.frequency,
+        anchorDay,
+      );
 
       await this.dataSource.transaction(async (manager) => {
         let groupKeyVersion: GroupKeyVersion | undefined;
@@ -223,20 +256,77 @@ export class RecurringExpensesScheduler {
     }
   }
 
-  private advanceDate(
+  /**
+   * Reason a template must not generate right now, or `null` if it's clear.
+   * Mirrors the app rule that archived groups can't receive new expenses, and
+   * guards against a group payer that has left/been removed. Personal templates
+   * (no group, no group payer) are always generable.
+   */
+  private generationBlockedReason(template: RecurringExpense): string | null {
+    if (template.group?.isArchived) {
+      return 'group_archived';
+    }
+    const payer = template.paidByGroupMember;
+    if (
+      payer &&
+      (payer.joinStatus === 'removed' || payer.joinStatus === 'left')
+    ) {
+      return 'group_payer_removed';
+    }
+    return null;
+  }
+
+  /**
+   * Advance a `YYYY-MM-DD` date by one frequency step, in **UTC**.
+   *
+   * All arithmetic goes through `Date.UTC(...)` so the result never depends on
+   * the server's local timezone or DST — parsing with `new Date(dateStr)` then
+   * mutating via local `setDate/setMonth` (the previous approach) shifts by a
+   * day on negative-offset servers and around DST. Day/week overflow is handled
+   * by `Date.UTC` normalization (e.g. Dec 31 + 1d → Jan 1).
+   *
+   * Month-end convention (monthly/yearly): if the anchor day does not exist in
+   * the target month, land on that month's **last valid day** — and recover the
+   * anchor day whenever a later month is long enough. `anchorDay` (the template
+   * start date's day-of-month) is what makes "31st of every month" produce
+   * Jan 31 → Feb 28 → Mar 31 → Apr 30 → May 31 instead of drifting to the 28th.
+   * Without it (defaulting to the current day) each month would stick at the
+   * clamped day.
+   */
+  advanceDate(
     dateStr: string,
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly',
+    anchorDay?: number,
   ): string {
-    const d = new Date(dateStr);
+    const [y, m, d] = dateStr.split('-').map(Number);
     if (frequency === 'daily') {
-      d.setDate(d.getDate() + 1);
-    } else if (frequency === 'weekly') {
-      d.setDate(d.getDate() + 7);
-    } else if (frequency === 'monthly') {
-      d.setMonth(d.getMonth() + 1);
-    } else if (frequency === 'yearly') {
-      d.setFullYear(d.getFullYear() + 1);
+      return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
     }
-    return d.toISOString().slice(0, 10);
+    if (frequency === 'weekly') {
+      return new Date(Date.UTC(y, m - 1, d + 7)).toISOString().slice(0, 10);
+    }
+    const anchor = anchorDay ?? d;
+    // monthly → next month (0-indexed m); yearly → same month next year.
+    return frequency === 'monthly'
+      ? this.clampToMonth(y, m, anchor)
+      : this.clampToMonth(y + 1, m - 1, anchor);
+  }
+
+  /**
+   * Build a `YYYY-MM-DD` for the given (possibly out-of-range) month index,
+   * clamping the day to the target month's last valid day. `monthIdx0` may be
+   * 12 (December + 1) and is normalized into the next year.
+   */
+  private clampToMonth(year: number, monthIdx0: number, day: number): string {
+    const targetYear = year + Math.floor(monthIdx0 / 12);
+    const targetMonth = ((monthIdx0 % 12) + 12) % 12;
+    // Day 0 of the following month = the last day of the target month.
+    const lastDay = new Date(
+      Date.UTC(targetYear, targetMonth + 1, 0),
+    ).getUTCDate();
+    const clampedDay = Math.min(day, lastDay);
+    return new Date(Date.UTC(targetYear, targetMonth, clampedDay))
+      .toISOString()
+      .slice(0, 10);
   }
 }

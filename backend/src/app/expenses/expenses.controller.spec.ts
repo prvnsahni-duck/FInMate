@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ExpensesController } from './expenses.controller';
-import { ExpensesAnalyticsService, ExpensesCrudService } from './services';
+import {
+  ExpenseExportQueryService,
+  ExpensesAnalyticsService,
+  ExpensesCrudService,
+} from './services';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { SuccessResponse } from '../common/response.util';
 
@@ -26,6 +30,9 @@ describe('ExpensesController', () => {
       getCategoryDistribution: jest.fn(),
       getCombinedMonthlyAnalytics: jest.fn(),
     };
+    const mockExpenseExportQueryService = {
+      getExportRows: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ExpensesController],
@@ -34,6 +41,10 @@ describe('ExpensesController', () => {
         {
           provide: ExpensesAnalyticsService,
           useValue: mockExpensesAnalyticsService,
+        },
+        {
+          provide: ExpenseExportQueryService,
+          useValue: mockExpenseExportQueryService,
         },
       ],
     })

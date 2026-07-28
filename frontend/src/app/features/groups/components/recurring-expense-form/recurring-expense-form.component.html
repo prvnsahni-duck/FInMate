@@ -111,6 +111,7 @@
           data-testid="recurring-start-date-input"
           type="date"
           formControlName="startDate"
+          [min]="template ? null : getTodayDateString()"
           class="finmate-input"
         />
       </div>
@@ -119,12 +120,20 @@
         <label for="endDate">End Date (Optional)</label>
         <input
           id="endDate"
+          data-testid="recurring-end-date-input"
           type="date"
           formControlName="endDate"
+          [min]="form.get('startDate')?.value"
           class="finmate-input"
         />
       </div>
     </div>
+
+    @if (form.hasError('endBeforeStart')) {
+      <div class="field-error" data-testid="recurring-end-before-start-error">
+        End date must be on or after the start date.
+      </div>
+    }
 
     <!-- Splits Participant Checklist -->
     <div class="form-field participants-checklist">

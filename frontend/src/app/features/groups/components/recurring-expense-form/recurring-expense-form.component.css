@@ -29,6 +29,12 @@
   font-size: 0.9rem;
 }
 
+.field-error {
+  color: #fca5a5;
+  font-size: 0.8rem;
+  margin-top: -8px;
+}
+
 .form-layout {
   display: flex;
   flex-direction: column;

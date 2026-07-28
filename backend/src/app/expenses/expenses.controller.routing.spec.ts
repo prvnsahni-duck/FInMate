@@ -2,7 +2,11 @@ import { Test } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import * as http from 'http';
 import { ExpensesController } from './expenses.controller';
-import { ExpensesAnalyticsService, ExpensesCrudService } from './services';
+import {
+  ExpenseExportQueryService,
+  ExpensesAnalyticsService,
+  ExpensesCrudService,
+} from './services';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 /**
@@ -65,6 +69,9 @@ describe('ExpensesController — HTTP route matching', () => {
     getCategoryDistribution: jest.fn().mockResolvedValue([]),
     getCombinedMonthlyAnalytics: jest.fn().mockResolvedValue([]),
   };
+  const exportQuery: Record<string, jest.Mock> = {
+    getExportRows: jest.fn().mockResolvedValue([]),
+  };
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
@@ -72,6 +79,7 @@ describe('ExpensesController — HTTP route matching', () => {
       providers: [
         { provide: ExpensesCrudService, useValue: crud },
         { provide: ExpensesAnalyticsService, useValue: analytics },
+        { provide: ExpenseExportQueryService, useValue: exportQuery },
       ],
     })
       .overrideGuard(JwtAuthGuard)

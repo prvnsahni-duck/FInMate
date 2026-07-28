@@ -66,6 +66,33 @@ export interface GroupAuditLog {
 export class GroupHistoryLogComponent {
   historyLogs = input.required<GroupAuditLog[]>();
 
+  /**
+   * Human-readable phrasing for non-expense actions (expense.* is handled
+   * separately because it interpolates the title/amount). Anything not listed
+   * falls back to a humanized version of the raw code so the log never shows
+   * a machine string like "group.keys_provisioned".
+   */
+  private static readonly ACTION_LABELS: Record<string, string> = {
+    'group.created': 'created the group',
+    'group.updated': 'updated the group settings',
+    'group.archived': 'archived the group',
+    'group.keys_provisioned': 'set up group encryption',
+    'group.key_rotated': 'rotated the group encryption key',
+    'group.member_invited': 'invited a new member',
+    'group.member_joined': 'joined the group',
+    'group.member_left': 'left the group',
+    'group.member_removed': 'removed a member',
+    'group.member_updated': "updated a member's role",
+    'group.month_closed': 'closed the monthly ledger',
+    'group.expenses_imported': 'imported expenses',
+    'group.contributions_updated': 'updated contributions',
+    'group.invite_created': 'created an invite link',
+    'group.invite_link_regenerated': 'regenerated the invite link',
+    'settlement.proposed': 'proposed a settlement',
+    'settlement.confirmed': 'confirmed a settlement',
+    'settlement.cancelled': 'cancelled a settlement',
+  };
+
   getLogMessage(log: GroupAuditLog): string {
     const act = log.action;
     const title = log.metadata?.title || log.metadata?.newTitle || 'an expense';
@@ -76,6 +103,16 @@ export class GroupHistoryLogComponent {
     if (act === 'expense.updated') return `updated expense to "${title}"${amt}`;
     if (act === 'expense.deleted') return `deleted expense "${title}"${amt}`;
     if (act === 'expense.restored') return `restored expense "${title}"`;
-    return `performed action "${act}"`;
+
+    const known = GroupHistoryLogComponent.ACTION_LABELS[act];
+    if (known) return known;
+
+    // Fallback: turn "group.some_action" into "some action" so unmapped or
+    // future codes still read as prose rather than an identifier.
+    const humanized = act
+      .replace(/^[a-z]+\./, '')
+      .replace(/[._]/g, ' ')
+      .trim();
+    return humanized ? `performed "${humanized}"` : 'performed an action';
   }
 }

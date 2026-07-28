@@ -20,6 +20,7 @@ import {
 } from '@finmate/data-models';
 import { DataSource, EntityManager, In, Repository } from 'typeorm';
 import { calculateDeterministicSplits } from '../split-calculator.util';
+import { RecurringExpensesScheduler } from './recurring-expenses.scheduler';
 
 @Injectable()
 export class RecurringExpensesService {
@@ -36,7 +37,15 @@ export class RecurringExpensesService {
     private readonly groupMemberRepository: Repository<GroupMember>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    // Reused so the create path and the daily cron share one generation
+    // routine — immediate and scheduled occurrences are byte-for-byte identical.
+    private readonly scheduler: RecurringExpensesScheduler,
   ) {}
+
+  /** Server's notion of "today" (UTC), identical to the scheduler's. */
+  private todayStr(): string {
+    return new Date().toISOString().slice(0, 10);
+  }
 
   private async getGroupMembership(
     userId: string,
@@ -424,7 +433,27 @@ export class RecurringExpensesService {
       throw new NotFoundException('Failed to create recurring expense');
     }
 
-    return this.mapResponse(saved);
+    // Option A: if the template's first occurrence is due today, materialize it
+    // immediately so it lands in the ledger without waiting for the midnight
+    // cron. Past-dated and future-dated templates are left to the scheduler
+    // (its `nextOccurrenceDate <= today` sweep). This reuses the scheduler's
+    // one generation routine — no second code path. It runs in its own
+    // transaction (already committed template above); a failure here is
+    // non-fatal because the cron will still generate the occurrence, so the
+    // create must not be rolled back or reported as failed.
+    const today = this.todayStr();
+    let firstOccurrenceGenerated = false;
+    if (saved.status === 'active' && saved.nextOccurrenceDate === today) {
+      try {
+        await this.scheduler.generateDueOccurrences(saved, today);
+        firstOccurrenceGenerated = true;
+      } catch {
+        // Swallow: template is persisted; the cron backstops generation.
+        firstOccurrenceGenerated = false;
+      }
+    }
+
+    return { ...(await this.mapResponse(saved)), firstOccurrenceGenerated };
   }
 
   async listRecurringExpenses(
@@ -443,7 +472,10 @@ export class RecurringExpensesService {
       .leftJoinAndSelect('template.paidByUser', 'paidByUser')
       .leftJoinAndSelect('template.paidByGroupMember', 'paidByGroupMember')
       .leftJoinAndSelect('template.ownerUser', 'ownerUser')
-      .leftJoinAndSelect('template.group', 'group');
+      .leftJoinAndSelect('template.group', 'group')
+      // Needed so the response carries groupKeyVersionId — the client resolves
+      // the group decryption key by version to decrypt the title/description.
+      .leftJoinAndSelect('template.groupKeyVersion', 'groupKeyVersion');
 
     if (groupId) {
       if (groupId === 'personal') {
@@ -479,6 +511,7 @@ export class RecurringExpensesService {
         'paidByGroupMember.user',
         'ownerUser',
         'group',
+        'groupKeyVersion',
       ],
     });
     if (!template) {
@@ -684,6 +717,10 @@ export class RecurringExpensesService {
       ownerUserId: template.ownerUser.id,
       groupId: template.group?.id ?? null,
       groupKeyVersionId: template.groupKeyVersion?.id ?? null,
+      // Derived (no column): group templates are group-encrypted, the rest are
+      // personal-scoped. The client needs this to pick the right decryption key
+      // for the title/description ciphertext.
+      encryptionScope: template.group ? 'group' : 'personal',
       frequency: template.frequency,
       startDate: template.startDate,
       endDate: template.endDate ?? null,

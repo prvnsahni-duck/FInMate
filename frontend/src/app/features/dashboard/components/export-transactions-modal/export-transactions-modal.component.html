@@ -1,0 +1,161 @@
+<div
+  data-testid="export-dialog-backdrop"
+  class="fixed inset-0 z-[60] flex items-end justify-center md:items-center md:p-4 bg-slate-900/60 backdrop-blur-md transition-all duration-300"
+>
+  <div
+    data-testid="export-dialog"
+    class="bg-white dark:bg-finmate-card w-full md:max-w-lg h-[100dvh] md:h-auto md:max-h-[88vh] rounded-none md:rounded-3xl p-6 pb-safe md:p-8 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 relative flex flex-col overflow-y-auto"
+  >
+    <!-- Close Button -->
+    <button
+      (click)="close()"
+      data-testid="export-dialog-close-button"
+      aria-label="Close"
+      class="absolute top-6 right-6 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors z-10"
+    >
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      </svg>
+    </button>
+
+    <!-- Header -->
+    <div class="flex-shrink-0 pr-8 mb-4">
+      <h2 class="text-2xl font-bold mb-1 text-secondary">Export Transactions</h2>
+      <p class="text-sm text-slate-500 dark:text-slate-400">
+        Download your expense history for a date range as an Excel (.xlsx) file.
+        Encrypted details are decrypted on your device.
+      </p>
+    </div>
+
+    <!-- Error Alert -->
+    @if (errorMessage) {
+      <div
+        data-testid="export-error"
+        class="mb-4 p-3.5 bg-red-500/10 border border-red-500/25 text-red-500 rounded-2xl text-sm font-semibold flex items-center space-x-2 flex-shrink-0"
+      >
+        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+        <span>{{ errorMessage }}</span>
+      </div>
+    }
+
+    <div class="space-y-4">
+      <!-- Date Range -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="text-label" for="export-from">From Date</label>
+          <input
+            id="export-from"
+            data-testid="export-from-date"
+            type="date"
+            [(ngModel)]="fromDate"
+            [max]="toDate"
+            class="input-base text-sm py-2.5"
+          />
+        </div>
+        <div>
+          <label class="text-label" for="export-to">To Date</label>
+          <input
+            id="export-to"
+            data-testid="export-to-date"
+            type="date"
+            [(ngModel)]="toDate"
+            [min]="fromDate"
+            class="input-base text-sm py-2.5"
+          />
+        </div>
+      </div>
+
+      <!-- Expense Type -->
+      <div>
+        <span class="text-label">Include</span>
+        <div class="grid grid-cols-3 gap-1 bg-surface rounded-xl p-1 text-xs font-semibold mt-1">
+          <button
+            type="button"
+            data-testid="export-type-all"
+            (click)="type = 'all'"
+            [class]="type === 'all' ? 'bg-primary text-white px-3 py-2 rounded-lg' : 'text-muted px-3 py-2 rounded-lg hover:text-secondary transition-colors'"
+          >All</button>
+          <button
+            type="button"
+            data-testid="export-type-personal"
+            (click)="type = 'personal'"
+            [class]="type === 'personal' ? 'bg-primary text-white px-3 py-2 rounded-lg' : 'text-muted px-3 py-2 rounded-lg hover:text-secondary transition-colors'"
+          >Personal</button>
+          <button
+            type="button"
+            data-testid="export-type-group"
+            (click)="type = 'group'"
+            [class]="type === 'group' ? 'bg-primary text-white px-3 py-2 rounded-lg' : 'text-muted px-3 py-2 rounded-lg hover:text-secondary transition-colors'"
+          >Group</button>
+        </div>
+      </div>
+
+      <!-- Optional Filters -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="text-label" for="export-category">Category <span class="text-muted font-normal">(optional)</span></label>
+          <select id="export-category" data-testid="export-category" [(ngModel)]="category" class="input-base text-sm py-2.5">
+            <option value="">All categories</option>
+            @for (cat of categoryOptions; track cat.value) {
+              <option [value]="cat.value">{{ cat.label }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="text-label" for="export-status">Status <span class="text-muted font-normal">(optional)</span></label>
+          <select id="export-status" data-testid="export-status" [(ngModel)]="status" class="input-base text-sm py-2.5">
+            <option value="">All statuses</option>
+            <option value="settled">Settled</option>
+            <option value="pending">Pending</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-label" for="export-currency">Currency <span class="text-muted font-normal">(optional)</span></label>
+          <select id="export-currency" data-testid="export-currency" [(ngModel)]="currency" class="input-base text-sm py-2.5">
+            <option value="">All currencies</option>
+            @for (code of currencyOptions; track code) {
+              <option [value]="code">{{ code }}</option>
+            }
+          </select>
+        </div>
+        <div>
+          <label class="text-label" for="export-format">Format</label>
+          <select id="export-format" data-testid="export-format" [(ngModel)]="format" class="input-base text-sm py-2.5">
+            <option value="xlsx">Excel (.xlsx)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="flex gap-3 mt-6 flex-shrink-0">
+      <button
+        type="button"
+        (click)="close()"
+        [disabled]="isExporting"
+        class="flex-1 py-2.5 bg-secondary/10 hover:bg-secondary/20 text-secondary rounded-xl text-sm font-bold transition-all cursor-pointer disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        data-testid="export-submit"
+        (click)="onExport()"
+        [disabled]="isExporting"
+        class="flex-1 bg-primary text-white font-semibold transition-all duration-200 hover:brightness-110 active:scale-95 shadow-md shadow-primary/20 py-2.5 rounded-xl text-sm font-bold cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+      >
+        @if (isExporting) {
+          <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+          <span>Exporting…</span>
+        } @else {
+          <span>Export</span>
+        }
+      </button>
+    </div>
+  </div>
+</div>

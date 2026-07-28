@@ -317,18 +317,6 @@ export class ExpensesService {
   }
 
   /**
-   * Export expenses ledger.
-   */
-  exportExpenses(groupId: string, format: 'csv' | 'xlsx'): Observable<Blob> {
-    return this.http.get(
-      `${this.baseUrl}/export/expenses?groupId=${groupId}&format=${format}`,
-      {
-        responseType: 'blob',
-      },
-    );
-  }
-
-  /**
    * Import expenses.
    */
   importExpenses(formData: FormData): Observable<void> {

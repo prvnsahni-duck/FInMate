@@ -12,6 +12,8 @@ import {
   FormsModule,
   FormBuilder,
   Validators,
+  AbstractControl,
+  ValidationErrors,
 } from '@angular/forms';
 import { jwtDecode } from 'jwt-decode';
 import { RecurringExpensesService } from '../../services/recurring-expenses.service';
@@ -27,6 +29,19 @@ import {
   DropdownComponent,
   DropdownOption,
 } from '../../../../shared/components/dropdown/dropdown.component';
+
+/**
+ * Cross-field rule: the optional End Date must not fall before the Start Date.
+ * Dates are `YYYY-MM-DD` strings, so a lexicographic compare is a date compare.
+ */
+function endDateNotBeforeStart(
+  group: AbstractControl,
+): ValidationErrors | null {
+  const start = group.get('startDate')?.value;
+  const end = group.get('endDate')?.value;
+  if (!start || !end) return null;
+  return end < start ? { endBeforeStart: true } : null;
+}
 
 @Component({
   selector: 'app-recurring-expense-form',
@@ -79,30 +94,38 @@ export class RecurringExpenseFormComponent implements OnChanges {
   @Input() members: GroupMember[] = [];
   @Input() template: any | null = null; // For editing existing template
 
-  @Output() saveSuccess = new EventEmitter<void>();
+  // Emits the saved template. `firstOccurrenceGenerated` tells the parent
+  // whether a ledger expense was materialized now (start date = today), so it
+  // can refresh the ledger in addition to the recurring list.
+  @Output() saveSuccess = new EventEmitter<{
+    firstOccurrenceGenerated?: boolean;
+  }>();
   @Output() cancelled = new EventEmitter<void>();
 
   selectedUserIds = new Set<string>();
   isSubmitting = false;
   errorMessage = '';
 
-  form = this.fb.group({
-    title: ['', [Validators.required, Validators.maxLength(160)]],
-    description: [''],
-    amountTotal: [
-      null as number | null,
-      [Validators.required, Validators.min(0.01)],
-    ],
-    currency: ['', [Validators.required]],
-    category: [
-      'Food & Drinks',
-      [Validators.required, Validators.maxLength(64)],
-    ],
-    frequency: ['monthly' as const, [Validators.required]],
-    startDate: [this.getTodayDateString(), [Validators.required]],
-    endDate: [''],
-    paidByUserId: ['', [Validators.required]],
-  });
+  form = this.fb.group(
+    {
+      title: ['', [Validators.required, Validators.maxLength(160)]],
+      description: [''],
+      amountTotal: [
+        null as number | null,
+        [Validators.required, Validators.min(0.01)],
+      ],
+      currency: ['', [Validators.required]],
+      category: [
+        'Food & Drinks',
+        [Validators.required, Validators.maxLength(64)],
+      ],
+      frequency: ['monthly' as const, [Validators.required]],
+      startDate: [this.getTodayDateString(), [Validators.required]],
+      endDate: [''],
+      paidByUserId: ['', [Validators.required]],
+    },
+    { validators: [endDateNotBeforeStart] },
+  );
 
   get currencySymbol(): string {
     const cur = this.form.get('currency')?.value;
@@ -270,9 +293,10 @@ export class RecurringExpenseFormComponent implements OnChanges {
         : this.recurringExpensesService.createRecurringExpense(payload);
 
       request$.subscribe({
-        next: () => {
+        next: (saved) => {
           this.isSubmitting = false;
-          this.saveSuccess.emit();
+          // `saved` carries firstOccurrenceGenerated on create; updates omit it.
+          this.saveSuccess.emit(saved ?? {});
         },
         error: (err) => {
           this.isSubmitting = false;

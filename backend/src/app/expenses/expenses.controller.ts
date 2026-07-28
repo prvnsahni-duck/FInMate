@@ -16,8 +16,16 @@ import {
   DefaultValuePipe,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CreateExpenseDto, UpdateExpenseDto } from './dto';
-import { ExpensesAnalyticsService, ExpensesCrudService } from './services';
+import {
+  CreateExpenseDto,
+  ExportExpensesQueryDto,
+  UpdateExpenseDto,
+} from './dto';
+import {
+  ExpenseExportQueryService,
+  ExpensesAnalyticsService,
+  ExpensesCrudService,
+} from './services';
 import { SuccessResponse } from '../common/response.util';
 
 @Controller('expenses')
@@ -26,6 +34,7 @@ export class ExpensesController {
   constructor(
     private readonly expensesCrudService: ExpensesCrudService,
     private readonly expensesAnalyticsService: ExpensesAnalyticsService,
+    private readonly expenseExportQueryService: ExpenseExportQueryService,
   ) {}
 
   // ─── CRUD ─────────────────────────────────────────────────────────────────
@@ -100,6 +109,32 @@ export class ExpensesController {
       limitNum,
     );
     return new SuccessResponse('My expenses retrieved successfully', result);
+  }
+
+  // ─── Export ───────────────────────────────────────────────────────────────
+
+  /**
+   * Returns the caller's expense rows (personal + their share of group
+   * expenses) matching the given filters, for client-side workbook generation.
+   *
+   * Titles/descriptions are returned as ciphertext — decryption and .xlsx
+   * generation happen in the browser, preserving the zero-knowledge design.
+   * The server remains the single source of truth for permissions/filtering.
+   */
+  @Get('export')
+  async exportExpenses(
+    @Query() query: ExportExpensesQueryDto,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const rows = await this.expenseExportQueryService.getExportRows(
+      req.user.id,
+      query,
+    );
+    return new SuccessResponse('Export data retrieved successfully', {
+      rows,
+      count: rows.length,
+      filters: query,
+    });
   }
 
   // ─── Analytics ────────────────────────────────────────────────────────────
