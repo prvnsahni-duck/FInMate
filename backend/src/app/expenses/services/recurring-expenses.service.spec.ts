@@ -545,6 +545,68 @@ describe('RecurringExpenses Service & Scheduler', () => {
     });
   });
 
+  describe('lifecycle guards (never generate against invalid targets)', () => {
+    const dueTemplate = (over: Record<string, any> = {}) => ({
+      id: 'template-x',
+      title: 'Group Rent',
+      amountTotal: 100,
+      currency: 'USD',
+      category: 'rent',
+      paidByUser: undefined,
+      paidByGroupMember: {
+        id: 'gm-payer',
+        joinStatus: 'active',
+        group: { id: 'group-1' },
+      },
+      ownerUser: { id: 'user-1' },
+      group: { id: 'group-1', isArchived: false },
+      groupKeyVersion: { id: 'gkv-1', version: 1, status: 'ACTIVE' },
+      frequency: 'daily' as const,
+      startDate: '2026-06-20',
+      nextOccurrenceDate: '2026-06-20',
+      status: 'active' as const,
+      ...over,
+    });
+
+    it('skips generation when the group is archived', async () => {
+      await scheduler.generateDueOccurrences(
+        dueTemplate({ group: { id: 'group-1', isArchived: true } }) as any,
+        '2026-06-20',
+      );
+      expect(mockExpenseRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('skips generation when the group payer has been removed', async () => {
+      await scheduler.generateDueOccurrences(
+        dueTemplate({
+          paidByGroupMember: {
+            id: 'gm-payer',
+            joinStatus: 'removed',
+            group: { id: 'group-1' },
+          },
+        }) as any,
+        '2026-06-20',
+      );
+      expect(mockExpenseRepo.create).not.toHaveBeenCalled();
+    });
+
+    it('generates for an active group template with an active payer', async () => {
+      mockRecurringExpenseSplitRepo.find.mockResolvedValue([
+        {
+          participantGroupMember: { id: 'gm-1' },
+          splitType: 'equal',
+          shareValue: 1,
+          amountOwed: 100,
+        },
+      ]);
+      await scheduler.generateDueOccurrences(
+        dueTemplate() as any,
+        '2026-06-20',
+      );
+      expect(mockExpenseRepo.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('RecurringExpensesScheduler Cron Engine', () => {
     it('generateDueOccurrences is idempotent per day — a re-run generates no duplicate', async () => {
       const template: any = {

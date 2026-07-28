@@ -120,6 +120,23 @@ export class RecurringExpensesScheduler {
    * date today), so immediate and scheduled generation produce identical rows.
    */
   async generateDueOccurrences(template: RecurringExpense, todayStr: string) {
+    // Never materialize expenses against an invalid target. A template whose
+    // group has been archived, or whose group payer has left/been removed,
+    // is skipped (not advanced, not failed) so it neither creates stale rows
+    // nor blocks the rest of the cron sweep. It resumes automatically if the
+    // condition clears (e.g. the group is un-archived).
+    const skip = this.generationBlockedReason(template);
+    if (skip) {
+      this.logger.log({
+        event: 'scheduler_template_skipped',
+        scheduler: 'recurring_expenses',
+        templateId: template.id,
+        reason: skip,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
     // Process all occurrences up to today (handles missed runs)
     let currentOccurrenceDate = template.nextOccurrenceDate;
     // Anchor month-end recurrence to the template's original day-of-month so
@@ -237,6 +254,26 @@ export class RecurringExpensesScheduler {
       });
       currentOccurrenceDate = nextDate;
     }
+  }
+
+  /**
+   * Reason a template must not generate right now, or `null` if it's clear.
+   * Mirrors the app rule that archived groups can't receive new expenses, and
+   * guards against a group payer that has left/been removed. Personal templates
+   * (no group, no group payer) are always generable.
+   */
+  private generationBlockedReason(template: RecurringExpense): string | null {
+    if (template.group?.isArchived) {
+      return 'group_archived';
+    }
+    const payer = template.paidByGroupMember;
+    if (
+      payer &&
+      (payer.joinStatus === 'removed' || payer.joinStatus === 'left')
+    ) {
+      return 'group_payer_removed';
+    }
+    return null;
   }
 
   /**
