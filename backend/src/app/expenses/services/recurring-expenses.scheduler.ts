@@ -95,7 +95,7 @@ export class RecurringExpensesScheduler {
 
     for (const template of dueTemplates) {
       try {
-        await this.processSingleTemplate(template, todayStr);
+        await this.generateDueOccurrences(template, todayStr);
       } catch (err: any) {
         this.logger.error(
           {
@@ -111,10 +111,15 @@ export class RecurringExpensesScheduler {
     }
   }
 
-  private async processSingleTemplate(
-    template: RecurringExpense,
-    todayStr: string,
-  ) {
+  /**
+   * Materialize every occurrence of a template that is due on or before
+   * `todayStr`, advancing `nextOccurrenceDate` and completing the template past
+   * its end date. This is the single generation path — the daily cron calls it
+   * for each due template, and `RecurringExpensesService.createRecurringExpense`
+   * calls it once for a template whose first occurrence is already due (start
+   * date today), so immediate and scheduled generation produce identical rows.
+   */
+  async generateDueOccurrences(template: RecurringExpense, todayStr: string) {
     // Process all occurrences up to today (handles missed runs)
     let currentOccurrenceDate = template.nextOccurrenceDate;
 

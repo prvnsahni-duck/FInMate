@@ -94,7 +94,12 @@ export class RecurringExpenseFormComponent implements OnChanges {
   @Input() members: GroupMember[] = [];
   @Input() template: any | null = null; // For editing existing template
 
-  @Output() saveSuccess = new EventEmitter<void>();
+  // Emits the saved template. `firstOccurrenceGenerated` tells the parent
+  // whether a ledger expense was materialized now (start date = today), so it
+  // can refresh the ledger in addition to the recurring list.
+  @Output() saveSuccess = new EventEmitter<{
+    firstOccurrenceGenerated?: boolean;
+  }>();
   @Output() cancelled = new EventEmitter<void>();
 
   selectedUserIds = new Set<string>();
@@ -288,9 +293,10 @@ export class RecurringExpenseFormComponent implements OnChanges {
         : this.recurringExpensesService.createRecurringExpense(payload);
 
       request$.subscribe({
-        next: () => {
+        next: (saved) => {
           this.isSubmitting = false;
-          this.saveSuccess.emit();
+          // `saved` carries firstOccurrenceGenerated on create; updates omit it.
+          this.saveSuccess.emit(saved ?? {});
         },
         error: (err) => {
           this.isSubmitting = false;

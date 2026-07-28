@@ -176,6 +176,121 @@ describe('RecurringExpenses Service & Scheduler', () => {
       expect(mockRecurringExpenseRepo.save).toHaveBeenCalled();
     });
 
+    it('Option A: generates today’s occurrence immediately when the start date is today', async () => {
+      jest.useFakeTimers({ now: new Date('2026-06-20T12:00:00Z') });
+      const ownerUser = { id: 'user-owner' };
+      mockUserRepo.findOne.mockResolvedValueOnce(ownerUser); // owner
+      mockUserRepo.findOne.mockResolvedValueOnce(ownerUser); // paidBy
+      mockUserRepo.find.mockResolvedValueOnce([ownerUser]);
+
+      mockRecurringExpenseRepo.findOne.mockResolvedValue({
+        id: 'template-id',
+        title: 'Daily Coffee',
+        amountTotal: 5,
+        currency: 'USD',
+        category: 'food',
+        paidByUser: ownerUser,
+        ownerUser,
+        frequency: 'daily',
+        startDate: '2026-06-20',
+        nextOccurrenceDate: '2026-06-20',
+        status: 'active',
+      });
+      mockRecurringExpenseSplitRepo.find.mockResolvedValue([
+        {
+          id: 'split-1',
+          participantUser: ownerUser,
+          splitType: 'equal',
+          shareValue: 1,
+          amountOwed: 5,
+        },
+      ]);
+
+      const result = await service.createRecurringExpense('user-owner', {
+        title: 'Daily Coffee',
+        amountTotal: 5,
+        currency: 'USD',
+        category: 'food',
+        paidByUserId: 'user-owner',
+        frequency: 'daily',
+        startDate: '2026-06-20',
+        splits: [
+          {
+            participantUserId: 'user-owner',
+            splitType: 'equal',
+            shareValue: 1,
+          },
+        ],
+      });
+
+      // Exactly one ledger Expense materialized for today, via the scheduler's
+      // shared routine — no second generation path.
+      expect(mockExpenseRepo.create).toHaveBeenCalledTimes(1);
+      expect(mockExpenseRepo.save).toHaveBeenCalledTimes(1);
+      const createdExpense = mockExpenseRepo.create.mock.calls[0][0];
+      expect(createdExpense.expenseDate).toBe('2026-06-20');
+      expect(createdExpense.status).toBe('posted');
+      expect(result.firstOccurrenceGenerated).toBe(true);
+      // Daily → nextOccurrenceDate advanced past today (prevents duplicates).
+      expect(result.nextOccurrenceDate).toBe('2026-06-21');
+
+      jest.useRealTimers();
+    });
+
+    it('Option A: creates template only (no occurrence) when the start date is in the future', async () => {
+      jest.useFakeTimers({ now: new Date('2026-06-20T12:00:00Z') });
+      const ownerUser = { id: 'user-owner' };
+      mockUserRepo.findOne.mockResolvedValueOnce(ownerUser);
+      mockUserRepo.findOne.mockResolvedValueOnce(ownerUser);
+      mockUserRepo.find.mockResolvedValueOnce([ownerUser]);
+
+      mockRecurringExpenseRepo.findOne.mockResolvedValue({
+        id: 'template-id',
+        title: 'Future Sub',
+        amountTotal: 5,
+        currency: 'USD',
+        category: 'bills',
+        paidByUser: ownerUser,
+        ownerUser,
+        frequency: 'daily',
+        startDate: '2026-06-25',
+        nextOccurrenceDate: '2026-06-25',
+        status: 'active',
+      });
+      mockRecurringExpenseSplitRepo.find.mockResolvedValue([
+        {
+          id: 'split-1',
+          participantUser: ownerUser,
+          splitType: 'equal',
+          shareValue: 1,
+          amountOwed: 5,
+        },
+      ]);
+
+      const result = await service.createRecurringExpense('user-owner', {
+        title: 'Future Sub',
+        amountTotal: 5,
+        currency: 'USD',
+        category: 'bills',
+        paidByUserId: 'user-owner',
+        frequency: 'daily',
+        startDate: '2026-06-25',
+        splits: [
+          {
+            participantUserId: 'user-owner',
+            splitType: 'equal',
+            shareValue: 1,
+          },
+        ],
+      });
+
+      expect(mockExpenseRepo.create).not.toHaveBeenCalled();
+      expect(result.firstOccurrenceGenerated).toBe(false);
+      expect(result.nextOccurrenceDate).toBe('2026-06-25');
+
+      jest.useRealTimers();
+    });
+
     it('should create group recurring expense template with a GroupMember (pending) payer', async () => {
       const ownerUser = { id: 'user-owner' };
       const group = { id: 'group-1', currency: 'USD' };
@@ -353,6 +468,40 @@ describe('RecurringExpenses Service & Scheduler', () => {
   });
 
   describe('RecurringExpensesScheduler Cron Engine', () => {
+    it('generateDueOccurrences is idempotent per day — a re-run generates no duplicate', async () => {
+      const template: any = {
+        id: 'template-x',
+        title: 'Daily',
+        amountTotal: 5,
+        currency: 'USD',
+        category: 'food',
+        paidByUser: { id: 'user-1' },
+        ownerUser: { id: 'user-1' },
+        frequency: 'daily' as const,
+        nextOccurrenceDate: '2026-06-20',
+        status: 'active' as const,
+      };
+      mockRecurringExpenseSplitRepo.find.mockResolvedValue([
+        {
+          participantUser: { id: 'user-1' },
+          splitType: 'equal',
+          shareValue: 1,
+          amountOwed: 5,
+        },
+      ]);
+
+      // First run (e.g. immediate create) materializes today and advances.
+      await scheduler.generateDueOccurrences(template, '2026-06-20');
+      expect(mockExpenseRepo.create).toHaveBeenCalledTimes(1);
+      expect(template.nextOccurrenceDate).toBe('2026-06-21');
+
+      // Second run for the same day (e.g. the midnight cron) is a no-op —
+      // nextOccurrenceDate is already past today, so no duplicate expense.
+      mockExpenseRepo.create.mockClear();
+      await scheduler.generateDueOccurrences(template, '2026-06-20');
+      expect(mockExpenseRepo.create).not.toHaveBeenCalled();
+    });
+
     it('should process due active recurring expenses', async () => {
       // Freeze the clock so only one occurrence (2026-06-20) is due
       jest.useFakeTimers({ now: new Date('2026-06-20T12:00:00Z') });

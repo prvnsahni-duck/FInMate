@@ -2339,7 +2339,7 @@
         [groupCurrency]="group()!.currency"
         [members]="members()"
         [template]="selectedRecurringExpenseForEdit()"
-        (saveSuccess)="onRecurringExpenseSaved()"
+        (saveSuccess)="onRecurringExpenseSaved($event)"
         (cancelled)="closeRecurringExpenseForm()"
       ></app-recurring-expense-form>
     </div>

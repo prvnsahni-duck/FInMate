@@ -1268,10 +1268,16 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.isRecurringExpenseFormOpen.set(false);
   }
 
-  onRecurringExpenseSaved() {
+  onRecurringExpenseSaved(saved?: { firstOccurrenceGenerated?: boolean }) {
     const g = this.group();
     if (g?.id) {
       this.fetchRecurringExpenses(g.id);
+      // When the template's start date is today, the backend materializes the
+      // first occurrence immediately — refresh the ledger (and balances/history)
+      // exactly like a manual expense create so it shows without a reload.
+      if (saved?.firstOccurrenceGenerated) {
+        this.onExpenseCreated();
+      }
     }
     this.closeRecurringExpenseForm();
   }
