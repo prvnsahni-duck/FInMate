@@ -5,7 +5,7 @@ import { ExpensesService } from '../../services/expenses.service';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
-import { CurrencyPipe, DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { provideRouter } from '@angular/router';
 import { GroupMember } from '@finmate/data-models';
@@ -188,7 +188,7 @@ describe('GroupDetailComponent', () => {
     })
       .overrideComponent(GroupDetailComponent, {
         set: {
-          imports: [CurrencyPipe, DatePipe, FormsModule],
+          imports: [CurrencyPipe, DatePipe, DecimalPipe, FormsModule],
           schemas: [NO_ERRORS_SCHEMA],
         },
       })
