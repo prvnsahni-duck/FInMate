@@ -253,6 +253,131 @@ describe('CreateExpenseModalComponent', () => {
     });
   });
 
+  // --- Edit-mode change detection ---
+  describe('change detection (edit mode)', () => {
+    const openInEditMode = (overrides: Record<string, unknown> = {}) => {
+      component.groupId = 'group-1';
+      component.members = [
+        {
+          id: 'm1',
+          role: 'owner',
+          user: { id: 'user-1', email: 'a@b.com', displayName: 'Alice' },
+        },
+        {
+          id: 'm2',
+          role: 'member',
+          user: { id: 'user-2', email: 'c@d.com', displayName: 'Bob' },
+        },
+      ] as any;
+      component.expense = {
+        id: 'exp-1',
+        title: 'Dinner',
+        description: 'Taxi',
+        amountTotal: 120,
+        currency: 'USD',
+        category: 'food',
+        expenseDate: '2026-06-28',
+        paidByUserId: 'user-1',
+        ownerUserId: 'user-1',
+        version: 3,
+        splits: [
+          { participantUserId: 'user-1', splitType: 'percent', shareValue: 60 },
+          { participantUserId: 'user-2', splitType: 'percent', shareValue: 40 },
+        ],
+        ...overrides,
+      } as any;
+
+      component.ngOnChanges({
+        expense: {
+          currentValue: component.expense,
+          previousValue: null,
+          firstChange: true,
+          isFirstChange: () => true,
+        },
+      });
+    };
+
+    it('reports no changes immediately after opening in edit mode', () => {
+      openInEditMode();
+      expect(component.hasChanges()).toBe(false);
+      expect(component.changeSummary()).toEqual([]);
+    });
+
+    it('detects a changed field and marks it modified', () => {
+      openInEditMode();
+      component.expenseForm.patchValue({ amountTotal: 150 });
+
+      expect(component.hasChanges()).toBe(true);
+      expect(component.isFieldModified('amountTotal')).toBe(true);
+      expect(component.isFieldModified('title')).toBe(false);
+
+      const amountChange = component
+        .changeSummary()
+        .find((c) => c.key === 'amountTotal');
+      expect(amountChange).toEqual({
+        key: 'amountTotal',
+        label: 'Amount',
+        from: '$120.00',
+        to: '$150.00',
+      });
+    });
+
+    it('detects participant changes', () => {
+      openInEditMode();
+      component.toggleParticipant('user-2'); // remove Bob
+
+      expect(component.isFieldModified('participants')).toBe(true);
+    });
+
+    it('does NOT call updateExpense when nothing changed (no-op guard)', async () => {
+      openInEditMode();
+
+      await component.onSubmit();
+
+      expect(mockExpensesService.updateExpense).not.toHaveBeenCalled();
+      expect(component.errorMessage).toBe('No changes detected.');
+    });
+
+    it('preserves the original split configuration when participants are unchanged', async () => {
+      openInEditMode();
+      component.expenseForm.patchValue({ title: 'Dinner (updated)' });
+
+      await component.onSubmit();
+
+      expect(mockExpensesService.updateExpense).toHaveBeenCalledWith(
+        'exp-1',
+        expect.objectContaining({
+          splits: [
+            {
+              participantUserId: 'user-1',
+              participantGroupMemberId: undefined,
+              splitType: 'percent',
+              shareValue: 60,
+            },
+            {
+              participantUserId: 'user-2',
+              participantGroupMemberId: undefined,
+              splitType: 'percent',
+              shareValue: 40,
+            },
+          ],
+        }),
+      );
+    });
+
+    it('falls back to an equal split when the participant set changes', async () => {
+      openInEditMode();
+      component.toggleParticipant('user-2'); // remove Bob → participants changed
+
+      await component.onSubmit();
+
+      const call = mockExpensesService.updateExpense.mock.calls[0][1];
+      expect(call.splits).toEqual([
+        { participantUserId: 'user-1', splitType: 'equal', shareValue: 1 },
+      ]);
+    });
+  });
+
   // --- Participant management ---
   describe('participant toggling', () => {
     it('should add participant when toggled on', () => {

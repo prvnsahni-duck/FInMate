@@ -12,8 +12,7 @@ export class EmailService {
     this.resendApiKey =
       this.configService.get<string>('RESEND_API_KEY') || null;
     this.fromEmail =
-      this.configService.get<string>('FROM_EMAIL') ||
-      'FinMate <onboarding@resend.dev>';
+      this.configService.get<string>('FROM_EMAIL') || 'noreply@finmate.app';
 
     if (!this.resendApiKey) {
       this.logger.warn(

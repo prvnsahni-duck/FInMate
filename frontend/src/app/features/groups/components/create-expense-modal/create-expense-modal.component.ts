@@ -48,6 +48,36 @@ import {
 } from '../../../../core/constants/app.constants';
 import { CryptoRecoveryPanelComponent } from '../../../../shared/components/crypto-recovery-panel/crypto-recovery-panel.component';
 import { CryptoRecoveryQueueService } from '../../../../core/services/crypto-recovery-queue.service';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+
+/**
+ * One row of the edit-mode "Changes" summary. `key` matches the form control
+ * name (or a synthetic name like 'participants'/'attachments') so the template
+ * can both list the change and highlight the corresponding field.
+ */
+export interface ExpenseFieldChange {
+  key: string;
+  label: string;
+  from: string;
+  to: string;
+}
+
+/**
+ * Snapshot of an expense's editable state, captured when the modal opens in
+ * edit mode. Every field the form can touch is recorded here so the current
+ * form state can be diffed against it (see `changeSummary`).
+ */
+interface ExpenseSnapshot {
+  title: string;
+  description: string;
+  amountTotal: number | null;
+  currency: string;
+  category: string;
+  expenseDate: string;
+  paidByUserId: string;
+  participantIds: string[];
+  attachmentKeys: string[];
+}
 
 @Component({
   selector: 'app-create-expense-modal',
@@ -154,7 +184,222 @@ export class CreateExpenseModalComponent implements OnChanges {
   private searchTimeoutId?: ReturnType<typeof setTimeout>;
   private searchSub?: Subscription;
 
+  // --- Edit-mode change detection ---------------------------------------
+  /**
+   * The expense's editable state as it was when the modal opened in edit
+   * mode. Null in create mode (nothing to diff against).
+   */
+  private originalSnapshot: ExpenseSnapshot | null = null;
+
+  /**
+   * The expense's original split rows, preserved verbatim so an edit that
+   * doesn't touch the participant set keeps the exact split configuration
+   * (equal / fixed / percent / share). Without this, onSubmit() would rebuild
+   * every split as `equal`, silently flattening a non-equal split just because
+   * the user changed an unrelated field like the title.
+   */
+  private originalSplits: ExpenseSplitInputDto[] | null = null;
+
+  /**
+   * Monotonic counter bumped on every edit (form value change, participant
+   * toggle, attachment add/remove). Read inside the change-detection computeds
+   * purely as a reactive dependency: the underlying state (reactive form,
+   * `selectedUserIds` Set, `attachedFiles` array) is mutated imperatively and
+   * isn't otherwise signal-tracked, so this is what makes the summary recompute.
+   */
+  private changeTick = signal(0);
+
+  private markChanged(): void {
+    this.changeTick.update((n) => n + 1);
+  }
+
+  get isEditMode(): boolean {
+    return !!this.expense;
+  }
+
+  /**
+   * Only the fields that actually differ from the original, in display order.
+   * Empty when nothing changed (or in create mode).
+   */
+  changeSummary = computed<ExpenseFieldChange[]>(() => {
+    this.changeTick(); // reactive dependency — see changeTick doc
+    const snap = this.originalSnapshot;
+    if (!snap) return [];
+
+    const v = this.expenseForm.getRawValue();
+    const changes: ExpenseFieldChange[] = [];
+
+    const title = v.title ?? '';
+    if (title !== snap.title) {
+      changes.push({
+        key: 'title',
+        label: 'Title',
+        from: snap.title,
+        to: title,
+      });
+    }
+
+    // Coerce both sides: `amountTotal` is typed number but a decimal column
+    // can serialize as a string at runtime, which would otherwise read as a
+    // spurious change the moment the modal opens.
+    const amount =
+      v.amountTotal === null || v.amountTotal === undefined
+        ? null
+        : Number(v.amountTotal);
+    if (amount !== snap.amountTotal) {
+      changes.push({
+        key: 'amountTotal',
+        label: 'Amount',
+        from: this.formatAmount(snap.amountTotal, snap.currency),
+        to: this.formatAmount(amount, v.currency ?? snap.currency),
+      });
+    }
+
+    const currency = v.currency ?? '';
+    if (currency !== snap.currency) {
+      changes.push({
+        key: 'currency',
+        label: 'Currency',
+        from: snap.currency,
+        to: currency,
+      });
+    }
+
+    const category = v.category ?? '';
+    if (category !== snap.category) {
+      changes.push({
+        key: 'category',
+        label: 'Category',
+        from: this.categoryLabel(snap.category),
+        to: this.categoryLabel(category),
+      });
+    }
+
+    const expenseDate = v.expenseDate ?? '';
+    if (expenseDate !== snap.expenseDate) {
+      changes.push({
+        key: 'expenseDate',
+        label: 'Date',
+        from: snap.expenseDate,
+        to: expenseDate,
+      });
+    }
+
+    const paidBy = v.paidByUserId ?? '';
+    if (paidBy !== snap.paidByUserId) {
+      changes.push({
+        key: 'paidByUserId',
+        label: 'Paid by',
+        from: this.userName(snap.paidByUserId),
+        to: this.userName(paidBy),
+      });
+    }
+
+    const description = v.description ?? '';
+    if (description !== snap.description) {
+      changes.push({
+        key: 'description',
+        label: 'Note',
+        from: snap.description || '—',
+        to: description || '—',
+      });
+    }
+
+    const currentParticipants = Array.from(this.selectedUserIds).sort();
+    if (!this.arraysEqual(currentParticipants, snap.participantIds)) {
+      changes.push({
+        key: 'participants',
+        label: 'Participants',
+        from: this.participantNames(snap.participantIds),
+        to: this.participantNames(currentParticipants),
+      });
+    }
+
+    const currentExisting = this.attachedFiles
+      .filter((f) => !f.key.startsWith('pending:'))
+      .map((f) => f.key)
+      .sort();
+    const pendingCount = this.attachedFiles.length - currentExisting.length;
+    const removedExisting = snap.attachmentKeys.filter(
+      (k) => !currentExisting.includes(k),
+    );
+    if (pendingCount > 0 || removedExisting.length > 0) {
+      changes.push({
+        key: 'attachments',
+        label: 'Receipts',
+        from: this.fileCountLabel(snap.attachmentKeys.length),
+        to: this.fileCountLabel(this.attachedFiles.length),
+      });
+    }
+
+    return changes;
+  });
+
+  /** Field keys that differ from the original — used to highlight inputs. */
+  modifiedFields = computed(
+    () => new Set(this.changeSummary().map((c) => c.key)),
+  );
+
+  hasChanges = computed(() => this.changeSummary().length > 0);
+
+  isFieldModified(key: string): boolean {
+    return this.modifiedFields().has(key);
+  }
+
+  private arraysEqual(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((v, i) => v === b[i]);
+  }
+
+  private symbolFor(currency?: string): string {
+    if (currency === 'INR') return '₹';
+    if (currency === 'EUR') return '€';
+    return '$';
+  }
+
+  private formatAmount(amount: number | null, currency?: string): string {
+    if (amount === null || amount === undefined) return '—';
+    return `${this.symbolFor(currency)}${Number(amount).toFixed(2)}`;
+  }
+
+  private categoryLabel(value: string): string {
+    return this.categoryOptions.find((o) => o.value === value)?.label ?? value;
+  }
+
+  private userName(id: string): string {
+    if (!id) return '—';
+    const payer = this.payerOptions.find((o) => o.value === id);
+    if (payer) return payer.label;
+    const participant = this.availableParticipants.find((p) => p.id === id);
+    if (participant) return participant.name ?? 'Member';
+    const split = this.originalSplits?.find(
+      (s) => s.participantUserId === id,
+    ) as
+      | {
+          participantUser?: { displayName?: string };
+          participantUserDisplayName?: string;
+        }
+      | undefined;
+    return (
+      split?.participantUser?.displayName ||
+      split?.participantUserDisplayName ||
+      'Member'
+    );
+  }
+
+  private participantNames(ids: string[]): string {
+    if (ids.length === 0) return 'None';
+    return ids.map((id) => this.userName(id)).join(', ');
+  }
+
+  private fileCountLabel(count: number): string {
+    return count === 1 ? '1 file' : `${count} files`;
+  }
+
   constructor() {
+    this.expenseForm.valueChanges
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.markChanged());
+
     this.destroyRef.onDestroy(() => {
       if (this.searchTimeoutId) {
         clearTimeout(this.searchTimeoutId);
@@ -395,10 +640,45 @@ export class CreateExpenseModalComponent implements OnChanges {
           });
         });
       }
+
+      // Preserve the exact original split rows so an edit that leaves the
+      // participant set untouched keeps their split configuration verbatim
+      // (see originalSplits doc). Snapshot the whole editable state so the
+      // "Changes" summary can diff against it.
+      this.originalSplits = this.expense.splits
+        ? this.expense.splits.map((s) => ({
+            participantUserId: s.participantUserId,
+            participantGroupMemberId: s.participantGroupMemberId,
+            splitType: s.splitType,
+            shareValue: s.shareValue,
+          }))
+        : null;
+      this.originalSnapshot = {
+        title: this.expense.title ?? '',
+        description: this.expense.description ?? '',
+        amountTotal:
+          this.expense.amountTotal === null ||
+          this.expense.amountTotal === undefined
+            ? null
+            : Number(this.expense.amountTotal),
+        currency: this.expense.currency ?? '',
+        category: this.expense.category ?? '',
+        expenseDate: this.expense.expenseDate ?? '',
+        paidByUserId: this.expense.paidByUserId ?? '',
+        participantIds: Array.from(this.selectedUserIds).sort(),
+        attachmentKeys: (this.expense.attachments ?? [])
+          .map((a) => a.storageKey)
+          .sort(),
+      };
+      this.markChanged();
       return;
     }
 
-    if (changes['members'] && this.members) {
+    // Create mode only. In edit mode the participant selection comes from the
+    // expense's own splits (handled in the `expense` branch above, which
+    // returns before reaching here); a later members re-emit must not clobber
+    // that selection or reset the payer.
+    if (changes['members'] && this.members && !this.expense) {
       this.selectedUserIds.clear();
       this.members.forEach((m) => {
         if (
@@ -464,6 +744,7 @@ export class CreateExpenseModalComponent implements OnChanges {
     } else {
       this.selectedUserIds.add(userId);
     }
+    this.markChanged();
   }
 
   onSplitToggleChange() {
@@ -476,6 +757,7 @@ export class CreateExpenseModalComponent implements OnChanges {
         this.expenseForm.patchValue({ paidByUserId: currentUserId });
       }
     }
+    this.markChanged();
   }
 
   onSearchChange(query: string) {
@@ -514,6 +796,7 @@ export class CreateExpenseModalComponent implements OnChanges {
     this.selectedUserIds.add(user.id);
     this.searchQuery = '';
     this.searchResults = [];
+    this.markChanged();
   }
 
   removeFriendFromSplit(userId: string) {
@@ -521,6 +804,7 @@ export class CreateExpenseModalComponent implements OnChanges {
     if (userId === currentUserId) return;
     this.selectedUserIds.delete(userId);
     this.resolvedFriends.delete(userId);
+    this.markChanged();
   }
 
   closeModal() {
@@ -544,18 +828,46 @@ export class CreateExpenseModalComponent implements OnChanges {
       }
     }
 
+    // Guard against no-op updates: if editing and nothing actually changed,
+    // don't touch the API. The Save button is already disabled in this state,
+    // so this is a belt-and-suspenders check (e.g. an Enter-key submit). Only
+    // enforced when we have an original snapshot to diff against — otherwise
+    // fail open and let the save proceed.
+    if (this.isEditMode && this.originalSnapshot && !this.hasChanges()) {
+      this.errorMessage = 'No changes detected.';
+      return;
+    }
+
     if (this.expenseForm.valid && this.selectedUserIds.size > 0) {
       this.isSubmitting = true;
       this.errorMessage = '';
 
       const formValue = this.expenseForm.value;
-      const splits: ExpenseSplitInputDto[] = Array.from(
-        this.selectedUserIds,
-      ).map((userId) => ({
-        participantUserId: userId,
-        splitType: 'equal' as const,
-        shareValue: 1,
-      }));
+
+      // Preserve the original split configuration when the participant set is
+      // untouched — the UI only builds `equal` splits, so rebuilding blindly
+      // would flatten a fixed/percent/share expense on any unrelated edit.
+      // Once participants change, the preserved shares no longer map cleanly,
+      // so fall back to an equal split across the current selection.
+      const participantsUnchanged =
+        !!this.originalSnapshot &&
+        this.arraysEqual(
+          Array.from(this.selectedUserIds).sort(),
+          this.originalSnapshot.participantIds,
+        );
+      const splits: ExpenseSplitInputDto[] =
+        participantsUnchanged && this.originalSplits?.length
+          ? this.originalSplits.map((s) => ({
+              participantUserId: s.participantUserId,
+              participantGroupMemberId: s.participantGroupMemberId,
+              splitType: s.splitType,
+              shareValue: s.shareValue,
+            }))
+          : Array.from(this.selectedUserIds).map((userId) => ({
+              participantUserId: userId,
+              splitType: 'equal' as const,
+              shareValue: 1,
+            }));
 
       const title = formValue.title;
       const amountTotal = formValue.amountTotal;
@@ -798,6 +1110,7 @@ export class CreateExpenseModalComponent implements OnChanges {
             size: (file.size / 1024).toFixed(1) + ' KB',
             key: `pending:${Math.random().toString(36).substring(2, 10)}`,
           });
+          this.markChanged();
         };
         reader.readAsArrayBuffer(file);
       }
@@ -815,5 +1128,6 @@ export class CreateExpenseModalComponent implements OnChanges {
       }
     }
     this.attachedFiles.splice(index, 1);
+    this.markChanged();
   }
 }
