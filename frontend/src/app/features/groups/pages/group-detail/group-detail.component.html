@@ -525,6 +525,48 @@
               }
             </div>
 
+            <!-- Net Group Spending summary: Expenses − Refunds = Net -->
+            @if (expenses().length > 0) {
+              <div
+                data-testid="ledger-spending-summary"
+                class="grid grid-cols-3 gap-3 mb-6"
+              >
+                <div class="p-3 rounded-2xl bg-surface border border-border/5">
+                  <p class="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">
+                    Expenses
+                  </p>
+                  <p class="text-sm font-bold text-red-500 dark:text-red-400">
+                    {{
+                      ledgerSpendingSummary().totalExpense
+                        | currency: group()!.currency
+                    }}
+                  </p>
+                </div>
+                <div class="p-3 rounded-2xl bg-surface border border-border/5">
+                  <p class="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">
+                    Refunds
+                  </p>
+                  <p class="text-sm font-bold text-green-500 dark:text-green-400">
+                    {{
+                      ledgerSpendingSummary().totalRefund
+                        | currency: group()!.currency
+                    }}
+                  </p>
+                </div>
+                <div class="p-3 rounded-2xl bg-surface border border-border/5">
+                  <p class="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">
+                    Net Group Spending
+                  </p>
+                  <p class="text-sm font-bold">
+                    {{
+                      ledgerSpendingSummary().netSpending
+                        | currency: group()!.currency
+                    }}
+                  </p>
+                </div>
+              </div>
+            }
+
             <!-- Filters Toggle / Info Row (Visible only on Mobile, hides on Desktop) -->
             @if (group()!.groupType !== 'household') {
               <div
@@ -782,10 +824,16 @@
                 }
               </div>
             } @else {
+              <!-- Bounded, independently-scrolling ledger list: only this
+                   region scrolls (infinite scroll appends the next page near
+                   the bottom) — the page header, filters, and app shell's
+                   sticky header / bottom nav stay put. -->
               <div
-                class="space-y-4"
+                data-testid="expense-list-scroll-container"
+                class="space-y-4 max-h-[65vh] overflow-y-auto pr-1 -mr-1"
                 [class.opacity-40]="isLoadingExpenses()"
                 [class.pointer-events-none]="isLoadingExpenses()"
+                (scroll)="onExpenseListScroll($event)"
               >
                 @for (expense of expenses(); track expense.id) {
                   <div
@@ -793,8 +841,8 @@
                     data-testid="expense-card"
                     class="flex flex-col p-4 rounded-2xl bg-surface border border-border/5 hover:border-primary/30 hover:bg-surface-alt transition-colors group/row"
                   >
-                    <div class="flex items-center justify-between w-full">
-                      <div class="flex items-center space-x-4 min-w-0 flex-1">
+                    <div class="flex items-start justify-between gap-2 w-full">
+                      <div class="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
                         <button
                           (click)="toggleExpenseExpand(expense.id)"
                           [attr.data-testid]="
@@ -819,10 +867,31 @@
                           </svg>
                         </button>
                         <div
-                          class="w-10 h-10 rounded-xl bg-gradient-to-br from-surface-alt to-surface flex items-center justify-center"
+                          [class]="
+                            isRefundTx(expense)
+                              ? 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-green-500/10'
+                              : 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-surface-alt to-surface'
+                          "
                         >
-                          <!-- Dynamic category icon -->
-                          @if (expense.category === 'Food & Drinks') {
+                          <!-- Refund icon takes precedence over the category icon,
+                               so users never have to open the transaction to know
+                               whether money went out or came back. -->
+                          @if (isRefundTx(expense)) {
+                            <svg
+                              data-testid="refund-icon"
+                              class="w-5 h-5 text-green-500 dark:text-green-400"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M3 10h10a5 5 0 015 5v0a5 5 0 01-5 5H9m-6-10l4-4m-4 4l4 4"
+                              ></path>
+                            </svg>
+                          } @else if (expense.category === 'Food & Drinks') {
                             <svg
                               class="w-5 h-5 text-muted"
                               fill="none"
@@ -922,16 +991,18 @@
                             </svg>
                           }
                         </div>
-                        <div class="min-w-0">
+                        <div class="min-w-0 flex-1">
                           <h4
-                            class="font-bold flex items-center gap-2 min-w-0"
+                            class="font-bold flex items-start gap-2 min-w-0"
                             data-testid="expense-title"
                           >
                             @if (
                               !$any(expense).decryption ||
                               $any(expense).decryption.state === 'success'
                             ) {
-                              {{ expense.title }}
+                              <span class="line-clamp-2 break-words">{{
+                                expense.title
+                              }}</span>
                             } @else if (
                               $any(expense).decryption.category ===
                                 'temporary' ||
@@ -995,17 +1066,32 @@
                               >
                             }
                           </h4>
-                          <p class="text-xs text-muted truncate">
-                            {{ expense.expenseDate | date }} •
+                          <p class="text-[11px] sm:text-xs text-muted mt-0.5 line-clamp-1">
+                            {{ expense.expenseDate | date: 'MMM d' }} •
                             {{ expense.category }}
+                            @if (isRefundTx(expense)) {
+                              <span
+                                data-testid="refund-badge-list"
+                                class="ml-1 inline-flex items-center gap-0.5 text-[10px] font-bold uppercase tracking-wide text-green-600 dark:text-green-400"
+                              >
+                                • Refund
+                              </span>
+                            }
                           </p>
                         </div>
                       </div>
 
-                      <div class="flex items-center space-x-4 shrink-0">
-                        <div class="text-right">
+                      <div class="flex items-start space-x-1 sm:space-x-4 shrink-0">
+                        <div class="text-right shrink-0">
                           <p
-                            class="font-bold text-lg"
+                            [class]="
+                              'font-bold text-base sm:text-lg whitespace-nowrap ' +
+                              (expense.status === 'void'
+                                ? ''
+                                : isRefundTx(expense)
+                                  ? 'text-green-500 dark:text-green-400'
+                                  : 'text-red-500 dark:text-red-400')
+                            "
                             data-testid="expense-amount"
                             [style.text-decoration]="
                               expense.status === 'void'
@@ -1013,19 +1099,21 @@
                                 : 'none'
                             "
                           >
-                            {{
+                            {{ isRefundTx(expense) ? '+' : '-'
+                            }}{{
                               expense.amountTotal | currency: group()!.currency
                             }}
                           </p>
-                          <p class="text-xs text-muted">
-                            Paid by {{ payerDisplayName(expense) }}
+                          <p class="text-[11px] sm:text-xs text-muted truncate max-w-[110px] sm:max-w-none">
+                            {{ isRefundTx(expense) ? 'Received by' : 'Paid by' }}
+                            {{ payerDisplayName(expense) }}
                           </p>
                         </div>
 
                         <!-- Ledger Actions with Hover details indicator -->
-                        <div class="flex items-center space-x-1">
+                        <div class="flex items-center space-x-0.5 sm:space-x-1">
                           <svg
-                            class="w-4 h-4 text-primary opacity-0 group-hover/row:opacity-100 transition-opacity mr-2"
+                            class="hidden sm:block w-4 h-4 text-primary opacity-0 group-hover/row:opacity-100 transition-opacity mr-2"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1038,7 +1126,36 @@
                             ></path>
                           </svg>
                           @if (
+                            !isViewer() &&
+                            expense.status !== 'void' &&
+                            isExpenseEditLocked(expense) &&
+                            (isOwnerOrAdmin() ||
+                              expense.ownerUserId === currentUserId() ||
+                              expense.paidByUserId === currentUserId())
+                          ) {
+                            <span
+                              data-testid="expense-locked-badge"
+                              class="p-2 text-amber-500 cursor-help"
+                              [title]="expenseLockMessage(expense)"
+                            >
+                              <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+                                ></path>
+                              </svg>
+                            </span>
+                          }
+                          @if (
                             !isMonthLocked() &&
+                            !isExpenseEditLocked(expense) &&
                             !isViewer() &&
                             expense.status !== 'void' &&
                             (isOwnerOrAdmin() ||
@@ -1117,11 +1234,63 @@
                       </div>
                     </div>
 
-                    <!-- Slide-Down Split Participants Details -->
+                    <!-- Slide-Down Transaction Details (type, amount, payer, split, notes, date, category) -->
                     @if (expandedExpenseIds()[expense.id]) {
                       <div
-                        class="mt-4 pt-4 border-t border-secondary/15 space-y-2 animate-fade-in"
+                        class="mt-4 pt-4 border-t border-secondary/15 space-y-3 animate-fade-in"
+                        data-testid="expense-detail-panel"
                       >
+                        <div class="flex flex-wrap items-center gap-2 text-xs">
+                          @if (isRefundTx(expense)) {
+                            <span
+                              data-testid="refund-badge-detail"
+                              class="px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 dark:text-green-400 font-bold uppercase tracking-wide text-[10px]"
+                              >Refund</span
+                            >
+                          } @else {
+                            <span
+                              class="px-2 py-0.5 rounded-full bg-secondary/10 text-secondary font-bold uppercase tracking-wide text-[10px]"
+                              >Expense</span
+                            >
+                          }
+                          <span class="text-muted">{{ expense.category }}</span>
+                          <span class="text-muted">•</span>
+                          <span class="text-muted">{{
+                            expense.expenseDate | date
+                          }}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 text-xs">
+                          <div>
+                            <p class="text-secondary/60 uppercase tracking-wide text-[10px] font-bold mb-0.5">
+                              Amount
+                            </p>
+                            <p
+                              [class]="
+                                'font-bold' +
+                                (isRefundTx(expense)
+                                  ? ' text-green-500 dark:text-green-400'
+                                  : '')
+                              "
+                            >
+                              {{ isRefundTx(expense) ? '+' : ''
+                              }}{{ expense.amountTotal | currency: group()!.currency }}
+                            </p>
+                          </div>
+                          <div>
+                            <p class="text-secondary/60 uppercase tracking-wide text-[10px] font-bold mb-0.5">
+                              {{ isRefundTx(expense) ? 'Received By' : 'Paid By' }}
+                            </p>
+                            <p class="font-bold">{{ payerDisplayName(expense) }}</p>
+                          </div>
+                        </div>
+                        @if (expense.description) {
+                          <div>
+                            <p class="text-secondary/60 uppercase tracking-wide text-[10px] font-bold mb-0.5">
+                              Notes
+                            </p>
+                            <p class="text-xs whitespace-pre-wrap">{{ expense.description }}</p>
+                          </div>
+                        }
                         <p
                           class="text-[10px] font-bold text-secondary/60 uppercase tracking-wider mb-2"
                         >
@@ -1194,35 +1363,27 @@
                     }
                   </div>
                 }
-              </div>
-            }
 
-            <!-- Pagination Controls -->
-            @if (
-              group()!.groupType !== 'household' &&
-              expenses().length > 0 &&
-              totalExpenses() > pageSize()
-            ) {
-              <div
-                class="flex items-center justify-between mt-6 pt-4 border-t border-border/5"
-              >
-                <button
-                  [disabled]="currentPage() === 1"
-                  (click)="changePage(-1)"
-                  class="py-1.5 px-3 bg-surface hover:bg-surface-alt disabled:opacity-40 disabled:cursor-not-allowed text-secondary rounded-xl text-xs font-bold transition-all"
-                >
-                  Previous
-                </button>
-                <span class="text-xs text-muted font-medium">
-                  Page {{ currentPage() }} of {{ totalPages() }}
-                </span>
-                <button
-                  [disabled]="currentPage() * pageSize() >= totalExpenses()"
-                  (click)="changePage(1)"
-                  class="py-1.5 px-3 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold transition-all"
-                >
-                  Next
-                </button>
+                <!-- Infinite scroll: loading-next-page indicator / end-of-list -->
+                @if (isLoadingMoreExpenses()) {
+                  <div
+                    data-testid="expense-list-loading-more"
+                    class="flex items-center justify-center py-4"
+                  >
+                    <div
+                      class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"
+                    ></div>
+                  </div>
+                } @else if (
+                  !hasMoreExpenses() && expenses().length > pageSize()
+                ) {
+                  <p
+                    data-testid="expense-list-end"
+                    class="text-center text-xs text-muted py-4"
+                  >
+                    You've reached the end of the list.
+                  </p>
+                }
               </div>
             }
           </div>

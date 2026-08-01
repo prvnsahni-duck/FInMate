@@ -212,6 +212,35 @@ export class ExpensesController {
     );
   }
 
+  /**
+   * Soft duplicate check, used by the client before Save to warn the user —
+   * never to block the save. Matches on amount + date + scope + type only;
+   * title is deliberately excluded (see findPotentialDuplicates() doc).
+   */
+  @Get('duplicates')
+  async findDuplicates(
+    @Query('amountTotal') amountTotal: string,
+    @Query('expenseDate') expenseDate: string,
+    @Query('currency') currency: string,
+    @Query('transactionType') transactionType: string | undefined,
+    @Query('groupId') groupId: string | undefined,
+    @Query('excludeId') excludeId: string | undefined,
+    @Req() req: Request & { user: { id: string } },
+  ) {
+    const result = await this.expensesCrudService.findPotentialDuplicates(
+      req.user.id,
+      {
+        amountTotal: Number(amountTotal),
+        expenseDate,
+        currency,
+        transactionType: transactionType === 'refund' ? 'refund' : 'expense',
+        groupId: groupId && groupId !== 'personal' ? groupId : undefined,
+        excludeId,
+      },
+    );
+    return new SuccessResponse('Potential duplicates retrieved', result);
+  }
+
   // ─── Single-expense routes (must come after all literal routes above) ────
 
   @Get(':id')

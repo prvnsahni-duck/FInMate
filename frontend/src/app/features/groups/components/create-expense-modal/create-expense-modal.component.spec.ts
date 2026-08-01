@@ -44,6 +44,7 @@ describe('CreateExpenseModalComponent', () => {
     mockExpensesService = {
       createExpense: jest.fn().mockReturnValue(of({ id: 'exp-new' })),
       updateExpense: jest.fn().mockReturnValue(of({ id: 'exp-1' })),
+      checkDuplicates: jest.fn().mockReturnValue(of([])),
     };
 
     mockFriendsService = {
@@ -458,6 +459,92 @@ describe('CreateExpenseModalComponent', () => {
           groupId: 'group-1',
         }),
       );
+    });
+
+    it('should show the duplicate warning and not save when a matching transaction exists', async () => {
+      mockExpensesService.checkDuplicates.mockReturnValue(
+        of([
+          {
+            id: 'exp-existing',
+            title: 'Dinner',
+            amountTotal: 100,
+            currency: 'USD',
+            category: 'food',
+            expenseDate: '2026-06-28',
+            transactionType: 'expense',
+            paidByUserId: 'user-1',
+          },
+        ]),
+      );
+
+      await component.onSubmit();
+
+      expect(mockExpensesService.checkDuplicates).toHaveBeenCalledWith(
+        expect.objectContaining({
+          amountTotal: 100,
+          expenseDate: '2026-06-28',
+          currency: 'USD',
+          transactionType: 'expense',
+          groupId: 'group-1',
+        }),
+      );
+      expect(component.showDuplicateDialog()).toBe(true);
+      expect(component.potentialDuplicates().length).toBe(1);
+      expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
+    });
+
+    it('proceeds with the save when the user confirms "This is a New Transaction"', async () => {
+      mockExpensesService.checkDuplicates.mockReturnValue(
+        of([
+          {
+            id: 'exp-existing',
+            title: 'Dinner',
+            amountTotal: 100,
+            currency: 'USD',
+            category: 'food',
+            expenseDate: '2026-06-28',
+            transactionType: 'expense',
+            paidByUserId: 'user-1',
+          },
+        ]),
+      );
+
+      await component.onSubmit();
+      expect(component.showDuplicateDialog()).toBe(true);
+
+      await component.confirmNewTransaction();
+
+      expect(component.showDuplicateDialog()).toBe(false);
+      expect(mockExpensesService.createExpense).toHaveBeenCalled();
+      // The resubmit skips the check it already showed the user — it must
+      // not re-run it a second time for the same confirmed submission.
+      expect(mockExpensesService.checkDuplicates).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancels the save and returns to the form when the user confirms "This is the Same Transaction"', async () => {
+      mockExpensesService.checkDuplicates.mockReturnValue(
+        of([
+          {
+            id: 'exp-existing',
+            title: 'Dinner',
+            amountTotal: 100,
+            currency: 'USD',
+            category: 'food',
+            expenseDate: '2026-06-28',
+            transactionType: 'expense',
+            paidByUserId: 'user-1',
+          },
+        ]),
+      );
+
+      await component.onSubmit();
+      expect(component.showDuplicateDialog()).toBe(true);
+
+      component.confirmSameTransaction();
+
+      expect(component.showDuplicateDialog()).toBe(false);
+      expect(component.potentialDuplicates().length).toBe(0);
+      expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
     });
 
     it('should call updateExpense when editing an existing expense', async () => {

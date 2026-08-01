@@ -53,6 +53,16 @@ export class Expense {
   @Column({ type: 'varchar', length: 64 })
   category!: string;
 
+  /**
+   * Distinguishes money leaving the group (`expense`, the default) from money
+   * returning to it (`refund` — e.g. a security-deposit return, cashback, or
+   * cancellation refund). A refund behaves as a *negative* expense: the same
+   * `paidBy*` (who received the money) and `splits` model applies, but its
+   * contribution to balances, settlements and net spending is inverted.
+   */
+  @Column({ type: 'varchar', length: 20, default: 'expense' })
+  transactionType!: 'expense' | 'refund';
+
   @ManyToOne(() => User, { nullable: true })
   paidByUser?: User;
 

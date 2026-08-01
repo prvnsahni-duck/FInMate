@@ -294,7 +294,10 @@ export class SettlementsService {
       // Initialize all current members to 0 for this currency
       allMembers.forEach((m) => balanceMap.set(m.id, 0));
 
-      // Add paid expenses
+      // Add paid expenses. A refund is a negative expense: the payer is the
+      // member who *received* the returned money, so their contribution to the
+      // ledger is inverted (they now effectively owe the group the shared
+      // portion back), while each participant's share swings the other way.
       for (const expense of expenses) {
         if (expense.currency !== currency) continue;
         const payerId = resolveMemberId({
@@ -302,13 +305,14 @@ export class SettlementsService {
           user: expense.paidByUser,
         });
         if (!payerId) continue;
+        const sign = expense.transactionType === 'refund' ? -1 : 1;
         balanceMap.set(
           payerId,
-          (balanceMap.get(payerId) || 0) + Number(expense.amountTotal),
+          (balanceMap.get(payerId) || 0) + sign * Number(expense.amountTotal),
         );
       }
 
-      // Subtract split owes
+      // Subtract split owes (added back for refunds — see the payer loop above)
       for (const split of splits) {
         if (split.expense.currency !== currency) continue;
         const participantId = resolveMemberId({
@@ -316,9 +320,11 @@ export class SettlementsService {
           user: split.participantUser,
         });
         if (!participantId) continue;
+        const sign = split.expense.transactionType === 'refund' ? -1 : 1;
         balanceMap.set(
           participantId,
-          (balanceMap.get(participantId) || 0) - Number(split.amountOwed),
+          (balanceMap.get(participantId) || 0) -
+            sign * Number(split.amountOwed),
         );
       }
 

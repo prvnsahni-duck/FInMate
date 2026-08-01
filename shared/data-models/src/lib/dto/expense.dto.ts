@@ -101,6 +101,17 @@ export class CreateExpenseDto {
   @MaxLength(64, { message: 'Expense category cannot exceed 64 characters' })
   category!: string;
 
+  /**
+   * `expense` (default) = money spent; `refund` = money returned to the group.
+   * A refund reuses the same paidBy/split model but is treated as a negative
+   * expense in every balance and net-spending calculation.
+   */
+  @IsIn(['expense', 'refund'], {
+    message: 'transactionType must be expense or refund',
+  })
+  @IsOptional()
+  transactionType?: 'expense' | 'refund';
+
   /** Required for personal expenses; for group expenses, this or paidByGroupMemberId. */
   @IsUUID('4', { message: 'Paid-by User ID must be a valid UUID' })
   @IsOptional()
@@ -190,6 +201,12 @@ export class UpdateExpenseDto {
   @IsOptional()
   @MaxLength(64, { message: 'Expense category cannot exceed 64 characters' })
   category?: string;
+
+  @IsIn(['expense', 'refund'], {
+    message: 'transactionType must be expense or refund',
+  })
+  @IsOptional()
+  transactionType?: 'expense' | 'refund';
 
   @IsUUID('4', { message: 'Paid-by User ID must be a valid UUID' })
   @IsOptional()

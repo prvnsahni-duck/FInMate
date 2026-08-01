@@ -30,7 +30,11 @@
     <!-- Header (Sticky) -->
     <div class="flex-shrink-0 pr-8">
       <h2 class="text-2xl font-bold mb-1">
-        {{ expense ? 'Edit Expense' : 'Add New Expense' }}
+        {{
+          expense
+            ? 'Edit ' + transactionNoun
+            : 'Add New ' + transactionNoun
+        }}
       </h2>
       <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
         {{
@@ -87,6 +91,58 @@
     >
       <!-- Scrollable Form Body -->
       <div class="flex-1 overflow-y-auto pr-1 -mr-1 space-y-4">
+        <!-- Transaction Type (Expense / Refund) -->
+        <div>
+          <span
+            id="transaction-type-label"
+            class="flex items-center text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
+            >Transaction Type
+            @if (isFieldModified('transactionType')) {
+              <span
+                class="ml-2 text-[10px] font-bold uppercase tracking-wide text-finmate-neon bg-finmate-neon/10 px-1.5 py-0.5 rounded-full"
+                >Modified</span
+              >
+            }
+          </span>
+          <div
+            role="group"
+            aria-labelledby="transaction-type-label"
+            class="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-black/20 border border-slate-200/50 dark:border-white/5"
+          >
+            <button
+              type="button"
+              data-testid="transaction-type-expense"
+              (click)="setTransactionType('expense')"
+              [class]="
+                !isRefund()
+                  ? 'py-2.5 px-4 rounded-xl text-sm font-semibold bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm transition-all'
+                  : 'py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all'
+              "
+            >
+              Expense
+            </button>
+            <button
+              type="button"
+              data-testid="transaction-type-refund"
+              (click)="setTransactionType('refund')"
+              [class]="
+                isRefund()
+                  ? 'py-2.5 px-4 rounded-xl text-sm font-semibold bg-green-500 text-white shadow-sm transition-all'
+                  : 'py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all'
+              "
+            >
+              Refund
+            </button>
+          </div>
+          @if (isRefund()) {
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">
+              A refund records money returning to the group. "Paid By" is the
+              person who received it; the split rule shares it back exactly like
+              an expense.
+            </p>
+          }
+        </div>
+
         <!-- Title / Name -->
         <div>
           <label
@@ -342,7 +398,7 @@
             <label
               for="expense-payer-select"
               class="flex items-center text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-              >Paid By *
+              >{{ isRefund() ? 'Received By *' : 'Paid By *' }}
               @if (isFieldModified('paidByUserId')) {
                 <span
                   class="ml-2 text-[10px] font-bold uppercase tracking-wide text-finmate-neon bg-finmate-neon/10 px-1.5 py-0.5 rounded-full"
@@ -354,7 +410,7 @@
               id="expense-payer-select"
               formControlName="paidByUserId"
               [options]="payerOptions"
-              placeholder="Select payer..."
+              [placeholder]="isRefund() ? 'Who received it...' : 'Select payer...'"
             ></app-dropdown>
           </div>
 
@@ -415,12 +471,12 @@
           </div>
         }
 
-        <!-- Description (Optional) -->
+        <!-- Notes (Optional) -->
         <div>
           <label
             for="expense-desc-input"
             class="flex items-center text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-            >Description (Optional)
+            >Notes (Optional)
             @if (isFieldModified('description')) {
               <span
                 class="ml-2 text-[10px] font-bold uppercase tracking-wide text-finmate-neon bg-finmate-neon/10 px-1.5 py-0.5 rounded-full"
@@ -430,13 +486,25 @@
           </label>
           <textarea
             id="expense-desc-input"
+            data-testid="expense-notes-input"
             formControlName="description"
-            placeholder="Add more details, notes, or comments..."
+            [placeholder]="
+              isRefund()
+                ? 'e.g. Original deposit was ₹20,000; ₹2,000 deducted for electricity before refunding the rest.'
+                : 'Add more details, notes, or comments...'
+            "
             rows="2"
             class="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon outline-none transition-all resize-none"
             [class.ring-1]="isFieldModified('description')"
             [class.ring-finmate-neon]="isFieldModified('description')"
           ></textarea>
+          @if (isRefund()) {
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Use notes to record any deductions (e.g. damages, cleaning fees)
+              taken out before the refund — this is for record-keeping only and
+              won't affect the amount or split.
+            </p>
+          }
         </div>
 
         <!-- Attachments Section (Zero-Knowledge file uploader simulation) -->
@@ -549,10 +617,12 @@
           Cancel
         </button>
         <app-submit-button
-          [label]="'Save Expense'"
+          [label]="'Save ' + transactionNoun"
           [testId]="'expense-save-button'"
-          [loadingLabel]="'Saving...'"
-          [isLoading]="isSubmitting"
+          [loadingLabel]="
+            isCheckingDuplicates() ? 'Checking...' : 'Saving...'
+          "
+          [isLoading]="isSubmitting || isCheckingDuplicates()"
           [disabled]="
             expenseForm.invalid ||
             selectedUserIds.size === 0 ||
@@ -566,4 +636,73 @@
       </div>
     </form>
   </div>
+
+  <!-- Possible Duplicate Transaction confirmation -->
+  @if (showDuplicateDialog()) {
+    <div
+      data-testid="duplicate-warning-backdrop"
+      class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-4 bg-slate-900/70 backdrop-blur-md"
+    >
+      <div
+        data-testid="duplicate-warning-dialog"
+        class="bg-white dark:bg-finmate-card w-full md:max-w-md rounded-t-3xl md:rounded-3xl p-6 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 max-h-[85vh] flex flex-col"
+      >
+        <h3 class="text-lg font-bold mb-1">Possible Duplicate Transaction</h3>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          We found one or more transactions with the same amount and date. Is
+          this the same transaction you already recorded?
+        </p>
+
+        <div class="flex-1 overflow-y-auto space-y-2 -mr-1 pr-1">
+          @for (dup of potentialDuplicates(); track dup.id) {
+            <div
+              data-testid="duplicate-match-row"
+              class="p-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200/50 dark:border-white/5"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-semibold text-sm truncate">{{
+                  dup.title
+                }}</span>
+                <span
+                  class="font-bold text-sm shrink-0"
+                  [class.text-green-500]="dup.transactionType === 'refund'"
+                  [class.text-red-500]="dup.transactionType !== 'refund'"
+                  >{{ dup.transactionType === 'refund' ? '+' : '-'
+                  }}{{ dup.amountTotal | currency: dup.currency }}</span
+                >
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {{ dup.expenseDate | date }} • {{ dup.category }}
+                @if (groupId) {
+                  •
+                  {{ dup.transactionType === 'refund' ? 'Received by' : 'Paid by' }}
+                  {{ duplicatePayerName(dup) }}
+                }
+                • {{ dup.transactionType === 'refund' ? 'Refund' : 'Expense' }}
+              </p>
+            </div>
+          }
+        </div>
+
+        <div class="flex-shrink-0 flex flex-col space-y-2 pt-4 mt-2 border-t border-slate-200 dark:border-white/5">
+          <button
+            type="button"
+            data-testid="duplicate-confirm-new"
+            (click)="confirmNewTransaction()"
+            class="w-full py-3 px-4 bg-primary text-white font-semibold rounded-2xl transition-all hover:brightness-110 active:scale-95"
+          >
+            This is a New Transaction
+          </button>
+          <button
+            type="button"
+            data-testid="duplicate-confirm-same"
+            (click)="confirmSameTransaction()"
+            class="w-full py-3 px-4 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded-2xl font-semibold transition-all"
+          >
+            This is the Same Transaction
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </div>
