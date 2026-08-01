@@ -117,6 +117,57 @@ export class ExpensesService {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
 
+  /**
+   * Signed contribution of an amount to net spending. Refunds count negatively
+   * (money returned), so aggregates read as `expenses − refunds`.
+   */
+  private signedAmount(
+    amount: number | string,
+    transactionType?: 'expense' | 'refund',
+  ): number {
+    const value = Number(amount);
+    return transactionType === 'refund' ? -value : value;
+  }
+
+  /**
+   * Enforces the group transaction editing window on `expenseDate`:
+   *  - Current calendar month: always editable.
+   *  - Previous calendar month: editable through the 7th (inclusive) of the
+   *    current month.
+   *  - Older months: read-only.
+   *
+   * Household groups are exempt — they have their own explicit ledger-close
+   * lock (see the household branch in ensureExpenseAccess). Personal expenses
+   * are not passed through here.
+   */
+  private assertWithinEditWindow(expenseDate: string): void {
+    const [yearStr, monthStr] = expenseDate.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr); // 1-based
+    if (!Number.isFinite(year) || !Number.isFinite(month)) {
+      return;
+    }
+
+    // The 7th (end of day) of the month AFTER the transaction's month. Passing
+    // the 1-based month as JS's 0-based month index lands on the next month and
+    // rolls the year over automatically (e.g. Dec → Jan).
+    const graceEnd = new Date(year, month, 7, 23, 59, 59, 999);
+    if (Date.now() <= graceEnd.getTime()) {
+      return;
+    }
+
+    const txMonthName = new Date(year, month - 1, 1).toLocaleString('en-US', {
+      month: 'long',
+    });
+    const lockMonthName = new Date(year, month, 1).toLocaleString('en-US', {
+      month: 'long',
+    });
+    throw new ForbiddenException({
+      errorCode: 'EXP_EDIT_WINDOW_LOCKED',
+      message: `Transactions from ${txMonthName} could only be modified until 7 ${lockMonthName} and are now locked.`,
+    });
+  }
+
   private async getGroupMembership(
     userId: string,
     groupId: string,
@@ -270,6 +321,10 @@ export class ExpensesService {
             message: `Household expenses from ${expense.ledgerMonth} are locked and cannot be modified`,
           });
         }
+      } else {
+        // Normal groups: previous month editable only until the 7th of the
+        // current month; older months are read-only.
+        this.assertWithinEditWindow(expense.expenseDate);
       }
     }
   }
@@ -415,6 +470,7 @@ export class ExpensesService {
       amountTotal: Number(expense.amountTotal),
       currency: expense.currency,
       category: expense.category,
+      transactionType: expense.transactionType ?? 'expense',
       paidByUserId: expense.paidByUser?.id ?? null,
       paidByGroupMemberId: expense.paidByGroupMember?.id ?? null,
       ownerUserId: expense.ownerUser.id,
@@ -574,6 +630,7 @@ export class ExpensesService {
       amountTotal: Number(expense.amountTotal),
       currency: expense.currency,
       category: expense.category,
+      transactionType: expense.transactionType ?? 'expense',
       paidByUserId: expense.paidByUser?.id ?? null,
       paidByGroupMemberId: expense.paidByGroupMember?.id ?? null,
       ownerUserId: expense.ownerUser?.id ?? null,
@@ -894,6 +951,13 @@ export class ExpensesService {
         });
       }
 
+      // ── Editing-window validation ───────────────────────────────────────
+      // Household groups govern back-dating via their own ledger rules; normal
+      // groups allow the current month plus the previous month until the 7th.
+      if (group.groupType !== 'household') {
+        this.assertWithinEditWindow(dto.expenseDate);
+      }
+
       // Frozen rule: inside a group ledger, the payer always resolves to
       // GroupMember, never User — paidByUserId is accepted as a client
       // convenience (the common "I paid" case) but is resolved to its
@@ -979,6 +1043,7 @@ export class ExpensesService {
           amountTotal: dto.amountTotal,
           currency: dto.currency.toUpperCase(),
           category: dto.category,
+          transactionType: dto.transactionType ?? 'expense',
           paidByUser,
           paidByGroupMember,
           ownerUser,
@@ -1310,6 +1375,22 @@ export class ExpensesService {
       }
     }
 
+    // Re-dating a normal-group transaction must not move it into a locked
+    // month. ensureExpenseAccess already validated the stored date's window;
+    // this guards the *new* date. (Household groups use their own ledger rules.)
+    if (
+      dto.expenseDate !== undefined &&
+      dto.expenseDate !== expense.expenseDate &&
+      expense.group
+    ) {
+      const grp = await this.groupRepository.findOne({
+        where: { id: expense.group.id },
+      });
+      if (grp && grp.groupType !== 'household') {
+        this.assertWithinEditWindow(dto.expenseDate);
+      }
+    }
+
     if (dto.paidByUserId && dto.paidByGroupMemberId) {
       throw new BadRequestException({
         errorCode: 'VAL_INVALID_INPUT',
@@ -1386,6 +1467,8 @@ export class ExpensesService {
     if (dto.currency !== undefined)
       expense.currency = dto.currency.toUpperCase();
     if (dto.category !== undefined) expense.category = dto.category;
+    if (dto.transactionType !== undefined)
+      expense.transactionType = dto.transactionType;
     if (dto.expenseDate !== undefined) expense.expenseDate = dto.expenseDate;
     if (dto.status !== undefined) expense.status = dto.status;
     if (dto.encryptionScope !== undefined)
@@ -1881,6 +1964,7 @@ export class ExpensesService {
         'expense.id',
         'expense.expenseDate',
         'expense.amountTotal',
+        'expense.transactionType',
         'expense.currency',
       ])
       .getMany();
@@ -1890,7 +1974,7 @@ export class ExpensesService {
       const month = exp.expenseDate.slice(0, 7); // YYYY-MM
       const key = `${month}_${exp.currency}`;
       const existing = groups.get(key) || { total: 0, currency: exp.currency };
-      existing.total += Number(exp.amountTotal);
+      existing.total += this.signedAmount(exp.amountTotal, exp.transactionType);
       groups.set(key, existing);
     }
 
@@ -1921,6 +2005,7 @@ export class ExpensesService {
         'expense.id',
         'expense.expenseDate',
         'expense.amountTotal',
+        'expense.transactionType',
         'expense.currency',
       ])
       .getMany();
@@ -1930,7 +2015,7 @@ export class ExpensesService {
       const year = exp.expenseDate.slice(0, 4); // YYYY
       const key = `${year}_${exp.currency}`;
       const existing = groups.get(key) || { total: 0, currency: exp.currency };
-      existing.total += Number(exp.amountTotal);
+      existing.total += this.signedAmount(exp.amountTotal, exp.transactionType);
       groups.set(key, existing);
     }
 
@@ -1968,6 +2053,7 @@ export class ExpensesService {
         'expense.id',
         'expense.category',
         'expense.amountTotal',
+        'expense.transactionType',
         'expense.currency',
       ])
       .getMany();
@@ -1976,7 +2062,7 @@ export class ExpensesService {
     for (const exp of expenses) {
       const key = `${exp.category}_${exp.currency}`;
       const existing = groups.get(key) || { total: 0, currency: exp.currency };
-      existing.total += Number(exp.amountTotal);
+      existing.total += this.signedAmount(exp.amountTotal, exp.transactionType);
       groups.set(key, existing);
     }
 
@@ -2677,11 +2763,12 @@ export class ExpensesService {
 
     const categorySum = new Map<string, { amount: number; currency: string }>();
 
-    // Add 100% personal expenses (paid by user, group is null, no splits exist)
+    // Add 100% personal expenses (paid by user, group is null, no splits exist).
+    // Refunds count negatively so net spending = expenses − refunds.
     for (const exp of paidPersonalExpenses) {
       if (!personalExpenseHasSplits.has(exp.id)) {
         const cat = exp.category || 'Other';
-        const amount = Number(exp.amountTotal);
+        const amount = this.signedAmount(exp.amountTotal, exp.transactionType);
         const curr = exp.currency || 'USD';
         const key = `${cat}_${curr}`;
         const entry = categorySum.get(key) ?? { amount: 0, currency: curr };
@@ -2690,11 +2777,12 @@ export class ExpensesService {
       }
     }
 
-    // Add split shares (owes) for both group and direct split expenses
+    // Add split shares (owes) for both group and direct split expenses. A
+    // refund share reduces the participant's net spending.
     for (const split of userSplits) {
       const exp = split.expense;
       const cat = exp.category || 'Other';
-      const amount = Number(split.amountOwed);
+      const amount = this.signedAmount(split.amountOwed, exp.transactionType);
       const curr = exp.currency || 'USD';
       const key = `${cat}_${curr}`;
       const entry = categorySum.get(key) ?? { amount: 0, currency: curr };

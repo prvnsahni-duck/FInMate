@@ -944,6 +944,85 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return resolveUserDisplayName(this.members(), userId);
   }
 
+  /** True when a transaction is a refund (money returned to the group) rather
+   *  than a normal expense — drives every visual distinction in the ledger. */
+  isRefundTx(entity: { transactionType?: string | null }): boolean {
+    return entity.transactionType === 'refund';
+  }
+
+  /**
+   * Mirrors the backend's editing-window rule (see
+   * ExpensesService.assertWithinEditWindow): the current calendar month is
+   * always editable; the previous month is editable through the 7th
+   * (inclusive) of the current month; anything older is read-only. Household
+   * groups are exempt — they use their own explicit ledger-close lock
+   * (isMonthLocked, driven by the month-navigation timeline).
+   */
+  private isPastEditWindow(expenseDate: string): boolean {
+    const [yearStr, monthStr] = expenseDate.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr); // 1-based
+    if (!Number.isFinite(year) || !Number.isFinite(month)) return false;
+    // Passing the 1-based month as JS's 0-based index lands on the next
+    // month, rolling the year over automatically (e.g. Dec -> Jan).
+    const graceEnd = new Date(year, month, 7, 23, 59, 59, 999);
+    return Date.now() > graceEnd.getTime();
+  }
+
+  /** True if this expense can no longer be added/edited/deleted per the
+   *  previous-month editing window (or the household ledger-close lock). */
+  isExpenseEditLocked(expense: GroupExpense): boolean {
+    const g = this.group();
+    if (g?.groupType === 'household') {
+      return this.isMonthLocked();
+    }
+    return this.isPastEditWindow(expense.expenseDate);
+  }
+
+  /**
+   * Group spending summary for the currently-loaded ledger page: total
+   * expenses, total refunds, and net spending (expenses − refunds), in the
+   * group's base currency. Client-side, page-scoped — matches what's on
+   * screen; the authoritative per-currency figures live in balances().
+   */
+  ledgerSpendingSummary = computed(() => {
+    const g = this.group();
+    const currency = g?.currency;
+    let totalExpense = 0;
+    let totalRefund = 0;
+    for (const expense of this.expenses()) {
+      if (expense.status === 'void') continue;
+      if (currency && expense.currency !== currency) continue;
+      const amount = Number(expense.amountTotal) || 0;
+      if (this.isRefundTx(expense)) {
+        totalRefund += amount;
+      } else {
+        totalExpense += amount;
+      }
+    }
+    return {
+      totalExpense,
+      totalRefund,
+      netSpending: totalExpense - totalRefund,
+    };
+  });
+
+  /** User-facing explanation for why a locked transaction can't be touched. */
+  expenseLockMessage(expense: GroupExpense): string {
+    const g = this.group();
+    if (g?.groupType === 'household') {
+      return `Household expenses from ${expense.ledgerMonth ?? 'a previous month'} are locked and cannot be modified.`;
+    }
+    const d = new Date(expense.expenseDate);
+    const txMonth = d.toLocaleDateString('en-US', { month: 'long' });
+    const lockDeadline = new Date(
+      d.getFullYear(),
+      d.getMonth() + 1,
+      1,
+    ).toLocaleDateString('en-US', { month: 'long' });
+    return `Transactions from ${txMonth} could only be modified until 7 ${lockDeadline} and are now locked.`;
+  }
+
   /** Resolves the payer display name for a group expense or recurring template.
    *  Prefers paidByUserId; falls back to paidByGroupMemberId so contact-backed
    *  (pending) payers are handled correctly via memberDisplayName(). */

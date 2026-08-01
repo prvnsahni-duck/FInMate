@@ -473,7 +473,7 @@ describe('ExpensesService', () => {
       category: 'Travel',
       paidByUser: { id: 'caller-id' },
       ownerUser: { id: 'caller-id' },
-      expenseDate: '2026-06-10',
+      expenseDate: '2026-07-10',
       status: 'posted',
       group: { id: 'group-id' },
     } as any);
@@ -616,7 +616,7 @@ describe('ExpensesService', () => {
       category: 'Food',
       paidByUserId: 'caller-id',
       groupId: 'group-id',
-      expenseDate: '2026-06-10',
+      expenseDate: '2026-07-10',
       splits: [
         { participantUserId: 'caller-id', splitType: 'equal', shareValue: 1 },
       ],
@@ -775,7 +775,7 @@ describe('ExpensesService', () => {
         amountTotal: 100,
         currency: 'USD',
         category: 'Food',
-        expenseDate: '2026-06-10',
+        expenseDate: '2026-07-10',
         status: 'posted',
         encryptionScope: 'group',
         isCarryForward: false,
@@ -1099,7 +1099,7 @@ describe('ExpensesService', () => {
           category: 'Food',
           paidByUserId: 'caller-id',
           groupId: 'group-id',
-          expenseDate: '2026-06-10',
+          expenseDate: '2026-07-10',
           splits: [
             {
               participantUserId: 'spectator-id',

@@ -64,6 +64,12 @@ export class UpdateExpenseDto {
   @IsOptional()
   category?: string;
 
+  @IsIn(['expense', 'refund'], {
+    message: 'transactionType must be expense or refund',
+  })
+  @IsOptional()
+  transactionType?: 'expense' | 'refund';
+
   @IsUUID('4', { message: 'paidByUserId must be a valid UUID v4' })
   @IsOptional()
   paidByUserId?: string;

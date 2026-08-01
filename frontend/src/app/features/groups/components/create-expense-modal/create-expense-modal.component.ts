@@ -73,6 +73,7 @@ interface ExpenseSnapshot {
   amountTotal: number | null;
   currency: string;
   category: string;
+  transactionType: 'expense' | 'refund';
   expenseDate: string;
   paidByUserId: string;
   participantIds: string[];
@@ -275,6 +276,18 @@ export class CreateExpenseModalComponent implements OnChanges {
       });
     }
 
+    const transactionType = (v.transactionType ?? 'expense') as
+      | 'expense'
+      | 'refund';
+    if (transactionType !== snap.transactionType) {
+      changes.push({
+        key: 'transactionType',
+        label: 'Type',
+        from: snap.transactionType === 'refund' ? 'Refund' : 'Expense',
+        to: transactionType === 'refund' ? 'Refund' : 'Expense',
+      });
+    }
+
     const expenseDate = v.expenseDate ?? '';
     if (expenseDate !== snap.expenseDate) {
       changes.push({
@@ -411,6 +424,7 @@ export class CreateExpenseModalComponent implements OnChanges {
   expenseForm = this.fb.group({
     title: ['', [Validators.required, Validators.maxLength(160)]],
     description: [''],
+    transactionType: ['expense' as 'expense' | 'refund', [Validators.required]],
     amountTotal: [
       null as number | null,
       [Validators.required, Validators.min(0.01)],
@@ -423,6 +437,21 @@ export class CreateExpenseModalComponent implements OnChanges {
     expenseDate: [this.getTodayDateString(), [Validators.required]],
     paidByUserId: ['', [Validators.required]],
   });
+
+  /** True when the user is recording a refund (money returning to the group). */
+  isRefund = computed(() => {
+    this.changeTick(); // reactive dependency — form is mutated imperatively
+    return this.expenseForm.get('transactionType')?.value === 'refund';
+  });
+
+  get transactionNoun(): string {
+    return this.isRefund() ? 'Refund' : 'Expense';
+  }
+
+  setTransactionType(type: 'expense' | 'refund'): void {
+    this.expenseForm.patchValue({ transactionType: type });
+    this.markChanged();
+  }
 
   get currencySymbol(): string {
     const cur = this.expenseForm.get('currency')?.value;
@@ -585,6 +614,8 @@ export class CreateExpenseModalComponent implements OnChanges {
       this.expenseForm.patchValue({
         title: this.expense.title,
         description: this.expense.description || '',
+        transactionType:
+          (this.expense.transactionType as 'expense' | 'refund') ?? 'expense',
         amountTotal: this.expense.amountTotal,
         currency: this.expense.currency,
         category: this.expense.category,
@@ -663,6 +694,8 @@ export class CreateExpenseModalComponent implements OnChanges {
             : Number(this.expense.amountTotal),
         currency: this.expense.currency ?? '',
         category: this.expense.category ?? '',
+        transactionType:
+          (this.expense.transactionType as 'expense' | 'refund') ?? 'expense',
         expenseDate: this.expense.expenseDate ?? '',
         paidByUserId: this.expense.paidByUserId ?? '',
         participantIds: Array.from(this.selectedUserIds).sort(),
@@ -1033,6 +1066,7 @@ export class CreateExpenseModalComponent implements OnChanges {
         const payload: any = {
           title,
           description: formValue.description ?? undefined,
+          transactionType: formValue.transactionType ?? 'expense',
           amountTotal,
           currency,
           category,
