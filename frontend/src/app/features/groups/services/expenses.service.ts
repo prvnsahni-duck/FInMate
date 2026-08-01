@@ -17,6 +17,20 @@ import { GroupKeyService } from '../../../core/services/group-key.service';
 import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
 import { CryptoSessionManager } from '../../../core/services/crypto-session-manager.service';
 
+/** Minimal shape of a duplicate-check match — only what the warning dialog
+ *  needs to display, decrypted client-side like any other expense list item. */
+export interface DuplicateExpenseMatch {
+  id: string;
+  title: string;
+  amountTotal: number;
+  currency: string;
+  category: string;
+  expenseDate: string;
+  transactionType?: 'expense' | 'refund';
+  paidByUserId?: string | null;
+  paidByGroupMemberId?: string | null;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -321,5 +335,45 @@ export class ExpensesService {
    */
   importExpenses(formData: FormData): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/import/expenses`, formData);
+  }
+
+  /**
+   * Soft duplicate check — used before Save to warn (never block) the user.
+   * Matches on amount + date + scope (personal/group) + transaction type
+   * only; title is deliberately excluded (users write wildly different
+   * titles for the same real-world transaction). `excludeId` omits the
+   * expense currently being edited from its own duplicate results.
+   */
+  checkDuplicates(params: {
+    amountTotal: number;
+    expenseDate: string;
+    currency: string;
+    transactionType: 'expense' | 'refund';
+    groupId?: string;
+    excludeId?: string;
+  }): Observable<DuplicateExpenseMatch[]> {
+    let httpParams = new HttpParams()
+      .set('amountTotal', params.amountTotal.toString())
+      .set('expenseDate', params.expenseDate)
+      .set('currency', params.currency)
+      .set('transactionType', params.transactionType);
+    if (params.groupId) {
+      httpParams = httpParams.set('groupId', params.groupId);
+    }
+    if (params.excludeId) {
+      httpParams = httpParams.set('excludeId', params.excludeId);
+    }
+
+    return this.http
+      .get<any>(`${this.baseUrl}/expenses/duplicates`, { params: httpParams })
+      .pipe(
+        mergeMap(async (res) => {
+          const items: any[] = Array.isArray(res.data) ? res.data : [];
+          if (items.length === 0) return [];
+          return (await this.decryptor.decryptExpenses(
+            items,
+          )) as DuplicateExpenseMatch[];
+        }),
+      );
   }
 }

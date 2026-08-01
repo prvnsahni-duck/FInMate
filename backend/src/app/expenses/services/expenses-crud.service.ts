@@ -32,6 +32,20 @@ export class ExpensesCrudService {
     return this.expensesService.listExpenses(userId, params);
   }
 
+  async findPotentialDuplicates(
+    userId: string,
+    params: {
+      amountTotal: number;
+      expenseDate: string;
+      currency: string;
+      transactionType?: 'expense' | 'refund';
+      groupId?: string;
+      excludeId?: string;
+    },
+  ): Promise<Record<string, unknown>[]> {
+    return this.expensesService.findPotentialDuplicates(userId, params);
+  }
+
   async getExpenseById(
     userId: string,
     id: string,

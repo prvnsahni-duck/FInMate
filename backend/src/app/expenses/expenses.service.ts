@@ -1165,6 +1165,89 @@ export class ExpensesService {
     return this.mapExpenseResponse(saved);
   }
 
+  /**
+   * Soft duplicate check: finds other posted transactions in the same scope
+   * (personal, or a specific group) with the same amount, date, currency and
+   * transaction type. Never blocks a save — the caller (frontend) uses this
+   * only to warn the user and let them decide. Title is intentionally never
+   * part of the match (users write wildly different titles for the same
+   * real-world transaction), so results are capped and returned in the same
+   * shape as listExpenses()/getExpenseById() for the caller to decrypt.
+   */
+  async findPotentialDuplicates(
+    userId: string,
+    params: {
+      amountTotal: number;
+      expenseDate: string;
+      currency: string;
+      transactionType?: 'expense' | 'refund';
+      groupId?: string;
+      excludeId?: string;
+    },
+  ): Promise<Record<string, unknown>[]> {
+    if (!Number.isFinite(params.amountTotal) || params.amountTotal <= 0) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'amountTotal must be a positive number',
+      });
+    }
+    if (!this.isValidDateFormat(params.expenseDate)) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'expenseDate must use YYYY-MM-DD format',
+      });
+    }
+
+    if (params.groupId) {
+      const membership = await this.getGroupMembership(userId, params.groupId);
+      if (!membership) {
+        throw new ForbiddenException('You do not have access to this group');
+      }
+    }
+
+    const query = this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.ownerUser', 'ownerUser')
+      .leftJoinAndSelect('expense.group', 'group')
+      .leftJoinAndSelect('expense.groupKeyVersion', 'groupKeyVersion')
+      .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember')
+      .where('expense.status != :voidStatus', { voidStatus: 'void' })
+      .andWhere('expense.amountTotal = :amountTotal', {
+        amountTotal: params.amountTotal,
+      })
+      .andWhere('expense.expenseDate = :expenseDate', {
+        expenseDate: params.expenseDate,
+      })
+      .andWhere('expense.currency = :currency', {
+        currency: params.currency.toUpperCase(),
+      })
+      .andWhere('expense.transactionType = :transactionType', {
+        transactionType: params.transactionType ?? 'expense',
+      });
+
+    if (params.groupId) {
+      query.andWhere('group.id = :groupId', { groupId: params.groupId });
+    } else {
+      query.andWhere('group.id IS NULL AND ownerUser.id = :userId', {
+        userId,
+      });
+    }
+
+    if (params.excludeId) {
+      query.andWhere('expense.id != :excludeId', {
+        excludeId: params.excludeId,
+      });
+    }
+
+    const matches = await query
+      .orderBy('expense.createdAt', 'DESC')
+      .take(10)
+      .getMany();
+
+    return this.batchMapExpenseResponses(matches);
+  }
+
   /** List expenses with pagination and filtering. */
   async listExpenses(
     userId: string,

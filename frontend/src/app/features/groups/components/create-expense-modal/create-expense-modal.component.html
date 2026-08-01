@@ -614,10 +614,12 @@
           Cancel
         </button>
         <app-submit-button
-          [label]="'Save Expense'"
+          [label]="'Save ' + transactionNoun"
           [testId]="'expense-save-button'"
-          [loadingLabel]="'Saving...'"
-          [isLoading]="isSubmitting"
+          [loadingLabel]="
+            isCheckingDuplicates() ? 'Checking...' : 'Saving...'
+          "
+          [isLoading]="isSubmitting || isCheckingDuplicates()"
           [disabled]="
             expenseForm.invalid ||
             selectedUserIds.size === 0 ||
@@ -631,4 +633,73 @@
       </div>
     </form>
   </div>
+
+  <!-- Possible Duplicate Transaction confirmation -->
+  @if (showDuplicateDialog()) {
+    <div
+      data-testid="duplicate-warning-backdrop"
+      class="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-4 bg-slate-900/70 backdrop-blur-md"
+    >
+      <div
+        data-testid="duplicate-warning-dialog"
+        class="bg-white dark:bg-finmate-card w-full md:max-w-md rounded-t-3xl md:rounded-3xl p-6 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 max-h-[85vh] flex flex-col"
+      >
+        <h3 class="text-lg font-bold mb-1">Possible Duplicate Transaction</h3>
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">
+          We found one or more transactions with the same amount and date. Is
+          this the same transaction you already recorded?
+        </p>
+
+        <div class="flex-1 overflow-y-auto space-y-2 -mr-1 pr-1">
+          @for (dup of potentialDuplicates(); track dup.id) {
+            <div
+              data-testid="duplicate-match-row"
+              class="p-3 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200/50 dark:border-white/5"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-semibold text-sm truncate">{{
+                  dup.title
+                }}</span>
+                <span
+                  class="font-bold text-sm shrink-0"
+                  [class.text-green-500]="dup.transactionType === 'refund'"
+                  [class.text-red-500]="dup.transactionType !== 'refund'"
+                  >{{ dup.transactionType === 'refund' ? '+' : '-'
+                  }}{{ dup.amountTotal | currency: dup.currency }}</span
+                >
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                {{ dup.expenseDate | date }} • {{ dup.category }}
+                @if (groupId) {
+                  •
+                  {{ dup.transactionType === 'refund' ? 'Received by' : 'Paid by' }}
+                  {{ duplicatePayerName(dup) }}
+                }
+                • {{ dup.transactionType === 'refund' ? 'Refund' : 'Expense' }}
+              </p>
+            </div>
+          }
+        </div>
+
+        <div class="flex-shrink-0 flex flex-col space-y-2 pt-4 mt-2 border-t border-slate-200 dark:border-white/5">
+          <button
+            type="button"
+            data-testid="duplicate-confirm-new"
+            (click)="confirmNewTransaction()"
+            class="w-full py-3 px-4 bg-primary text-white font-semibold rounded-2xl transition-all hover:brightness-110 active:scale-95"
+          >
+            This is a New Transaction
+          </button>
+          <button
+            type="button"
+            data-testid="duplicate-confirm-same"
+            (click)="confirmSameTransaction()"
+            class="w-full py-3 px-4 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded-2xl font-semibold transition-all"
+          >
+            This is the Same Transaction
+          </button>
+        </div>
+      </div>
+    </div>
+  }
 </div>

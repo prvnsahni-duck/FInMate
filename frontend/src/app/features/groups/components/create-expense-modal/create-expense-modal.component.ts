@@ -11,6 +11,7 @@ import {
   computed,
 } from '@angular/core';
 import { Subscription } from 'rxjs';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import {
   ReactiveFormsModule,
   FormsModule,
@@ -20,7 +21,10 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { jwtDecode } from 'jwt-decode';
-import { ExpensesService } from '../../services/expenses.service';
+import {
+  DuplicateExpenseMatch,
+  ExpensesService,
+} from '../../services/expenses.service';
 import { FriendsService } from '../../../../features/friends/services/friends.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 import {
@@ -89,6 +93,8 @@ interface ExpenseSnapshot {
     SubmitButtonComponent,
     DropdownComponent,
     CryptoRecoveryPanelComponent,
+    CurrencyPipe,
+    DatePipe,
   ],
   templateUrl: './create-expense-modal.component.html',
 })
@@ -128,6 +134,15 @@ export class CreateExpenseModalComponent implements OnChanges {
   isSubmitting = false;
   errorMessage = '';
   attachedFiles: { name: string; size: string; key: string }[] = [];
+
+  // --- Possible-duplicate warning (amount + date + scope + type match) ---
+  showDuplicateDialog = signal(false);
+  potentialDuplicates = signal<DuplicateExpenseMatch[]>([]);
+  isCheckingDuplicates = signal(false);
+  /** Consumed by the very next onSubmit() call only — set when the user
+   *  confirms "This is a New Transaction" so that specific resubmit skips
+   *  the check it already showed them, without suppressing future checks. */
+  private skipDuplicateCheckOnce = false;
 
   /**
    * Reactive group-key availability, checked proactively as soon as groupId
@@ -844,6 +859,32 @@ export class CreateExpenseModalComponent implements OnChanges {
     this.closeModalEvent.emit();
   }
 
+  /** "This is a New Transaction": dismiss the warning and resubmit once,
+   *  skipping the check that just ran (it already showed the user these
+   *  matches — no need to ask again for this same submit). */
+  async confirmNewTransaction(): Promise<void> {
+    this.showDuplicateDialog.set(false);
+    this.potentialDuplicates.set([]);
+    this.skipDuplicateCheckOnce = true;
+    await this.onSubmit();
+  }
+
+  /** "This is the Same Transaction": cancel the save and return to the form. */
+  confirmSameTransaction(): void {
+    this.showDuplicateDialog.set(false);
+    this.potentialDuplicates.set([]);
+  }
+
+  /** Payer/receiver display name for a duplicate-match row in the warning
+   *  dialog — falls back gracefully since the match may involve a member
+   *  not in the current payer list (e.g. a pending/removed member). */
+  duplicatePayerName(item: DuplicateExpenseMatch): string {
+    const id = item.paidByUserId;
+    if (!id) return 'Unknown';
+    const payer = this.availablePayers.find((p) => p.id === id);
+    return payer?.name ?? 'Unknown';
+  }
+
   filesToEncrypt: Array<{
     name: string;
     type: string;
@@ -906,6 +947,9 @@ export class CreateExpenseModalComponent implements OnChanges {
       const amountTotal = formValue.amountTotal;
       const currency = formValue.currency;
       const category = formValue.category;
+      const transactionType = (formValue.transactionType ?? 'expense') as
+        | 'expense'
+        | 'refund';
       const expenseDate = formValue.expenseDate;
       const paidByUserId = formValue.paidByUserId;
 
@@ -921,6 +965,38 @@ export class CreateExpenseModalComponent implements OnChanges {
         this.isSubmitting = false;
         return;
       }
+
+      // Soft duplicate check: amount + date + scope + type only (never
+      // title). Purely advisory — shows a confirmation dialog and returns
+      // without saving; skipDuplicateCheckOnce lets the very next resubmit
+      // (after the user picks "This is a New Transaction") through without
+      // re-showing the same warning.
+      if (!this.skipDuplicateCheckOnce) {
+        this.isCheckingDuplicates.set(true);
+        try {
+          const duplicates = await firstValueFrom(
+            this.expensesService.checkDuplicates({
+              amountTotal,
+              expenseDate,
+              currency,
+              transactionType,
+              groupId: this.groupId ?? undefined,
+              excludeId: this.expense?.id,
+            }),
+          );
+          if (duplicates.length > 0) {
+            this.isSubmitting = false;
+            this.potentialDuplicates.set(duplicates);
+            this.showDuplicateDialog.set(true);
+            return;
+          }
+        } catch {
+          // Advisory only — a failed check must never block a legitimate save.
+        } finally {
+          this.isCheckingDuplicates.set(false);
+        }
+      }
+      this.skipDuplicateCheckOnce = false;
 
       try {
         const user = this.getCurrentUserId();
