@@ -382,10 +382,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return g ? this.archiveConfirmName().trim() === g.name.trim() : false;
   });
 
-  totalPages = computed(() => {
-    return Math.ceil(this.totalExpenses() / this.pageSize()) || 1;
-  });
-
   ngOnInit() {
     this.currentUserId.set(this.getCurrentUserId());
     this.closeMonthSelected.set(this.getCurrentMonthString());
@@ -751,13 +747,31 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
+  /** True while a subsequent page is being appended via infinite scroll
+   *  (distinct from isLoadingExpenses, which covers the initial/replace load
+   *  and drives the full-list skeleton/dim state). */
+  isLoadingMoreExpenses = signal<boolean>(false);
+
+  /** More pages remain to fetch for the current filter set. */
+  hasMoreExpenses = computed(
+    () => this.expenses().length < this.totalExpenses(),
+  );
+
   /**
    * Owns its own section-scoped loading/error state (isLoadingExpenses /
    * ledgerError) — it no longer touches the page-wide isLoading/showSkeleton
    * gate, which now only covers the brief window until getGroup() resolves.
+   *
+   * `append`: false (default) replaces the list — used for the initial load
+   * and whenever filters/group/page reset to 1. true appends the fetched
+   * page to the existing list — used by infinite scroll (loadMoreExpenses).
    */
-  fetchExpenses(groupId: string) {
-    this.isLoadingExpenses.set(true);
+  fetchExpenses(groupId: string, append = false) {
+    if (append) {
+      this.isLoadingMoreExpenses.set(true);
+    } else {
+      this.isLoadingExpenses.set(true);
+    }
     let start = this.filterStartDate();
     let end = this.filterEndDate();
     const g = this.group();
@@ -819,19 +833,52 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
               splits: mappedSplits,
             } as GroupExpense;
           });
-          this.expenses.set(mappedExpenses);
+          if (append) {
+            this.expenses.update((prev) => [...prev, ...mappedExpenses]);
+          } else {
+            this.expenses.set(mappedExpenses);
+          }
           this.totalExpenses.set(res.meta?.totalItems || 0);
           this.isLoadingExpenses.set(false);
+          this.isLoadingMoreExpenses.set(false);
           this.ledgerError.set(false);
           // Hand the freshly-fetched list to the coordinator for
-          // classification + automatic retry/recovery.
+          // classification + automatic retry/recovery. Safe to call
+          // repeatedly over the full (old + newly-appended) list — it
+          // re-decrypts from each item's preserved ciphertext and skips
+          // anything already successfully decrypted.
           this.startDecryption();
         },
         error: () => {
           this.isLoadingExpenses.set(false);
+          this.isLoadingMoreExpenses.set(false);
           this.ledgerError.set(true);
         },
       });
+  }
+
+  /**
+   * Infinite scroll: called when the ledger's scrollable list nears its
+   * bottom (see onExpenseListScroll in the template). Guards against
+   * duplicate in-flight requests and stops once every page has loaded.
+   */
+  loadMoreExpenses(): void {
+    if (this.isLoadingExpenses() || this.isLoadingMoreExpenses()) return;
+    if (!this.hasMoreExpenses()) return;
+    const g = this.group();
+    if (!g?.id) return;
+    this.currentPage.update((v) => v + 1);
+    this.fetchExpenses(g.id, true);
+  }
+
+  /** Scroll handler for the bounded expense-list container — triggers the
+   *  next page once the user is within `threshold`px of the bottom. */
+  onExpenseListScroll(event: Event): void {
+    const el = event.target as HTMLElement;
+    const threshold = 200;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) {
+      this.loadMoreExpenses();
+    }
   }
 
   fetchMembers(groupId: string) {
@@ -1207,14 +1254,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         error: (err) =>
           alert(err.error?.message || 'Import failed. Check file format.'),
       });
-    }
-  }
-
-  changePage(delta: number) {
-    this.currentPage.update((val) => val + delta);
-    const g = this.group();
-    if (g?.id) {
-      this.fetchExpenses(g.id);
     }
   }
 

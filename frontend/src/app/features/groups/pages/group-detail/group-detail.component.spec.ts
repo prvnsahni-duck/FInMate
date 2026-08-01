@@ -475,6 +475,123 @@ describe('GroupDetailComponent', () => {
     });
   });
 
+  describe('infinite scroll ledger pagination', () => {
+    const page1Item = { id: 'exp-1', title: 'First', amountTotal: 10 };
+    const page2Item = { id: 'exp-2', title: 'Second', amountTotal: 20 };
+
+    it('appends (not replaces) the next page and increments currentPage', () => {
+      mockExpensesService.getExpenses = jest
+        .fn()
+        .mockReturnValueOnce(
+          of({ data: [page1Item], meta: { totalItems: 2 } }),
+        )
+        .mockReturnValueOnce(
+          of({ data: [page2Item], meta: { totalItems: 2 } }),
+        ) as any;
+
+      fixture.detectChanges();
+
+      expect(component.expenses().length).toBe(1);
+      expect(component.currentPage()).toBe(1);
+      expect(component.hasMoreExpenses()).toBe(true);
+
+      component.loadMoreExpenses();
+
+      expect(component.currentPage()).toBe(2);
+      expect(component.expenses().length).toBe(2);
+      expect(component.expenses().map((e) => e.id)).toEqual([
+        'exp-1',
+        'exp-2',
+      ]);
+      expect(component.hasMoreExpenses()).toBe(false);
+    });
+
+    it('does not fetch another page while one is already loading', () => {
+      const secondPageSubject = new Subject<{
+        data: unknown[];
+        meta: { totalItems: number };
+      }>();
+      mockExpensesService.getExpenses = jest
+        .fn()
+        .mockReturnValueOnce(
+          of({ data: [page1Item], meta: { totalItems: 2 } }),
+        )
+        .mockReturnValue(secondPageSubject.asObservable()) as any;
+
+      fixture.detectChanges();
+
+      component.loadMoreExpenses();
+      expect(component.isLoadingMoreExpenses()).toBe(true);
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledTimes(2);
+
+      // A second trigger while the first page-2 request is still in flight
+      // must not fire a duplicate request.
+      component.loadMoreExpenses();
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledTimes(2);
+
+      secondPageSubject.next({ data: [page2Item], meta: { totalItems: 2 } });
+      secondPageSubject.complete();
+    });
+
+    it('does not fetch beyond the last page once every item has loaded', () => {
+      mockExpensesService.getExpenses = jest
+        .fn()
+        .mockReturnValue(
+          of({ data: [page1Item], meta: { totalItems: 1 } }),
+        ) as any;
+
+      fixture.detectChanges();
+
+      expect(component.hasMoreExpenses()).toBe(false);
+      component.loadMoreExpenses();
+
+      // Only the initial load — loadMoreExpenses() was a no-op.
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledTimes(1);
+      expect(component.currentPage()).toBe(1);
+    });
+
+    it('triggers loadMoreExpenses via onExpenseListScroll once near the bottom', () => {
+      mockExpensesService.getExpenses = jest
+        .fn()
+        .mockReturnValueOnce(
+          of({ data: [page1Item], meta: { totalItems: 2 } }),
+        )
+        .mockReturnValueOnce(
+          of({ data: [page2Item], meta: { totalItems: 2 } }),
+        ) as any;
+
+      fixture.detectChanges();
+
+      const scrollTarget = {
+        scrollHeight: 1000,
+        scrollTop: 850,
+        clientHeight: 200,
+      } as unknown as HTMLElement;
+      component.onExpenseListScroll({ target: scrollTarget } as unknown as Event);
+
+      expect(component.currentPage()).toBe(2);
+      expect(component.expenses().length).toBe(2);
+    });
+
+    it('does not trigger loadMoreExpenses when far from the bottom', () => {
+      mockExpensesService.getExpenses = jest
+        .fn()
+        .mockReturnValue(of({ data: [page1Item], meta: { totalItems: 5 } })) as any;
+
+      fixture.detectChanges();
+
+      const scrollTarget = {
+        scrollHeight: 1000,
+        scrollTop: 0,
+        clientHeight: 200,
+      } as unknown as HTMLElement;
+      component.onExpenseListScroll({ target: scrollTarget } as unknown as Event);
+
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledTimes(1);
+      expect(component.currentPage()).toBe(1);
+    });
+  });
+
   it('should handle toggle of contribution mode', () => {
     fixture.detectChanges();
     expect(component.contributionMode).toBe('amount');
