@@ -482,9 +482,7 @@ describe('GroupDetailComponent', () => {
     it('appends (not replaces) the next page and increments currentPage', () => {
       mockExpensesService.getExpenses = jest
         .fn()
-        .mockReturnValueOnce(
-          of({ data: [page1Item], meta: { totalItems: 2 } }),
-        )
+        .mockReturnValueOnce(of({ data: [page1Item], meta: { totalItems: 2 } }))
         .mockReturnValueOnce(
           of({ data: [page2Item], meta: { totalItems: 2 } }),
         ) as any;
@@ -499,10 +497,7 @@ describe('GroupDetailComponent', () => {
 
       expect(component.currentPage()).toBe(2);
       expect(component.expenses().length).toBe(2);
-      expect(component.expenses().map((e) => e.id)).toEqual([
-        'exp-1',
-        'exp-2',
-      ]);
+      expect(component.expenses().map((e) => e.id)).toEqual(['exp-1', 'exp-2']);
       expect(component.hasMoreExpenses()).toBe(false);
     });
 
@@ -513,9 +508,7 @@ describe('GroupDetailComponent', () => {
       }>();
       mockExpensesService.getExpenses = jest
         .fn()
-        .mockReturnValueOnce(
-          of({ data: [page1Item], meta: { totalItems: 2 } }),
-        )
+        .mockReturnValueOnce(of({ data: [page1Item], meta: { totalItems: 2 } }))
         .mockReturnValue(secondPageSubject.asObservable()) as any;
 
       fixture.detectChanges();
@@ -553,9 +546,7 @@ describe('GroupDetailComponent', () => {
     it('triggers loadMoreExpenses via onExpenseListScroll once near the bottom', () => {
       mockExpensesService.getExpenses = jest
         .fn()
-        .mockReturnValueOnce(
-          of({ data: [page1Item], meta: { totalItems: 2 } }),
-        )
+        .mockReturnValueOnce(of({ data: [page1Item], meta: { totalItems: 2 } }))
         .mockReturnValueOnce(
           of({ data: [page2Item], meta: { totalItems: 2 } }),
         ) as any;
@@ -567,7 +558,9 @@ describe('GroupDetailComponent', () => {
         scrollTop: 850,
         clientHeight: 200,
       } as unknown as HTMLElement;
-      component.onExpenseListScroll({ target: scrollTarget } as unknown as Event);
+      component.onExpenseListScroll({
+        target: scrollTarget,
+      } as unknown as Event);
 
       expect(component.currentPage()).toBe(2);
       expect(component.expenses().length).toBe(2);
@@ -576,7 +569,9 @@ describe('GroupDetailComponent', () => {
     it('does not trigger loadMoreExpenses when far from the bottom', () => {
       mockExpensesService.getExpenses = jest
         .fn()
-        .mockReturnValue(of({ data: [page1Item], meta: { totalItems: 5 } })) as any;
+        .mockReturnValue(
+          of({ data: [page1Item], meta: { totalItems: 5 } }),
+        ) as any;
 
       fixture.detectChanges();
 
@@ -585,7 +580,9 @@ describe('GroupDetailComponent', () => {
         scrollTop: 0,
         clientHeight: 200,
       } as unknown as HTMLElement;
-      component.onExpenseListScroll({ target: scrollTarget } as unknown as Event);
+      component.onExpenseListScroll({
+        target: scrollTarget,
+      } as unknown as Event);
 
       expect(mockExpensesService.getExpenses).toHaveBeenCalledTimes(1);
       expect(component.currentPage()).toBe(1);

@@ -17,3 +17,4 @@ export { AddExpenseVersionHistory1719400000000 } from './1719400000000-AddExpens
 export { AddPasswordRecoveryKey1719500000000 } from './1719500000000-AddPasswordRecoveryKey';
 export { AddContactsAndPendingMembers1719600000000 } from './1719600000000-AddContactsAndPendingMembers';
 export { AddRecurringExpenseGroupMemberPayer1719700000000 } from './1719700000000-AddRecurringExpenseGroupMemberPayer';
+export { AddExpenseTransactionType1719800000000 } from './1719800000000-AddExpenseTransactionType';

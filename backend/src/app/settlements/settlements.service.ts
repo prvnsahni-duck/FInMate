@@ -323,7 +323,8 @@ export class SettlementsService {
         const sign = split.expense.transactionType === 'refund' ? -1 : 1;
         balanceMap.set(
           participantId,
-          (balanceMap.get(participantId) || 0) - sign * Number(split.amountOwed),
+          (balanceMap.get(participantId) || 0) -
+            sign * Number(split.amountOwed),
         );
       }
 

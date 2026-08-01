@@ -93,7 +93,8 @@
       <div class="flex-1 overflow-y-auto pr-1 -mr-1 space-y-4">
         <!-- Transaction Type (Expense / Refund) -->
         <div>
-          <label
+          <span
+            id="transaction-type-label"
             class="flex items-center text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
             >Transaction Type
             @if (isFieldModified('transactionType')) {
@@ -102,8 +103,10 @@
                 >Modified</span
               >
             }
-          </label>
+          </span>
           <div
+            role="group"
+            aria-labelledby="transaction-type-label"
             class="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-black/20 border border-slate-200/50 dark:border-white/5"
           >
             <button

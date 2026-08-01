@@ -233,8 +233,7 @@ export class ExpensesController {
         amountTotal: Number(amountTotal),
         expenseDate,
         currency,
-        transactionType:
-          transactionType === 'refund' ? 'refund' : 'expense',
+        transactionType: transactionType === 'refund' ? 'refund' : 'expense',
         groupId: groupId && groupId !== 'personal' ? groupId : undefined,
         excludeId,
       },
