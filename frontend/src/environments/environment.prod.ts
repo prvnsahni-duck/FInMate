@@ -1,4 +1,10 @@
 export const environment = {
   production: true,
-  apiBaseUrl: '/api',
+  // Absolute origin — production has no dev-server proxy (proxy.conf.json
+  // only applies to `ng serve`) and Cloudflare Pages has no reverse proxy
+  // configured, so a relative '/api' would resolve against the Pages origin
+  // itself instead of the backend. Must include /api/v1: the backend's
+  // global prefix (backend/src/main.ts) is 'api/v1', not 'api' — locally
+  // that gap is papered over by proxy.conf.json's pathRewrite.
+  apiBaseUrl: 'https://finmate-api.prvnsahni.com/api/v1',
 };
