@@ -688,6 +688,87 @@ describe('GroupDetailComponent', () => {
     });
   });
 
+  describe('ledger export date range', () => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    beforeEach(() => {
+      component.group.set(mockGroup as any);
+    });
+
+    it('opens the modal defaulting to the current month', () => {
+      component.openExportModal();
+
+      expect(component.showExportModal()).toBe(true);
+      expect(component.exportRangeMode()).toBe('month');
+      const now = new Date();
+      expect(component.exportFromDate()).toBe(
+        `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`,
+      );
+    });
+
+    it('exports only the current month by default (not the whole ledger)', async () => {
+      const spy = jest
+        .spyOn((component as any).expenseExportService, 'exportExpenses')
+        .mockResolvedValue(undefined);
+
+      component.openExportModal();
+      await component.exportLedger();
+
+      const now = new Date();
+      const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+      const lastDay = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+      ).getDate();
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          groupId: 'group-1',
+          type: 'group',
+          from: `${month}-01`,
+          to: `${month}-${pad(lastDay)}`,
+        }),
+        'xlsx',
+        expect.any(String),
+      );
+      expect(component.showExportModal()).toBe(false);
+    });
+
+    it('exports the picked custom range', async () => {
+      const spy = jest
+        .spyOn((component as any).expenseExportService, 'exportExpenses')
+        .mockResolvedValue(undefined);
+
+      component.openExportModal();
+      component.exportRangeMode.set('custom');
+      component.exportFromDate.set('2026-05-01');
+      component.exportToDate.set('2026-05-15');
+      await component.exportLedger();
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ from: '2026-05-01', to: '2026-05-15' }),
+        'xlsx',
+        expect.any(String),
+      );
+    });
+
+    it('rejects an inverted custom range without calling the export service', async () => {
+      const spy = jest
+        .spyOn((component as any).expenseExportService, 'exportExpenses')
+        .mockResolvedValue(undefined);
+
+      component.openExportModal();
+      component.exportRangeMode.set('custom');
+      component.exportFromDate.set('2026-05-20');
+      component.exportToDate.set('2026-05-01');
+      await component.exportLedger();
+
+      expect(component.exportError()).toContain('from');
+      expect(spy).not.toHaveBeenCalled();
+      expect(component.showExportModal()).toBe(true);
+    });
+  });
+
   it('should handle toggle of contribution mode', () => {
     fixture.detectChanges();
     expect(component.contributionMode).toBe('amount');

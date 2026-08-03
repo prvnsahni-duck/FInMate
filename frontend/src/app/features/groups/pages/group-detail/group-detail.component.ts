@@ -257,6 +257,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   showLeftScrollCue = signal<boolean>(false);
   showRightScrollCue = signal<boolean>(false);
   isExporting = signal<boolean>(false);
+  // ── Ledger export date-range dialog ───────────────────────────────────────
+  showExportModal = signal<boolean>(false);
+  exportRangeMode = signal<'month' | 'custom'>('month');
+  exportFromDate = signal<string>('');
+  exportToDate = signal<string>('');
+  exportError = signal<string>('');
   isFilterBottomSheetOpen = signal<boolean>(false);
   showSkeleton = signal<boolean>(false);
   isLoadingExpenses = signal<boolean>(false);
@@ -1283,26 +1289,70 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
+  /** Open the ledger export dialog, defaulting to the current calendar month
+   *  (first-of-month → today) — never the whole ledger. */
+  openExportModal(): void {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    this.exportFromDate.set(`${month}-01`);
+    this.exportToDate.set(
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    );
+    this.exportRangeMode.set('month');
+    this.exportError.set('');
+    this.showExportModal.set(true);
+  }
+
+  /** Close the export dialog (no-op mid-export so the download isn't abandoned). */
+  closeExportModal(): void {
+    if (this.isExporting()) return;
+    this.showExportModal.set(false);
+  }
+
+  /** Resolve the effective [from, to] for the export based on the chosen mode:
+   *  'month' = current calendar month; 'custom' = the picked date inputs. */
+  private resolveExportRange(): { from: string; to: string } {
+    if (this.exportRangeMode() === 'month') {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+      return { from: `${month}-01`, to: `${month}-${this.lastDayOfMonth(month)}` };
+    }
+    return { from: this.exportFromDate(), to: this.exportToDate() };
+  }
+
   /**
-   * Export the full group ledger to Excel.
+   * Export the group ledger for the chosen date range to Excel.
    *
    * The backend returns every expense in the group as ciphertext (it can't
    * decrypt — zero-knowledge); this client fetches those rows, decrypts the
    * title/description with the group key, and builds the .xlsx locally. That's
    * why the old server-side CSV/xlsx export is gone: it wrote ciphertext into
-   * the file. Respects the ledger's active category/date filters.
+   * the file. Respects the ledger's active category filter.
    */
   async exportLedger() {
     const g = this.group();
     if (!g || this.isExporting()) return;
+
+    const { from, to } = this.resolveExportRange();
+    if (!from || !to) {
+      this.exportError.set('Please choose both a from and to date.');
+      return;
+    }
+    if (from > to) {
+      this.exportError.set('The "from" date must be on or before the "to" date.');
+      return;
+    }
+    this.exportError.set('');
 
     this.isExporting.set(true);
     try {
       const filter: ExportFilter = {
         groupId: g.id,
         type: 'group',
-        from: this.filterStartDate() || '',
-        to: this.filterEndDate() || '',
+        from,
+        to,
         category: this.filterCategory() || undefined,
       };
       const datePart = new Date().toISOString().slice(0, 10);
@@ -1311,12 +1361,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         'xlsx',
         `ledger-${this.sanitizeForFilename(g.name)}-${datePart}`,
       );
+      this.isExporting.set(false);
+      this.showExportModal.set(false);
     } catch (err: any) {
-      alert(
+      this.exportError.set(
         'Failed to export ledger: ' +
           (err?.error?.message || err?.message || 'Unknown error'),
       );
-    } finally {
       this.isExporting.set(false);
     }
   }
