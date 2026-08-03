@@ -44,7 +44,7 @@ export interface SuggestedSettlement {
     <!-- Suggested Settlements -->
     @if (suggestedSettlements().length > 0) {
       <div
-        class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 mt-8"
+        class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 mt-4"
       >
         <h2 class="text-xl font-bold mb-4">Suggested Settlements</h2>
         <div class="space-y-3">

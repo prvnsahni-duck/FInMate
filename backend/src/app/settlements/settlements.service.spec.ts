@@ -355,6 +355,98 @@ describe('SettlementsService', () => {
         currency: 'USD',
       });
     });
+
+    it('treats a refund as a negative expense in the settlement engine', async () => {
+      // A pays 100 split equally (50/50). A refund of 20 (split equally) comes
+      // back to the original payer A. Net spending = 80 ⇒ 40 each. A has paid a
+      // net 80 and owes 40, so the group owes A 40; B owes 40.
+      const userA = { id: 'aaaa', email: 'a@ex.com', displayName: 'User A' };
+      const userB = { id: 'bbbb', email: 'b@ex.com', displayName: 'User B' };
+
+      const mockMembers = [
+        { id: 'member-a', user: userA, joinStatus: 'active' },
+        { id: 'member-b', user: userB, joinStatus: 'active' },
+      ] as any[];
+
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
+      groupMemberRepository.find.mockResolvedValueOnce(mockMembers);
+
+      expenseRepository.find.mockResolvedValueOnce([
+        {
+          id: 'exp-1',
+          amountTotal: 100.0,
+          currency: 'USD',
+          transactionType: 'expense',
+          paidByUser: userA,
+        },
+        {
+          id: 'refund-1',
+          amountTotal: 20.0,
+          currency: 'USD',
+          transactionType: 'refund',
+          paidByUser: userA,
+        },
+      ] as any[]);
+
+      expenseSplitRepository.find.mockResolvedValueOnce([
+        {
+          expense: { id: 'exp-1', currency: 'USD', transactionType: 'expense' },
+          participantUser: userA,
+          amountOwed: 50.0,
+        },
+        {
+          expense: { id: 'exp-1', currency: 'USD', transactionType: 'expense' },
+          participantUser: userB,
+          amountOwed: 50.0,
+        },
+        {
+          expense: {
+            id: 'refund-1',
+            currency: 'USD',
+            transactionType: 'refund',
+          },
+          participantUser: userA,
+          amountOwed: 10.0,
+        },
+        {
+          expense: {
+            id: 'refund-1',
+            currency: 'USD',
+            transactionType: 'refund',
+          },
+          participantUser: userB,
+          amountOwed: 10.0,
+        },
+      ] as any[]);
+
+      settlementRepository.find.mockResolvedValueOnce([]);
+
+      const result = await service.calculateGroupBalances('aaaa', 'group-id');
+
+      expect(result.balances).toContainEqual(
+        expect.objectContaining({
+          userId: 'aaaa',
+          netBalance: 40.0,
+          currency: 'USD',
+        }),
+      );
+      expect(result.balances).toContainEqual(
+        expect.objectContaining({
+          userId: 'bbbb',
+          netBalance: -40.0,
+          currency: 'USD',
+        }),
+      );
+      expect(result.suggestedSettlements[0]).toMatchObject({
+        fromUserId: 'bbbb',
+        toUserId: 'aaaa',
+        amount: 40.0,
+        currency: 'USD',
+      });
+    });
   });
 
   // ── Phase 3: Friends Balance (registered-user-only aggregation) ─────────

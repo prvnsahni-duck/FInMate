@@ -9,6 +9,8 @@
       [personalExpenses]="personalExpenses"
       [myExpenses]="filteredMyExpenses"
       [expenseViewFilter]="expenseViewFilter"
+      [hasMoreExpenses]="hasMoreMyExpenses"
+      [isLoadingMoreExpenses]="isLoadingMoreExpenses"
       [pendingInvitations]="pendingInvitations"
       [categoryAnalytics]="categoryAnalytics"
       [userProfile]="userProfile"
@@ -28,6 +30,7 @@
       (declineInvitationEvent)="declineInvitation($event)"
       (confirmDeleteExpenseEvent)="confirmDeleteExpense($event)"
       (expenseViewFilterChange)="setExpenseViewFilter($event)"
+      (loadMoreExpensesEvent)="loadMoreMyExpenses()"
       (openGroupExpenseEvent)="openGroupExpense($event)"
     ></app-dashboard-home>
   }

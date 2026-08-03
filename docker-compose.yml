@@ -45,7 +45,9 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
       FRONTEND_URL: http://localhost:8080
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      FROM_EMAIL: ${FROM_EMAIL:-noreply@finmate.app}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-Finmate}
+      MAIL_FROM_EMAIL: ${MAIL_FROM_EMAIL:-noreply@mail.prvnsahni.com}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     depends_on:
       postgres:

@@ -120,13 +120,7 @@ export class AuthService {
     const frontendUrl =
       this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200';
     const verifyUrl = `${frontendUrl}/auth/verify-email?token=${token}`;
-    await this.emailService.sendEmail(
-      user.email,
-      'Verify your email — FinMate',
-      `<p>Confirm your email to automatically link any groups you were added to before you registered:</p>
-       <p><a href="${verifyUrl}">${verifyUrl}</a></p>
-       <p>This link expires in 24 hours.</p>`,
-    );
+    await this.emailService.sendVerificationEmail(user.email, verifyUrl);
   }
 
   /**

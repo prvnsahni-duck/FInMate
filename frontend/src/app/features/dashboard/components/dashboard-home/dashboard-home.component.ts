@@ -25,6 +25,10 @@ export class DashboardHomeComponent {
   @Input() personalExpenses: any[] = [];
   @Input() myExpenses: any[] = [];
   @Input() expenseViewFilter: 'all' | 'personal' | 'group_share' = 'all';
+  /** True while a subsequent page is being appended via infinite scroll. */
+  @Input() isLoadingMoreExpenses = false;
+  /** More pages of the unified expense list remain to fetch. */
+  @Input() hasMoreExpenses = false;
   @Input() pendingInvitations: any[] = [];
   @Input() categoryAnalytics: any[] = [];
   @Input() userProfile: any = null;
@@ -58,9 +62,22 @@ export class DashboardHomeComponent {
     groupId: string;
     expenseId: string;
   }>();
+  /** Emitted when the transactions list nears its bottom — asks the parent to
+   *  fetch and append the next page. */
+  @Output() loadMoreExpensesEvent = new EventEmitter<void>();
 
   get displayExpenses(): any[] {
     return this.myExpenses.length > 0 ? this.myExpenses : this.personalExpenses;
+  }
+
+  /** Scroll handler for the bounded transactions container — requests the next
+   *  page once the user is within `threshold`px of the bottom. */
+  onExpenseListScroll(event: Event): void {
+    const el = event.target as HTMLElement;
+    const threshold = 200;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) {
+      this.loadMoreExpensesEvent.emit();
+    }
   }
 
   // SVG Icon Paths

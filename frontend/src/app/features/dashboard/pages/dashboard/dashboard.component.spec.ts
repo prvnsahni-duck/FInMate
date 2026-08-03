@@ -200,4 +200,63 @@ describe('DashboardComponent', () => {
     expect(mockExpensesService.deleteExpense).toHaveBeenCalledWith('exp-1');
     expect(component.isDeleteConfirmOpen).toBe(false);
   });
+
+  describe('infinite scroll (my expenses)', () => {
+    it('reports more pages remain when total exceeds the loaded count', () => {
+      mockExpensesService.getMyExpenses.mockReturnValue(
+        of({ data: mockExpenses, meta: { totalItems: 5 } }),
+      );
+      fixture.detectChanges(); // triggers ngOnInit → refreshExpenseData
+
+      expect(component.myExpenses.length).toBe(2);
+      expect(component.totalMyExpenses).toBe(5);
+      expect(component.hasMoreMyExpenses).toBe(true);
+    });
+
+    it('appends the next page and advances the page cursor on loadMore', () => {
+      mockExpensesService.getMyExpenses.mockReturnValue(
+        of({ data: mockExpenses, meta: { totalItems: 5 } }),
+      );
+      fixture.detectChanges();
+
+      const nextPage = [
+        {
+          id: 'exp-3',
+          title: 'Coffee',
+          amountTotal: 5,
+          expenseDate: new Date(),
+        },
+      ];
+      mockExpensesService.getMyExpenses.mockReturnValue(
+        of({ data: nextPage, meta: { totalItems: 5 } }),
+      );
+
+      component.loadMoreMyExpenses();
+
+      expect(mockExpensesService.getMyExpenses).toHaveBeenLastCalledWith({
+        page: 2,
+        limit: 50,
+      });
+      expect(component.expensesPage).toBe(2);
+      expect(component.myExpenses.map((e) => e.id)).toEqual([
+        'exp-1',
+        'exp-2',
+        'exp-3',
+      ]);
+      expect(component.isLoadingMoreExpenses).toBe(false);
+    });
+
+    it('does not fetch more when everything is already loaded', () => {
+      mockExpensesService.getMyExpenses.mockReturnValue(
+        of({ data: mockExpenses, meta: { totalItems: 2 } }),
+      );
+      fixture.detectChanges();
+      mockExpensesService.getMyExpenses.mockClear();
+
+      component.loadMoreMyExpenses();
+
+      expect(component.hasMoreMyExpenses).toBe(false);
+      expect(mockExpensesService.getMyExpenses).not.toHaveBeenCalled();
+    });
+  });
 });

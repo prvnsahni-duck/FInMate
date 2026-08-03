@@ -1,5 +1,13 @@
 export const APP_NAME = 'FinMate';
 
+/**
+ * Day of the *following* month, inclusive, until which the previous month's
+ * group expenses stay editable. After this day the month is closed and its
+ * expenses become fully read-only. Mirrors the backend MONTH_LOCK_DAY config
+ * (see ExpenseEditPolicyService); keep the two in sync if the cutoff changes.
+ */
+export const MONTH_LOCK_DAY = 7;
+
 // Password visibility toggle icons (single-path, matching app-icon usage).
 export const EYE_ICON_PATH =
   'M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z';

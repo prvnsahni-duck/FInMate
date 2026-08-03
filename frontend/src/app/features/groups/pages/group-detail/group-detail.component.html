@@ -109,7 +109,7 @@
     }
 
     <div
-      class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4"
+      class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4"
     >
       <div>
         <a
@@ -209,7 +209,7 @@
     <!-- Household timeline selector -->
     @if (group()!.groupType === 'household') {
       <div
-        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-4 mb-8 shadow-xl shadow-black/5 flex items-center justify-between"
+        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-4 mb-4 shadow-xl shadow-black/5 flex items-center justify-between"
       >
         <button
           (click)="changeMonth(-1)"
@@ -266,7 +266,7 @@
       group()!.groupType === 'household' && carryForwardBalances().length > 0
     ) {
       <div
-        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 mb-8 shadow-xl shadow-black/5"
+        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 mb-4 shadow-xl shadow-black/5"
       >
         <h3
           class="text-sm font-extrabold text-secondary uppercase tracking-wider mb-6 flex items-center gap-2"
@@ -371,7 +371,7 @@
       <div class="lg:col-span-2 space-y-8">
         <!-- Sticky Tabs Navigation Wrapper -->
         <div
-          class="sticky top-[64px] lg:top-0 z-30 bg-finmate-bg/95 backdrop-blur-md py-2 transition-all duration-200"
+          class="sticky top-[64px] lg:top-0 z-30 bg-finmate-bg/95 backdrop-blur-md transition-all duration-200"
         >
           <div class="relative w-full overflow-hidden">
             <!-- Fade overlays for horizontal scroll cues -->
@@ -501,7 +501,7 @@
                    Hidden when the ledger is empty — nothing to export. -->
               @if (totalExpenses() > 0) {
                 <button
-                  (click)="exportLedger()"
+                  (click)="openExportModal()"
                   [disabled]="isExporting()"
                   class="text-xs font-semibold py-1.5 px-3 rounded-lg border border-border/10 hover:bg-surface text-muted flex items-center space-x-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
@@ -1420,9 +1420,34 @@
               </button>
             </div>
           } @else {
-            <app-group-history-log
-              [historyLogs]="historyLogs()"
-            ></app-group-history-log>
+            <div
+              class="max-h-[65vh] overflow-y-auto pr-1 -mr-1"
+              data-testid="history-scroll-container"
+              (scroll)="onHistoryScroll($event)"
+            >
+              <app-group-history-log
+                [historyLogs]="historyLogs()"
+              ></app-group-history-log>
+
+              <!-- Infinite scroll: loading-next-page indicator / end-of-list -->
+              @if (isLoadingMoreHistory()) {
+                <div
+                  data-testid="history-loading-more"
+                  class="flex items-center justify-center py-4"
+                >
+                  <div
+                    class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"
+                  ></div>
+                </div>
+              } @else if (!hasMoreHistory() && historyLogs().length > 0) {
+                <p
+                  data-testid="history-end"
+                  class="text-center text-xs text-muted py-4"
+                >
+                  You've reached the end of the history.
+                </p>
+              }
+            </div>
           }
         }
 
@@ -2503,6 +2528,111 @@
         (saveSuccess)="onRecurringExpenseSaved($event)"
         (cancelled)="closeRecurringExpenseForm()"
       ></app-recurring-expense-form>
+    </div>
+  </div>
+}
+
+<!-- ── Ledger Export date-range dialog ──────────────────────────────────── -->
+@if (showExportModal()) {
+  <div
+    class="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4"
+    data-testid="export-ledger-modal"
+  >
+    <!-- Backdrop -->
+    <div
+      (click)="closeExportModal()"
+      (keydown.escape)="closeExportModal()"
+      role="presentation"
+      class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+    ></div>
+
+    <!-- Content -->
+    <div
+      class="relative w-full max-w-md bg-white dark:bg-finmate-card rounded-3xl p-6 shadow-2xl animate-fade-in"
+    >
+      <h3 class="text-lg font-bold text-secondary mb-1">Export Ledger</h3>
+      <p class="text-xs text-muted mb-5">
+        Choose the period to export. Defaults to this month.
+      </p>
+
+      <!-- Range mode toggle -->
+      <div class="flex gap-1 bg-surface rounded-xl p-1 text-xs font-semibold mb-4">
+        <button
+          type="button"
+          (click)="exportRangeMode.set('month')"
+          data-testid="export-mode-month"
+          [class]="
+            exportRangeMode() === 'month'
+              ? 'flex-1 bg-primary text-white px-3 py-1.5 rounded-lg'
+              : 'flex-1 text-muted px-3 py-1.5 rounded-lg hover:text-secondary transition-colors'
+          "
+        >
+          This Month
+        </button>
+        <button
+          type="button"
+          (click)="exportRangeMode.set('custom')"
+          data-testid="export-mode-custom"
+          [class]="
+            exportRangeMode() === 'custom'
+              ? 'flex-1 bg-primary text-white px-3 py-1.5 rounded-lg'
+              : 'flex-1 text-muted px-3 py-1.5 rounded-lg hover:text-secondary transition-colors'
+          "
+        >
+          Custom Range
+        </button>
+      </div>
+
+      @if (exportRangeMode() === 'custom') {
+        <div class="grid grid-cols-2 gap-3 mb-4">
+          <label class="block">
+            <span class="text-[11px] font-semibold text-muted">From</span>
+            <input
+              type="date"
+              [ngModel]="exportFromDate()"
+              (ngModelChange)="exportFromDate.set($event)"
+              data-testid="export-from-date"
+              class="mt-1 w-full text-sm bg-surface border border-border/10 rounded-xl px-3 py-2 text-secondary focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </label>
+          <label class="block">
+            <span class="text-[11px] font-semibold text-muted">To</span>
+            <input
+              type="date"
+              [ngModel]="exportToDate()"
+              (ngModelChange)="exportToDate.set($event)"
+              data-testid="export-to-date"
+              class="mt-1 w-full text-sm bg-surface border border-border/10 rounded-xl px-3 py-2 text-secondary focus:outline-none focus:ring-2 focus:ring-primary/40"
+            />
+          </label>
+        </div>
+      }
+
+      @if (exportError()) {
+        <p class="text-xs text-error font-medium mb-3" data-testid="export-error">
+          {{ exportError() }}
+        </p>
+      }
+
+      <div class="flex justify-end gap-2 mt-2">
+        <button
+          type="button"
+          (click)="closeExportModal()"
+          [disabled]="isExporting()"
+          class="text-xs font-semibold py-2 px-4 rounded-xl border border-border/10 hover:bg-surface text-muted cursor-pointer disabled:opacity-60"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          (click)="exportLedger()"
+          [disabled]="isExporting()"
+          data-testid="export-confirm"
+          class="text-xs font-bold py-2 px-4 rounded-xl bg-primary text-white hover:brightness-110 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {{ isExporting() ? 'Exporting…' : 'Export Excel' }}
+        </button>
+      </div>
     </div>
   </div>
 }

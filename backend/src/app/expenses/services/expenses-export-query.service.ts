@@ -50,6 +50,8 @@ export interface ExportRow {
   // ── Plaintext metadata ───────────────────────────────────────────────────
   amountTotal: number;
   myShare: number;
+  /** `expense` (default) or `refund` — a refund is a negative expense. */
+  transactionType: 'expense' | 'refund';
   currency: string;
   category: string;
   expenseType: 'PERSONAL' | 'GROUP_SHARE';
@@ -157,6 +159,7 @@ export class ExpenseExportQueryService {
           wrappedContentKeys: [],
           amountTotal: Number(exp.amountTotal),
           myShare: Number(exp.amountTotal),
+          transactionType: exp.transactionType ?? 'expense',
           currency: exp.currency,
           category: exp.category,
           expenseType: 'PERSONAL',
@@ -192,6 +195,7 @@ export class ExpenseExportQueryService {
           wrappedContentKeys: [],
           amountTotal: Number(exp.amountTotal),
           myShare: Number(split.amountOwed),
+          transactionType: exp.transactionType ?? 'expense',
           currency: exp.currency,
           category: exp.category,
           expenseType: 'GROUP_SHARE',
@@ -303,6 +307,7 @@ export class ExpenseExportQueryService {
         wrappedContentKeys: [],
         amountTotal: Number(exp.amountTotal),
         myShare: mine ? mine.amount : 0,
+        transactionType: exp.transactionType ?? 'expense',
         currency: exp.currency,
         category: exp.category,
         expenseType: 'GROUP_SHARE',

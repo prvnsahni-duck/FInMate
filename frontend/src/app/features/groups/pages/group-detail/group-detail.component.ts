@@ -31,6 +31,7 @@ import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
 import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../../core/constants/crypto.constants';
+import { MONTH_LOCK_DAY } from '../../../../core/constants/app.constants';
 import { ExpenseDecryptCoordinator } from '../../../../core/services/expense-decrypt-coordinator.service';
 import { ExpenseDecryptionService } from '../../../../core/services/expense-decryption.service';
 import { classifyDecryptionError } from '../../../../core/models/decryption-state';
@@ -88,6 +89,17 @@ export interface GroupExpense extends Expense {
     mimeType: string;
     sizeBytes: number;
   }>;
+}
+
+/**
+ * Scope-wide, pagination-independent monetary totals per currency, returned in
+ * the expense listing's `meta.totals` (see backend `LedgerTotals`).
+ */
+export interface LedgerTotals {
+  currency: string;
+  totalExpense: number;
+  totalRefund: number;
+  net: number;
 }
 
 @Component({
@@ -227,6 +239,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   currentPage = signal<number>(1);
   pageSize = signal<number>(20);
   totalExpenses = signal<number>(0);
+  /**
+   * Scope-wide monetary totals per currency from the backend, independent of
+   * pagination — so the summary tiles show the true totals for the whole
+   * filtered ledger, not just the pages loaded so far. Null until the first
+   * page response arrives.
+   */
+  ledgerTotals = signal<LedgerTotals[] | null>(null);
   currentUserId = signal<string | null>(null);
   currentTimelineMonth = signal<Date>(new Date());
   isMonthLocked = signal<boolean>(false);
@@ -238,6 +257,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   showLeftScrollCue = signal<boolean>(false);
   showRightScrollCue = signal<boolean>(false);
   isExporting = signal<boolean>(false);
+  // ── Ledger export date-range dialog ───────────────────────────────────────
+  showExportModal = signal<boolean>(false);
+  exportRangeMode = signal<'month' | 'custom'>('month');
+  exportFromDate = signal<string>('');
+  exportToDate = signal<string>('');
+  exportError = signal<string>('');
   isFilterBottomSheetOpen = signal<boolean>(false);
   showSkeleton = signal<boolean>(false);
   isLoadingExpenses = signal<boolean>(false);
@@ -255,6 +280,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   isLoadingBalances = signal<boolean>(false);
   isLoadingHistory = signal<boolean>(false);
   historyError = signal<boolean>(false);
+  /** Infinite scroll state for the History tab, mirroring the ledger. */
+  historyPage = signal<number>(1);
+  totalHistoryLogs = signal<number>(0);
+  isLoadingMoreHistory = signal<boolean>(false);
+  hasMoreHistory = computed(
+    () => this.historyLogs().length < this.totalHistoryLogs(),
+  );
   isLoadingTrash = signal<boolean>(false);
   trashError = signal<boolean>(false);
   isLoadingRecurring = signal<boolean>(false);
@@ -726,6 +758,16 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
+  /** Zero-padded last calendar day of a `YYYY-MM` month (e.g. '30' for June,
+   *  '28'/'29' for February). Avoids emitting impossible dates like
+   *  `2026-06-31`, which the backend's date column rejects. */
+  private lastDayOfMonth(yearMonth: string): string {
+    const [year, month] = yearMonth.split('-').map(Number);
+    // Day 0 of the next month is the last day of `month` (month is 1-based).
+    const day = new Date(year, month, 0).getDate();
+    return String(day).padStart(2, '0');
+  }
+
   changeMonth(delta: number) {
     const g = this.group();
     if (g?.groupType !== 'household') return;
@@ -734,12 +776,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     nextDate.setMonth(nextDate.getMonth() + delta);
     this.currentTimelineMonth.set(nextDate);
 
-    const todayMonth = new Date();
-    const isPast =
-      nextDate.getFullYear() < todayMonth.getFullYear() ||
-      (nextDate.getFullYear() === todayMonth.getFullYear() &&
-        nextDate.getMonth() < todayMonth.getMonth());
-    this.isMonthLocked.set(isPast);
+    // A household ledger month closes on the same cadence as every other
+    // group: the previous month stays editable through MONTH_LOCK_DAY of the
+    // following month (grace period), only then does it lock. Mirrors the
+    // backend ExpenseEditPolicyService.
+    const y = nextDate.getFullYear();
+    const m = String(nextDate.getMonth() + 1).padStart(2, '0');
+    this.isMonthLocked.set(this.isPastEditWindow(`${y}-${m}-01`));
 
     if (g?.id) {
       this.fetchExpenses(g.id);
@@ -778,7 +821,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     if (g?.groupType === 'household') {
       const activeMonth = this.getCurrentMonthString();
       start = `${activeMonth}-01`;
-      end = `${activeMonth}-31`;
+      end = `${activeMonth}-${this.lastDayOfMonth(activeMonth)}`;
     }
 
     this.expensesService
@@ -839,6 +882,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
             this.expenses.set(mappedExpenses);
           }
           this.totalExpenses.set(res.meta?.totalItems || 0);
+          // Authoritative totals for the whole filtered scope — same on every
+          // page, so setting on append is harmless and keeps them fresh.
+          this.ledgerTotals.set(
+            (res.meta as { totals?: LedgerTotals[] } | undefined)?.totals ??
+              null,
+          );
           this.isLoadingExpenses.set(false);
           this.isLoadingMoreExpenses.set(false);
           this.ledgerError.set(false);
@@ -924,20 +973,62 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
-  fetchHistoryLogs(groupId: string) {
-    this.isLoadingHistory.set(true);
+  /**
+   * `append`: false (default) replaces the list — initial load / retry, resets
+   * to page 1. true appends the fetched page — used by infinite scroll
+   * (loadMoreHistory). Mirrors fetchExpenses.
+   */
+  fetchHistoryLogs(groupId: string, append = false) {
+    if (append) {
+      this.isLoadingMoreHistory.set(true);
+    } else {
+      this.historyPage.set(1);
+      this.isLoadingHistory.set(true);
+    }
     this.historyError.set(false);
-    this.groupsService.getHistoryLogs(groupId).subscribe({
+    this.groupsService.getHistoryLogs(groupId, this.historyPage()).subscribe({
       next: (res) => {
-        this.historyLogs.set(res.data || []);
+        const logs = res.data || [];
+        if (append) {
+          this.historyLogs.update((prev) => [...prev, ...logs]);
+        } else {
+          this.historyLogs.set(logs);
+        }
+        this.totalHistoryLogs.set(res.meta?.totalItems ?? logs.length);
         this.isLoadingHistory.set(false);
+        this.isLoadingMoreHistory.set(false);
       },
       error: (err) => {
         console.error('Failed to fetch history logs', err);
         this.isLoadingHistory.set(false);
+        this.isLoadingMoreHistory.set(false);
         this.historyError.set(true);
       },
     });
+  }
+
+  /**
+   * Infinite scroll for the History tab: fetch and append the next page.
+   * Guards against duplicate in-flight requests and stops once every page has
+   * loaded. Mirrors loadMoreExpenses.
+   */
+  loadMoreHistory(): void {
+    if (this.isLoadingHistory() || this.isLoadingMoreHistory()) return;
+    if (!this.hasMoreHistory()) return;
+    const g = this.group();
+    if (!g?.id) return;
+    this.historyPage.update((v) => v + 1);
+    this.fetchHistoryLogs(g.id, true);
+  }
+
+  /** Scroll handler for the bounded history-list container — triggers the next
+   *  page once the user is within `threshold`px of the bottom. */
+  onHistoryScroll(event: Event): void {
+    const el = event.target as HTMLElement;
+    const threshold = 200;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) {
+      this.loadMoreHistory();
+    }
   }
 
   fetchDeletedExpenses(groupId: string) {
@@ -998,12 +1089,11 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   /**
-   * Mirrors the backend's editing-window rule (see
-   * ExpensesService.assertWithinEditWindow): the current calendar month is
-   * always editable; the previous month is editable through the 7th
-   * (inclusive) of the current month; anything older is read-only. Household
-   * groups are exempt — they use their own explicit ledger-close lock
-   * (isMonthLocked, driven by the month-navigation timeline).
+   * Mirrors the backend's editing-window rule (see ExpenseEditPolicyService):
+   * the current calendar month is always editable; the previous month is
+   * editable through MONTH_LOCK_DAY (inclusive) of the current month; anything
+   * older is read-only. Household groups follow the same rule — their
+   * month-navigation lock (isMonthLocked) is computed from this same window.
    */
   private isPastEditWindow(expenseDate: string): boolean {
     const [yearStr, monthStr] = expenseDate.split('-');
@@ -1012,7 +1102,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     if (!Number.isFinite(year) || !Number.isFinite(month)) return false;
     // Passing the 1-based month as JS's 0-based index lands on the next
     // month, rolling the year over automatically (e.g. Dec -> Jan).
-    const graceEnd = new Date(year, month, 7, 23, 59, 59, 999);
+    const graceEnd = new Date(year, month, MONTH_LOCK_DAY, 23, 59, 59, 999);
     return Date.now() > graceEnd.getTime();
   }
 
@@ -1027,14 +1117,31 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   /**
-   * Group spending summary for the currently-loaded ledger page: total
+   * Group spending summary for the whole filtered ledger scope: total
    * expenses, total refunds, and net spending (expenses − refunds), in the
-   * group's base currency. Client-side, page-scoped — matches what's on
-   * screen; the authoritative per-currency figures live in balances().
+   * group's base currency. Prefers the backend's pagination-independent totals
+   * (`ledgerTotals`) so the tiles stay correct no matter how many pages have
+   * loaded; falls back to summing the loaded rows only until those arrive.
    */
   ledgerSpendingSummary = computed(() => {
     const g = this.group();
     const currency = g?.currency;
+
+    const totals = this.ledgerTotals();
+    if (totals) {
+      const scoped = currency
+        ? totals.filter((t) => t.currency === currency)
+        : totals;
+      const totalExpense = scoped.reduce((s, t) => s + t.totalExpense, 0);
+      const totalRefund = scoped.reduce((s, t) => s + t.totalRefund, 0);
+      return {
+        totalExpense,
+        totalRefund,
+        netSpending: totalExpense - totalRefund,
+      };
+    }
+
+    // Fallback: page-scoped sum of the rows loaded so far.
     let totalExpense = 0;
     let totalRefund = 0;
     for (const expense of this.expenses()) {
@@ -1067,7 +1174,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       d.getMonth() + 1,
       1,
     ).toLocaleDateString('en-US', { month: 'long' });
-    return `Transactions from ${txMonth} could only be modified until 7 ${lockDeadline} and are now locked.`;
+    return `Transactions from ${txMonth} could only be modified until ${MONTH_LOCK_DAY} ${lockDeadline} and are now locked.`;
   }
 
   /** Resolves the payer display name for a group expense or recurring template.
@@ -1182,26 +1289,75 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
+  /** Open the ledger export dialog, defaulting to the current calendar month
+   *  (first-of-month → today) — never the whole ledger. */
+  openExportModal(): void {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+    this.exportFromDate.set(`${month}-01`);
+    this.exportToDate.set(
+      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    );
+    this.exportRangeMode.set('month');
+    this.exportError.set('');
+    this.showExportModal.set(true);
+  }
+
+  /** Close the export dialog (no-op mid-export so the download isn't abandoned). */
+  closeExportModal(): void {
+    if (this.isExporting()) return;
+    this.showExportModal.set(false);
+  }
+
+  /** Resolve the effective [from, to] for the export based on the chosen mode:
+   *  'month' = current calendar month; 'custom' = the picked date inputs. */
+  private resolveExportRange(): { from: string; to: string } {
+    if (this.exportRangeMode() === 'month') {
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+      return {
+        from: `${month}-01`,
+        to: `${month}-${this.lastDayOfMonth(month)}`,
+      };
+    }
+    return { from: this.exportFromDate(), to: this.exportToDate() };
+  }
+
   /**
-   * Export the full group ledger to Excel.
+   * Export the group ledger for the chosen date range to Excel.
    *
    * The backend returns every expense in the group as ciphertext (it can't
    * decrypt — zero-knowledge); this client fetches those rows, decrypts the
    * title/description with the group key, and builds the .xlsx locally. That's
    * why the old server-side CSV/xlsx export is gone: it wrote ciphertext into
-   * the file. Respects the ledger's active category/date filters.
+   * the file. Respects the ledger's active category filter.
    */
   async exportLedger() {
     const g = this.group();
     if (!g || this.isExporting()) return;
+
+    const { from, to } = this.resolveExportRange();
+    if (!from || !to) {
+      this.exportError.set('Please choose both a from and to date.');
+      return;
+    }
+    if (from > to) {
+      this.exportError.set(
+        'The "from" date must be on or before the "to" date.',
+      );
+      return;
+    }
+    this.exportError.set('');
 
     this.isExporting.set(true);
     try {
       const filter: ExportFilter = {
         groupId: g.id,
         type: 'group',
-        from: this.filterStartDate() || '',
-        to: this.filterEndDate() || '',
+        from,
+        to,
         category: this.filterCategory() || undefined,
       };
       const datePart = new Date().toISOString().slice(0, 10);
@@ -1210,12 +1366,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         'xlsx',
         `ledger-${this.sanitizeForFilename(g.name)}-${datePart}`,
       );
+      this.isExporting.set(false);
+      this.showExportModal.set(false);
     } catch (err: any) {
-      alert(
+      this.exportError.set(
         'Failed to export ledger: ' +
           (err?.error?.message || err?.message || 'Unknown error'),
       );
-    } finally {
       this.isExporting.set(false);
     }
   }

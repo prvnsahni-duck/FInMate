@@ -23,6 +23,7 @@ import {
 } from '@finmate/data-models';
 import { Repository } from 'typeorm';
 import { ExpensesService } from './expenses.service';
+import { ExpenseEditPolicyService } from './services/expense-edit-policy.service';
 
 describe('ExpensesService', () => {
   let service: ExpensesService;
@@ -219,6 +220,9 @@ describe('ExpensesService', () => {
           useValue: mockReceiptVersionRepository,
         },
         { provide: getDataSourceToken(), useValue: mockDataSource },
+        // Real policy service (no ConfigService provided → default cutoff of 7),
+        // so the edit-window behaviour under test matches production.
+        ExpenseEditPolicyService,
       ],
     }).compile();
 
@@ -533,11 +537,24 @@ describe('ExpensesService', () => {
   it('should build paginated list for caller', async () => {
     groupMemberRepository.find.mockResolvedValue([] as any);
 
+    // Aggregate sub-query returned by `.clone()` for scope-wide totals.
+    const totalsBuilder = {
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      addGroupBy: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([
+        { currency: 'USD', transactionType: 'expense', sum: '50' },
+        { currency: 'USD', transactionType: 'refund', sum: '20' },
+      ]),
+    };
+
     const queryBuilder = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       orWhere: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
+      clone: jest.fn(() => totalsBuilder),
       orderBy: jest.fn().mockReturnThis(),
       addOrderBy: jest.fn().mockReturnThis(),
       getCount: jest.fn().mockResolvedValue(1),
@@ -575,6 +592,10 @@ describe('ExpensesService', () => {
 
     expect(result.meta.totalItems).toBe(1);
     expect(result.data).toHaveLength(1);
+    // Scope-wide totals come from the aggregate, not the page rows.
+    expect(result.meta.totals).toEqual([
+      { currency: 'USD', totalExpense: 50, totalRefund: 20, net: 30 },
+    ]);
   });
 
   it('should reject list request with invalid date format', async () => {
@@ -583,6 +604,26 @@ describe('ExpensesService', () => {
         page: 1,
         limit: 20,
         startDate: '06-10-2026',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('should reject a shape-valid but impossible calendar date (400, not 500)', async () => {
+    // 2026-06-31 passes the YYYY-MM-DD regex but June has 30 days; without the
+    // calendar check this reaches Postgres and surfaces as an unhandled 500.
+    await expect(
+      service.listExpenses('caller-id', {
+        page: 1,
+        limit: 20,
+        endDate: '2026-06-31',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    await expect(
+      service.listExpenses('caller-id', {
+        page: 1,
+        limit: 20,
+        endDate: '2026-02-30',
       }),
     ).rejects.toThrow(BadRequestException);
   });
@@ -1148,6 +1189,75 @@ describe('ExpensesService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
+    it('should reject a metadata-only update on a normal group expense in a closed month (403)', async () => {
+      // Dated years in the past → unambiguously past the grace window whenever
+      // the suite runs, so no clock control is needed.
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-1',
+        version: 1,
+        title: 'Old Trip',
+        amountTotal: 500,
+        currency: 'USD',
+        category: 'Travel',
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        expenseDate: '2020-01-10',
+        status: 'posted',
+        group: { id: 'group-id' },
+      } as any);
+      groupMemberRepository.findOne.mockResolvedValue({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        groupType: 'trip',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+
+      // Even a title-only edit is rejected — a closed month is fully read-only.
+      await expect(
+        service.updateExpense('caller-id', 'exp-1', {
+          version: 1,
+          title: 'Tampered title',
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject deleting a normal group expense in a closed month', async () => {
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-1',
+        version: 1,
+        title: 'Old Trip',
+        amountTotal: 500,
+        currency: 'USD',
+        category: 'Travel',
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        expenseDate: '2020-01-10',
+        status: 'posted',
+        group: { id: 'group-id' },
+      } as any);
+      groupMemberRepository.findOne.mockResolvedValue({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        groupType: 'trip',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+
+      await expect(service.deleteExpense('caller-id', 'exp-1')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(expenseRepository.softRemove).not.toHaveBeenCalled();
+    });
+
     it('should calculate carry forward balances correctly for a household group', async () => {
       groupMemberRepository.findOne.mockResolvedValue({
         id: 'membership-id',
@@ -1664,6 +1774,139 @@ describe('ExpensesService', () => {
 
         expect(userABal?.netBalance).toBe(75);
         expect(userBBal?.netBalance).toBe(-75);
+      });
+
+      // Refund Scenario A: money returns to the original payer. Net spending and
+      // the payer's net-paid both drop by the refund, so shares recompute off the
+      // reduced spending. (Expense 200 → refund 80 to payer ⇒ net 120, 60 each.)
+      it('treats a refund to the original payer as a negative expense', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        groupMemberRepository.find.mockResolvedValue([
+          {
+            id: 'member-a',
+            user: { id: 'user-a', displayName: 'User A' },
+            joinStatus: 'active',
+          },
+          {
+            id: 'member-b',
+            user: { id: 'user-b', displayName: 'User B' },
+            joinStatus: 'active',
+          },
+        ] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 200,
+            currency: 'USD',
+            isCarryForward: false,
+            transactionType: 'expense',
+            paidByGroupMember: { id: 'member-a' },
+            paidByUser: undefined,
+          },
+          {
+            id: 'refund-1',
+            amountTotal: 80,
+            currency: 'USD',
+            isCarryForward: false,
+            transactionType: 'refund',
+            paidByGroupMember: { id: 'member-a' },
+            paidByUser: undefined,
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        const rowA = balances.find((b) => b.groupMemberId === 'member-a');
+        const rowB = balances.find((b) => b.groupMemberId === 'member-b');
+
+        // Net spending 120 ⇒ each target 60. A paid net 120, B paid 0.
+        expect(rowA!.paid).toBe(120);
+        expect(rowA!.expected).toBe(60);
+        expect(rowA!.netBalance).toBe(60);
+        expect(rowB!.netBalance).toBe(-60);
+      });
+
+      // Refund Scenario B: money returns to a *different* member. Net spending
+      // still drops by the refund; the recipient's net-paid goes negative so
+      // they owe their share plus the credit they received.
+      it('treats a refund to another member as a negative expense (credited to the recipient)', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        groupMemberRepository.find.mockResolvedValue([
+          {
+            id: 'member-a',
+            user: { id: 'user-a', displayName: 'User A' },
+            joinStatus: 'active',
+          },
+          {
+            id: 'member-b',
+            user: { id: 'user-b', displayName: 'User B' },
+            joinStatus: 'active',
+          },
+        ] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 200,
+            currency: 'USD',
+            isCarryForward: false,
+            transactionType: 'expense',
+            paidByGroupMember: { id: 'member-a' },
+            paidByUser: undefined,
+          },
+          {
+            id: 'refund-1',
+            amountTotal: 80,
+            currency: 'USD',
+            isCarryForward: false,
+            transactionType: 'refund',
+            paidByGroupMember: { id: 'member-b' },
+            paidByUser: undefined,
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        const rowA = balances.find((b) => b.groupMemberId === 'member-a');
+        const rowB = balances.find((b) => b.groupMemberId === 'member-b');
+
+        // Net spending 120 ⇒ each target 60. A paid 200, B paid -80 (credit).
+        expect(rowA!.paid).toBe(200);
+        expect(rowA!.netBalance).toBe(140);
+        expect(rowB!.paid).toBe(-80);
+        expect(rowB!.netBalance).toBe(-140);
+        // Conservation: balances net to zero.
+        const totalNet = balances.reduce((s, b) => s + b.netBalance, 0);
+        expect(Math.round(totalNet * 100) / 100).toBe(0);
       });
     });
 

@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
 import { Store } from '@ngxs/store';
@@ -76,9 +76,18 @@ export class GroupsService {
     );
   }
 
-  getHistoryLogs(groupId: string): Observable<GroupAuditLogResponse> {
+  getHistoryLogs(
+    groupId: string,
+    page = 1,
+    limit = 20,
+  ): Observable<GroupAuditLogResponse> {
+    const params = new HttpParams()
+      .set('page', page.toString())
+      .set('limit', limit.toString());
     return this.http
-      .get<GroupAuditLogResponse>(`${this.baseUrl}/groups/${groupId}/history`)
+      .get<GroupAuditLogResponse>(`${this.baseUrl}/groups/${groupId}/history`, {
+        params,
+      })
       .pipe(
         mergeMap(async (res) => {
           const logs = res.data || [];

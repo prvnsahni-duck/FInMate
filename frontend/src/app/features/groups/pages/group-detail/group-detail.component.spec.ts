@@ -352,7 +352,10 @@ describe('GroupDetailComponent', () => {
       expect(component.group()).toBeNull();
       expect(mockGroupsService.getMembers).toHaveBeenCalledWith('group-1');
       expect(mockGroupsService.getBalances).toHaveBeenCalledWith('group-1');
-      expect(mockGroupsService.getHistoryLogs).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getHistoryLogs).toHaveBeenCalledWith(
+        'group-1',
+        1,
+      );
       expect(mockGroupsService.getDeletedExpenses).toHaveBeenCalledWith(
         'group-1',
       );
@@ -586,6 +589,183 @@ describe('GroupDetailComponent', () => {
 
       expect(mockExpensesService.getExpenses).toHaveBeenCalledTimes(1);
       expect(component.currentPage()).toBe(1);
+    });
+  });
+
+  describe('household month date filter', () => {
+    it('requests a valid last-day-of-month endDate (never YYYY-MM-31 for short months)', () => {
+      fixture.detectChanges(); // loads the household group
+      (mockExpensesService.getExpenses as jest.Mock).mockClear();
+
+      // June has 30 days — the old code emitted 2026-06-31, which 500s.
+      component.currentTimelineMonth.set(new Date(2026, 5, 15));
+      component.fetchExpenses('group-1');
+
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledWith(
+        'group-1',
+        expect.objectContaining({
+          startDate: '2026-06-01',
+          endDate: '2026-06-30',
+        }),
+      );
+    });
+
+    it('handles February (28 days) correctly', () => {
+      fixture.detectChanges();
+      (mockExpensesService.getExpenses as jest.Mock).mockClear();
+
+      component.currentTimelineMonth.set(new Date(2026, 1, 10));
+      component.fetchExpenses('group-1');
+
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledWith(
+        'group-1',
+        expect.objectContaining({
+          startDate: '2026-02-01',
+          endDate: '2026-02-28',
+        }),
+      );
+    });
+  });
+
+  describe('infinite scroll history', () => {
+    const log1 = { id: 'log-1', action: 'expense.created' };
+    const log2 = { id: 'log-2', action: 'expense.updated' };
+
+    it('appends the next page and increments historyPage', () => {
+      mockGroupsService.getHistoryLogs = jest
+        .fn()
+        .mockReturnValueOnce(of({ data: [log1], meta: { totalItems: 2 } }))
+        .mockReturnValueOnce(of({ data: [log2], meta: { totalItems: 2 } }))
+        .mockReturnValue(of({ data: [], meta: { totalItems: 2 } })) as any;
+
+      fixture.detectChanges();
+
+      expect(component.historyLogs().length).toBe(1);
+      expect(component.hasMoreHistory()).toBe(true);
+
+      component.loadMoreHistory();
+
+      expect(component.historyPage()).toBe(2);
+      expect(component.historyLogs().map((l) => l.id)).toEqual([
+        'log-1',
+        'log-2',
+      ]);
+      expect(mockGroupsService.getHistoryLogs).toHaveBeenLastCalledWith(
+        'group-1',
+        2,
+      );
+      expect(component.hasMoreHistory()).toBe(false);
+    });
+
+    it('does not fetch more when every page is already loaded', () => {
+      mockGroupsService.getHistoryLogs = jest
+        .fn()
+        .mockReturnValue(of({ data: [log1], meta: { totalItems: 1 } })) as any;
+      fixture.detectChanges();
+      (mockGroupsService.getHistoryLogs as jest.Mock).mockClear();
+
+      component.loadMoreHistory();
+
+      expect(component.hasMoreHistory()).toBe(false);
+      expect(mockGroupsService.getHistoryLogs).not.toHaveBeenCalled();
+    });
+
+    it('triggers loadMoreHistory via onHistoryScroll near the bottom', () => {
+      mockGroupsService.getHistoryLogs = jest
+        .fn()
+        .mockReturnValue(of({ data: [log1], meta: { totalItems: 2 } })) as any;
+      fixture.detectChanges();
+      const spy = jest.spyOn(component, 'loadMoreHistory');
+
+      const target = {
+        scrollHeight: 900,
+        scrollTop: 750,
+        clientHeight: 100,
+      } as HTMLElement;
+      component.onHistoryScroll({ target } as unknown as Event);
+
+      expect(spy).toHaveBeenCalled();
+    });
+  });
+
+  describe('ledger export date range', () => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+
+    beforeEach(() => {
+      component.group.set(mockGroup as any);
+    });
+
+    it('opens the modal defaulting to the current month', () => {
+      component.openExportModal();
+
+      expect(component.showExportModal()).toBe(true);
+      expect(component.exportRangeMode()).toBe('month');
+      const now = new Date();
+      expect(component.exportFromDate()).toBe(
+        `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`,
+      );
+    });
+
+    it('exports only the current month by default (not the whole ledger)', async () => {
+      const spy = jest
+        .spyOn((component as any).expenseExportService, 'exportExpenses')
+        .mockResolvedValue(undefined);
+
+      component.openExportModal();
+      await component.exportLedger();
+
+      const now = new Date();
+      const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+      const lastDay = new Date(
+        now.getFullYear(),
+        now.getMonth() + 1,
+        0,
+      ).getDate();
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          groupId: 'group-1',
+          type: 'group',
+          from: `${month}-01`,
+          to: `${month}-${pad(lastDay)}`,
+        }),
+        'xlsx',
+        expect.any(String),
+      );
+      expect(component.showExportModal()).toBe(false);
+    });
+
+    it('exports the picked custom range', async () => {
+      const spy = jest
+        .spyOn((component as any).expenseExportService, 'exportExpenses')
+        .mockResolvedValue(undefined);
+
+      component.openExportModal();
+      component.exportRangeMode.set('custom');
+      component.exportFromDate.set('2026-05-01');
+      component.exportToDate.set('2026-05-15');
+      await component.exportLedger();
+
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({ from: '2026-05-01', to: '2026-05-15' }),
+        'xlsx',
+        expect.any(String),
+      );
+    });
+
+    it('rejects an inverted custom range without calling the export service', async () => {
+      const spy = jest
+        .spyOn((component as any).expenseExportService, 'exportExpenses')
+        .mockResolvedValue(undefined);
+
+      component.openExportModal();
+      component.exportRangeMode.set('custom');
+      component.exportFromDate.set('2026-05-20');
+      component.exportToDate.set('2026-05-01');
+      await component.exportLedger();
+
+      expect(component.exportError()).toContain('from');
+      expect(spy).not.toHaveBeenCalled();
+      expect(component.showExportModal()).toBe(true);
     });
   });
 

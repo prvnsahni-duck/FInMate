@@ -32,6 +32,7 @@ export interface ParsedRow {
   split_type?: string;
   shares_data?: string;
   description?: string;
+  transaction_type?: string;
 }
 
 @Injectable()
@@ -230,6 +231,7 @@ export class ImportService {
           splitType: 'equal' | 'fixed' | 'percent' | 'share';
           splits: Array<{ email: string; user: User; value: number }>;
           description?: string;
+          transactionType: 'expense' | 'refund';
         }> = [];
 
         for (let i = 0; i < rows.length; i++) {
@@ -328,6 +330,22 @@ export class ImportService {
               rowNum,
               'category',
               'Category cannot exceed 64 characters',
+            );
+          }
+
+          // Transaction type validation (optional; defaults to `expense` so
+          // legacy files without the column keep importing as normal expenses).
+          const transactionTypeStr = String(row.transaction_type || 'expense')
+            .trim()
+            .toLowerCase();
+          if (
+            transactionTypeStr !== 'expense' &&
+            transactionTypeStr !== 'refund'
+          ) {
+            addError(
+              rowNum,
+              'transaction_type',
+              "Transaction type must be 'expense' or 'refund'",
             );
           }
 
@@ -512,6 +530,7 @@ export class ImportService {
               description: row.description
                 ? String(row.description).trim()
                 : undefined,
+              transactionType: transactionTypeStr as 'expense' | 'refund',
             });
           }
         }
@@ -546,6 +565,7 @@ export class ImportService {
             group: group,
             expenseDate: rowData.date,
             status: 'posted',
+            transactionType: rowData.transactionType,
           });
 
           const savedExpense = await manager.save(Expense, expense);
@@ -783,6 +803,7 @@ export class ImportService {
         amount: Number(expense.amountTotal).toFixed(2),
         currency: expense.currency.toUpperCase(),
         category: expense.category,
+        transaction_type: expense.transactionType ?? 'expense',
         payer_email: expense.paidByUser?.email?.toLowerCase() || '',
         split_type: splits[0]?.splitType || 'equal',
         shares_data: sharesData,
@@ -798,6 +819,7 @@ export class ImportService {
         'amount',
         'currency',
         'category',
+        'transaction_type',
         'payer_email',
         'split_type',
         'shares_data',
