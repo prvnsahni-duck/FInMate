@@ -151,6 +151,23 @@ describe('ExpenseExportQueryService', () => {
     });
   });
 
+  it('defaults transactionType to expense and surfaces refunds when set', async () => {
+    expenseRepo.createQueryBuilder.mockReturnValue(
+      makeQb([
+        personalExpense(),
+        personalExpense({ id: 'p-2', transactionType: 'refund' }),
+      ]),
+    );
+    splitRepo.createQueryBuilder.mockReturnValue(makeQb([]));
+
+    const rows = await service.getExportRows('user-1', {});
+
+    const normal = rows.find((r) => r.id === 'p-1');
+    const refund = rows.find((r) => r.id === 'p-2');
+    expect(normal!.transactionType).toBe('expense');
+    expect(refund!.transactionType).toBe('refund');
+  });
+
   it('returns group shares with GROUP_SHARE type, myShare = amountOwed and splitType', async () => {
     expenseRepo.createQueryBuilder.mockReturnValue(makeQb([]));
     splitRepo.createQueryBuilder.mockReturnValue(makeQb([groupSplit()]));

@@ -355,6 +355,103 @@ describe('ImportService', () => {
       );
     });
 
+    it('imports a refund row (transaction_type=refund) as a refund expense', async () => {
+      const csvContent =
+        'date,title,amount,currency,category,transaction_type,payer_email,split_type,shares_data,description\n' +
+        '2026-06-10,Cashback,20.00,USD,Food,refund,a@ex.com,equal,,Card cashback\n';
+
+      const file = createMockFile(csvContent, 'test.csv', 'text/csv');
+
+      const userA = { id: 'aaaa', email: 'a@ex.com' };
+      const userB = { id: 'bbbb', email: 'b@ex.com' };
+      const mockMembers = [
+        { user: userA, joinStatus: 'active' },
+        { user: userB, joinStatus: 'active' },
+      ];
+
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: false,
+      });
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'member-1',
+        role: 'member',
+      });
+      mockManager.find.mockResolvedValueOnce(mockMembers);
+      mockManager.findOne.mockResolvedValueOnce(userA);
+
+      const result = await service.importExpenses('aaaa', 'group-1', file);
+
+      expect(result.successCount).toBe(1);
+      expect(result.errorCount).toBe(0);
+      expect(mockManager.create).toHaveBeenCalledWith(
+        Expense,
+        expect.objectContaining({
+          title: 'Cashback',
+          amountTotal: 20.0,
+          transactionType: 'refund',
+        }),
+      );
+    });
+
+    it('defaults a row without transaction_type to a normal expense', async () => {
+      const csvContent =
+        'date,title,amount,currency,category,payer_email,split_type,shares_data,description\n' +
+        '2026-06-10,Dinner,10.00,USD,Food,a@ex.com,equal,,Goa dinner\n';
+
+      const file = createMockFile(csvContent, 'test.csv', 'text/csv');
+
+      const userA = { id: 'aaaa', email: 'a@ex.com' };
+      const userB = { id: 'bbbb', email: 'b@ex.com' };
+      const mockMembers = [
+        { user: userA, joinStatus: 'active' },
+        { user: userB, joinStatus: 'active' },
+      ];
+
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: false,
+      });
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'member-1',
+        role: 'member',
+      });
+      mockManager.find.mockResolvedValueOnce(mockMembers);
+      mockManager.findOne.mockResolvedValueOnce(userA);
+
+      await service.importExpenses('aaaa', 'group-1', file);
+
+      expect(mockManager.create).toHaveBeenCalledWith(
+        Expense,
+        expect.objectContaining({ transactionType: 'expense' }),
+      );
+    });
+
+    it('rejects a row with an invalid transaction_type', async () => {
+      const csvContent =
+        'date,title,amount,currency,category,transaction_type,payer_email,split_type,shares_data,description\n' +
+        '2026-06-10,Dinner,10.00,USD,Food,bonus,a@ex.com,equal,,Goa dinner\n';
+
+      const file = createMockFile(csvContent, 'test.csv', 'text/csv');
+
+      const userA = { id: 'aaaa', email: 'a@ex.com' };
+      const mockMembers = [{ user: userA, joinStatus: 'active' }];
+
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'group-1',
+        isArchived: false,
+      });
+      mockManager.findOne.mockResolvedValueOnce({
+        id: 'member-1',
+        role: 'member',
+      });
+      mockManager.find.mockResolvedValueOnce(mockMembers);
+
+      await expect(
+        service.importExpenses('aaaa', 'group-1', file),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should allocate rounding remainder to lexicographically first user if payer is not in the split', async () => {
       // 10.00 split equally among B and C, paid by A (A is not in the split)
       const csvContent =
@@ -518,7 +615,7 @@ describe('ImportService', () => {
 
       const csvContent = result.buffer.toString('utf-8');
       expect(csvContent).toContain(
-        'date,title,amount,currency,category,payer_email,split_type,shares_data,description',
+        'date,title,amount,currency,category,transaction_type,payer_email,split_type,shares_data,description',
       );
       expect(csvContent).toContain('2026-06-10');
       expect(csvContent).toContain('Lunch');

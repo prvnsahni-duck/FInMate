@@ -41,6 +41,8 @@ export interface ExportRow {
   wrappedContentKeys?: Array<{ userId: string; wrappedKey: string }>;
   amountTotal: number;
   myShare: number;
+  /** `expense` (default) or `refund` — a refund is a negative expense. */
+  transactionType?: 'expense' | 'refund';
   currency: string;
   category: string;
   expenseType: 'PERSONAL' | 'GROUP_SHARE';
@@ -91,6 +93,11 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { header: 'Date', type: 'date', value: (r) => formatDate(r.expenseDate) },
   { header: 'Description', type: 'text', value: (r) => r.title ?? '' },
   { header: 'Amount', type: 'number', value: (r) => r.amountTotal },
+  {
+    header: 'Type',
+    type: 'text',
+    value: (r) => (r.transactionType === 'refund' ? 'Refund' : 'Expense'),
+  },
   { header: 'Currency', type: 'text', value: (r) => r.currency },
   { header: 'Category', type: 'text', value: (r) => r.category },
   {

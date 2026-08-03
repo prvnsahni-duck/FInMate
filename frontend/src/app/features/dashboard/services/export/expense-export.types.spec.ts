@@ -33,6 +33,7 @@ describe('EXPORT_COLUMNS', () => {
       'Date',
       'Description',
       'Amount',
+      'Type',
       'Currency',
       'Category',
       'Expense Type',
@@ -44,6 +45,15 @@ describe('EXPORT_COLUMNS', () => {
       'Notes',
       'Created At',
     ]);
+  });
+
+  it('renders the transaction Type column as Expense/Refund', () => {
+    expect(valueOf('Type', row({ transactionType: 'refund' }))).toBe('Refund');
+    expect(valueOf('Type', row({ transactionType: 'expense' }))).toBe(
+      'Expense',
+    );
+    // Legacy rows without the field read as a normal expense.
+    expect(valueOf('Type', row())).toBe('Expense');
   });
 
   const valueOf = (header: string, r: ExportRow) =>

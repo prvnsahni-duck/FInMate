@@ -2318,13 +2318,17 @@ export class ExpensesService {
     const carryExpenses = expenses.filter((exp) => exp.isCarryForward);
     const normalExpenses = expenses.filter((exp) => !exp.isCarryForward);
 
-    // Compute total monthly spending S from normal expenses only
+    // Compute net monthly spending S from normal expenses only. A refund is a
+    // negative expense, so it reduces both group spending and the recipient's
+    // net paid amount (signedAmount handles the sign).
     const S = normalExpenses.reduce(
-      (sum, exp) => sum + Number(exp.amountTotal),
+      (sum, exp) => sum + this.signedAmount(exp.amountTotal, exp.transactionType),
       0,
     );
 
-    // Compute normal paid amounts per active member (registered or pending).
+    // Compute normal net paid amounts per active member (registered or
+    // pending). For a refund the payer field holds the member who *received*
+    // the returned money, so signedAmount subtracts it from their net paid.
     const paidMap = new Map<string, number>();
     for (const member of activeMembers) {
       paidMap.set(member.id, 0);
@@ -2337,7 +2341,8 @@ export class ExpensesService {
       if (!memberId) continue;
       paidMap.set(
         memberId,
-        (paidMap.get(memberId) ?? 0) + Number(exp.amountTotal),
+        (paidMap.get(memberId) ?? 0) +
+          this.signedAmount(exp.amountTotal, exp.transactionType),
       );
     }
 
@@ -2386,7 +2391,8 @@ export class ExpensesService {
       if (!payerId) continue;
       carryPaidMap.set(
         payerId,
-        (carryPaidMap.get(payerId) ?? 0) + Number(exp.amountTotal),
+        (carryPaidMap.get(payerId) ?? 0) +
+          this.signedAmount(exp.amountTotal, exp.transactionType),
       );
     }
 
@@ -2398,7 +2404,8 @@ export class ExpensesService {
       if (participantId) {
         carryOwedMap.set(
           participantId,
-          (carryOwedMap.get(participantId) ?? 0) + Number(split.amountOwed),
+          (carryOwedMap.get(participantId) ?? 0) +
+            this.signedAmount(split.amountOwed, split.expense?.transactionType),
         );
       }
     }
@@ -2747,6 +2754,7 @@ export class ExpensesService {
         description: exp.description,
         amountTotal: Number(exp.amountTotal),
         myShare: Number(exp.amountTotal),
+        transactionType: exp.transactionType ?? 'expense',
         category: exp.category,
         expenseDate: exp.expenseDate,
         currency: exp.currency,
@@ -2775,6 +2783,7 @@ export class ExpensesService {
         description: exp.description,
         amountTotal: Number(exp.amountTotal),
         myShare: Number(split.amountOwed),
+        transactionType: exp.transactionType ?? 'expense',
         category: exp.category,
         expenseDate: exp.expenseDate,
         currency: exp.currency,

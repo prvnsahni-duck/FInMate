@@ -1755,6 +1755,139 @@ describe('ExpensesService', () => {
         expect(userABal?.netBalance).toBe(75);
         expect(userBBal?.netBalance).toBe(-75);
       });
+
+      // Refund Scenario A: money returns to the original payer. Net spending and
+      // the payer's net-paid both drop by the refund, so shares recompute off the
+      // reduced spending. (Expense 200 → refund 80 to payer ⇒ net 120, 60 each.)
+      it('treats a refund to the original payer as a negative expense', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        groupMemberRepository.find.mockResolvedValue([
+          {
+            id: 'member-a',
+            user: { id: 'user-a', displayName: 'User A' },
+            joinStatus: 'active',
+          },
+          {
+            id: 'member-b',
+            user: { id: 'user-b', displayName: 'User B' },
+            joinStatus: 'active',
+          },
+        ] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 200,
+            currency: 'USD',
+            isCarryForward: false,
+            transactionType: 'expense',
+            paidByGroupMember: { id: 'member-a' },
+            paidByUser: undefined,
+          },
+          {
+            id: 'refund-1',
+            amountTotal: 80,
+            currency: 'USD',
+            isCarryForward: false,
+            transactionType: 'refund',
+            paidByGroupMember: { id: 'member-a' },
+            paidByUser: undefined,
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        const rowA = balances.find((b) => b.groupMemberId === 'member-a');
+        const rowB = balances.find((b) => b.groupMemberId === 'member-b');
+
+        // Net spending 120 ⇒ each target 60. A paid net 120, B paid 0.
+        expect(rowA!.paid).toBe(120);
+        expect(rowA!.expected).toBe(60);
+        expect(rowA!.netBalance).toBe(60);
+        expect(rowB!.netBalance).toBe(-60);
+      });
+
+      // Refund Scenario B: money returns to a *different* member. Net spending
+      // still drops by the refund; the recipient's net-paid goes negative so
+      // they owe their share plus the credit they received.
+      it('treats a refund to another member as a negative expense (credited to the recipient)', async () => {
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        groupMemberRepository.find.mockResolvedValue([
+          {
+            id: 'member-a',
+            user: { id: 'user-a', displayName: 'User A' },
+            joinStatus: 'active',
+          },
+          {
+            id: 'member-b',
+            user: { id: 'user-b', displayName: 'User B' },
+            joinStatus: 'active',
+          },
+        ] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'exp-1',
+            amountTotal: 200,
+            currency: 'USD',
+            isCarryForward: false,
+            transactionType: 'expense',
+            paidByGroupMember: { id: 'member-a' },
+            paidByUser: undefined,
+          },
+          {
+            id: 'refund-1',
+            amountTotal: 80,
+            currency: 'USD',
+            isCarryForward: false,
+            transactionType: 'refund',
+            paidByGroupMember: { id: 'member-b' },
+            paidByUser: undefined,
+          },
+        ] as any);
+
+        const balances = await service.getCarryForwardSummary(
+          'caller-id',
+          'group-id',
+          '2026-06',
+        );
+
+        const rowA = balances.find((b) => b.groupMemberId === 'member-a');
+        const rowB = balances.find((b) => b.groupMemberId === 'member-b');
+
+        // Net spending 120 ⇒ each target 60. A paid 200, B paid -80 (credit).
+        expect(rowA!.paid).toBe(200);
+        expect(rowA!.netBalance).toBe(140);
+        expect(rowB!.paid).toBe(-80);
+        expect(rowB!.netBalance).toBe(-140);
+        // Conservation: balances net to zero.
+        const totalNet = balances.reduce((s, b) => s + b.netBalance, 0);
+        expect(Math.round(totalNet * 100) / 100).toBe(0);
+      });
     });
 
     describe('closeMonth', () => {
