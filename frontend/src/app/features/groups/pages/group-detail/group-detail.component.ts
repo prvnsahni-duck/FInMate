@@ -274,6 +274,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   isLoadingBalances = signal<boolean>(false);
   isLoadingHistory = signal<boolean>(false);
   historyError = signal<boolean>(false);
+  /** Infinite scroll state for the History tab, mirroring the ledger. */
+  historyPage = signal<number>(1);
+  totalHistoryLogs = signal<number>(0);
+  isLoadingMoreHistory = signal<boolean>(false);
+  hasMoreHistory = computed(
+    () => this.historyLogs().length < this.totalHistoryLogs(),
+  );
   isLoadingTrash = signal<boolean>(false);
   trashError = signal<boolean>(false);
   isLoadingRecurring = signal<boolean>(false);
@@ -960,20 +967,62 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
-  fetchHistoryLogs(groupId: string) {
-    this.isLoadingHistory.set(true);
+  /**
+   * `append`: false (default) replaces the list — initial load / retry, resets
+   * to page 1. true appends the fetched page — used by infinite scroll
+   * (loadMoreHistory). Mirrors fetchExpenses.
+   */
+  fetchHistoryLogs(groupId: string, append = false) {
+    if (append) {
+      this.isLoadingMoreHistory.set(true);
+    } else {
+      this.historyPage.set(1);
+      this.isLoadingHistory.set(true);
+    }
     this.historyError.set(false);
-    this.groupsService.getHistoryLogs(groupId).subscribe({
+    this.groupsService.getHistoryLogs(groupId, this.historyPage()).subscribe({
       next: (res) => {
-        this.historyLogs.set(res.data || []);
+        const logs = res.data || [];
+        if (append) {
+          this.historyLogs.update((prev) => [...prev, ...logs]);
+        } else {
+          this.historyLogs.set(logs);
+        }
+        this.totalHistoryLogs.set(res.meta?.totalItems ?? logs.length);
         this.isLoadingHistory.set(false);
+        this.isLoadingMoreHistory.set(false);
       },
       error: (err) => {
         console.error('Failed to fetch history logs', err);
         this.isLoadingHistory.set(false);
+        this.isLoadingMoreHistory.set(false);
         this.historyError.set(true);
       },
     });
+  }
+
+  /**
+   * Infinite scroll for the History tab: fetch and append the next page.
+   * Guards against duplicate in-flight requests and stops once every page has
+   * loaded. Mirrors loadMoreExpenses.
+   */
+  loadMoreHistory(): void {
+    if (this.isLoadingHistory() || this.isLoadingMoreHistory()) return;
+    if (!this.hasMoreHistory()) return;
+    const g = this.group();
+    if (!g?.id) return;
+    this.historyPage.update((v) => v + 1);
+    this.fetchHistoryLogs(g.id, true);
+  }
+
+  /** Scroll handler for the bounded history-list container — triggers the next
+   *  page once the user is within `threshold`px of the bottom. */
+  onHistoryScroll(event: Event): void {
+    const el = event.target as HTMLElement;
+    const threshold = 200;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < threshold) {
+      this.loadMoreHistory();
+    }
   }
 
   fetchDeletedExpenses(groupId: string) {

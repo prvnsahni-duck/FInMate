@@ -352,7 +352,10 @@ describe('GroupDetailComponent', () => {
       expect(component.group()).toBeNull();
       expect(mockGroupsService.getMembers).toHaveBeenCalledWith('group-1');
       expect(mockGroupsService.getBalances).toHaveBeenCalledWith('group-1');
-      expect(mockGroupsService.getHistoryLogs).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getHistoryLogs).toHaveBeenCalledWith(
+        'group-1',
+        1,
+      );
       expect(mockGroupsService.getDeletedExpenses).toHaveBeenCalledWith(
         'group-1',
       );
@@ -621,6 +624,67 @@ describe('GroupDetailComponent', () => {
           endDate: '2026-02-28',
         }),
       );
+    });
+  });
+
+  describe('infinite scroll history', () => {
+    const log1 = { id: 'log-1', action: 'expense.created' };
+    const log2 = { id: 'log-2', action: 'expense.updated' };
+
+    it('appends the next page and increments historyPage', () => {
+      mockGroupsService.getHistoryLogs = jest
+        .fn()
+        .mockReturnValueOnce(of({ data: [log1], meta: { totalItems: 2 } }))
+        .mockReturnValueOnce(of({ data: [log2], meta: { totalItems: 2 } }))
+        .mockReturnValue(of({ data: [], meta: { totalItems: 2 } })) as any;
+
+      fixture.detectChanges();
+
+      expect(component.historyLogs().length).toBe(1);
+      expect(component.hasMoreHistory()).toBe(true);
+
+      component.loadMoreHistory();
+
+      expect(component.historyPage()).toBe(2);
+      expect(component.historyLogs().map((l) => l.id)).toEqual([
+        'log-1',
+        'log-2',
+      ]);
+      expect(mockGroupsService.getHistoryLogs).toHaveBeenLastCalledWith(
+        'group-1',
+        2,
+      );
+      expect(component.hasMoreHistory()).toBe(false);
+    });
+
+    it('does not fetch more when every page is already loaded', () => {
+      mockGroupsService.getHistoryLogs = jest
+        .fn()
+        .mockReturnValue(of({ data: [log1], meta: { totalItems: 1 } })) as any;
+      fixture.detectChanges();
+      (mockGroupsService.getHistoryLogs as jest.Mock).mockClear();
+
+      component.loadMoreHistory();
+
+      expect(component.hasMoreHistory()).toBe(false);
+      expect(mockGroupsService.getHistoryLogs).not.toHaveBeenCalled();
+    });
+
+    it('triggers loadMoreHistory via onHistoryScroll near the bottom', () => {
+      mockGroupsService.getHistoryLogs = jest
+        .fn()
+        .mockReturnValue(of({ data: [log1], meta: { totalItems: 2 } })) as any;
+      fixture.detectChanges();
+      const spy = jest.spyOn(component, 'loadMoreHistory');
+
+      const target = {
+        scrollHeight: 900,
+        scrollTop: 750,
+        clientHeight: 100,
+      } as HTMLElement;
+      component.onHistoryScroll({ target } as unknown as Event);
+
+      expect(spy).toHaveBeenCalled();
     });
   });
 

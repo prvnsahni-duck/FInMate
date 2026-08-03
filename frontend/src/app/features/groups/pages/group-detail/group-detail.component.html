@@ -1420,9 +1420,34 @@
               </button>
             </div>
           } @else {
-            <app-group-history-log
-              [historyLogs]="historyLogs()"
-            ></app-group-history-log>
+            <div
+              class="max-h-[65vh] overflow-y-auto pr-1 -mr-1"
+              data-testid="history-scroll-container"
+              (scroll)="onHistoryScroll($event)"
+            >
+              <app-group-history-log
+                [historyLogs]="historyLogs()"
+              ></app-group-history-log>
+
+              <!-- Infinite scroll: loading-next-page indicator / end-of-list -->
+              @if (isLoadingMoreHistory()) {
+                <div
+                  data-testid="history-loading-more"
+                  class="flex items-center justify-center py-4"
+                >
+                  <div
+                    class="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"
+                  ></div>
+                </div>
+              } @else if (!hasMoreHistory() && historyLogs().length > 0) {
+                <p
+                  data-testid="history-end"
+                  class="text-center text-xs text-muted py-4"
+                >
+                  You've reached the end of the history.
+                </p>
+              }
+            </div>
           }
         }
 

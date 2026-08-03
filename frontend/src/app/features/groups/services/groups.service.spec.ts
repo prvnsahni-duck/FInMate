@@ -144,9 +144,24 @@ describe('GroupsService', () => {
         done();
       });
 
-      const req = httpMock.expectOne('/api/groups/group-1/history');
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/groups/group-1/history',
+      );
       expect(req.request.method).toBe('GET');
+      // Paginated by default (page 1, limit 20) for infinite scroll.
+      expect(req.request.params.get('page')).toBe('1');
+      expect(req.request.params.get('limit')).toBe('20');
       req.flush(mockLogs);
+    });
+
+    it('passes an explicit page for infinite scroll', (done) => {
+      service.getHistoryLogs('group-1', 3).subscribe(() => done());
+
+      const req = httpMock.expectOne(
+        (r) => r.url === '/api/groups/group-1/history',
+      );
+      expect(req.request.params.get('page')).toBe('3');
+      req.flush({ data: [] });
     });
   });
 
