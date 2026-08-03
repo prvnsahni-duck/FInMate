@@ -109,7 +109,7 @@
     }
 
     <div
-      class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4"
+      class="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4"
     >
       <div>
         <a
@@ -209,7 +209,7 @@
     <!-- Household timeline selector -->
     @if (group()!.groupType === 'household') {
       <div
-        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-4 mb-8 shadow-xl shadow-black/5 flex items-center justify-between"
+        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-4 mb-4 shadow-xl shadow-black/5 flex items-center justify-between"
       >
         <button
           (click)="changeMonth(-1)"
@@ -266,7 +266,7 @@
       group()!.groupType === 'household' && carryForwardBalances().length > 0
     ) {
       <div
-        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 mb-8 shadow-xl shadow-black/5"
+        class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 mb-4 shadow-xl shadow-black/5"
       >
         <h3
           class="text-sm font-extrabold text-secondary uppercase tracking-wider mb-6 flex items-center gap-2"
@@ -371,7 +371,7 @@
       <div class="lg:col-span-2 space-y-8">
         <!-- Sticky Tabs Navigation Wrapper -->
         <div
-          class="sticky top-[64px] lg:top-0 z-30 bg-finmate-bg/95 backdrop-blur-md py-2 transition-all duration-200"
+          class="sticky top-[64px] lg:top-0 z-30 bg-finmate-bg/95 backdrop-blur-md transition-all duration-200"
         >
           <div class="relative w-full overflow-hidden">
             <!-- Fade overlays for horizontal scroll cues -->
