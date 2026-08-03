@@ -201,6 +201,59 @@ describe('CreateExpenseModalComponent', () => {
       expect(component.expenseForm.get('amountTotal')?.value).toBe(50);
     });
 
+    it('resolves group-member payer/splits to user ids in edit mode', () => {
+      // Group expenses come back with paidByUserId/participantUserId = null and
+      // the ids in paidByGroupMemberId/participantGroupMemberId; the payer
+      // dropdown and participant checkboxes are keyed by user id, so these must
+      // be resolved via `members` or "Paid By"/"Split Among" render empty.
+      component.groupId = 'group-1';
+      component.members = [
+        {
+          id: 'm1',
+          joinStatus: 'active',
+          role: 'owner',
+          user: { id: 'u1', email: 'a@b.com' },
+        },
+        {
+          id: 'm2',
+          joinStatus: 'active',
+          role: 'member',
+          user: { id: 'u2', email: 'c@d.com' },
+        },
+      ] as any;
+      component.expense = {
+        id: 'exp-2',
+        title: 'Rent',
+        amountTotal: 1000,
+        currency: 'INR',
+        category: 'housing',
+        expenseDate: '2026-07-01',
+        paidByUserId: null,
+        paidByGroupMemberId: 'm1',
+        ownerUserId: 'u1',
+        version: 1,
+        splits: [
+          { participantUserId: null, participantGroupMemberId: 'm1' },
+          { participantUserId: null, participantGroupMemberId: 'm2' },
+        ],
+      } as any;
+
+      component.ngOnChanges({
+        expense: {
+          currentValue: component.expense,
+          previousValue: null,
+          firstChange: true,
+          isFirstChange: () => true,
+        },
+      });
+
+      expect(component.expenseForm.get('paidByUserId')?.value).toBe('u1');
+      expect(component.selectedUserIds.has('u1')).toBeTruthy();
+      expect(component.selectedUserIds.has('u2')).toBeTruthy();
+      // Not flagged as modified when nothing was actually changed.
+      expect(component.hasChanges()).toBeFalsy();
+    });
+
     it('should patch currency from group', () => {
       component.groupCurrency = 'EUR';
       component.ngOnChanges({

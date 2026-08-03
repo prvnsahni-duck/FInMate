@@ -605,6 +605,26 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
   }
 
+  /**
+   * Resolves a split/payer reference to a *user* id — the id space the payer
+   * dropdown and participant checkboxes are keyed by. Group expenses carry the
+   * reference as a GroupMember id (participantUserId/paidByUserId come back
+   * null), so fall back to looking the member up in `members`. Returns null for
+   * pending (userless) members, which can't be represented in the user-keyed
+   * selection.
+   */
+  private resolveParticipantUserId(
+    userId?: string | null,
+    groupMemberId?: string | null,
+  ): string | null {
+    if (userId) return userId;
+    if (groupMemberId) {
+      const member = this.members.find((m) => m.id === groupMemberId);
+      return member?.user?.id ?? null;
+    }
+    return null;
+  }
+
   ngOnChanges(changes: SimpleChanges) {
     // Runs before the edit-mode early return below so the proactive key check
     // also happens when the modal opens in edit mode (both `expense` and
@@ -626,6 +646,17 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
 
     if (changes['expense'] && this.expense) {
+      // Group expenses store the payer and split participants against
+      // GroupMember rows (frozen rule), so the server returns paidByUserId /
+      // participantUserId as null and carries the ids in paidByGroupMemberId /
+      // participantGroupMemberId. The payer dropdown and participant checkboxes
+      // are keyed by *user* id, so resolve member ids back to user ids here or
+      // "Paid By" and "Split Equally Among" render empty in edit mode.
+      const resolvedPayerUserId = this.resolveParticipantUserId(
+        this.expense.paidByUserId,
+        this.expense.paidByGroupMemberId,
+      );
+
       this.expenseForm.patchValue({
         title: this.expense.title,
         description: this.expense.description || '',
@@ -635,14 +666,18 @@ export class CreateExpenseModalComponent implements OnChanges {
         currency: this.expense.currency,
         category: this.expense.category,
         expenseDate: this.expense.expenseDate,
-        paidByUserId: this.expense.paidByUserId,
+        paidByUserId: resolvedPayerUserId,
       });
 
       this.selectedUserIds.clear();
       if (this.expense.splits) {
         this.expense.splits.forEach((s) => {
-          if (s.participantUserId) {
-            this.selectedUserIds.add(s.participantUserId);
+          const uid = this.resolveParticipantUserId(
+            s.participantUserId,
+            s.participantGroupMemberId,
+          );
+          if (uid) {
+            this.selectedUserIds.add(uid);
           }
         });
       }
@@ -712,7 +747,7 @@ export class CreateExpenseModalComponent implements OnChanges {
         transactionType:
           (this.expense.transactionType as 'expense' | 'refund') ?? 'expense',
         expenseDate: this.expense.expenseDate ?? '',
-        paidByUserId: this.expense.paidByUserId ?? '',
+        paidByUserId: resolvedPayerUserId ?? '',
         participantIds: Array.from(this.selectedUserIds).sort(),
         attachmentKeys: (this.expense.attachments ?? [])
           .map((a) => a.storageKey)
