@@ -220,7 +220,12 @@ describe('DashboardComponent', () => {
       fixture.detectChanges();
 
       const nextPage = [
-        { id: 'exp-3', title: 'Coffee', amountTotal: 5, expenseDate: new Date() },
+        {
+          id: 'exp-3',
+          title: 'Coffee',
+          amountTotal: 5,
+          expenseDate: new Date(),
+        },
       ];
       mockExpensesService.getMyExpenses.mockReturnValue(
         of({ data: nextPage, meta: { totalItems: 5 } }),

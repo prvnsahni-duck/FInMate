@@ -2332,7 +2332,8 @@ export class ExpensesService {
     // negative expense, so it reduces both group spending and the recipient's
     // net paid amount (signedAmount handles the sign).
     const S = normalExpenses.reduce(
-      (sum, exp) => sum + this.signedAmount(exp.amountTotal, exp.transactionType),
+      (sum, exp) =>
+        sum + this.signedAmount(exp.amountTotal, exp.transactionType),
       0,
     );
 

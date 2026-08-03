@@ -1317,7 +1317,10 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
       const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-      return { from: `${month}-01`, to: `${month}-${this.lastDayOfMonth(month)}` };
+      return {
+        from: `${month}-01`,
+        to: `${month}-${this.lastDayOfMonth(month)}`,
+      };
     }
     return { from: this.exportFromDate(), to: this.exportToDate() };
   }
@@ -1341,7 +1344,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       return;
     }
     if (from > to) {
-      this.exportError.set('The "from" date must be on or before the "to" date.');
+      this.exportError.set(
+        'The "from" date must be on or before the "to" date.',
+      );
       return;
     }
     this.exportError.set('');
