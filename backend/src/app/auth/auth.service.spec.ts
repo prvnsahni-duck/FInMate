@@ -26,7 +26,10 @@ describe('AuthService', () => {
   let jwtService: jest.Mocked<JwtService>;
   let redisService: jest.Mocked<RedisService>;
   let encryptionService: jest.Mocked<EncryptionService>;
-  let emailService: { sendEmail: jest.Mock };
+  let emailService: {
+    sendEmail: jest.Mock;
+    sendVerificationEmail: jest.Mock;
+  };
   let contactsService: { claimContactsForUser: jest.Mock };
 
   beforeEach(async () => {
@@ -71,6 +74,7 @@ describe('AuthService', () => {
 
     const mockEmailService = {
       sendEmail: jest.fn().mockResolvedValue(undefined),
+      sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     const mockContactsService = {
@@ -153,7 +157,9 @@ describe('AuthService', () => {
         updatedAt: new Date(),
       } as any;
       usersService.createUser.mockResolvedValue(mockUser);
-      emailService.sendEmail.mockRejectedValueOnce(new Error('SMTP down'));
+      emailService.sendVerificationEmail.mockRejectedValueOnce(
+        new Error('provider down'),
+      );
 
       await expect(
         service.register('test@example.com', 'password'),
