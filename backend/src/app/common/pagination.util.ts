@@ -1,3 +1,16 @@
+/**
+ * Scope-wide monetary totals for a filtered expense query, per currency.
+ * Independent of pagination — computed over every matching row, not just the
+ * current page — so summary tiles stay correct as the user pages/scrolls.
+ */
+export interface LedgerTotals {
+  currency: string;
+  totalExpense: number;
+  totalRefund: number;
+  /** totalExpense − totalRefund. */
+  net: number;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   meta: {
@@ -6,6 +19,8 @@ export interface PaginatedResponse<T> {
     itemsPerPage: number;
     totalPages: number;
     currentPage: number;
+    /** Present on expense listings; absent elsewhere. */
+    totals?: LedgerTotals[];
   };
   links: {
     first: string;

@@ -31,6 +31,7 @@ import { Store } from '@ngxs/store';
 import { ClientEncryptionService } from '../../../../core/services/encryption.service';
 import { GroupKeyService } from '../../../../core/services/group-key.service';
 import { DECRYPTION_FAILED_PLACEHOLDER } from '../../../../core/constants/crypto.constants';
+import { MONTH_LOCK_DAY } from '../../../../core/constants/app.constants';
 import { ExpenseDecryptCoordinator } from '../../../../core/services/expense-decrypt-coordinator.service';
 import { ExpenseDecryptionService } from '../../../../core/services/expense-decryption.service';
 import { classifyDecryptionError } from '../../../../core/models/decryption-state';
@@ -88,6 +89,17 @@ export interface GroupExpense extends Expense {
     mimeType: string;
     sizeBytes: number;
   }>;
+}
+
+/**
+ * Scope-wide, pagination-independent monetary totals per currency, returned in
+ * the expense listing's `meta.totals` (see backend `LedgerTotals`).
+ */
+export interface LedgerTotals {
+  currency: string;
+  totalExpense: number;
+  totalRefund: number;
+  net: number;
 }
 
 @Component({
@@ -227,6 +239,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   currentPage = signal<number>(1);
   pageSize = signal<number>(20);
   totalExpenses = signal<number>(0);
+  /**
+   * Scope-wide monetary totals per currency from the backend, independent of
+   * pagination — so the summary tiles show the true totals for the whole
+   * filtered ledger, not just the pages loaded so far. Null until the first
+   * page response arrives.
+   */
+  ledgerTotals = signal<LedgerTotals[] | null>(null);
   currentUserId = signal<string | null>(null);
   currentTimelineMonth = signal<Date>(new Date());
   isMonthLocked = signal<boolean>(false);
@@ -734,12 +753,13 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     nextDate.setMonth(nextDate.getMonth() + delta);
     this.currentTimelineMonth.set(nextDate);
 
-    const todayMonth = new Date();
-    const isPast =
-      nextDate.getFullYear() < todayMonth.getFullYear() ||
-      (nextDate.getFullYear() === todayMonth.getFullYear() &&
-        nextDate.getMonth() < todayMonth.getMonth());
-    this.isMonthLocked.set(isPast);
+    // A household ledger month closes on the same cadence as every other
+    // group: the previous month stays editable through MONTH_LOCK_DAY of the
+    // following month (grace period), only then does it lock. Mirrors the
+    // backend ExpenseEditPolicyService.
+    const y = nextDate.getFullYear();
+    const m = String(nextDate.getMonth() + 1).padStart(2, '0');
+    this.isMonthLocked.set(this.isPastEditWindow(`${y}-${m}-01`));
 
     if (g?.id) {
       this.fetchExpenses(g.id);
@@ -839,6 +859,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
             this.expenses.set(mappedExpenses);
           }
           this.totalExpenses.set(res.meta?.totalItems || 0);
+          // Authoritative totals for the whole filtered scope — same on every
+          // page, so setting on append is harmless and keeps them fresh.
+          this.ledgerTotals.set(
+            (res.meta as { totals?: LedgerTotals[] } | undefined)?.totals ??
+              null,
+          );
           this.isLoadingExpenses.set(false);
           this.isLoadingMoreExpenses.set(false);
           this.ledgerError.set(false);
@@ -998,12 +1024,11 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   /**
-   * Mirrors the backend's editing-window rule (see
-   * ExpensesService.assertWithinEditWindow): the current calendar month is
-   * always editable; the previous month is editable through the 7th
-   * (inclusive) of the current month; anything older is read-only. Household
-   * groups are exempt — they use their own explicit ledger-close lock
-   * (isMonthLocked, driven by the month-navigation timeline).
+   * Mirrors the backend's editing-window rule (see ExpenseEditPolicyService):
+   * the current calendar month is always editable; the previous month is
+   * editable through MONTH_LOCK_DAY (inclusive) of the current month; anything
+   * older is read-only. Household groups follow the same rule — their
+   * month-navigation lock (isMonthLocked) is computed from this same window.
    */
   private isPastEditWindow(expenseDate: string): boolean {
     const [yearStr, monthStr] = expenseDate.split('-');
@@ -1012,7 +1037,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     if (!Number.isFinite(year) || !Number.isFinite(month)) return false;
     // Passing the 1-based month as JS's 0-based index lands on the next
     // month, rolling the year over automatically (e.g. Dec -> Jan).
-    const graceEnd = new Date(year, month, 7, 23, 59, 59, 999);
+    const graceEnd = new Date(year, month, MONTH_LOCK_DAY, 23, 59, 59, 999);
     return Date.now() > graceEnd.getTime();
   }
 
@@ -1027,14 +1052,31 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   /**
-   * Group spending summary for the currently-loaded ledger page: total
+   * Group spending summary for the whole filtered ledger scope: total
    * expenses, total refunds, and net spending (expenses − refunds), in the
-   * group's base currency. Client-side, page-scoped — matches what's on
-   * screen; the authoritative per-currency figures live in balances().
+   * group's base currency. Prefers the backend's pagination-independent totals
+   * (`ledgerTotals`) so the tiles stay correct no matter how many pages have
+   * loaded; falls back to summing the loaded rows only until those arrive.
    */
   ledgerSpendingSummary = computed(() => {
     const g = this.group();
     const currency = g?.currency;
+
+    const totals = this.ledgerTotals();
+    if (totals) {
+      const scoped = currency
+        ? totals.filter((t) => t.currency === currency)
+        : totals;
+      const totalExpense = scoped.reduce((s, t) => s + t.totalExpense, 0);
+      const totalRefund = scoped.reduce((s, t) => s + t.totalRefund, 0);
+      return {
+        totalExpense,
+        totalRefund,
+        netSpending: totalExpense - totalRefund,
+      };
+    }
+
+    // Fallback: page-scoped sum of the rows loaded so far.
     let totalExpense = 0;
     let totalRefund = 0;
     for (const expense of this.expenses()) {
@@ -1067,7 +1109,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       d.getMonth() + 1,
       1,
     ).toLocaleDateString('en-US', { month: 'long' });
-    return `Transactions from ${txMonth} could only be modified until 7 ${lockDeadline} and are now locked.`;
+    return `Transactions from ${txMonth} could only be modified until ${MONTH_LOCK_DAY} ${lockDeadline} and are now locked.`;
   }
 
   /** Resolves the payer display name for a group expense or recurring template.

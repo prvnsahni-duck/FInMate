@@ -23,10 +23,15 @@ import {
   User,
 } from '@finmate/data-models';
 import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
-import { paginate, PaginatedResponse } from '../common/pagination.util';
+import {
+  LedgerTotals,
+  paginate,
+  PaginatedResponse,
+} from '../common/pagination.util';
 import { simplifyLedgerDebts } from '../common/ledger-debt-simplifier';
 import { resolveMemberDisplay } from '../common/member-display.util';
 import { calculateDeterministicSplits } from './split-calculator.util';
+import { ExpenseEditPolicyService } from './services/expense-edit-policy.service';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -92,6 +97,7 @@ export class ExpensesService {
     private readonly auditLogRepository: Repository<AuditLog>,
     @InjectRepository(EncryptedExpenseKey)
     private readonly encryptedExpenseKeyRepository: Repository<EncryptedExpenseKey>,
+    private readonly expenseEditPolicy: ExpenseEditPolicyService,
   ) {}
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -132,40 +138,17 @@ export class ExpensesService {
   /**
    * Enforces the group transaction editing window on `expenseDate`:
    *  - Current calendar month: always editable.
-   *  - Previous calendar month: editable through the 7th (inclusive) of the
-   *    current month.
-   *  - Older months: read-only.
+   *  - Previous calendar month: editable through MONTH_LOCK_DAY (inclusive) of
+   *    the current month.
+   *  - After that day, and older months: fully locked (no edit, no delete).
    *
-   * Household groups are exempt — they have their own explicit ledger-close
-   * lock (see the household branch in ensureExpenseAccess). Personal expenses
-   * are not passed through here.
+   * The rule itself lives in ExpenseEditPolicyService — the single source of
+   * truth, unit-tested exhaustively. Household groups are exempt here (they
+   * have their own explicit ledger-close lock in ensureExpenseAccess), and
+   * personal expenses are never passed through this at all.
    */
   private assertWithinEditWindow(expenseDate: string): void {
-    const [yearStr, monthStr] = expenseDate.split('-');
-    const year = Number(yearStr);
-    const month = Number(monthStr); // 1-based
-    if (!Number.isFinite(year) || !Number.isFinite(month)) {
-      return;
-    }
-
-    // The 7th (end of day) of the month AFTER the transaction's month. Passing
-    // the 1-based month as JS's 0-based month index lands on the next month and
-    // rolls the year over automatically (e.g. Dec → Jan).
-    const graceEnd = new Date(year, month, 7, 23, 59, 59, 999);
-    if (Date.now() <= graceEnd.getTime()) {
-      return;
-    }
-
-    const txMonthName = new Date(year, month - 1, 1).toLocaleString('en-US', {
-      month: 'long',
-    });
-    const lockMonthName = new Date(year, month, 1).toLocaleString('en-US', {
-      month: 'long',
-    });
-    throw new ForbiddenException({
-      errorCode: 'EXP_EDIT_WINDOW_LOCKED',
-      message: `Transactions from ${txMonthName} could only be modified until 7 ${lockMonthName} and are now locked.`,
-    });
+    this.expenseEditPolicy.assertCanEdit(expenseDate);
   }
 
   private async getGroupMembership(
@@ -312,18 +295,17 @@ export class ExpensesService {
         });
       }
 
-      // Household month-lock: previous month's expenses are immutable
-      if (group.groupType === 'household' && expense.ledgerMonth) {
-        const currentMonth = this.toYearMonth();
-        if (expense.ledgerMonth < currentMonth) {
-          throw new ForbiddenException({
-            errorCode: 'EXP_MONTH_LOCKED',
-            message: `Household expenses from ${expense.ledgerMonth} are locked and cannot be modified`,
-          });
-        }
+      // Monthly closing window (all group types). The current month is always
+      // editable; the previous month stays editable through MONTH_LOCK_DAY of
+      // the following month; older months are locked. Household groups are
+      // keyed by their ledgerMonth (the accounting month), other groups by the
+      // transaction date — but they share one rule so the grace period is
+      // consistent everywhere. See ExpenseEditPolicyService.
+      if (group.groupType === 'household') {
+        this.expenseEditPolicy.assertCanEdit(
+          expense.ledgerMonth ?? expense.expenseDate,
+        );
       } else {
-        // Normal groups: previous month editable only until the 7th of the
-        // current month; older months are read-only.
         this.assertWithinEditWindow(expense.expenseDate);
       }
     }
@@ -952,11 +934,11 @@ export class ExpensesService {
       }
 
       // ── Editing-window validation ───────────────────────────────────────
-      // Household groups govern back-dating via their own ledger rules; normal
-      // groups allow the current month plus the previous month until the 7th.
-      if (group.groupType !== 'household') {
-        this.assertWithinEditWindow(dto.expenseDate);
-      }
+      // One rule for every group type: the current month plus the previous
+      // month through MONTH_LOCK_DAY of the following month. A household
+      // expense's ledgerMonth is derived from expenseDate, so gating on the
+      // date here lands on the same month.
+      this.assertWithinEditWindow(dto.expenseDate);
 
       // Frozen rule: inside a group ledger, the payer always resolves to
       // GroupMember, never User — paidByUserId is accepted as a client
@@ -1352,6 +1334,11 @@ export class ExpensesService {
       }
     }
 
+    // Snapshot the fully-filtered query for the scope-wide monetary totals
+    // BEFORE ordering/pagination is applied, so the summary tiles reflect every
+    // matching row rather than just the current page (see computeLedgerTotals).
+    const totalsQuery = query.clone();
+
     query
       .orderBy('expense.expenseDate', 'DESC')
       .addOrderBy('expense.createdAt', 'DESC')
@@ -1363,9 +1350,12 @@ export class ExpensesService {
       .take(limit)
       .getMany();
 
-    const mapped = await this.batchMapExpenseResponses(expenses);
+    const [mapped, totals] = await Promise.all([
+      this.batchMapExpenseResponses(expenses),
+      this.computeLedgerTotals(totalsQuery),
+    ]);
 
-    return paginate(mapped, total, page, limit, '/api/v1/expenses', {
+    const response = paginate(mapped, total, page, limit, '/api/v1/expenses', {
       groupId: params.groupId,
       category: params.category,
       status: params.status,
@@ -1373,6 +1363,58 @@ export class ExpensesService {
       endDate: params.endDate,
       cursor: params.cursor,
     });
+    response.meta.totals = totals;
+    return response;
+  }
+
+  /**
+   * Sum amounts over an already-filtered expense query, grouped by currency and
+   * split into expenses vs. refunds. Runs on the pre-pagination query so the
+   * result is the true total for the whole filtered scope. Amounts are stored
+   * in plaintext (only titles/descriptions are encrypted), so this is a plain
+   * SQL aggregate.
+   */
+  private async computeLedgerTotals(
+    filteredQuery: ReturnType<Repository<Expense>['createQueryBuilder']>,
+  ): Promise<LedgerTotals[]> {
+    const rows = await filteredQuery
+      .select('expense.currency', 'currency')
+      .addSelect('expense.transactionType', 'transactionType')
+      .addSelect('SUM(expense.amountTotal)', 'sum')
+      .groupBy('expense.currency')
+      .addGroupBy('expense.transactionType')
+      .getRawMany<{
+        currency: string;
+        transactionType: 'expense' | 'refund' | null;
+        sum: string | number | null;
+      }>();
+
+    const byCurrency = new Map<
+      string,
+      { totalExpense: number; totalRefund: number }
+    >();
+    for (const row of rows) {
+      const currency = row.currency;
+      if (!currency) continue;
+      const entry = byCurrency.get(currency) ?? {
+        totalExpense: 0,
+        totalRefund: 0,
+      };
+      const amount = Number(row.sum) || 0;
+      if (row.transactionType === 'refund') {
+        entry.totalRefund += amount;
+      } else {
+        entry.totalExpense += amount;
+      }
+      byCurrency.set(currency, entry);
+    }
+
+    return [...byCurrency.entries()].map(([currency, v]) => ({
+      currency,
+      totalExpense: v.totalExpense,
+      totalRefund: v.totalRefund,
+      net: v.totalExpense - v.totalRefund,
+    }));
   }
 
   /** Get a single expense by ID. */

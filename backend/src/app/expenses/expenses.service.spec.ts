@@ -23,6 +23,7 @@ import {
 } from '@finmate/data-models';
 import { Repository } from 'typeorm';
 import { ExpensesService } from './expenses.service';
+import { ExpenseEditPolicyService } from './services/expense-edit-policy.service';
 
 describe('ExpensesService', () => {
   let service: ExpensesService;
@@ -219,6 +220,9 @@ describe('ExpensesService', () => {
           useValue: mockReceiptVersionRepository,
         },
         { provide: getDataSourceToken(), useValue: mockDataSource },
+        // Real policy service (no ConfigService provided → default cutoff of 7),
+        // so the edit-window behaviour under test matches production.
+        ExpenseEditPolicyService,
       ],
     }).compile();
 
@@ -533,11 +537,24 @@ describe('ExpensesService', () => {
   it('should build paginated list for caller', async () => {
     groupMemberRepository.find.mockResolvedValue([] as any);
 
+    // Aggregate sub-query returned by `.clone()` for scope-wide totals.
+    const totalsBuilder = {
+      select: jest.fn().mockReturnThis(),
+      addSelect: jest.fn().mockReturnThis(),
+      groupBy: jest.fn().mockReturnThis(),
+      addGroupBy: jest.fn().mockReturnThis(),
+      getRawMany: jest.fn().mockResolvedValue([
+        { currency: 'USD', transactionType: 'expense', sum: '50' },
+        { currency: 'USD', transactionType: 'refund', sum: '20' },
+      ]),
+    };
+
     const queryBuilder = {
       leftJoinAndSelect: jest.fn().mockReturnThis(),
       where: jest.fn().mockReturnThis(),
       orWhere: jest.fn().mockReturnThis(),
       andWhere: jest.fn().mockReturnThis(),
+      clone: jest.fn(() => totalsBuilder),
       orderBy: jest.fn().mockReturnThis(),
       addOrderBy: jest.fn().mockReturnThis(),
       getCount: jest.fn().mockResolvedValue(1),
@@ -575,6 +592,10 @@ describe('ExpensesService', () => {
 
     expect(result.meta.totalItems).toBe(1);
     expect(result.data).toHaveLength(1);
+    // Scope-wide totals come from the aggregate, not the page rows.
+    expect(result.meta.totals).toEqual([
+      { currency: 'USD', totalExpense: 50, totalRefund: 20, net: 30 },
+    ]);
   });
 
   it('should reject list request with invalid date format', async () => {
@@ -1146,6 +1167,75 @@ describe('ExpensesService', () => {
           title: 'Updated Rent',
         } as any),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject a metadata-only update on a normal group expense in a closed month (403)', async () => {
+      // Dated years in the past → unambiguously past the grace window whenever
+      // the suite runs, so no clock control is needed.
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-1',
+        version: 1,
+        title: 'Old Trip',
+        amountTotal: 500,
+        currency: 'USD',
+        category: 'Travel',
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        expenseDate: '2020-01-10',
+        status: 'posted',
+        group: { id: 'group-id' },
+      } as any);
+      groupMemberRepository.findOne.mockResolvedValue({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        groupType: 'trip',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+
+      // Even a title-only edit is rejected — a closed month is fully read-only.
+      await expect(
+        service.updateExpense('caller-id', 'exp-1', {
+          version: 1,
+          title: 'Tampered title',
+        } as any),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should reject deleting a normal group expense in a closed month', async () => {
+      expenseRepository.findOne.mockResolvedValue({
+        id: 'exp-1',
+        version: 1,
+        title: 'Old Trip',
+        amountTotal: 500,
+        currency: 'USD',
+        category: 'Travel',
+        paidByUser: { id: 'caller-id' },
+        ownerUser: { id: 'caller-id' },
+        expenseDate: '2020-01-10',
+        status: 'posted',
+        group: { id: 'group-id' },
+      } as any);
+      groupMemberRepository.findOne.mockResolvedValue({
+        id: 'membership-id',
+        role: 'member',
+        joinStatus: 'active',
+      } as any);
+      groupRepository.findOne.mockResolvedValue({
+        id: 'group-id',
+        groupType: 'trip',
+        currency: 'USD',
+        isArchived: false,
+      } as any);
+
+      await expect(service.deleteExpense('caller-id', 'exp-1')).rejects.toThrow(
+        ForbiddenException,
+      );
+      expect(expenseRepository.softRemove).not.toHaveBeenCalled();
     });
 
     it('should calculate carry forward balances correctly for a household group', async () => {
