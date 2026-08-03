@@ -2535,13 +2535,20 @@
 <!-- ── Ledger Export date-range dialog ──────────────────────────────────── -->
 @if (showExportModal()) {
   <div
-    class="fixed inset-0 z-[100] overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-    (click)="closeExportModal()"
+    class="fixed inset-0 z-[100] overflow-y-auto flex items-center justify-center p-4"
     data-testid="export-ledger-modal"
   >
+    <!-- Backdrop -->
     <div
-      class="w-full max-w-md bg-white dark:bg-finmate-card rounded-3xl p-6 shadow-2xl relative animate-fade-in"
-      (click)="$event.stopPropagation()"
+      (click)="closeExportModal()"
+      (keydown.escape)="closeExportModal()"
+      role="presentation"
+      class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+    ></div>
+
+    <!-- Content -->
+    <div
+      class="relative w-full max-w-md bg-white dark:bg-finmate-card rounded-3xl p-6 shadow-2xl animate-fade-in"
     >
       <h3 class="text-lg font-bold text-secondary mb-1">Export Ledger</h3>
       <p class="text-xs text-muted mb-5">
