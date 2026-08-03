@@ -90,6 +90,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
   activeGroupsCount = 0;
   personalExpenses: GroupExpense[] = [];
   myExpenses: any[] = []; // personal + group shares
+  totalMyExpenses = 0;
+  /** 1-based page of the unified /expenses/me list currently loaded. */
+  expensesPage = 1;
+  private readonly expensesPageSize = 50;
+  /** True while infinite scroll is appending a subsequent page. */
+  isLoadingMoreExpenses = false;
   expenseViewFilter: 'all' | 'personal' | 'group_share' = 'all';
   get isExpenseModalOpen(): boolean {
     return this.expensesUiStore.showCreateExpenseModal();
@@ -167,25 +173,26 @@ export class DashboardComponent implements OnInit, OnDestroy {
   refreshExpenseData() {
     this.isLoading = true;
 
-    // 1. Fetch personal + group-share expenses (unified list)
-    this.expensesService.getMyExpenses({ page: 1, limit: 50 }).subscribe({
-      next: (res) => {
-        const items: any[] = Array.isArray(res.data)
-          ? res.data
-          : Array.isArray(res.data?.data)
-            ? res.data.data
-            : [];
-        this.myExpenses = items;
-        // Keep personalExpenses for backwards compat with existing templates
-        this.personalExpenses = items.filter(
-          (e) => e.expenseType === 'PERSONAL' || !e.expenseType,
-        ) as GroupExpense[];
-        // Note: "Total Personal Balance" is derived (income − monthly spend) via
-        // the totalBalance getter — no longer a running sum of expenses here.
-        this.isLoading = false;
-      },
-      error: () => (this.isLoading = false),
-    });
+    // 1. Fetch personal + group-share expenses (unified list). Resets to the
+    //    first page; infinite scroll appends further pages via loadMoreMyExpenses.
+    this.expensesPage = 1;
+    this.expensesService
+      .getMyExpenses({ page: 1, limit: this.expensesPageSize })
+      .subscribe({
+        next: (res) => {
+          const items = this.extractExpenseItems(res);
+          this.myExpenses = items;
+          this.totalMyExpenses = this.extractExpenseTotal(res, items.length);
+          // Keep personalExpenses for backwards compat with existing templates
+          this.personalExpenses = items.filter(
+            (e) => e.expenseType === 'PERSONAL' || !e.expenseType,
+          ) as GroupExpense[];
+          // Note: "Total Personal Balance" is derived (income − monthly spend) via
+          // the totalBalance getter — no longer a running sum of expenses here.
+          this.isLoading = false;
+        },
+        error: () => (this.isLoading = false),
+      });
 
     // 2. Combined monthly total (personal + group shares)
     this.expensesService.getCombinedMonthlyTotal().subscribe({
@@ -346,6 +353,57 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   setExpenseViewFilter(filter: 'all' | 'personal' | 'group_share'): void {
     this.expenseViewFilter = filter;
+  }
+
+  /** More pages of the unified list remain to fetch (filter-independent — the
+   *  in-view filtering is client-side over whatever has been loaded). */
+  get hasMoreMyExpenses(): boolean {
+    return this.myExpenses.length < this.totalMyExpenses;
+  }
+
+  /**
+   * Infinite scroll: fetch the next page of /expenses/me and append it to the
+   * loaded list. Guards against duplicate in-flight requests and stops once
+   * every page has loaded. Mirrors the group ledger's loadMoreExpenses.
+   */
+  loadMoreMyExpenses(): void {
+    if (this.isLoading || this.isLoadingMoreExpenses) return;
+    if (!this.hasMoreMyExpenses) return;
+    this.isLoadingMoreExpenses = true;
+    const nextPage = this.expensesPage + 1;
+    this.expensesService
+      .getMyExpenses({ page: nextPage, limit: this.expensesPageSize })
+      .subscribe({
+        next: (res) => {
+          const items = this.extractExpenseItems(res);
+          this.myExpenses = [...this.myExpenses, ...items];
+          this.totalMyExpenses = this.extractExpenseTotal(
+            res,
+            this.totalMyExpenses,
+          );
+          this.personalExpenses = this.myExpenses.filter(
+            (e) => e.expenseType === 'PERSONAL' || !e.expenseType,
+          ) as GroupExpense[];
+          this.expensesPage = nextPage;
+          this.isLoadingMoreExpenses = false;
+        },
+        error: () => (this.isLoadingMoreExpenses = false),
+      });
+  }
+
+  /** Pulls the expense array out of the paginated /expenses/me response,
+   *  tolerating both the unwrapped and doubly-nested shapes. */
+  private extractExpenseItems(res: any): any[] {
+    return Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.data?.data)
+        ? res.data.data
+        : [];
+  }
+
+  /** Total item count from the paginated response, falling back to `fallback`. */
+  private extractExpenseTotal(res: any, fallback: number): number {
+    return res?.meta?.totalItems ?? res?.data?.meta?.totalItems ?? fallback;
   }
 
   openGroupExpense(event: { groupId: string; expenseId: string }): void {

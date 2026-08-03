@@ -220,7 +220,10 @@
       </button>
     </div>
     } @else {
-    <div class="space-y-4 max-h-[480px] overflow-y-auto pr-1">
+    <div
+      class="space-y-4 max-h-[480px] overflow-y-auto pr-1"
+      (scroll)="onExpenseListScroll($event)"
+    >
       @for (expense of displayExpenses; track expense.id) {
 
       @if (expense.expenseType === 'GROUP_SHARE') {
@@ -301,6 +304,16 @@
       </div>
       }
 
+      }
+
+      @if (isLoadingMoreExpenses) {
+      <div class="flex items-center justify-center py-4" data-testid="expenses-loading-more">
+        <div class="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+      </div>
+      } @else if (!hasMoreExpenses && displayExpenses.length > 0) {
+      <p class="text-center text-[10px] text-muted py-3" data-testid="expenses-end">
+        You've reached the end.
+      </p>
       }
     </div>
     }

@@ -109,4 +109,59 @@ describe('DashboardHomeComponent', () => {
     acceptBtn.click();
     expect(emitSpy).toHaveBeenCalledWith(mockInvitations[0]);
   });
+
+  describe('infinite scroll', () => {
+    it('emits loadMoreExpensesEvent when scrolled near the bottom', () => {
+      fixture.detectChanges();
+      const emitSpy = jest.spyOn(component.loadMoreExpensesEvent, 'emit');
+
+      // 900 - 750 - 100 = 50px from the bottom (< 200 threshold).
+      const target = {
+        scrollHeight: 900,
+        scrollTop: 750,
+        clientHeight: 100,
+      } as HTMLElement;
+      component.onExpenseListScroll({ target } as unknown as Event);
+
+      expect(emitSpy).toHaveBeenCalled();
+    });
+
+    it('does not emit loadMoreExpensesEvent when far from the bottom', () => {
+      fixture.detectChanges();
+      const emitSpy = jest.spyOn(component.loadMoreExpensesEvent, 'emit');
+
+      // 900 - 100 - 100 = 700px from the bottom (>= 200 threshold).
+      const target = {
+        scrollHeight: 900,
+        scrollTop: 100,
+        clientHeight: 100,
+      } as HTMLElement;
+      component.onExpenseListScroll({ target } as unknown as Event);
+
+      expect(emitSpy).not.toHaveBeenCalled();
+    });
+
+    it('shows the loading-more spinner while a page is appending', () => {
+      component.myExpenses = mockExpenses;
+      component.isLoadingMoreExpenses = true;
+      fixture.detectChanges();
+
+      const spinner = fixture.nativeElement.querySelector(
+        '[data-testid="expenses-loading-more"]',
+      );
+      expect(spinner).toBeTruthy();
+    });
+
+    it('shows the end-of-list message once no more pages remain', () => {
+      component.myExpenses = mockExpenses;
+      component.isLoadingMoreExpenses = false;
+      component.hasMoreExpenses = false;
+      fixture.detectChanges();
+
+      const end = fixture.nativeElement.querySelector(
+        '[data-testid="expenses-end"]',
+      );
+      expect(end).toBeTruthy();
+    });
+  });
 });
