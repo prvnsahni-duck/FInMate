@@ -589,6 +589,41 @@ describe('GroupDetailComponent', () => {
     });
   });
 
+  describe('household month date filter', () => {
+    it('requests a valid last-day-of-month endDate (never YYYY-MM-31 for short months)', () => {
+      fixture.detectChanges(); // loads the household group
+      (mockExpensesService.getExpenses as jest.Mock).mockClear();
+
+      // June has 30 days — the old code emitted 2026-06-31, which 500s.
+      component.currentTimelineMonth.set(new Date(2026, 5, 15));
+      component.fetchExpenses('group-1');
+
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledWith(
+        'group-1',
+        expect.objectContaining({
+          startDate: '2026-06-01',
+          endDate: '2026-06-30',
+        }),
+      );
+    });
+
+    it('handles February (28 days) correctly', () => {
+      fixture.detectChanges();
+      (mockExpensesService.getExpenses as jest.Mock).mockClear();
+
+      component.currentTimelineMonth.set(new Date(2026, 1, 10));
+      component.fetchExpenses('group-1');
+
+      expect(mockExpensesService.getExpenses).toHaveBeenCalledWith(
+        'group-1',
+        expect.objectContaining({
+          startDate: '2026-02-01',
+          endDate: '2026-02-28',
+        }),
+      );
+    });
+  });
+
   it('should handle toggle of contribution mode', () => {
     fixture.detectChanges();
     expect(component.contributionMode).toBe('amount');

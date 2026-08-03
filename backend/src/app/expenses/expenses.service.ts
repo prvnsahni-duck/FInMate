@@ -110,7 +110,17 @@ export class ExpensesService {
 
   private isValidDateFormat(value?: string): boolean {
     if (!value) return true;
-    return /^\d{4}-\d{2}-\d{2}$/.test(value);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    // Reject shape-valid but impossible calendar dates (e.g. 2026-06-31,
+    // 2026-02-30). Postgres rejects these against a `date` column, so without
+    // this check they surface as an unhandled 500 instead of a clean 400.
+    const [y, m, d] = value.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return (
+      dt.getUTCFullYear() === y &&
+      dt.getUTCMonth() === m - 1 &&
+      dt.getUTCDate() === d
+    );
   }
 
   /** Returns the YYYY-MM string for the given date string or today. */

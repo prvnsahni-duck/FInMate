@@ -745,6 +745,16 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
+  /** Zero-padded last calendar day of a `YYYY-MM` month (e.g. '30' for June,
+   *  '28'/'29' for February). Avoids emitting impossible dates like
+   *  `2026-06-31`, which the backend's date column rejects. */
+  private lastDayOfMonth(yearMonth: string): string {
+    const [year, month] = yearMonth.split('-').map(Number);
+    // Day 0 of the next month is the last day of `month` (month is 1-based).
+    const day = new Date(year, month, 0).getDate();
+    return String(day).padStart(2, '0');
+  }
+
   changeMonth(delta: number) {
     const g = this.group();
     if (g?.groupType !== 'household') return;
@@ -798,7 +808,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     if (g?.groupType === 'household') {
       const activeMonth = this.getCurrentMonthString();
       start = `${activeMonth}-01`;
-      end = `${activeMonth}-31`;
+      end = `${activeMonth}-${this.lastDayOfMonth(activeMonth)}`;
     }
 
     this.expensesService

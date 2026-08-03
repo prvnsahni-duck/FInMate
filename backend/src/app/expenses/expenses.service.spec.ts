@@ -608,6 +608,26 @@ describe('ExpensesService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('should reject a shape-valid but impossible calendar date (400, not 500)', async () => {
+    // 2026-06-31 passes the YYYY-MM-DD regex but June has 30 days; without the
+    // calendar check this reaches Postgres and surfaces as an unhandled 500.
+    await expect(
+      service.listExpenses('caller-id', {
+        page: 1,
+        limit: 20,
+        endDate: '2026-06-31',
+      }),
+    ).rejects.toThrow(BadRequestException);
+
+    await expect(
+      service.listExpenses('caller-id', {
+        page: 1,
+        limit: 20,
+        endDate: '2026-02-30',
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
   it('should reject list request for unauthorized group filter', async () => {
     groupMemberRepository.find.mockResolvedValue([] as any);
 
