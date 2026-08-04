@@ -631,6 +631,34 @@ describe('GroupDetailComponent', () => {
         }),
       );
     });
+
+    it('shows the month navigator only for single-calendar-month date filters', () => {
+      fixture.detectChanges(); // loads the household group (default This Month)
+      expect(component.showMonthNav()).toBe(true);
+
+      component.filterStore.openDraft();
+      component.filterStore.setDraftPreset('last_30_days');
+      component.filterStore.apply();
+      expect(component.showMonthNav()).toBe(false);
+
+      component.filterStore.setDraftPreset('last_month');
+      component.filterStore.apply();
+      expect(component.showMonthNav()).toBe(true);
+    });
+
+    it('does not reset an arrow-navigated month when an unrelated filter changes', () => {
+      fixture.detectChanges();
+      // Navigate back to June via the arrows.
+      component.currentTimelineMonth.set(new Date(2026, 5, 1));
+
+      // Change only the category through the drawer (date preset unchanged).
+      component.filterStore.openDraft();
+      component.filterStore.setDraftCategory('Food & Drinks');
+      component.applyFilterDrawer();
+
+      // The navigated month must be preserved (not re-anchored to the current month).
+      expect(component.currentTimelineMonth().getMonth()).toBe(5);
+    });
   });
 
   describe('infinite scroll history', () => {

@@ -225,8 +225,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     { value: 'Others', label: 'Others' },
   ];
 
-  /** Date-preset options for the filter drawer, in the spec's order. */
+  /** Date-preset options for the filter drawer (day-level first, then ranges). */
   readonly datePresetOptions: { value: DatePreset; label: string }[] = [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'last_7_days', label: 'Last 7 Days' },
+    { value: 'last_30_days', label: 'Last 30 Days' },
     { value: 'this_month', label: 'This Month' },
     { value: 'last_month', label: 'Last Month' },
     { value: 'last_3_months', label: 'Last 3 Months' },
@@ -256,14 +260,36 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   ]);
 
   /**
-   * The effective date range every filter-driven surface should use: the
-   * navigated month for household ledgers (which are month-driven), otherwise
-   * the unified filter's resolved preset range. Recomputes on filter change
-   * and, for household, on month navigation.
+   * Date presets that represent a single calendar month. For a household group
+   * these are the only states where the month ◀ ▶ navigator is meaningful (it
+   * steps the navigated month); every other preset/custom range is a
+   * multi-day/range state where the navigator is hidden to avoid two conflicting
+   * date controls fighting over the same state.
+   */
+  private readonly MONTH_MODE_PRESETS: DatePreset[] = [
+    'this_month',
+    'last_month',
+  ];
+
+  /**
+   * True when the household month navigator (◀ ▶) should be shown: household
+   * group AND the applied date filter is a single calendar month. In every other
+   * date state the date filter is the single source of truth and the arrows hide.
+   */
+  showMonthNav = computed(
+    () =>
+      this.group()?.groupType === 'household' &&
+      this.MONTH_MODE_PRESETS.includes(this.filterStore.applied().date.preset),
+  );
+
+  /**
+   * The effective date range every filter-driven surface should use. In household
+   * "month mode" (This Month / Last Month) it follows the navigated month; every
+   * other state uses the unified filter's resolved range. Recomputes on filter
+   * change and, for household month mode, on month navigation.
    */
   effectiveDateRange = computed<{ from?: string; to?: string }>(() => {
-    const g = this.group();
-    if (g?.groupType === 'household') {
+    if (this.showMonthNav()) {
       const month = this.getCurrentMonthString();
       return {
         from: `${month}-01`,
@@ -271,6 +297,105 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       };
     }
     return this.filterStore.resolvedRange();
+  });
+
+  /**
+   * Active (non-default) filters as removable summary chips. The date chip only
+   * appears when the date is not the default (This Month).
+   */
+  activeFilterChips = computed(() => {
+    const f = this.filterStore.applied();
+    const chips: {
+      key: 'date' | 'category' | 'member' | 'paidBy' | 'type';
+      label: string;
+    }[] = [];
+    if (f.date.preset !== 'this_month') {
+      chips.push({ key: 'date', label: this.filterStore.dateRangeLabel() });
+    }
+    if (f.category) chips.push({ key: 'category', label: f.category });
+    if (f.memberId) {
+      chips.push({
+        key: 'member',
+        label: 'Member: ' + this.memberNameById(f.memberId),
+      });
+    }
+    if (f.paidById) {
+      chips.push({
+        key: 'paidBy',
+        label: 'Paid by: ' + this.memberNameById(f.paidById),
+      });
+    }
+    if (f.transactionType && f.transactionType !== 'both') {
+      chips.push({
+        key: 'type',
+        label:
+          f.transactionType === 'refund' ? 'Refunds only' : 'Expenses only',
+      });
+    }
+    return chips;
+  });
+
+  /** Display name for a group-member id (used by the member/payer chips). */
+  memberNameById(id: string): string {
+    const m = this.members().find((mem) => mem.id === id);
+    return m ? this.memberDisplayName(m) : 'Unknown';
+  }
+
+  /** Remove one applied filter from its summary chip. */
+  removeFilterChip(
+    key: 'date' | 'category' | 'member' | 'paidBy' | 'type',
+  ): void {
+    switch (key) {
+      case 'date':
+        this.filterStore.clearAppliedDate();
+        // Date reverted to This Month → re-anchor the household navigator.
+        this.anchorHouseholdMonth();
+        break;
+      case 'category':
+        this.filterStore.clearAppliedCategory();
+        break;
+      case 'member':
+        this.filterStore.clearAppliedMember();
+        break;
+      case 'paidBy':
+        this.filterStore.clearAppliedPaidBy();
+        break;
+      case 'type':
+        this.filterStore.clearAppliedTxType();
+        break;
+    }
+  }
+
+  /**
+   * Re-anchor the household month navigator to match the applied date preset —
+   * This Month → the current month, Last Month → the previous month. Called only
+   * when the date preset actually changes (via Apply / chip removal / Clear all),
+   * never on plain arrow navigation, so stepping through months isn't reset by
+   * unrelated filter edits.
+   */
+  private anchorHouseholdMonth(): void {
+    if (this.group()?.groupType !== 'household') return;
+    const preset = this.filterStore.applied().date.preset;
+    const now = new Date();
+    if (preset === 'this_month') {
+      this.currentTimelineMonth.set(
+        new Date(now.getFullYear(), now.getMonth(), 1),
+      );
+    } else if (preset === 'last_month') {
+      this.currentTimelineMonth.set(
+        new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      );
+    }
+  }
+
+  /**
+   * Custom-range validity for the drawer: an explicit From must not be after an
+   * explicit To. Incomplete ranges (only one bound) are allowed as open bounds.
+   */
+  draftDateRangeValid = computed(() => {
+    const d = this.filterStore.draft().date;
+    if (d.preset !== 'custom' || !d.from || !d.to) return true;
+    return d.from <= d.to;
   });
 
   /**
@@ -752,7 +877,14 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
 
   /** Commit the drawer's draft. The applied() effect handles refetch + URL sync. */
   applyFilterDrawer() {
+    if (!this.draftDateRangeValid()) return;
+    const previousPreset = this.filterStore.applied().date.preset;
     this.filterStore.apply();
+    // Only re-anchor the household navigator when the date preset itself changed,
+    // so editing category/member etc. never resets an arrow-navigated month.
+    if (this.filterStore.applied().date.preset !== previousPreset) {
+      this.anchorHouseholdMonth();
+    }
     this.setFilterBottomSheet(false);
   }
 
@@ -771,6 +903,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   clearAllFilters() {
     this.filterStore.resetDraft();
     this.filterStore.apply();
+    this.anchorHouseholdMonth();
   }
 
   @ViewChild('filterBtn') filterBtn!: ElementRef<HTMLButtonElement>;

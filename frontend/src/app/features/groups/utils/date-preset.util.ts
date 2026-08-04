@@ -68,6 +68,16 @@ function shiftMonth(
   return { year: d.getFullYear(), month0: d.getMonth() };
 }
 
+/** A day offset from `now` as a local `YYYY-MM-DD` (handles month/year rollover). */
+function shiftDay(now: Date, deltaDays: number): string {
+  const d = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + deltaDays,
+  );
+  return ymd(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 /**
  * Resolve a preset to inclusive `{from,to}` bounds. `all_time` yields an empty
  * range (no bounds); `custom` echoes the caller-supplied dates.
@@ -80,6 +90,19 @@ export function resolveDatePreset(
   const cur = { year: now.getFullYear(), month0: now.getMonth() };
 
   switch (preset) {
+    case 'today': {
+      const t = shiftDay(now, 0);
+      return { from: t, to: t };
+    }
+    case 'yesterday': {
+      const y = shiftDay(now, -1);
+      return { from: y, to: y };
+    }
+    case 'last_7_days':
+      // Inclusive of today: today and the 6 days before it.
+      return { from: shiftDay(now, -6), to: shiftDay(now, 0) };
+    case 'last_30_days':
+      return { from: shiftDay(now, -29), to: shiftDay(now, 0) };
     case 'this_month':
       return {
         from: monthStart(cur.year, cur.month0),
@@ -137,12 +160,23 @@ function parse(dateStr: string): { y: number; m0: number; d: number } {
  *  - custom range  → `D MMM YYYY – D MMM YYYY`
  *  - all time      → `All Time`
  */
+const NAMED_PRESET_LABELS: Partial<Record<DatePreset, string>> = {
+  all_time: 'All Time',
+  today: 'Today',
+  yesterday: 'Yesterday',
+  last_7_days: 'Last 7 Days',
+  last_30_days: 'Last 30 Days',
+};
+
 export function formatDateRangeLabel(
   preset: DatePreset,
   from?: string,
   to?: string,
 ): string {
-  if (preset === 'all_time' || !from || !to) return 'All Time';
+  // Day-level presets read best as their name; month presets show the range.
+  const named = NAMED_PRESET_LABELS[preset];
+  if (named) return named;
+  if (!from || !to) return 'All Time';
 
   const a = parse(from);
   const b = parse(to);

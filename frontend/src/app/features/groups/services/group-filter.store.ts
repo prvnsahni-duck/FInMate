@@ -130,4 +130,38 @@ export class GroupFilterStore {
   cancelDraft(): void {
     this._draft.set(cloneFilter(this._applied()));
   }
+
+  // ── Remove a single applied filter (from a removable summary chip) ──────────
+  // Each mutates the applied set directly and re-syncs the draft, so the owning
+  // component's applied() effect re-fetches and updates the URL.
+
+  private syncDraftToApplied(): void {
+    this._draft.set(cloneFilter(this._applied()));
+  }
+
+  /** Reset the date filter back to the default (This Month). */
+  clearAppliedDate(): void {
+    this._applied.update((a) => ({ ...a, date: { preset: 'this_month' } }));
+    this.syncDraftToApplied();
+  }
+
+  clearAppliedCategory(): void {
+    this._applied.update((a) => ({ ...a, category: undefined }));
+    this.syncDraftToApplied();
+  }
+
+  clearAppliedMember(): void {
+    this._applied.update((a) => ({ ...a, memberId: undefined }));
+    this.syncDraftToApplied();
+  }
+
+  clearAppliedPaidBy(): void {
+    this._applied.update((a) => ({ ...a, paidById: undefined }));
+    this.syncDraftToApplied();
+  }
+
+  clearAppliedTxType(): void {
+    this._applied.update((a) => ({ ...a, transactionType: 'both' }));
+    this.syncDraftToApplied();
+  }
 }

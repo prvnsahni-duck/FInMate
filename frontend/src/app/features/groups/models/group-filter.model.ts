@@ -12,6 +12,10 @@
  * column so registered and pending (Contact-backed) members resolve.
  */
 export type DatePreset =
+  | 'today'
+  | 'yesterday'
+  | 'last_7_days'
+  | 'last_30_days'
   | 'this_month'
   | 'last_month'
   | 'last_3_months'
@@ -105,6 +109,10 @@ export function filterToQueryParams(f: GroupFilter): GroupFilterQueryParams {
 }
 
 const DATE_PRESETS: readonly DatePreset[] = [
+  'today',
+  'yesterday',
+  'last_7_days',
+  'last_30_days',
   'this_month',
   'last_month',
   'last_3_months',

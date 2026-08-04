@@ -5,6 +5,34 @@ describe('date-preset.util', () => {
   const now = new Date(2026, 7, 4); // Aug 4, 2026 (local)
 
   describe('resolveDatePreset', () => {
+    it('today → single current day', () => {
+      expect(resolveDatePreset('today', now)).toEqual({
+        from: '2026-08-04',
+        to: '2026-08-04',
+      });
+    });
+
+    it('yesterday → single previous day (handles rollover)', () => {
+      expect(resolveDatePreset('yesterday', new Date(2026, 7, 1))).toEqual({
+        from: '2026-07-31',
+        to: '2026-07-31',
+      });
+    });
+
+    it('last_7_days → today and the 6 days before (inclusive)', () => {
+      expect(resolveDatePreset('last_7_days', now)).toEqual({
+        from: '2026-07-29',
+        to: '2026-08-04',
+      });
+    });
+
+    it('last_30_days → today and the 29 days before (inclusive)', () => {
+      expect(resolveDatePreset('last_30_days', now)).toEqual({
+        from: '2026-07-06',
+        to: '2026-08-04',
+      });
+    });
+
     it('this_month → current calendar month', () => {
       expect(resolveDatePreset('this_month', now)).toEqual({
         from: '2026-08-01',
@@ -101,6 +129,21 @@ describe('date-preset.util', () => {
       expect(formatDateRangeLabel('custom', '2026-07-15', '2026-09-10')).toBe(
         '15 Jul 2026 – 10 Sep 2026',
       );
+    });
+
+    it('day-level presets read as their friendly name', () => {
+      expect(formatDateRangeLabel('today', '2026-08-04', '2026-08-04')).toBe(
+        'Today',
+      );
+      expect(
+        formatDateRangeLabel('yesterday', '2026-08-03', '2026-08-03'),
+      ).toBe('Yesterday');
+      expect(
+        formatDateRangeLabel('last_7_days', '2026-07-29', '2026-08-04'),
+      ).toBe('Last 7 Days');
+      expect(
+        formatDateRangeLabel('last_30_days', '2026-07-06', '2026-08-04'),
+      ).toBe('Last 30 Days');
     });
 
     it('all_time → All Time', () => {

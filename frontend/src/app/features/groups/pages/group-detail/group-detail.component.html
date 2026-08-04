@@ -211,39 +211,11 @@
       <div
         class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-4 mb-4 shadow-xl shadow-black/5 flex items-center justify-between"
       >
-        <button
-          (click)="changeMonth(-1)"
-          class="p-2 text-muted hover:text-secondary transition-colors"
-        >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            ></path>
-          </svg>
-        </button>
-        <div class="text-center">
-          <span class="text-lg font-bold text-secondary">{{
-            getMonthDisplayName()
-          }}</span>
-          @if (isMonthLocked()) {
-            <span
-              class="ml-2 text-xs font-semibold px-2 py-0.5 bg-red-500/10 text-red-500 rounded-full"
-              >Locked (Read-Only)</span
-            >
-          }
-        </div>
-        <div class="flex items-center gap-1">
+        @if (showMonthNav()) {
           <button
-            (click)="changeMonth(1)"
-            class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            (click)="changeMonth(-1)"
+            aria-label="Previous month"
+            class="p-2 text-muted hover:text-secondary transition-colors"
           >
             <svg
               class="w-6 h-6"
@@ -255,10 +227,51 @@
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 stroke-width="2"
-                d="M9 5l7 7-7 7"
+                d="M15 19l-7-7 7-7"
               ></path>
             </svg>
           </button>
+        } @else {
+          <span class="w-9 shrink-0"></span>
+        }
+        <div class="text-center px-2 min-w-0">
+          <span class="text-lg font-bold text-secondary">{{
+            showMonthNav() ? getMonthDisplayName() : filterStore.dateRangeLabel()
+          }}</span>
+          @if (showMonthNav() && isMonthLocked()) {
+            <span
+              class="ml-2 text-xs font-semibold px-2 py-0.5 bg-red-500/10 text-red-500 rounded-full"
+              >Locked (Read-Only)</span
+            >
+          }
+          @if (!showMonthNav()) {
+            <p class="text-[10px] text-muted mt-0.5">
+              Month navigation is available only for a single calendar month.
+            </p>
+          }
+        </div>
+        <div class="flex items-center gap-1">
+          @if (showMonthNav()) {
+            <button
+              (click)="changeMonth(1)"
+              aria-label="Next month"
+              class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 5l7 7-7 7"
+                ></path>
+              </svg>
+            </button>
+          }
 
           <!-- Unified filter button (category / member / payer / type) -->
           <button
@@ -520,6 +533,47 @@
           </div>
         }
 
+        <!-- Active-filter summary: removable chips (all group types) -->
+        @if (activeFilterChips().length > 0) {
+          <div
+            data-testid="active-filter-chips"
+            class="flex flex-wrap items-center gap-2 mb-4"
+          >
+            @for (chip of activeFilterChips(); track chip.key) {
+              <span
+                class="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold"
+              >
+                {{ chip.label }}
+                <button
+                  (click)="removeFilterChip(chip.key)"
+                  [attr.aria-label]="'Remove ' + chip.label + ' filter'"
+                  class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-primary/20 transition cursor-pointer"
+                >
+                  <svg
+                    class="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2.5"
+                      d="M6 18L18 6M6 6l12 12"
+                    ></path>
+                  </svg>
+                </button>
+              </span>
+            }
+            <button
+              (click)="clearAllFilters()"
+              class="text-xs font-bold text-muted hover:text-primary transition cursor-pointer px-1"
+            >
+              Clear all
+            </button>
+          </div>
+        }
+
         <!-- Unified Filter Drawer — page-level so it opens from any tab -->
         @if (isFilterBottomSheetOpen()) {
           <div
@@ -572,25 +626,15 @@
 
               <!-- Form Fields -->
               <div class="space-y-6 flex-1">
-                <!-- Date (household stays month-driven, so hide the date section) -->
-                @if (group()!.groupType !== 'household') {
-                  <div>
-                    <p class="text-label">Date</p>
-                    <div class="grid grid-cols-2 gap-2 mt-1">
-                      @for (opt of datePresetOptions; track opt.value) {
-                        <button
-                          (click)="filterStore.setDraftPreset(opt.value)"
-                          class="py-2 px-3 rounded-xl text-xs font-semibold border transition cursor-pointer"
-                          [class]="
-                            filterStore.draft().date.preset === opt.value
-                              ? 'bg-primary text-white border-primary'
-                              : 'bg-surface text-secondary border-border/10 hover:brightness-110'
-                          "
-                        >
-                          {{ opt.label }}
-                        </button>
-                      }
-                    </div>
+                <!-- Date: preset dropdown + custom range (all group types) -->
+                <div>
+                  <p class="text-label">Date</p>
+                    <app-dropdown
+                      [ngModel]="filterStore.draft().date.preset"
+                      (ngModelChange)="filterStore.setDraftPreset($event)"
+                      [options]="datePresetOptions"
+                      size="md"
+                    ></app-dropdown>
                     @if (filterStore.draft().date.preset === 'custom') {
                       <div class="grid grid-cols-2 gap-3 mt-3">
                         <div>
@@ -620,9 +664,30 @@
                           />
                         </div>
                       </div>
+                      @if (!draftDateRangeValid()) {
+                        <p
+                          data-testid="custom-range-error"
+                          class="text-[11px] font-semibold text-red-500 mt-2"
+                        >
+                          The "From" date must be on or before the "To" date.
+                        </p>
+                      }
+                      @if (
+                        filterStore.draft().date.from ||
+                        filterStore.draft().date.to
+                      ) {
+                        <button
+                          (click)="
+                            filterStore.setDraftCustomFrom('');
+                            filterStore.setDraftCustomTo('')
+                          "
+                          class="mt-2 text-[11px] font-semibold text-muted hover:text-primary transition cursor-pointer"
+                        >
+                          Clear dates
+                        </button>
+                      }
                     }
                   </div>
-                }
 
                 <!-- Category -->
                 <div>
@@ -714,7 +779,8 @@
                 </button>
                 <button
                   (click)="applyFilterDrawer()"
-                  class="flex-1 py-3.5 bg-primary hover:brightness-110 text-white rounded-2xl text-sm font-bold shadow-md shadow-primary/10 transition cursor-pointer"
+                  [disabled]="!draftDateRangeValid()"
+                  class="flex-1 py-3.5 bg-primary hover:brightness-110 text-white rounded-2xl text-sm font-bold shadow-md shadow-primary/10 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Apply
                 </button>
