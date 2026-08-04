@@ -617,6 +617,65 @@ describe('CreateExpenseModalComponent', () => {
       );
     });
 
+    it('submits exact amount splits when they add up to the total', async () => {
+      component.members = [
+        {
+          id: 'm1',
+          joinStatus: 'active',
+          role: 'owner',
+          user: { id: 'user-1', email: 'a@b.com', displayName: 'Alice' },
+        },
+        {
+          id: 'm2',
+          joinStatus: 'active',
+          role: 'member',
+          user: { id: 'user-2', email: 'c@d.com', displayName: 'Bob' },
+        },
+      ] as any;
+      component.selectedUserIds.add('user-2');
+      component.selectSplitMode('fixed');
+      component.setExactSplitAmount('user-1', 60);
+      component.setExactSplitAmount('user-2', 40);
+
+      await component.onSubmit();
+
+      expect(mockExpensesService.createExpense).toHaveBeenCalledWith(
+        expect.objectContaining({
+          splits: [
+            { participantUserId: 'user-1', splitType: 'fixed', shareValue: 60 },
+            { participantUserId: 'user-2', splitType: 'fixed', shareValue: 40 },
+          ],
+        }),
+      );
+    });
+
+    it('does not submit exact amount splits while money is unassigned', async () => {
+      component.members = [
+        {
+          id: 'm1',
+          joinStatus: 'active',
+          role: 'owner',
+          user: { id: 'user-1', email: 'a@b.com', displayName: 'Alice' },
+        },
+        {
+          id: 'm2',
+          joinStatus: 'active',
+          role: 'member',
+          user: { id: 'user-2', email: 'c@d.com', displayName: 'Bob' },
+        },
+      ] as any;
+      component.selectedUserIds.add('user-2');
+      component.selectSplitMode('fixed');
+      component.setExactSplitAmount('user-1', 60);
+      component.setExactSplitAmount('user-2', 20);
+
+      await component.onSubmit();
+
+      expect(component.errorMessage).toBe(
+        'Split amounts must add up to the total.',
+      );
+      expect(mockExpensesService.createExpense).not.toHaveBeenCalled();
+    });
     it('should not submit when form is invalid', async () => {
       component.expenseForm.patchValue({ title: '' });
       await component.onSubmit();

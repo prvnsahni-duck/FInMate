@@ -71,6 +71,8 @@ export interface ExpenseFieldChange {
  * edit mode. Every field the form can touch is recorded here so the current
  * form state can be diffed against it (see `changeSummary`).
  */
+type EditableSplitMode = 'equal' | 'fixed';
+
 interface ExpenseSnapshot {
   title: string;
   description: string;
@@ -131,6 +133,11 @@ export class CreateExpenseModalComponent implements OnChanges {
   @Output() closeModalEvent = new EventEmitter<void>();
 
   selectedUserIds = new Set<string>();
+  splitMode: EditableSplitMode = 'equal';
+  splitDraftAmounts = new Map<string, number>();
+  isSplitEditorOpen = signal(false);
+  participantSearchTerm = signal('');
+  private splitExplicitlyChanged = false;
   isSubmitting = false;
   errorMessage = '';
   attachedFiles: { name: string; size: string; key: string }[] = [];
@@ -334,12 +341,23 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
 
     const currentParticipants = Array.from(this.selectedUserIds).sort();
-    if (!this.arraysEqual(currentParticipants, snap.participantIds)) {
+    const participantsChanged = !this.arraysEqual(
+      currentParticipants,
+      snap.participantIds,
+    );
+    if (participantsChanged) {
       changes.push({
         key: 'participants',
         label: 'Participants',
         from: this.participantNames(snap.participantIds),
         to: this.participantNames(currentParticipants),
+      });
+    } else if (this.splitExplicitlyChanged) {
+      changes.push({
+        key: 'participants',
+        label: 'Split',
+        from: 'Original split',
+        to: this.splitSummary(),
       });
     }
 
@@ -422,6 +440,120 @@ export class CreateExpenseModalComponent implements OnChanges {
   private fileCountLabel(count: number): string {
     return count === 1 ? '1 file' : `${count} files`;
   }
+  private amountCents(value: number | null | undefined): number {
+    if (
+      value === null ||
+      value === undefined ||
+      !Number.isFinite(Number(value))
+    ) {
+      return 0;
+    }
+    return Math.round((Number(value) + Number.EPSILON) * 100);
+  }
+
+  private fromCents(value: number): number {
+    return Math.round(value) / 100;
+  }
+
+  participantName(participant: { name?: string | null }): string {
+    return participant.name || 'Member';
+  }
+
+  participantInitials(name: string | null | undefined): string {
+    return (
+      (name || 'Member')
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? '')
+        .join('') || '?'
+    );
+  }
+
+  filteredParticipants = computed(() => {
+    this.changeTick();
+    const term = this.participantSearchTerm().trim().toLowerCase();
+    const participants = this.availableParticipants;
+    if (participants.length < 8 || !term) return participants;
+    return participants.filter((participant) =>
+      this.participantName(participant).toLowerCase().includes(term),
+    );
+  });
+
+  selectedParticipantCount = computed(() => {
+    this.changeTick();
+    return this.selectedUserIds.size;
+  });
+
+  selectedParticipants = computed(() => {
+    this.changeTick();
+    return this.availableParticipants.filter((participant) =>
+      this.selectedUserIds.has(participant.id),
+    );
+  });
+
+  splitTotalCents = computed(() => {
+    this.changeTick();
+    return this.amountCents(this.expenseForm.get('amountTotal')?.value);
+  });
+
+  splitAssignedCents = computed(() => {
+    this.changeTick();
+    if (this.splitMode !== 'fixed') return this.splitTotalCents();
+    return this.selectedParticipants().reduce(
+      (sum, participant) =>
+        sum + this.amountCents(this.splitDraftAmounts.get(participant.id) ?? 0),
+      0,
+    );
+  });
+
+  splitRemainingCents = computed(
+    () => this.splitTotalCents() - this.splitAssignedCents(),
+  );
+
+  splitIsValid = computed(() => {
+    this.changeTick();
+    if (this.selectedUserIds.size === 0) return false;
+    if (this.splitMode === 'equal') return true;
+    return this.splitRemainingCents() === 0;
+  });
+
+  splitSummary = computed(() => {
+    this.changeTick();
+    const count = this.selectedUserIds.size;
+    if (count === 0) return 'No people selected';
+    if (!this.splitExplicitlyChanged && this.originalSplits?.length) {
+      const originalType = this.originalSplits[0]?.splitType;
+      if (originalType === 'percent')
+        return `Percentage split between ${count} people`;
+      if (originalType === 'share')
+        return `Share split between ${count} people`;
+      if (originalType === 'fixed') return `Exact amounts for ${count} people`;
+    }
+    if (this.splitMode === 'fixed') return `Exact amounts for ${count} people`;
+    return `Equal between ${count} ${count === 1 ? 'person' : 'people'}`;
+  });
+
+  splitAssignedLabel = computed(() =>
+    this.formatAmount(
+      this.fromCents(this.splitAssignedCents()),
+      this.expenseForm.get('currency')?.value ?? undefined,
+    ),
+  );
+
+  splitRemainingLabel = computed(() =>
+    this.formatAmount(
+      Math.abs(this.fromCents(this.splitRemainingCents())),
+      this.expenseForm.get('currency')?.value ?? undefined,
+    ),
+  );
+
+  splitTotalLabel = computed(() =>
+    this.formatAmount(
+      this.fromCents(this.splitTotalCents()),
+      this.expenseForm.get('currency')?.value ?? undefined,
+    ),
+  );
 
   constructor() {
     this.expenseForm.valueChanges
@@ -473,6 +605,10 @@ export class CreateExpenseModalComponent implements OnChanges {
     if (cur === 'INR') return '₹';
     if (cur === 'EUR') return '€';
     return '$';
+  }
+
+  currencyCode(): string {
+    return this.expenseForm.get('currency')?.value || 'USD';
   }
 
   getTodayDateString(): string {
@@ -734,6 +870,20 @@ export class CreateExpenseModalComponent implements OnChanges {
             shareValue: s.shareValue,
           }))
         : null;
+      this.splitExplicitlyChanged = false;
+      const originalSplitType = this.originalSplits?.[0]?.splitType;
+      this.splitMode = originalSplitType === 'fixed' ? 'fixed' : 'equal';
+      this.splitDraftAmounts.clear();
+      for (const split of this.expense.splits ?? []) {
+        const uid = this.resolveParticipantUserId(
+          split.participantUserId,
+          split.participantGroupMemberId,
+        );
+        if (uid && split.splitType === 'fixed') {
+          this.splitDraftAmounts.set(uid, Number(split.shareValue));
+        }
+      }
+      this.seedSplitDraftAmounts();
       this.originalSnapshot = {
         title: this.expense.title ?? '',
         description: this.expense.description ?? '',
@@ -826,8 +976,105 @@ export class CreateExpenseModalComponent implements OnChanges {
       this.selectedUserIds.delete(userId);
     } else {
       this.selectedUserIds.add(userId);
+      if (this.splitMode === 'fixed' && !this.splitDraftAmounts.has(userId)) {
+        this.splitDraftAmounts.set(userId, 0);
+      }
     }
     this.markChanged();
+  }
+  openSplitEditor(): void {
+    this.seedSplitDraftAmounts();
+    this.isSplitEditorOpen.set(true);
+  }
+
+  closeSplitEditor(): void {
+    this.isSplitEditorOpen.set(false);
+  }
+
+  selectSplitMode(mode: EditableSplitMode): void {
+    const previousMode = this.splitMode;
+    if (mode === 'fixed' && previousMode !== 'fixed') {
+      this.splitMode = 'equal';
+      this.seedSplitDraftAmounts();
+    }
+    this.splitMode = mode;
+    this.splitExplicitlyChanged = true;
+    this.seedSplitDraftAmounts();
+    this.markChanged();
+  }
+
+  resetSplitToEqual(): void {
+    this.splitMode = 'equal';
+    this.splitExplicitlyChanged = true;
+    this.seedSplitDraftAmounts();
+    this.markChanged();
+  }
+
+  setExactSplitAmount(userId: string, value: number | string | null): void {
+    const amount = value === null || value === '' ? 0 : Number(value);
+    this.splitDraftAmounts.set(userId, Number.isFinite(amount) ? amount : 0);
+    this.splitMode = 'fixed';
+    this.splitExplicitlyChanged = true;
+    this.markChanged();
+  }
+
+  selectAllParticipants(): void {
+    this.availableParticipants.forEach((participant) => {
+      this.selectedUserIds.add(participant.id);
+    });
+    this.seedSplitDraftAmounts();
+    this.markChanged();
+  }
+
+  clearParticipants(): void {
+    this.selectedUserIds.clear();
+    this.markChanged();
+  }
+
+  splitDisplayAmount(userId: string): number {
+    if (this.splitMode === 'fixed')
+      return this.splitDraftAmounts.get(userId) ?? 0;
+    return this.splitDraftAmounts.get(userId) ?? 0;
+  }
+
+  private seedSplitDraftAmounts(): void {
+    const participants = this.selectedParticipants();
+    if (!participants.length) return;
+
+    if (this.splitMode === 'fixed') {
+      for (const participant of participants) {
+        if (!this.splitDraftAmounts.has(participant.id)) {
+          this.splitDraftAmounts.set(participant.id, 0);
+        }
+      }
+      return;
+    }
+
+    const totalCents = this.splitTotalCents();
+    const baseCents = Math.floor(totalCents / participants.length);
+    const remainder = totalCents - baseCents * participants.length;
+    participants.forEach((participant, index) => {
+      this.splitDraftAmounts.set(
+        participant.id,
+        this.fromCents(baseCents + (index < remainder ? 1 : 0)),
+      );
+    });
+  }
+
+  private currentSplitPayload(): ExpenseSplitInputDto[] {
+    if (this.splitMode === 'fixed') {
+      return Array.from(this.selectedUserIds).map((userId) => ({
+        participantUserId: userId,
+        splitType: 'fixed' as const,
+        shareValue: this.splitDraftAmounts.get(userId) ?? 0,
+      }));
+    }
+
+    return Array.from(this.selectedUserIds).map((userId) => ({
+      participantUserId: userId,
+      splitType: 'equal' as const,
+      shareValue: 1,
+    }));
   }
 
   onSplitToggleChange() {
@@ -948,6 +1195,11 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
 
     if (this.expenseForm.valid && this.selectedUserIds.size > 0) {
+      if (!this.splitIsValid()) {
+        this.errorMessage = 'Split amounts must add up to the total.';
+        return;
+      }
+
       this.isSubmitting = true;
       this.errorMessage = '';
 
@@ -965,18 +1217,16 @@ export class CreateExpenseModalComponent implements OnChanges {
           this.originalSnapshot.participantIds,
         );
       const splits: ExpenseSplitInputDto[] =
-        participantsUnchanged && this.originalSplits?.length
+        participantsUnchanged &&
+        !this.splitExplicitlyChanged &&
+        this.originalSplits?.length
           ? this.originalSplits.map((s) => ({
               participantUserId: s.participantUserId,
               participantGroupMemberId: s.participantGroupMemberId,
               splitType: s.splitType,
               shareValue: s.shareValue,
             }))
-          : Array.from(this.selectedUserIds).map((userId) => ({
-              participantUserId: userId,
-              splitType: 'equal' as const,
-              shareValue: 1,
-            }));
+          : this.currentSplitPayload();
 
       const title = formValue.title;
       const amountTotal = formValue.amountTotal;

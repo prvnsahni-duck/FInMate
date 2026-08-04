@@ -394,11 +394,11 @@
 
         <!-- Paid By Select (visible if group mode OR direct split mode) -->
         @if (groupId || splitWithFriend) {
-          <div>
+          <div class="space-y-2">
             <label
               for="expense-payer-select"
-              class="flex items-center text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-              >{{ isRefund() ? 'Received By *' : 'Paid By *' }}
+              class="flex items-center text-sm font-semibold text-slate-700 dark:text-slate-300"
+              >{{ isRefund() ? 'Received by *' : 'Paid by *' }}
               @if (isFieldModified('paidByUserId')) {
                 <span
                   class="ml-2 text-[10px] font-bold uppercase tracking-wide text-finmate-neon bg-finmate-neon/10 px-1.5 py-0.5 rounded-full"
@@ -406,62 +406,123 @@
                 >
               }
             </label>
-            <app-dropdown
-              id="expense-payer-select"
-              formControlName="paidByUserId"
-              [options]="payerOptions"
-              [placeholder]="isRefund() ? 'Who received it...' : 'Select payer...'"
-            ></app-dropdown>
+            <div class="rounded-2xl bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5 p-3">
+              <app-dropdown
+                id="expense-payer-select"
+                formControlName="paidByUserId"
+                [options]="payerOptions"
+                [placeholder]="isRefund() ? 'Who received it...' : 'Select payer...'"
+              ></app-dropdown>
+            </div>
           </div>
 
-          <div>
-            <div
-              class="flex items-center text-sm font-semibold mb-2 text-slate-700 dark:text-slate-300"
-            >
-              Split Equally Among
-              @if (isFieldModified('participants')) {
-                <span
-                  class="ml-2 text-[10px] font-bold uppercase tracking-wide text-finmate-neon bg-finmate-neon/10 px-1.5 py-0.5 rounded-full"
-                  >Modified</span
-                >
-              }
+          <div class="space-y-2">
+            <div class="flex items-center justify-between gap-3">
+              <div
+                class="flex items-center text-sm font-semibold text-slate-700 dark:text-slate-300"
+              >
+                Split
+                @if (isFieldModified('participants')) {
+                  <span
+                    class="ml-2 text-[10px] font-bold uppercase tracking-wide text-finmate-neon bg-finmate-neon/10 px-1.5 py-0.5 rounded-full"
+                    >Modified</span
+                  >
+                }
+              </div>
+              <button
+                type="button"
+                (click)="openSplitEditor()"
+                class="text-xs font-bold text-primary hover:brightness-110 transition"
+              >
+                Customize Split
+              </button>
             </div>
-            <div
-              class="space-y-2 max-h-40 overflow-y-auto p-3 bg-slate-50 dark:bg-black/10 rounded-2xl border border-slate-200/50 dark:border-white/5"
-              [class.ring-1]="isFieldModified('participants')"
-              [class.ring-finmate-neon]="isFieldModified('participants')"
-            >
-              @for (
-                participant of availableParticipants;
-                track participant.id
-              ) {
-                <label
-                  class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
-                >
-                  <span class="flex items-center space-x-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      [checked]="selectedUserIds.has(participant.id)"
-                      (change)="toggleParticipant(participant.id)"
-                      class="w-5 h-5 rounded-lg border-slate-300 text-finmate-neon focus:ring-finmate-neon cursor-pointer"
-                    />
-                    <span
-                      class="text-sm font-medium text-slate-800 dark:text-slate-200"
-                    >
-                      {{ participant.name }}
-                    </span>
+
+            <div class="rounded-2xl bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5 p-3 space-y-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <div class="text-sm font-bold text-slate-900 dark:text-white">
+                    {{ splitSummary() }}
+                  </div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ selectedParticipantCount() }} selected
+                  </div>
+                </div>
+                @if (splitMode === 'fixed' && !splitIsValid()) {
+                  <span class="text-xs font-bold text-red-500 whitespace-nowrap">
+                    Remaining {{ splitRemainingLabel() }}
                   </span>
-                  @if (!groupId && participant.id !== getCurrentUserId()) {
-                    <button
-                      type="button"
-                      (click)="removeFriendFromSplit(participant.id)"
-                      class="text-slate-400 hover:text-red-500 text-sm"
-                    >
-                      Remove
-                    </button>
-                  }
-                </label>
+                }
+              </div>
+
+              @if (availableParticipants.length >= 8) {
+                <input
+                  type="search"
+                  [ngModel]="participantSearchTerm()"
+                  [ngModelOptions]="{ standalone: true }"
+                  (ngModelChange)="participantSearchTerm.set($event)"
+                  placeholder="Search people..."
+                  class="w-full px-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-sm text-slate-900 dark:text-white outline-none focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon"
+                />
               }
+
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  (click)="selectAllParticipants()"
+                  class="px-3 py-1.5 rounded-xl bg-white dark:bg-white/5 text-xs font-bold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-white/10"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  (click)="clearParticipants()"
+                  class="px-3 py-1.5 rounded-xl bg-white dark:bg-white/5 text-xs font-bold text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-white/10"
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div
+                class="space-y-1 max-h-40 overflow-y-auto"
+                [class.ring-1]="isFieldModified('participants')"
+                [class.ring-finmate-neon]="isFieldModified('participants')"
+              >
+                @for (participant of filteredParticipants(); track participant.id) {
+                  <label
+                    class="flex items-center justify-between p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"
+                  >
+                    <span class="flex items-center space-x-3 cursor-pointer min-w-0">
+                      <input
+                        type="checkbox"
+                        [checked]="selectedUserIds.has(participant.id)"
+                        (change)="toggleParticipant(participant.id)"
+                        class="w-5 h-5 rounded-lg border-slate-300 text-finmate-neon focus:ring-finmate-neon cursor-pointer"
+                      />
+                      <span
+                        class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-extrabold shrink-0"
+                        aria-hidden="true"
+                      >
+                        {{ participantInitials(participantName(participant)) }}
+                      </span>
+                      <span
+                        class="text-sm font-medium text-slate-800 dark:text-slate-200 truncate"
+                      >
+                        {{ participantName(participant) }}
+                      </span>
+                    </span>
+                    @if (!groupId && participant.id !== getCurrentUserId()) {
+                      <button
+                        type="button"
+                        (click)="removeFriendFromSplit(participant.id)"
+                        class="text-slate-400 hover:text-red-500 text-sm"
+                      >
+                        Remove
+                      </button>
+                    }
+                  </label>
+                }
+              </div>
             </div>
             @if (selectedUserIds.size === 0) {
               <span class="text-xs text-red-500 mt-1 block">
@@ -626,6 +687,7 @@
           [disabled]="
             expenseForm.invalid ||
             selectedUserIds.size === 0 ||
+            !splitIsValid() ||
             scopeKeyBlocked() ||
             (isEditMode && !hasChanges())
           "
@@ -637,6 +699,154 @@
     </form>
   </div>
 
+
+  <!-- Split customization sheet -->
+  @if (isSplitEditorOpen()) {
+    <div
+      class="fixed inset-0 z-[75] flex items-end justify-center md:items-center md:p-4 bg-slate-900/70 backdrop-blur-md"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Customize split"
+    >
+      <button
+        type="button"
+        (click)="closeSplitEditor()"
+        class="absolute inset-0 cursor-default"
+        aria-label="Close split editor"
+      ></button>
+      <div
+        class="relative bg-white dark:bg-finmate-card w-full md:max-w-md rounded-t-3xl md:rounded-3xl p-5 shadow-2xl shadow-black/40 border border-slate-200 dark:border-white/5 max-h-[88vh] flex flex-col"
+      >
+        <div class="mx-auto w-12 h-1.5 bg-slate-200 dark:bg-white/10 rounded-full mb-4 md:hidden"></div>
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-lg font-bold">Split Expense</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">
+              Equal split is the default. Exact amounts must total the expense.
+            </p>
+          </div>
+          <button
+            type="button"
+            (click)="closeSplitEditor()"
+            aria-label="Close split editor"
+            class="text-slate-400 hover:text-slate-700 dark:hover:text-white transition"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 p-1 rounded-2xl bg-slate-100 dark:bg-black/20 border border-slate-200/50 dark:border-white/5 mb-4">
+          <button
+            type="button"
+            (click)="selectSplitMode('equal')"
+            [class]="
+              splitMode === 'equal'
+                ? 'py-2.5 px-4 rounded-xl text-sm font-semibold bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm transition-all'
+                : 'py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all'
+            "
+          >
+            Equal
+          </button>
+          <button
+            type="button"
+            (click)="selectSplitMode('fixed')"
+            [class]="
+              splitMode === 'fixed'
+                ? 'py-2.5 px-4 rounded-xl text-sm font-semibold bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm transition-all'
+                : 'py-2.5 px-4 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all'
+            "
+          >
+            Exact Amount
+          </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <div class="rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200/50 dark:border-white/5 p-3">
+            <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Expense</div>
+            <div class="text-sm font-extrabold text-slate-900 dark:text-white">
+              {{ splitTotalLabel() }}
+            </div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200/50 dark:border-white/5 p-3">
+            <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Assigned</div>
+            <div class="text-sm font-extrabold text-slate-900 dark:text-white">
+              {{ splitAssignedLabel() }}
+            </div>
+          </div>
+          <div class="rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200/50 dark:border-white/5 p-3">
+            <div class="text-[10px] font-bold uppercase tracking-wide text-slate-400">Remaining</div>
+            <div
+              class="text-sm font-extrabold"
+              [class.text-red-500]="splitRemainingCents() !== 0"
+              [class.text-green-500]="splitRemainingCents() === 0"
+            >
+              {{ splitRemainingLabel() }}
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto space-y-2 -mr-1 pr-1">
+          @for (participant of selectedParticipants(); track participant.id) {
+            <div class="flex items-center justify-between gap-3 p-2 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-200/50 dark:border-white/5">
+              <div class="flex items-center gap-3 min-w-0">
+                <span
+                  class="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-extrabold shrink-0"
+                  aria-hidden="true"
+                >
+                  {{ participantInitials(participantName(participant)) }}
+                </span>
+                <span class="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {{ participantName(participant) }}
+                </span>
+              </div>
+              @if (splitMode === 'fixed') {
+                <div class="relative w-32 shrink-0">
+                  <span class="absolute left-3 top-2.5 text-xs font-bold text-slate-400">{{ currencySymbol }}</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    [ngModel]="splitDraftAmounts.get(participant.id) ?? 0"
+                    [ngModelOptions]="{ standalone: true }"
+                    (ngModelChange)="setExactSplitAmount(participant.id, $event)"
+                    class="w-full pl-7 pr-3 py-2 rounded-xl bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-finmate-neon focus:ring-1 focus:ring-finmate-neon"
+                  />
+                </div>
+              } @else {
+                <span class="text-sm font-bold text-slate-500 dark:text-slate-400">
+                  {{ splitDisplayAmount(participant.id) | currency: currencyCode() }}
+                </span>
+              }
+            </div>
+          } @empty {
+            <div class="py-8 text-sm text-center text-slate-500 dark:text-slate-400">
+              Select at least one participant first.
+            </div>
+          }
+        </div>
+
+        <div class="flex-shrink-0 pt-4 mt-4 border-t border-slate-200 dark:border-white/5 flex gap-3">
+          <button
+            type="button"
+            (click)="resetSplitToEqual()"
+            class="flex-1 py-3 px-4 bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 rounded-2xl font-semibold transition-all"
+          >
+            Reset to Equal
+          </button>
+          <button
+            type="button"
+            (click)="closeSplitEditor()"
+            [disabled]="!splitIsValid()"
+            class="flex-1 py-3 px-4 bg-primary text-white rounded-2xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  }
   <!-- Possible Duplicate Transaction confirmation -->
   @if (showDuplicateDialog()) {
     <div
@@ -706,3 +916,9 @@
     </div>
   }
 </div>
+
+
+
+
+
+
