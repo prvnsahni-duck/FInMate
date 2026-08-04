@@ -1032,8 +1032,6 @@ export class CreateExpenseModalComponent implements OnChanges {
   }
 
   splitDisplayAmount(userId: string): number {
-    if (this.splitMode === 'fixed')
-      return this.splitDraftAmounts.get(userId) ?? 0;
     return this.splitDraftAmounts.get(userId) ?? 0;
   }
 
