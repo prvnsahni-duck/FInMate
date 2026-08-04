@@ -12,6 +12,12 @@ export interface ExpenseListParams {
   status?: string;
   startDate?: string;
   endDate?: string;
+  /** Group member (participant via splits) filter — a group-member id. */
+  memberId?: string;
+  /** Payer filter — a group-member id. */
+  paidById?: string;
+  /** `undefined` applies no transaction-type filter. */
+  transactionType?: 'expense' | 'refund';
 }
 
 @Injectable()

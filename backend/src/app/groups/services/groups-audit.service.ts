@@ -11,7 +11,14 @@ export class GroupsAuditService {
     groupId: string,
     page: number,
     limit: number,
+    range?: { from?: string; to?: string },
   ): Promise<PaginatedResponse<Record<string, unknown>>> {
-    return this.groupsService.getGroupHistory(userId, groupId, page, limit);
+    return this.groupsService.getGroupHistory(
+      userId,
+      groupId,
+      page,
+      limit,
+      range,
+    );
   }
 }

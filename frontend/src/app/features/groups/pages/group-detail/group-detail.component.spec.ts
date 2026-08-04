@@ -351,13 +351,19 @@ describe('GroupDetailComponent', () => {
 
       expect(component.group()).toBeNull();
       expect(mockGroupsService.getMembers).toHaveBeenCalledWith('group-1');
-      expect(mockGroupsService.getBalances).toHaveBeenCalledWith('group-1');
+      expect(mockGroupsService.getBalances).toHaveBeenCalledWith(
+        'group-1',
+        undefined,
+      );
       expect(mockGroupsService.getHistoryLogs).toHaveBeenCalledWith(
         'group-1',
         1,
+        20,
+        expect.anything(),
       );
       expect(mockGroupsService.getDeletedExpenses).toHaveBeenCalledWith(
         'group-1',
+        expect.anything(),
       );
       expect(
         mockRecurringExpensesService.getRecurringExpenses,
@@ -653,6 +659,8 @@ describe('GroupDetailComponent', () => {
       expect(mockGroupsService.getHistoryLogs).toHaveBeenLastCalledWith(
         'group-1',
         2,
+        20,
+        expect.anything(),
       );
       expect(component.hasMoreHistory()).toBe(false);
     });

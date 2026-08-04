@@ -49,6 +49,11 @@ export class ExpenseExportService {
     if (filter.status) params = params.set('status', filter.status);
     if (filter.currency) params = params.set('currency', filter.currency);
     if (filter.groupId) params = params.set('groupId', filter.groupId);
+    if (filter.memberId) params = params.set('memberId', filter.memberId);
+    if (filter.paidById) params = params.set('paidById', filter.paidById);
+    if (filter.transactionType && filter.transactionType !== 'both') {
+      params = params.set('transactionType', filter.transactionType);
+    }
 
     const res = await firstValueFrom(
       this.http.get<{ rows?: ExportRow[]; data?: { rows?: ExportRow[] } }>(

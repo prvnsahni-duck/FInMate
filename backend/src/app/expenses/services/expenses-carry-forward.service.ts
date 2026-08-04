@@ -38,12 +38,14 @@ export class ExpensesCarryForwardService {
     groupId: string,
     page: number,
     limit: number,
+    range?: { from?: string; to?: string },
   ): Promise<PaginatedResponse<Record<string, unknown>>> {
     return this.expensesService.listDeletedExpenses(
       userId,
       groupId,
       page,
       limit,
+      range,
     );
   }
 }

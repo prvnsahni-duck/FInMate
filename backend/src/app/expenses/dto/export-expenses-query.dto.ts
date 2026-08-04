@@ -64,4 +64,21 @@ export class ExportExpensesQueryDto {
     typeof value === 'string' ? value.toUpperCase() : value,
   )
   currency?: string;
+
+  // ── Unified group-filter dimensions (group-ledger mode only) ───────────────
+
+  /** Group member (participant via splits) to filter by — a group-member id. */
+  @IsOptional()
+  @IsString()
+  memberId?: string;
+
+  /** Payer to filter by — a group-member id. */
+  @IsOptional()
+  @IsString()
+  paidById?: string;
+
+  /** `both` (or omitted) applies no transaction-type filter. */
+  @IsOptional()
+  @IsIn(['expense', 'refund', 'both'])
+  transactionType?: 'expense' | 'refund' | 'both';
 }

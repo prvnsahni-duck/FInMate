@@ -11,6 +11,10 @@ import {
   GroupMember,
 } from '@finmate/data-models';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  MemberRef,
+  applyExpenseDimensionFilters,
+} from '../group-expense-filters.util';
 
 /** Upper bound on rows a single export may return, to bound memory/response size. */
 export const MAX_EXPORT_ROWS = 10000;
@@ -28,6 +32,13 @@ export interface ExportFilter {
    * caller must be a member of the group.
    */
   groupId?: string;
+  // ── Unified group-filter dimensions (group-ledger mode only) ───────────────
+  /** Group-member id (participant via splits). */
+  memberId?: string;
+  /** Group-member id (payer). */
+  paidById?: string;
+  /** `both`/undefined applies no transaction-type filter. */
+  transactionType?: 'expense' | 'refund' | 'both';
 }
 
 /**
@@ -286,6 +297,26 @@ export class ExpenseExportQueryService {
       .andWhere('expense.deletedAt IS NULL');
 
     this.applyExpenseFilters(qb, filter, currency);
+
+    // Unified group-filter dimensions (member / payer / transaction type).
+    const [member, paidBy] = await Promise.all([
+      filter.memberId
+        ? this.resolveGroupMemberRef(filter.memberId, groupId)
+        : Promise.resolve(undefined),
+      filter.paidById
+        ? this.resolveGroupMemberRef(filter.paidById, groupId)
+        : Promise.resolve(undefined),
+    ]);
+    applyExpenseDimensionFilters(qb, {
+      transactionType:
+        filter.transactionType === 'expense' ||
+        filter.transactionType === 'refund'
+          ? filter.transactionType
+          : undefined,
+      member,
+      paidBy,
+    });
+
     const expenses = await qb.take(MAX_EXPORT_ROWS + 1).getMany();
 
     const myShareByExpense = await this.loadCallerShares(
@@ -334,6 +365,23 @@ export class ExpenseExportQueryService {
    * split type) for the given expenses. Expenses the caller does not
    * participate in are simply absent from the map.
    */
+  /**
+   * Resolve a group-member id (from the member/payer filter) to both ids it can
+   * appear under — its own id and the backing user's id (null for pending
+   * members). Returns undefined when it's not a member of the group.
+   */
+  private async resolveGroupMemberRef(
+    groupMemberId: string,
+    groupId: string,
+  ): Promise<MemberRef | undefined> {
+    const member = await this.groupMemberRepository.findOne({
+      where: { id: groupMemberId, group: { id: groupId } },
+      relations: ['user'],
+    });
+    if (!member) return undefined;
+    return { groupMemberId: member.id, userId: member.user?.id ?? null };
+  }
+
   private async loadCallerShares(
     userId: string,
     expenseIds: string[],

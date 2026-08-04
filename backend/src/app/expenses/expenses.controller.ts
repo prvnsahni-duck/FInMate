@@ -28,6 +28,11 @@ import {
 } from './services';
 import { SuccessResponse } from '../common/response.util';
 
+/** Normalize a raw `transactionType` query value; `both`/anything else → undefined (no filter). */
+function normalizeTxType(value?: string): 'expense' | 'refund' | undefined {
+  return value === 'expense' || value === 'refund' ? value : undefined;
+}
+
 @Controller('expenses')
 @UseGuards(JwtAuthGuard)
 export class ExpensesController {
@@ -61,6 +66,9 @@ export class ExpensesController {
     @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('memberId') memberId?: string,
+    @Query('paidById') paidById?: string,
+    @Query('transactionType') transactionType?: string,
     @Req() req?: Request & { user: { id: string } },
   ) {
     let pageNum = page ? parseInt(page, 10) : 1;
@@ -77,6 +85,12 @@ export class ExpensesController {
       status,
       startDate,
       endDate,
+      memberId,
+      paidById,
+      transactionType:
+        transactionType === 'expense' || transactionType === 'refund'
+          ? transactionType
+          : undefined,
     });
     return new SuccessResponse('Expenses retrieved successfully', result);
   }
@@ -145,12 +159,24 @@ export class ExpensesController {
     @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe)
     year: number,
     @Query('groupId') groupId: string | undefined,
+    @Query('startDate') startDate: string | undefined,
+    @Query('endDate') endDate: string | undefined,
+    @Query('category') category: string | undefined,
+    @Query('memberId') memberId: string | undefined,
+    @Query('paidById') paidById: string | undefined,
+    @Query('transactionType') transactionType: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
     const result = await this.expensesAnalyticsService.getMonthlySummary({
       userId: req.user.id,
       groupId,
       year,
+      startDate,
+      endDate,
+      category,
+      memberId,
+      paidById,
+      transactionType: normalizeTxType(transactionType),
     });
     return new SuccessResponse(
       'Monthly analytics summary retrieved successfully',
@@ -180,6 +206,10 @@ export class ExpensesController {
     @Query('groupId') groupId: string | undefined,
     @Query('startDate') startDate: string | undefined,
     @Query('endDate') endDate: string | undefined,
+    @Query('category') category: string | undefined,
+    @Query('memberId') memberId: string | undefined,
+    @Query('paidById') paidById: string | undefined,
+    @Query('transactionType') transactionType: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
     const result = await this.expensesAnalyticsService.getCategoryDistribution({
@@ -187,6 +217,10 @@ export class ExpensesController {
       groupId,
       startDate,
       endDate,
+      category,
+      memberId,
+      paidById,
+      transactionType: normalizeTxType(transactionType),
     });
     return new SuccessResponse(
       'Category distribution analytics retrieved successfully',

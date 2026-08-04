@@ -77,6 +77,9 @@ describe('ExpensesController', () => {
       'posted',
       '2026-06-01',
       '2026-06-10',
+      'member-1',
+      'payer-1',
+      'refund',
       {
         user: { id: 'user-1' },
       } as any,
@@ -91,6 +94,9 @@ describe('ExpensesController', () => {
       status: 'posted',
       startDate: '2026-06-01',
       endDate: '2026-06-10',
+      memberId: 'member-1',
+      paidById: 'payer-1',
+      transactionType: 'refund',
     });
   });
 

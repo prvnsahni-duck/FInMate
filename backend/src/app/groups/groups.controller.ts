@@ -231,6 +231,8 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
     const result = await this.groupsAuditService.getGroupHistory(
@@ -238,6 +240,7 @@ export class GroupsController {
       id,
       page,
       limit,
+      { from, to },
     );
     return new SuccessResponse('Group history retrieved successfully', result);
   }
@@ -250,6 +253,8 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
     const result = await this.expensesCarryForwardService.listDeletedExpenses(
@@ -257,6 +262,7 @@ export class GroupsController {
       id,
       page,
       limit,
+      { from, to },
     );
     return new SuccessResponse(
       'Deleted expenses retrieved successfully',

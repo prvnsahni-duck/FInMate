@@ -33,6 +33,11 @@ import { resolveMemberDisplay } from '../common/member-display.util';
 import { calculateDeterministicSplits } from './split-calculator.util';
 import { ExpenseEditPolicyService } from './services/expense-edit-policy.service';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto';
+import {
+  GroupExpenseDimensionFilters,
+  MemberRef,
+  applyExpenseDimensionFilters,
+} from './group-expense-filters.util';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +50,9 @@ interface ExpenseListParams {
   status?: string;
   startDate?: string;
   endDate?: string;
+  memberId?: string;
+  paidById?: string;
+  transactionType?: 'expense' | 'refund';
 }
 
 interface AnalyticsFilter {
@@ -52,6 +60,10 @@ interface AnalyticsFilter {
   groupId?: string;
   startDate?: string;
   endDate?: string;
+  category?: string;
+  memberId?: string;
+  paidById?: string;
+  transactionType?: 'expense' | 'refund';
 }
 
 interface MonthlyTotal {
@@ -1323,6 +1335,23 @@ export class ExpensesService {
       });
     }
 
+    // Unified group-filter dimensions (member / payer / transaction type).
+    // Applied before the totals-query clone below so the summary tiles reflect
+    // the same scope as the paginated rows.
+    const [memberRef, paidByRef] = await Promise.all([
+      params.memberId
+        ? this.resolveGroupMemberRef(params.memberId, params.groupId)
+        : Promise.resolve(undefined),
+      params.paidById
+        ? this.resolveGroupMemberRef(params.paidById, params.groupId)
+        : Promise.resolve(undefined),
+    ]);
+    applyExpenseDimensionFilters(query, {
+      transactionType: params.transactionType,
+      member: memberRef,
+      paidBy: paidByRef,
+    });
+
     if (params.cursor) {
       // Keyset pagination must key on the same columns as the sort
       // (expenseDate DESC, createdAt DESC) — a bare `id < cursor` skips or
@@ -2086,14 +2115,19 @@ export class ExpensesService {
 
     await this.assertGroupAccess(userId, groupId);
 
-    const startDate = `${year}-01-01`;
-    const endDate = `${year}-12-31`;
+    // An explicit date range from the unified filter (e.g. "Last 6 Months")
+    // overrides the year-wide window so the monthly bars match the selection.
+    const startDate = filter.startDate ?? `${year}-01-01`;
+    const endDate = filter.endDate ?? `${year}-12-31`;
+
+    const dimensions = await this.resolveAnalyticsDimensions(filter);
 
     const expenses = await this.buildBaseAnalyticsQuery(
       userId,
       groupId,
       startDate,
       endDate,
+      { category: filter.category, dimensions },
     )
       .select([
         'expense.id',
@@ -2135,7 +2169,15 @@ export class ExpensesService {
 
     await this.assertGroupAccess(userId, groupId);
 
-    const expenses = await this.buildBaseAnalyticsQuery(userId, groupId)
+    const dimensions = await this.resolveAnalyticsDimensions(filter);
+
+    const expenses = await this.buildBaseAnalyticsQuery(
+      userId,
+      groupId,
+      filter.startDate,
+      filter.endDate,
+      { category: filter.category, dimensions },
+    )
       .select([
         'expense.id',
         'expense.expenseDate',
@@ -2178,11 +2220,14 @@ export class ExpensesService {
 
     await this.assertGroupAccess(userId, groupId);
 
+    const dimensions = await this.resolveAnalyticsDimensions(filter);
+
     const expenses = await this.buildBaseAnalyticsQuery(
       userId,
       groupId,
       startDate,
       endDate,
+      { category: filter.category, dimensions },
     )
       .select([
         'expense.id',
@@ -2219,6 +2264,7 @@ export class ExpensesService {
     groupId?: string,
     startDate?: string,
     endDate?: string,
+    extra?: { category?: string; dimensions?: GroupExpenseDimensionFilters },
   ) {
     const query = this.expenseRepository
       .createQueryBuilder('expense')
@@ -2240,7 +2286,58 @@ export class ExpensesService {
       query.andWhere('expense.expense_date <= :endDate', { endDate });
     }
 
+    if (extra?.category) {
+      query.andWhere('expense.category = :anCategory', {
+        anCategory: extra.category,
+      });
+    }
+    if (extra?.dimensions) {
+      applyExpenseDimensionFilters(query, extra.dimensions);
+    }
+
     return query;
+  }
+
+  /**
+   * Resolve the unified filter's member/payer ids and pack the shared
+   * expense-dimension filters for the analytics query builder.
+   */
+  private async resolveAnalyticsDimensions(
+    filter: AnalyticsFilter,
+  ): Promise<GroupExpenseDimensionFilters> {
+    const [member, paidBy] = await Promise.all([
+      filter.memberId
+        ? this.resolveGroupMemberRef(filter.memberId, filter.groupId)
+        : Promise.resolve(undefined),
+      filter.paidById
+        ? this.resolveGroupMemberRef(filter.paidById, filter.groupId)
+        : Promise.resolve(undefined),
+    ]);
+    return {
+      transactionType: filter.transactionType,
+      member,
+      paidBy,
+    };
+  }
+
+  /**
+   * Resolve a group-member id (as sent by the member/payer filter dropdowns)
+   * to both identifiers it can appear under in expense/split rows: its own id
+   * and the backing registered user's id (null for pending, Contact-backed
+   * members). Returns undefined when the id is not a member of the group, so
+   * the filter is simply skipped rather than matching nothing by accident.
+   */
+  private async resolveGroupMemberRef(
+    groupMemberId: string,
+    groupId?: string,
+  ): Promise<MemberRef | undefined> {
+    if (!groupId || groupId === 'personal') return undefined;
+    const member = await this.groupMemberRepository.findOne({
+      where: { id: groupMemberId, group: { id: groupId } },
+      relations: ['user'],
+    });
+    if (!member) return undefined;
+    return { groupMemberId: member.id, userId: member.user?.id ?? null };
   }
 
   private async assertGroupAccess(
@@ -2610,6 +2707,7 @@ export class ExpensesService {
     groupId: string,
     page: number,
     limit: number,
+    range?: { from?: string; to?: string },
   ): Promise<PaginatedResponse<Record<string, unknown>>> {
     await this.assertGroupAccess(userId, groupId);
 
@@ -2624,8 +2722,19 @@ export class ExpensesService {
       .leftJoinAndSelect('expense.group', 'group')
       .where('group.id = :groupId', { groupId })
       .andWhere('expense.deletedAt IS NOT NULL')
-      .withDeleted()
-      .orderBy('expense.deletedAt', 'DESC');
+      .withDeleted();
+
+    // Optional date-period filter (the unified group filter), on expense date.
+    if (range?.from) {
+      query.andWhere('expense.expenseDate >= :trashFrom', {
+        trashFrom: range.from,
+      });
+    }
+    if (range?.to) {
+      query.andWhere('expense.expenseDate <= :trashTo', { trashTo: range.to });
+    }
+
+    query.orderBy('expense.deletedAt', 'DESC');
 
     const total = await query.getCount();
     const expenses = await query

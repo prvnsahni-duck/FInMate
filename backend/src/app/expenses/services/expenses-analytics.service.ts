@@ -6,6 +6,14 @@ export interface AnalyticsFilter {
   groupId?: string;
   startDate?: string;
   endDate?: string;
+  // ── Unified group-filter dimensions ──────────────────────────────────────
+  category?: string;
+  /** Group-member id (participant via splits). */
+  memberId?: string;
+  /** Group-member id (payer). */
+  paidById?: string;
+  /** `undefined` applies no transaction-type filter. */
+  transactionType?: 'expense' | 'refund';
 }
 
 export interface MonthlyTotal {

@@ -10,7 +10,10 @@ import {
 import { Subscription, forkJoin } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CurrencyPipe, PercentPipe } from '@angular/common';
-import { ExpensesService } from '../../services/expenses.service';
+import {
+  ExpensesService,
+  GroupAnalyticsQuery,
+} from '../../services/expenses.service';
 import { CATEGORY_OPTIONS } from '../../../../core/constants/app.constants';
 
 interface MonthlyData {
@@ -66,6 +69,8 @@ export class AnalyticsChartsComponent implements OnInit, OnChanges {
 
   @Input() groupId: string | null = null;
   @Input() currency = 'USD';
+  /** Unified group filter (date range + category/member/payer/type). */
+  @Input() filter?: GroupAnalyticsQuery;
 
   isLoading = true;
   processedCategories: ProcessedCategory[] = [];
@@ -83,7 +88,8 @@ export class AnalyticsChartsComponent implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges) {
     if (
       (changes['groupId'] && !changes['groupId'].firstChange) ||
-      (changes['currency'] && !changes['currency'].firstChange)
+      (changes['currency'] && !changes['currency'].firstChange) ||
+      (changes['filter'] && !changes['filter'].firstChange)
     ) {
       this.loadAnalytics();
     }
@@ -94,10 +100,10 @@ export class AnalyticsChartsComponent implements OnInit, OnChanges {
     const gId = this.groupId ? this.groupId : 'personal';
     this.analyticsSub?.unsubscribe();
 
-    // Load category distribution and monthly trends
+    // Load category distribution and monthly trends, honoring the group filter.
     this.analyticsSub = forkJoin({
-      categories: this.expensesService.getCategoryAnalytics(gId),
-      monthly: this.expensesService.getMonthlyAnalytics(gId),
+      categories: this.expensesService.getCategoryAnalytics(gId, this.filter),
+      monthly: this.expensesService.getMonthlyAnalytics(gId, this.filter),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({

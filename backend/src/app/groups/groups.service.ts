@@ -1026,6 +1026,7 @@ export class GroupsService {
     groupId: string,
     page: number,
     limit: number,
+    range?: { from?: string; to?: string },
   ): Promise<PaginatedResponse<Record<string, unknown>>> {
     // Verify caller has access
     const membership = await this.groupMemberRepository
@@ -1045,10 +1046,25 @@ export class GroupsService {
     const p = page > 0 ? page : 1;
     const l = limit > 0 ? limit : 20;
 
-    const [logs, total] = await this.auditLogRepository
+    const query = this.auditLogRepository
       .createQueryBuilder('log')
       .leftJoinAndSelect('log.actorUser', 'actorUser')
-      .where('log.group = :groupId', { groupId })
+      .where('log.group = :groupId', { groupId });
+
+    // Optional date-period filter (the unified group filter). Audit events carry
+    // a timestamp, so compare on its calendar date, inclusive of both bounds.
+    if (range?.from) {
+      query.andWhere('CAST(log.createdAt AS DATE) >= :histFrom', {
+        histFrom: range.from,
+      });
+    }
+    if (range?.to) {
+      query.andWhere('CAST(log.createdAt AS DATE) <= :histTo', {
+        histTo: range.to,
+      });
+    }
+
+    const [logs, total] = await query
       .orderBy('log.createdAt', 'DESC')
       .skip((p - 1) * l)
       .take(l)

@@ -6,7 +6,16 @@ import {
   PreconditionFailedException,
 } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, In, DataSource, EntityManager } from 'typeorm';
+import {
+  Repository,
+  In,
+  Between,
+  MoreThanOrEqual,
+  LessThanOrEqual,
+  FindOptionsWhere,
+  DataSource,
+  EntityManager,
+} from 'typeorm';
 import {
   Group,
   GroupMember,
@@ -169,7 +178,11 @@ export class SettlementsService {
     return resolveMemberDisplay(m);
   }
 
-  async calculateGroupBalances(userId: string, groupId: string) {
+  async calculateGroupBalances(
+    userId: string,
+    groupId: string,
+    range?: { from?: string; to?: string },
+  ) {
     // 1. Verify access: caller must have active membership
     const callerMember = await this.groupMemberRepository
       .createQueryBuilder('member')
@@ -195,9 +208,23 @@ export class SettlementsService {
       relations: ['user', 'contact'],
     });
 
-    // 3. Fetch all posted expenses in this group
+    // 3. Fetch posted expenses in this group. When the unified group filter has
+    //    an active date range, scope the expenses considered by expenseDate so
+    //    balances reflect that period. Settlements (real cash already moved
+    //    between members) are intentionally left unscoped.
+    const expenseWhere: FindOptionsWhere<Expense> = {
+      group: { id: groupId },
+      status: 'posted',
+    };
+    if (range?.from && range?.to) {
+      expenseWhere.expenseDate = Between(range.from, range.to);
+    } else if (range?.from) {
+      expenseWhere.expenseDate = MoreThanOrEqual(range.from);
+    } else if (range?.to) {
+      expenseWhere.expenseDate = LessThanOrEqual(range.to);
+    }
     const expenses = await this.expenseRepository.find({
-      where: { group: { id: groupId }, status: 'posted' },
+      where: expenseWhere,
       relations: [
         'paidByUser',
         'paidByGroupMember',

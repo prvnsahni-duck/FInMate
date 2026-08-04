@@ -68,11 +68,19 @@ export class GroupsService {
   }
 
   /**
-   * Fetch settlements & balances of a group.
+   * Fetch settlements & balances of a group. When the unified group filter has
+   * an active date range, pass it so balances reflect that period.
    */
-  getBalances(groupId: string): Observable<GroupBalancesResponse> {
+  getBalances(
+    groupId: string,
+    range?: { from?: string; to?: string },
+  ): Observable<GroupBalancesResponse> {
+    let params = new HttpParams();
+    if (range?.from) params = params.set('from', range.from);
+    if (range?.to) params = params.set('to', range.to);
     return this.http.get<GroupBalancesResponse>(
       `${this.baseUrl}/groups/${groupId}/settlements/balances`,
+      { params },
     );
   }
 
@@ -80,10 +88,13 @@ export class GroupsService {
     groupId: string,
     page = 1,
     limit = 20,
+    range?: { from?: string; to?: string },
   ): Observable<GroupAuditLogResponse> {
-    const params = new HttpParams()
+    let params = new HttpParams()
       .set('page', page.toString())
       .set('limit', limit.toString());
+    if (range?.from) params = params.set('from', range.from);
+    if (range?.to) params = params.set('to', range.to);
     return this.http
       .get<GroupAuditLogResponse>(`${this.baseUrl}/groups/${groupId}/history`, {
         params,
@@ -156,11 +167,17 @@ export class GroupsService {
   /**
    * Fetch deleted/soft-deleted expenses in a group.
    */
-  getDeletedExpenses(groupId: string): Observable<{ data: Expense[] }> {
+  getDeletedExpenses(
+    groupId: string,
+    range?: { from?: string; to?: string },
+  ): Observable<{ data: Expense[] }> {
+    let params = new HttpParams();
+    if (range?.from) params = params.set('from', range.from);
+    if (range?.to) params = params.set('to', range.to);
     return this.http
       .get<{
         data: Expense[];
-      }>(`${this.baseUrl}/groups/${groupId}/expenses/deleted`)
+      }>(`${this.baseUrl}/groups/${groupId}/expenses/deleted`, { params })
       .pipe(
         // Decrypt trashed expenses through the same central pipeline as the
         // ledger so titles render (and get contextual states) instead of

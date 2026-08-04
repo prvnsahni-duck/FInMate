@@ -29,11 +29,14 @@ export class SettlementsController {
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async getBalances(
     @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Query('from') from: string | undefined,
+    @Query('to') to: string | undefined,
     @Req() req: any,
   ) {
     const result = await this.settlementsService.calculateGroupBalances(
       req.user.id,
       groupId,
+      { from, to },
     );
     return new SuccessResponse(
       'Group balances calculated successfully',
