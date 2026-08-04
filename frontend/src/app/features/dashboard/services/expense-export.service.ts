@@ -49,6 +49,24 @@ export class ExpenseExportService {
     if (filter.status) params = params.set('status', filter.status);
     if (filter.currency) params = params.set('currency', filter.currency);
     if (filter.groupId) params = params.set('groupId', filter.groupId);
+    if (filter.categories?.length) {
+      params = params.set('categories', filter.categories.join(','));
+    }
+    if (filter.memberIds?.length) {
+      params = params.set('memberIds', filter.memberIds.join(','));
+    }
+    if (filter.paidByIds?.length) {
+      params = params.set('paidByIds', filter.paidByIds.join(','));
+    }
+    if (filter.transactionType && filter.transactionType !== 'both') {
+      params = params.set('transactionType', filter.transactionType);
+    }
+    if (filter.minAmount != null) {
+      params = params.set('minAmount', String(filter.minAmount));
+    }
+    if (filter.maxAmount != null) {
+      params = params.set('maxAmount', String(filter.maxAmount));
+    }
 
     const res = await firstValueFrom(
       this.http.get<{ rows?: ExportRow[]; data?: { rows?: ExportRow[] } }>(

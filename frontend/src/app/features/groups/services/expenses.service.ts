@@ -17,6 +17,19 @@ import { GroupKeyService } from '../../../core/services/group-key.service';
 import { ExpenseDecryptionService } from '../../../core/services/expense-decryption.service';
 import { CryptoSessionManager } from '../../../core/services/crypto-session-manager.service';
 
+/** Shared query for the group analytics endpoints, mirroring the unified filter. */
+export interface GroupAnalyticsQuery {
+  startDate?: string;
+  endDate?: string;
+  categories?: string[];
+  memberIds?: string[];
+  paidByIds?: string[];
+  /** Omit or 'both' to apply no transaction-type filter. */
+  transactionType?: 'expense' | 'refund';
+  minAmount?: number;
+  maxAmount?: number;
+}
+
 /** Minimal shape of a duplicate-check match — only what the warning dialog
  *  needs to display, decrypted client-side like any other expense list item. */
 export interface DuplicateExpenseMatch {
@@ -135,9 +148,17 @@ export class ExpensesService {
     options: {
       page?: number;
       limit?: number;
-      category?: string;
+      categories?: string[];
       startDate?: string;
       endDate?: string;
+      memberIds?: string[];
+      paidByIds?: string[];
+      /** Omit or 'both' to apply no transaction-type filter. */
+      transactionType?: 'expense' | 'refund';
+      minAmount?: number;
+      maxAmount?: number;
+      sortBy?: 'date' | 'amount';
+      sortOrder?: 'asc' | 'desc';
     } = {},
   ): Observable<GetExpensesResponse> {
     let params = new HttpParams().set('groupId', groupId);
@@ -148,14 +169,33 @@ export class ExpensesService {
     if (options.limit !== undefined) {
       params = params.set('limit', options.limit.toString());
     }
-    if (options.category) {
-      params = params.set('category', options.category);
+    if (options.categories?.length) {
+      params = params.set('categories', options.categories.join(','));
     }
     if (options.startDate) {
       params = params.set('startDate', options.startDate);
     }
     if (options.endDate) {
       params = params.set('endDate', options.endDate);
+    }
+    if (options.memberIds?.length) {
+      params = params.set('memberIds', options.memberIds.join(','));
+    }
+    if (options.paidByIds?.length) {
+      params = params.set('paidByIds', options.paidByIds.join(','));
+    }
+    if (options.transactionType) {
+      params = params.set('transactionType', options.transactionType);
+    }
+    if (options.minAmount != null) {
+      params = params.set('minAmount', String(options.minAmount));
+    }
+    if (options.maxAmount != null) {
+      params = params.set('maxAmount', String(options.maxAmount));
+    }
+    if (options.sortBy) {
+      params = params.set('sortBy', options.sortBy);
+      params = params.set('sortOrder', options.sortOrder ?? 'desc');
     }
 
     return this.http
@@ -234,29 +274,63 @@ export class ExpensesService {
       .pipe(mapDecryptExpense(this.decryptor));
   }
 
-  /**
-   * Fetch monthly summaries for analytics.
-   */
-  getMonthlyAnalytics(groupId?: string): Observable<MonthlyAnalyticsPoint[]> {
-    let url = `${this.baseUrl}/expenses/analytics/monthly`;
+  /** Builds the shared query params for the group analytics endpoints. */
+  private buildAnalyticsParams(
+    groupId?: string,
+    query?: GroupAnalyticsQuery,
+  ): HttpParams {
+    let params = new HttpParams();
     if (groupId && groupId !== 'personal') {
-      url += `?groupId=${groupId}`;
+      params = params.set('groupId', groupId);
     }
+    if (query?.startDate) params = params.set('startDate', query.startDate);
+    if (query?.endDate) params = params.set('endDate', query.endDate);
+    if (query?.categories?.length) {
+      params = params.set('categories', query.categories.join(','));
+    }
+    if (query?.memberIds?.length) {
+      params = params.set('memberIds', query.memberIds.join(','));
+    }
+    if (query?.paidByIds?.length) {
+      params = params.set('paidByIds', query.paidByIds.join(','));
+    }
+    if (query?.transactionType) {
+      params = params.set('transactionType', query.transactionType);
+    }
+    if (query?.minAmount != null) {
+      params = params.set('minAmount', String(query.minAmount));
+    }
+    if (query?.maxAmount != null) {
+      params = params.set('maxAmount', String(query.maxAmount));
+    }
+    return params;
+  }
+
+  /**
+   * Fetch monthly summaries for analytics, honoring the unified group filter.
+   */
+  getMonthlyAnalytics(
+    groupId?: string,
+    query?: GroupAnalyticsQuery,
+  ): Observable<MonthlyAnalyticsPoint[]> {
     return this.http
-      .get<MonthlyAnalyticsPoint[]>(url)
+      .get<
+        MonthlyAnalyticsPoint[]
+      >(`${this.baseUrl}/expenses/analytics/monthly`, { params: this.buildAnalyticsParams(groupId, query) })
       .pipe(shareReplay({ bufferSize: 1, refCount: true }));
   }
 
   /**
-   * Fetch category analytics.
+   * Fetch category analytics, honoring the unified group filter.
    */
-  getCategoryAnalytics(groupId?: string): Observable<CategoryAnalyticsPoint[]> {
-    let url = `${this.baseUrl}/expenses/analytics/categories`;
-    if (groupId && groupId !== 'personal') {
-      url += `?groupId=${groupId}`;
-    }
+  getCategoryAnalytics(
+    groupId?: string,
+    query?: GroupAnalyticsQuery,
+  ): Observable<CategoryAnalyticsPoint[]> {
     return this.http
-      .get<CategoryAnalyticsPoint[]>(url)
+      .get<
+        CategoryAnalyticsPoint[]
+      >(`${this.baseUrl}/expenses/analytics/categories`, { params: this.buildAnalyticsParams(groupId, query) })
       .pipe(shareReplay({ bufferSize: 1, refCount: true }));
   }
 

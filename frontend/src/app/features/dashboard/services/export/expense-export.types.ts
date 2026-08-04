@@ -22,6 +22,18 @@ export interface ExportFilter {
    * caller's share. Used by the group-detail export.
    */
   groupId?: string;
+  // ── Unified group-filter dimensions (group-ledger mode only) ───────────────
+  /** Categories (exact names) — matches ANY. */
+  categories?: string[];
+  /** Group-member ids (participants via splits) — matches ANY. */
+  memberIds?: string[];
+  /** Group-member ids (payers) — matches ANY. */
+  paidByIds?: string[];
+  /** Omit or 'both' to apply no transaction-type filter. */
+  transactionType?: 'expense' | 'refund' | 'both';
+  /** Inclusive amount bounds. */
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 /**

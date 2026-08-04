@@ -587,7 +587,7 @@ describe('ExpensesService', () => {
     const result = await service.listExpenses('caller-id', {
       page: 1,
       limit: 20,
-      category: 'Food',
+      categories: ['Food'],
     });
 
     expect(result.meta.totalItems).toBe(1);

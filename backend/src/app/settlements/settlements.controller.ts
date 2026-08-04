@@ -19,6 +19,7 @@ import {
   UpdateSettlementDto,
 } from '@finmate/data-models';
 import { SuccessResponse } from '../common/response.util';
+import { parseRawGroupExpenseFilter } from '../expenses/group-expense-filters.util';
 
 @Controller('groups/:groupId/settlements')
 @UseGuards(JwtAuthGuard, GroupRolesGuard)
@@ -29,11 +30,13 @@ export class SettlementsController {
   @GroupRoles('owner', 'admin', 'member', 'viewer')
   async getBalances(
     @Param('groupId', ParseUUIDPipe) groupId: string,
+    @Query() query: Record<string, string>,
     @Req() req: any,
   ) {
     const result = await this.settlementsService.calculateGroupBalances(
       req.user.id,
       groupId,
+      parseRawGroupExpenseFilter(query),
     );
     return new SuccessResponse(
       'Group balances calculated successfully',

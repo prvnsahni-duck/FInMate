@@ -11,6 +11,10 @@ import {
   GroupMember,
 } from '@finmate/data-models';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  MemberRef,
+  applyExpenseDimensionFilters,
+} from '../group-expense-filters.util';
 
 /** Upper bound on rows a single export may return, to bound memory/response size. */
 export const MAX_EXPORT_ROWS = 10000;
@@ -28,6 +32,18 @@ export interface ExportFilter {
    * caller must be a member of the group.
    */
   groupId?: string;
+  // ── Unified group-filter dimensions (group-ledger mode only) ───────────────
+  /** Categories (exact names) — matches ANY. */
+  categories?: string[];
+  /** Group-member ids (participants via splits) — matches ANY. */
+  memberIds?: string[];
+  /** Group-member ids (payers) — matches ANY. */
+  paidByIds?: string[];
+  /** `both`/undefined applies no transaction-type filter. */
+  transactionType?: 'expense' | 'refund' | 'both';
+  /** Inclusive amount bounds. */
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 /**
@@ -286,6 +302,25 @@ export class ExpenseExportQueryService {
       .andWhere('expense.deletedAt IS NULL');
 
     this.applyExpenseFilters(qb, filter, currency);
+
+    // Unified group-filter dimensions (categories / members / payers / type / amount).
+    const [member, paidBy] = await Promise.all([
+      this.resolveGroupMemberRefs(filter.memberIds, groupId),
+      this.resolveGroupMemberRefs(filter.paidByIds, groupId),
+    ]);
+    applyExpenseDimensionFilters(qb, {
+      categories: filter.categories,
+      transactionType:
+        filter.transactionType === 'expense' ||
+        filter.transactionType === 'refund'
+          ? filter.transactionType
+          : undefined,
+      member,
+      paidBy,
+      minAmount: filter.minAmount,
+      maxAmount: filter.maxAmount,
+    });
+
     const expenses = await qb.take(MAX_EXPORT_ROWS + 1).getMany();
 
     const myShareByExpense = await this.loadCallerShares(
@@ -334,6 +369,26 @@ export class ExpenseExportQueryService {
    * split type) for the given expenses. Expenses the caller does not
    * participate in are simply absent from the map.
    */
+  /**
+   * Resolve a group-member id (from the member/payer filter) to both ids it can
+   * appear under — its own id and the backing user's id (null for pending
+   * members). Returns undefined when it's not a member of the group.
+   */
+  private async resolveGroupMemberRefs(
+    groupMemberIds: string[] | undefined,
+    groupId: string,
+  ): Promise<MemberRef[]> {
+    if (!groupMemberIds?.length) return [];
+    const members = await this.groupMemberRepository.find({
+      where: { id: In(groupMemberIds), group: { id: groupId } },
+      relations: ['user'],
+    });
+    return members.map((m) => ({
+      groupMemberId: m.id,
+      userId: m.user?.id ?? null,
+    }));
+  }
+
   private async loadCallerShares(
     userId: string,
     expenseIds: string[],

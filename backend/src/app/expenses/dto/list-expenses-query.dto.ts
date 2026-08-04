@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -44,4 +45,19 @@ export class ListExpensesQueryDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  /** Group member (participant via splits) to filter by. Carries a group-member id. */
+  @IsOptional()
+  @IsUUID('4')
+  memberId?: string;
+
+  /** Payer to filter by. Carries a group-member id. */
+  @IsOptional()
+  @IsUUID('4')
+  paidById?: string;
+
+  /** `both` (or omitted) applies no transaction-type filter. */
+  @IsOptional()
+  @IsIn(['expense', 'refund', 'both'])
+  transactionType?: 'expense' | 'refund' | 'both';
 }

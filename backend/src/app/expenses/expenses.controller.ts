@@ -28,6 +28,33 @@ import {
 } from './services';
 import { SuccessResponse } from '../common/response.util';
 
+/** Normalize a raw `transactionType` query value; `both`/anything else → undefined (no filter). */
+function normalizeTxType(value?: string): 'expense' | 'refund' | undefined {
+  return value === 'expense' || value === 'refund' ? value : undefined;
+}
+
+/** Split a comma-separated query value into a trimmed, non-empty array (or undefined). */
+function csvParam(value?: string): string[] | undefined {
+  if (!value) return undefined;
+  const arr = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return arr.length ? arr : undefined;
+}
+
+/** Parse a numeric query value, or undefined when absent/invalid. */
+function numParam(value?: string): number | undefined {
+  if (value == null || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/** Normalize a sort direction; anything but `asc` → `desc`. */
+function normalizeSortOrder(value?: string): 'asc' | 'desc' {
+  return value === 'asc' ? 'asc' : 'desc';
+}
+
 @Controller('expenses')
 @UseGuards(JwtAuthGuard)
 export class ExpensesController {
@@ -57,10 +84,17 @@ export class ExpensesController {
     @Query('limit') limit?: string,
     @Query('cursor') cursor?: string,
     @Query('groupId') groupId?: string,
-    @Query('category') category?: string,
+    @Query('categories') categories?: string,
     @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('memberIds') memberIds?: string,
+    @Query('paidByIds') paidByIds?: string,
+    @Query('transactionType') transactionType?: string,
+    @Query('minAmount') minAmount?: string,
+    @Query('maxAmount') maxAmount?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
     @Req() req?: Request & { user: { id: string } },
   ) {
     let pageNum = page ? parseInt(page, 10) : 1;
@@ -73,10 +107,18 @@ export class ExpensesController {
       limit: limitNum,
       cursor,
       groupId,
-      category,
+      categories: csvParam(categories),
       status,
       startDate,
       endDate,
+      memberIds: csvParam(memberIds),
+      paidByIds: csvParam(paidByIds),
+      transactionType: normalizeTxType(transactionType),
+      minAmount: numParam(minAmount),
+      maxAmount: numParam(maxAmount),
+      sortBy:
+        sortBy === 'amount' ? 'amount' : sortBy === 'date' ? 'date' : undefined,
+      sortOrder: normalizeSortOrder(sortOrder),
     });
     return new SuccessResponse('Expenses retrieved successfully', result);
   }
@@ -145,12 +187,28 @@ export class ExpensesController {
     @Query('year', new DefaultValuePipe(new Date().getFullYear()), ParseIntPipe)
     year: number,
     @Query('groupId') groupId: string | undefined,
+    @Query('startDate') startDate: string | undefined,
+    @Query('endDate') endDate: string | undefined,
+    @Query('categories') categories: string | undefined,
+    @Query('memberIds') memberIds: string | undefined,
+    @Query('paidByIds') paidByIds: string | undefined,
+    @Query('transactionType') transactionType: string | undefined,
+    @Query('minAmount') minAmount: string | undefined,
+    @Query('maxAmount') maxAmount: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
     const result = await this.expensesAnalyticsService.getMonthlySummary({
       userId: req.user.id,
       groupId,
       year,
+      startDate,
+      endDate,
+      categories: csvParam(categories),
+      memberIds: csvParam(memberIds),
+      paidByIds: csvParam(paidByIds),
+      transactionType: normalizeTxType(transactionType),
+      minAmount: numParam(minAmount),
+      maxAmount: numParam(maxAmount),
     });
     return new SuccessResponse(
       'Monthly analytics summary retrieved successfully',
@@ -180,6 +238,12 @@ export class ExpensesController {
     @Query('groupId') groupId: string | undefined,
     @Query('startDate') startDate: string | undefined,
     @Query('endDate') endDate: string | undefined,
+    @Query('categories') categories: string | undefined,
+    @Query('memberIds') memberIds: string | undefined,
+    @Query('paidByIds') paidByIds: string | undefined,
+    @Query('transactionType') transactionType: string | undefined,
+    @Query('minAmount') minAmount: string | undefined,
+    @Query('maxAmount') maxAmount: string | undefined,
     @Req() req: Request & { user: { id: string } },
   ) {
     const result = await this.expensesAnalyticsService.getCategoryDistribution({
@@ -187,6 +251,12 @@ export class ExpensesController {
       groupId,
       startDate,
       endDate,
+      categories: csvParam(categories),
+      memberIds: csvParam(memberIds),
+      paidByIds: csvParam(paidByIds),
+      transactionType: normalizeTxType(transactionType),
+      minAmount: numParam(minAmount),
+      maxAmount: numParam(maxAmount),
     });
     return new SuccessResponse(
       'Category distribution analytics retrieved successfully',

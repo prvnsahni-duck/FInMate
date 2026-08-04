@@ -6,12 +6,18 @@ import {
   signal,
   computed,
   effect,
+  untracked,
   ViewChild,
   ElementRef,
   AfterViewInit,
   HostListener,
 } from '@angular/core';
-import { CurrencyPipe, DatePipe, DecimalPipe } from '@angular/common';
+import {
+  CurrencyPipe,
+  DatePipe,
+  DecimalPipe,
+  NgTemplateOutlet,
+} from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CreateExpenseModalComponent } from '../../components/create-expense-modal/create-expense-modal.component';
 import { RecurringExpenseFormComponent } from '../../components/recurring-expense-form/recurring-expense-form.component';
@@ -21,7 +27,10 @@ import { FormsModule } from '@angular/forms';
 import { AnalyticsChartsComponent } from '../../components/analytics-charts/analytics-charts.component';
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
 import { GroupsService } from '../../services/groups.service';
-import { ExpensesService } from '../../services/expenses.service';
+import {
+  ExpensesService,
+  GroupAnalyticsQuery,
+} from '../../services/expenses.service';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   DropdownComponent,
@@ -66,6 +75,21 @@ import {
   resolveMemberDisplayName,
   resolveUserDisplayName,
 } from '../../utils/member-display.util';
+import { GroupFilterStore } from '../../services/group-filter.store';
+import {
+  DatePreset,
+  GroupFilter,
+  filterFromQueryParams,
+  filterToQueryParams,
+} from '../../models/group-filter.model';
+
+/** A single removable filter-summary chip. Per-value for multi-select dimensions. */
+export interface FilterChip {
+  kind: 'date' | 'category' | 'member' | 'paidBy' | 'type' | 'amount';
+  key: string;
+  label: string;
+  value?: string;
+}
 
 export interface GroupExpense extends Expense {
   paidByUserId: string | null;
@@ -121,9 +145,11 @@ export interface LedgerTotals {
     DropdownComponent,
     CryptoRecoveryPanelComponent,
     DecimalPipe,
+    NgTemplateOutlet,
   ],
   templateUrl: './group-detail.component.html',
   styleUrls: ['./group-detail.component.scss'],
+  providers: [GroupFilterStore],
 })
 export class GroupDetailComponent implements OnInit, AfterViewInit {
   private groupsService = inject(GroupsService);
@@ -140,6 +166,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   private cryptoSession = inject(CryptoSessionManager);
   private recoveryQueue = inject(CryptoRecoveryQueueService);
   private expenseExportService = inject(ExpenseExportService);
+  /** Single source of truth for the unified group filter (component-scoped). */
+  readonly filterStore = inject(GroupFilterStore);
   private retryCooldownIntervalId?: ReturnType<typeof setInterval>;
 
   constructor() {
@@ -168,6 +196,31 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         }
       }
     });
+
+    // Whenever the applied filter changes, re-fetch every filter-driven surface
+    // and mirror it into the URL (so refresh/deep-links restore it). The first
+    // run is skipped: the initial fetch is owned by the route handlers (which
+    // read the same store), so this effect only handles *subsequent* changes.
+    // group()/currentPage are read untracked so it fires only on filter changes.
+    let filterEffectPrimed = false;
+    effect(() => {
+      this.filterStore.applied();
+      if (!filterEffectPrimed) {
+        filterEffectPrimed = true;
+        return;
+      }
+      untracked(() => {
+        const g = this.group();
+        if (!g?.id) return;
+        this.syncFilterToUrl();
+        this.currentPage.set(1);
+        this.fetchExpenses(g.id);
+        this.fetchBalances(g.id);
+        // History and Trash honor the date period too (reset to page 1).
+        this.fetchHistoryLogs(g.id);
+        this.fetchDeletedExpenses(g.id);
+      });
+    });
   }
 
   filterCategoryOptions: DropdownOption[] = [
@@ -180,6 +233,316 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     { value: 'Housing', label: 'Housing' },
     { value: 'Others', label: 'Others' },
   ];
+
+  /** Date-preset options for the filter drawer (day-level first, then ranges). */
+  readonly datePresetOptions: { value: DatePreset; label: string }[] = [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'last_7_days', label: 'Last 7 Days' },
+    { value: 'last_30_days', label: 'Last 30 Days' },
+    { value: 'this_month', label: 'This Month' },
+    { value: 'last_month', label: 'Last Month' },
+    { value: 'last_3_months', label: 'Last 3 Months' },
+    { value: 'last_6_months', label: 'Last 6 Months' },
+    { value: 'this_year', label: 'This Year' },
+    { value: 'last_year', label: 'Last 1 Year' },
+    { value: 'all_time', label: 'All Time' },
+    { value: 'custom', label: 'Custom Range' },
+  ];
+
+  /** Member (participant) dropdown options, sourced from group members. */
+  memberFilterOptions = computed<DropdownOption[]>(() => [
+    { value: '', label: 'All Members' },
+    ...this.members().map((m) => ({
+      value: m.id,
+      label: this.memberDisplayName(m),
+    })),
+  ]);
+
+  /** Paid-by (payer) dropdown options, sourced from group members. */
+  paidByFilterOptions = computed<DropdownOption[]>(() => [
+    { value: '', label: 'Anyone' },
+    ...this.members().map((m) => ({
+      value: m.id,
+      label: this.memberDisplayName(m),
+    })),
+  ]);
+
+  /** Category pills for the multi-select drawer (the plain 7 categories). */
+  readonly categoryPillOptions = this.filterCategoryOptions.slice(1);
+
+  /** Member pills (id + display name) for the multi-select member/payer controls. */
+  memberPillOptions = computed(() =>
+    this.members().map((m) => ({
+      value: m.id,
+      label: this.memberDisplayName(m),
+    })),
+  );
+
+  /** Sort options (field + direction combined into one dropdown value). */
+  readonly sortOptions: DropdownOption[] = [
+    { value: 'date_desc', label: 'Newest first' },
+    { value: 'date_asc', label: 'Oldest first' },
+    { value: 'amount_desc', label: 'Amount: high → low' },
+    { value: 'amount_asc', label: 'Amount: low → high' },
+  ];
+
+  /** Current draft sort as a single `field_order` string for the dropdown. */
+  draftSortValue = computed(() => {
+    const d = this.filterStore.draft();
+    return d.sortBy ? `${d.sortBy}_${d.sortOrder ?? 'desc'}` : 'date_desc';
+  });
+
+  onSortChange(value: string): void {
+    const [by, order] = value.split('_') as ['date' | 'amount', 'asc' | 'desc'];
+    this.filterStore.setDraftSort(by, order);
+  }
+
+  onDraftCategoriesChange(nextValues: string[]): void {
+    this.syncDraftArray(
+      this.filterStore.draft().categories ?? [],
+      nextValues,
+      (value) => this.filterStore.toggleDraftCategory(value),
+    );
+  }
+
+  onDraftMembersChange(nextValues: string[]): void {
+    this.syncDraftArray(
+      this.filterStore.draft().memberIds ?? [],
+      nextValues,
+      (value) => this.filterStore.toggleDraftMember(value),
+    );
+  }
+
+  onDraftPaidByChange(nextValues: string[]): void {
+    this.syncDraftArray(
+      this.filterStore.draft().paidByIds ?? [],
+      nextValues,
+      (value) => this.filterStore.toggleDraftPaidBy(value),
+    );
+  }
+
+  private syncDraftArray(
+    currentValues: string[],
+    nextValues: string[],
+    toggleValue: (value: string) => void,
+  ): void {
+    const nextSet = new Set(nextValues);
+    for (const value of currentValues) {
+      if (!nextSet.has(value)) toggleValue(value);
+    }
+    const currentSet = new Set(currentValues);
+    for (const value of nextValues) {
+      if (!currentSet.has(value)) toggleValue(value);
+    }
+  }
+
+  /**
+   * Date presets that represent a single calendar month. For a household group
+   * these are the only states where the month ◀ ▶ navigator is meaningful (it
+   * steps the navigated month); every other preset/custom range is a
+   * multi-day/range state where the navigator is hidden to avoid two conflicting
+   * date controls fighting over the same state.
+   */
+  private readonly MONTH_MODE_PRESETS: DatePreset[] = [
+    'this_month',
+    'last_month',
+  ];
+
+  /**
+   * True when the household month navigator (◀ ▶) should be shown: household
+   * group AND the applied date filter is a single calendar month. In every other
+   * date state the date filter is the single source of truth and the arrows hide.
+   */
+  showMonthNav = computed(
+    () =>
+      this.group()?.groupType === 'household' &&
+      this.MONTH_MODE_PRESETS.includes(this.filterStore.applied().date.preset),
+  );
+
+  /**
+   * The effective date range every filter-driven surface should use. In household
+   * "month mode" (This Month / Last Month) it follows the navigated month; every
+   * other state uses the unified filter's resolved range. Recomputes on filter
+   * change and, for household month mode, on month navigation.
+   */
+  effectiveDateRange = computed<{ from?: string; to?: string }>(() => {
+    if (this.showMonthNav()) {
+      const month = this.getCurrentMonthString();
+      return {
+        from: `${month}-01`,
+        to: `${month}-${this.lastDayOfMonth(month)}`,
+      };
+    }
+    return this.filterStore.resolvedRange();
+  });
+
+  /**
+   * Active (non-default) filters as removable summary chips. The date chip only
+   * appears when the date is not the default (This Month).
+   */
+  activeFilterChips = computed<FilterChip[]>(() => {
+    const f = this.filterStore.applied();
+    const chips: FilterChip[] = [];
+    if (f.date.preset !== 'this_month') {
+      chips.push({
+        kind: 'date',
+        key: 'date',
+        label: this.filterStore.dateRangeLabel(),
+      });
+    }
+    for (const c of f.categories ?? []) {
+      chips.push({ kind: 'category', key: 'cat:' + c, value: c, label: c });
+    }
+    for (const m of f.memberIds ?? []) {
+      chips.push({
+        kind: 'member',
+        key: 'mem:' + m,
+        value: m,
+        label: 'Member: ' + this.memberNameById(m),
+      });
+    }
+    for (const p of f.paidByIds ?? []) {
+      chips.push({
+        kind: 'paidBy',
+        key: 'pb:' + p,
+        value: p,
+        label: 'Paid by: ' + this.memberNameById(p),
+      });
+    }
+    if (f.transactionType && f.transactionType !== 'both') {
+      chips.push({
+        kind: 'type',
+        key: 'type',
+        label:
+          f.transactionType === 'refund' ? 'Refunds only' : 'Expenses only',
+      });
+    }
+    if (f.minAmount != null || f.maxAmount != null) {
+      chips.push({
+        kind: 'amount',
+        key: 'amount',
+        label: this.amountChipLabel(f),
+      });
+    }
+    return chips;
+  });
+
+  private amountChipLabel(f: GroupFilter): string {
+    const cur = this.group()?.currency ?? '';
+    const fmt = (n: number) => `${cur} ${n}`.trim();
+    if (f.minAmount != null && f.maxAmount != null) {
+      return `${fmt(f.minAmount)} – ${fmt(f.maxAmount)}`;
+    }
+    if (f.minAmount != null) return `≥ ${fmt(f.minAmount)}`;
+    return `≤ ${fmt(f.maxAmount as number)}`;
+  }
+
+  /** Display name for a group-member id (used by the member/payer chips). */
+  memberNameById(id: string): string {
+    const m = this.members().find((mem) => mem.id === id);
+    return m ? this.memberDisplayName(m) : 'Unknown';
+  }
+
+  /** Remove one applied filter from its summary chip. */
+  removeFilterChip(chip: FilterChip): void {
+    switch (chip.kind) {
+      case 'date':
+        this.filterStore.clearAppliedDate();
+        // Date reverted to This Month → re-anchor the household navigator.
+        this.anchorHouseholdMonth();
+        break;
+      case 'category':
+        if (chip.value) this.filterStore.removeAppliedCategory(chip.value);
+        break;
+      case 'member':
+        if (chip.value) this.filterStore.removeAppliedMember(chip.value);
+        break;
+      case 'paidBy':
+        if (chip.value) this.filterStore.removeAppliedPaidBy(chip.value);
+        break;
+      case 'type':
+        this.filterStore.clearAppliedTxType();
+        break;
+      case 'amount':
+        this.filterStore.clearAppliedAmount();
+        break;
+    }
+  }
+
+  /**
+   * Re-anchor the household month navigator to match the applied date preset —
+   * This Month → the current month, Last Month → the previous month. Called only
+   * when the date preset actually changes (via Apply / chip removal / Clear all),
+   * never on plain arrow navigation, so stepping through months isn't reset by
+   * unrelated filter edits.
+   */
+  private anchorHouseholdMonth(): void {
+    if (this.group()?.groupType !== 'household') return;
+    const preset = this.filterStore.applied().date.preset;
+    const now = new Date();
+    if (preset === 'this_month') {
+      this.currentTimelineMonth.set(
+        new Date(now.getFullYear(), now.getMonth(), 1),
+      );
+    } else if (preset === 'last_month') {
+      this.currentTimelineMonth.set(
+        new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      );
+    }
+  }
+
+  /**
+   * Custom-range validity for the drawer: an explicit From must not be after an
+   * explicit To. Incomplete ranges (only one bound) are allowed as open bounds.
+   */
+  draftDateRangeValid = computed(() => {
+    const d = this.filterStore.draft().date;
+    if (d.preset !== 'custom' || !d.from || !d.to) return true;
+    return d.from <= d.to;
+  });
+
+  /**
+   * The applied filter projected into the analytics query shape (resolved date
+   * range + dimensions), passed to <app-analytics-charts>.
+   */
+  analyticsFilter = computed<GroupAnalyticsQuery>(() => {
+    const applied = this.filterStore.applied();
+    const { from, to } = this.effectiveDateRange();
+    return {
+      startDate: from,
+      endDate: to,
+      categories: applied.categories,
+      memberIds: applied.memberIds,
+      paidByIds: applied.paidByIds,
+      transactionType:
+        applied.transactionType === 'both'
+          ? undefined
+          : applied.transactionType,
+      minAmount: applied.minAmount,
+      maxAmount: applied.maxAmount,
+    };
+  });
+
+  /** The applied dimension filters shared by the ledger, export and balances. */
+  private appliedDimensionOptions() {
+    const a = this.filterStore.applied();
+    return {
+      categories: a.categories,
+      memberIds: a.memberIds,
+      paidByIds: a.paidByIds,
+      transactionType:
+        a.transactionType === 'both' ? undefined : a.transactionType,
+      minAmount: a.minAmount,
+      maxAmount: a.maxAmount,
+    };
+  }
+
+  /** Full filter options (effective date range + dimensions) for balances/trash. */
+  private appliedFilterOptions() {
+    const { from, to } = this.effectiveDateRange();
+    return { from, to, ...this.appliedDimensionOptions() };
+  }
 
   visibilityOptions: DropdownOption[] = [
     { value: 'private', label: 'Private' },
@@ -211,6 +574,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   members = signal<GroupMember[]>([]);
   balances = signal<BalanceEntry[]>([]);
   suggestedSettlements = signal<SuggestedSettlement[]>([]);
+  /** Filtered balances/settlements (shown alongside overall when filters active). */
+  filteredBalances = signal<BalanceEntry[]>([]);
+  filteredSuggestedSettlements = signal<SuggestedSettlement[]>([]);
   historyLogs = signal<GroupAuditLog[]>([]);
   deletedExpenses = signal<Expense[]>([]);
   carryForwardBalances = signal<CarryForwardBalance[]>([]);
@@ -233,9 +599,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   isExpenseModalOpen = signal<boolean>(false);
   isDeleteConfirmOpen = signal<boolean>(false);
   deleteExpenseId = signal<string | null>(null);
-  filterCategory = signal<string>('');
-  filterStartDate = signal<string>('');
-  filterEndDate = signal<string>('');
   currentPage = signal<number>(1);
   pageSize = signal<number>(20);
   totalExpenses = signal<number>(0);
@@ -402,6 +765,16 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return entry ? entry.netBalance : 0;
   });
 
+  /** The caller's balance within the current filter (for the Filtered section). */
+  filteredUserBalance = computed(() => {
+    const g = this.group();
+    const currentUserId = this.currentUserId();
+    const entry = this.filteredBalances().find(
+      (b) => b.userId === currentUserId && b.currency === g?.currency,
+    );
+    return entry ? entry.netBalance : 0;
+  });
+
   // Archive (Delete Group) dialog state
   isArchiveDialogOpen = signal<boolean>(false);
   archiveConfirmName = signal<string>('');
@@ -418,7 +791,10 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.currentUserId.set(this.getCurrentUserId());
     this.closeMonthSelected.set(this.getCurrentMonthString());
 
-    // Subscribe to query parameters to sync tab and filters
+    // Subscribe to query parameters to sync the active tab. Filter query params
+    // are owned by the GroupFilterStore + its effect (see the constructor), not
+    // handled here — so navigating the filter into the URL never triggers a
+    // duplicate refetch through this subscription.
     this.route.queryParams
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe((qParams) => {
@@ -454,25 +830,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           }
         }
 
-        const category = qParams['category'] || '';
-        const start = qParams['start'] || '';
-        const end = qParams['end'] || '';
-
-        const isFilterChanged =
-          this.filterCategory() !== category ||
-          this.filterStartDate() !== start ||
-          this.filterEndDate() !== end;
-
-        this.filterCategory.set(category);
-        this.filterStartDate.set(start);
-        this.filterEndDate.set(end);
-
-        const groupId = this.group()?.id;
-        if (groupId && isFilterChanged) {
-          this.currentPage.set(1);
-          this.fetchExpenses(groupId);
-        }
-
         this.scrollToActiveTab();
         this.checkScrollCues();
       });
@@ -485,14 +842,11 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.startLoading();
           this.currentPage.set(1);
 
-          // Prefill filters from URL before initial fetch
-          const initialCategory =
-            this.route.snapshot.queryParams['category'] || '';
-          const initialStart = this.route.snapshot.queryParams['start'] || '';
-          const initialEnd = this.route.snapshot.queryParams['end'] || '';
-          this.filterCategory.set(initialCategory);
-          this.filterStartDate.set(initialStart);
-          this.filterEndDate.set(initialEnd);
+          // Seed the unified filter from the URL before any initial fetch, so
+          // deep-links / refresh restore the previously applied filter.
+          this.filterStore.initialize(
+            filterFromQueryParams(this.route.snapshot.queryParams),
+          );
 
           // Fired independently of getGroup() — none of these need the Group
           // response, only the groupId already available from the route.
@@ -642,35 +996,53 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     }
   }
 
-  applyFilters() {
+  /** Mirror the applied filter into the URL (merge, no history entry). */
+  private syncFilterToUrl() {
     this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: {
-        category: this.filterCategory() || null,
-        start: this.filterStartDate() || null,
-        end: this.filterEndDate() || null,
-      },
+      queryParams: filterToQueryParams(this.filterStore.applied()),
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
-    const groupId = this.group()?.id;
-    if (groupId) {
-      this.currentPage.set(1);
-      this.fetchExpenses(groupId);
-    }
   }
 
-  resetFilters() {
-    this.router.navigate([], {
-      relativeTo: this.route,
-      queryParams: {
-        category: null,
-        start: null,
-        end: null,
-      },
-      queryParamsHandling: 'merge',
-      replaceUrl: true,
-    });
+  // ── Filter drawer lifecycle ─────────────────────────────────────────────────
+
+  /** Open the drawer, seeding its draft from the currently applied filter. */
+  openFilterDrawer() {
+    this.filterStore.openDraft();
+    this.setFilterBottomSheet(true);
+  }
+
+  /** Commit the drawer's draft. The applied() effect handles refetch + URL sync. */
+  applyFilterDrawer() {
+    if (!this.draftDateRangeValid()) return;
+    const previousPreset = this.filterStore.applied().date.preset;
+    this.filterStore.apply();
+    // Only re-anchor the household navigator when the date preset itself changed,
+    // so editing category/member etc. never resets an arrow-navigated month.
+    if (this.filterStore.applied().date.preset !== previousPreset) {
+      this.anchorHouseholdMonth();
+    }
+    this.setFilterBottomSheet(false);
+  }
+
+  /** Clear the drawer's controls back to defaults (does not close or apply). */
+  resetFilterDrawer() {
+    this.filterStore.resetDraft();
+  }
+
+  /** Discard the drawer's draft edits and close without applying. */
+  cancelFilterDrawer() {
+    this.filterStore.cancelDraft();
+    this.setFilterBottomSheet(false);
+  }
+
+  /** Clear every applied filter immediately (used by inline "Clear Filters"). */
+  clearAllFilters() {
+    this.filterStore.resetDraft();
+    this.filterStore.apply();
+    this.anchorHouseholdMonth();
   }
 
   @ViewChild('filterBtn') filterBtn!: ElementRef<HTMLButtonElement>;
@@ -684,7 +1056,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     } else {
       setTimeout(() => {
         const firstEl = document.querySelector(
-          '#filterCategoryMobile button',
+          '#filterDrawer button',
         ) as HTMLElement;
         firstEl?.focus();
       }, 150);
@@ -693,7 +1065,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
 
   onBottomSheetKeyDown(event: KeyboardEvent) {
     if (event.key === 'Escape') {
-      this.setFilterBottomSheet(false);
+      this.cancelFilterDrawer();
       return;
     }
 
@@ -787,6 +1159,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     if (g?.id) {
       this.fetchExpenses(g.id);
       this.fetchCarryForward(g.id);
+      // History and Trash follow the navigated household month too.
+      this.fetchHistoryLogs(g.id);
+      this.fetchDeletedExpenses(g.id);
     }
   }
 
@@ -815,22 +1190,20 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     } else {
       this.isLoadingExpenses.set(true);
     }
-    let start = this.filterStartDate();
-    let end = this.filterEndDate();
-    const g = this.group();
-    if (g?.groupType === 'household') {
-      const activeMonth = this.getCurrentMonthString();
-      start = `${activeMonth}-01`;
-      end = `${activeMonth}-${this.lastDayOfMonth(activeMonth)}`;
-    }
+    const applied = this.filterStore.applied();
+    // Household ledgers stay month-driven (months lock); everything else uses the
+    // unified filter's resolved range. Either way, the other dimensions apply.
+    const { from, to } = this.effectiveDateRange();
 
     this.expensesService
       .getExpenses(groupId, {
         page: this.currentPage(),
         limit: this.pageSize(),
-        category: this.filterCategory(),
-        startDate: start,
-        endDate: end,
+        startDate: from,
+        endDate: to,
+        ...this.appliedDimensionOptions(),
+        sortBy: applied.sortBy,
+        sortOrder: applied.sortOrder,
       })
       .subscribe({
         next: (res) => {
@@ -953,24 +1326,31 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   fetchBalances(groupId: string) {
-    // No group()-null early return here (removed): this now fires in
-    // parallel with getGroup() rather than after it. userBalance is a
-    // computed() derived from group()+balances(), so it's correct regardless
-    // of arrival order — see the userBalance computed() above.
+    // Fires in parallel with getGroup(); userBalance is a computed() derived from
+    // group()+balances(), so it's correct regardless of arrival order.
     this.isLoadingBalances.set(true);
     this.balancesError.set(false);
-    this.groupsService.getBalances(groupId).subscribe({
-      next: (res) => {
-        this.balances.set(res.balances);
-        this.suggestedSettlements.set(res.suggestedSettlements);
-        this.isLoadingBalances.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to fetch balances', err);
-        this.isLoadingBalances.set(false);
-        this.balancesError.set(true);
-      },
-    });
+    // The backend returns both `overall` (all-time, carry-forward intact) and
+    // `filtered` (for the active filter). We always request both; the Filtered
+    // block is only shown in the UI when filters are actually active.
+    this.groupsService
+      .getBalances(groupId, this.appliedFilterOptions())
+      .subscribe({
+        next: (res) => {
+          this.balances.set(res.overall.balances);
+          this.suggestedSettlements.set(res.overall.suggestedSettlements);
+          this.filteredBalances.set(res.filtered.balances);
+          this.filteredSuggestedSettlements.set(
+            res.filtered.suggestedSettlements,
+          );
+          this.isLoadingBalances.set(false);
+        },
+        error: (err) => {
+          console.error('Failed to fetch balances', err);
+          this.isLoadingBalances.set(false);
+          this.balancesError.set(true);
+        },
+      });
   }
 
   /**
@@ -986,25 +1366,32 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       this.isLoadingHistory.set(true);
     }
     this.historyError.set(false);
-    this.groupsService.getHistoryLogs(groupId, this.historyPage()).subscribe({
-      next: (res) => {
-        const logs = res.data || [];
-        if (append) {
-          this.historyLogs.update((prev) => [...prev, ...logs]);
-        } else {
-          this.historyLogs.set(logs);
-        }
-        this.totalHistoryLogs.set(res.meta?.totalItems ?? logs.length);
-        this.isLoadingHistory.set(false);
-        this.isLoadingMoreHistory.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to fetch history logs', err);
-        this.isLoadingHistory.set(false);
-        this.isLoadingMoreHistory.set(false);
-        this.historyError.set(true);
-      },
-    });
+    this.groupsService
+      .getHistoryLogs(
+        groupId,
+        this.historyPage(),
+        20,
+        this.effectiveDateRange(),
+      )
+      .subscribe({
+        next: (res) => {
+          const logs = res.data || [];
+          if (append) {
+            this.historyLogs.update((prev) => [...prev, ...logs]);
+          } else {
+            this.historyLogs.set(logs);
+          }
+          this.totalHistoryLogs.set(res.meta?.totalItems ?? logs.length);
+          this.isLoadingHistory.set(false);
+          this.isLoadingMoreHistory.set(false);
+        },
+        error: (err) => {
+          console.error('Failed to fetch history logs', err);
+          this.isLoadingHistory.set(false);
+          this.isLoadingMoreHistory.set(false);
+          this.historyError.set(true);
+        },
+      });
   }
 
   /**
@@ -1034,17 +1421,19 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   fetchDeletedExpenses(groupId: string) {
     this.isLoadingTrash.set(true);
     this.trashError.set(false);
-    this.groupsService.getDeletedExpenses(groupId).subscribe({
-      next: (res) => {
-        this.deletedExpenses.set(res.data || []);
-        this.isLoadingTrash.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to fetch deleted expenses', err);
-        this.isLoadingTrash.set(false);
-        this.trashError.set(true);
-      },
-    });
+    this.groupsService
+      .getDeletedExpenses(groupId, this.appliedFilterOptions())
+      .subscribe({
+        next: (res) => {
+          this.deletedExpenses.set(res.data || []);
+          this.isLoadingTrash.set(false);
+        },
+        error: (err) => {
+          console.error('Failed to fetch deleted expenses', err);
+          this.isLoadingTrash.set(false);
+          this.trashError.set(true);
+        },
+      });
   }
 
   fetchCarryForward(groupId: string) {
@@ -1086,6 +1475,22 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
    *  than a normal expense — drives every visual distinction in the ledger. */
   isRefundTx(entity: { transactionType?: string | null }): boolean {
     return entity.transactionType === 'refund';
+  }
+
+  /**
+   * Whether the current user may act (history/edit/delete) on this expense at
+   * all — i.e. the action cluster should render. Not a viewer, not voided, and
+   * either an owner/admin or the expense's own owner/payer. The lock state then
+   * decides *which* controls show (lock badge vs. the edit buttons).
+   */
+  canActOnExpense(expense: GroupExpense): boolean {
+    if (this.isViewer() || expense.status === 'void') return false;
+    const uid = this.currentUserId();
+    return (
+      this.isOwnerOrAdmin() ||
+      expense.ownerUserId === uid ||
+      expense.paidByUserId === uid
+    );
   }
 
   /**
@@ -1289,17 +1694,29 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     });
   }
 
-  /** Open the ledger export dialog, defaulting to the current calendar month
-   *  (first-of-month → today) — never the whole ledger. */
+  /** Open the ledger export dialog, seeded from the currently applied filter's
+   *  date range so the export defaults to exactly what's on screen. Household
+   *  ledgers seed from the active month; all-time seeds blank (whole ledger). */
   openExportModal(): void {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
-    this.exportFromDate.set(`${month}-01`);
-    this.exportToDate.set(
-      `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
-    );
-    this.exportRangeMode.set('month');
+    const g = this.group();
+    if (g?.groupType === 'household') {
+      // Household exports the current calendar month (via 'month' mode), matching
+      // the ledger's month-driven behavior.
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const month = `${now.getFullYear()}-${pad(now.getMonth() + 1)}`;
+      this.exportFromDate.set(`${month}-01`);
+      this.exportToDate.set(`${month}-${this.lastDayOfMonth(month)}`);
+      this.exportRangeMode.set('month');
+    } else {
+      // Non-household seeds the currently applied filter's date range so the
+      // export defaults to exactly what's on screen. 'custom' so the seeded
+      // dates are used verbatim (all-time seeds blank = whole ledger).
+      const range = this.filterStore.resolvedRange();
+      this.exportFromDate.set(range.from ?? '');
+      this.exportToDate.set(range.to ?? '');
+      this.exportRangeMode.set('custom');
+    }
     this.exportError.set('');
     this.showExportModal.set(true);
   }
@@ -1339,11 +1756,12 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     if (!g || this.isExporting()) return;
 
     const { from, to } = this.resolveExportRange();
-    if (!from || !to) {
+    // Both blank = whole ledger (the "All Time" filter). Only one blank is an error.
+    if ((from && !to) || (!from && to)) {
       this.exportError.set('Please choose both a from and to date.');
       return;
     }
-    if (from > to) {
+    if (from && to && from > to) {
       this.exportError.set(
         'The "from" date must be on or before the "to" date.',
       );
@@ -1353,12 +1771,19 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
 
     this.isExporting.set(true);
     try {
+      // The export automatically uses every currently applied filter dimension.
+      const dims = this.appliedDimensionOptions();
       const filter: ExportFilter = {
         groupId: g.id,
         type: 'group',
         from,
         to,
-        category: this.filterCategory() || undefined,
+        categories: dims.categories,
+        memberIds: dims.memberIds,
+        paidByIds: dims.paidByIds,
+        transactionType: dims.transactionType,
+        minAmount: dims.minAmount,
+        maxAmount: dims.maxAmount,
       };
       const datePart = new Date().toISOString().slice(0, 10);
       await this.expenseExportService.exportExpenses(

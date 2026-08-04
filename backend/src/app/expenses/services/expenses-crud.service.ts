@@ -8,10 +8,21 @@ export interface ExpenseListParams {
   limit: number;
   cursor?: string;
   groupId?: string;
-  category?: string;
   status?: string;
   startDate?: string;
   endDate?: string;
+  /** Categories (exact names) — matches ANY. */
+  categories?: string[];
+  /** Participants (via splits) — group-member ids, matches ANY. */
+  memberIds?: string[];
+  /** Payers — group-member ids, matches ANY. */
+  paidByIds?: string[];
+  /** `undefined` applies no transaction-type filter. */
+  transactionType?: 'expense' | 'refund';
+  minAmount?: number;
+  maxAmount?: number;
+  sortBy?: 'date' | 'amount';
+  sortOrder?: 'asc' | 'desc';
 }
 
 @Injectable()

@@ -211,53 +211,95 @@
       <div
         class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-4 mb-4 shadow-xl shadow-black/5 flex items-center justify-between"
       >
-        <button
-          (click)="changeMonth(-1)"
-          class="p-2 text-muted hover:text-secondary transition-colors"
-        >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        @if (showMonthNav()) {
+          <button
+            (click)="changeMonth(-1)"
+            aria-label="Previous month"
+            class="p-2 text-muted hover:text-secondary transition-colors"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            ></path>
-          </svg>
-        </button>
-        <div class="text-center">
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 19l-7-7 7-7"
+              ></path>
+            </svg>
+          </button>
+        } @else {
+          <span class="w-9 shrink-0"></span>
+        }
+        <div class="text-center px-2 min-w-0">
           <span class="text-lg font-bold text-secondary">{{
-            getMonthDisplayName()
+            showMonthNav() ? getMonthDisplayName() : filterStore.dateRangeLabel()
           }}</span>
-          @if (isMonthLocked()) {
+          @if (showMonthNav() && isMonthLocked()) {
             <span
               class="ml-2 text-xs font-semibold px-2 py-0.5 bg-red-500/10 text-red-500 rounded-full"
               >Locked (Read-Only)</span
             >
           }
+          @if (!showMonthNav()) {
+            <p class="text-[10px] text-muted mt-0.5">
+              Month navigation is available only for a single calendar month.
+            </p>
+          }
         </div>
-        <button
-          (click)="changeMonth(1)"
-          class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
-        >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        <div class="flex items-center gap-1">
+          @if (showMonthNav()) {
+            <button
+              (click)="changeMonth(1)"
+              aria-label="Next month"
+              class="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 5l7 7-7 7"
+                ></path>
+              </svg>
+            </button>
+          }
+
+          <!-- Unified filter button (category / member / payer / type) -->
+          <button
+            (click)="openFilterDrawer()"
+            aria-label="Filters"
+            class="relative p-2 text-muted hover:text-secondary transition-colors cursor-pointer"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 5l7 7-7 7"
-            ></path>
-          </svg>
-        </button>
+            <svg
+              class="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+              ></path>
+            </svg>
+            @if (filterStore.hasActiveFilters()) {
+              <span
+                class="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-primary rounded-full ring-2 ring-finmate-card"
+                >{{ filterStore.activeCount() }}</span
+              >
+            }
+          </button>
+        </div>
       </div>
     }
 
@@ -449,6 +491,356 @@
           </div>
         </div>
 
+        <!-- Unified filter bar — common to every data tab (non-household).
+             The date-range label doubles as the "month header" for the page. -->
+        @if (
+          group()!.groupType !== 'household' &&
+          activeTab() !== 'settings' &&
+          activeTab() !== 'recurring'
+        ) {
+          <div
+            class="flex items-center justify-between bg-surface p-3 rounded-2xl border border-border/10"
+          >
+            <span class="text-base font-bold text-secondary">{{
+              filterStore.dateRangeLabel()
+            }}</span>
+            <button
+              #filterBtn
+              (click)="openFilterDrawer()"
+              class="relative flex items-center gap-2 text-xs font-bold text-secondary bg-surface-alt hover:brightness-110 px-3.5 py-2 rounded-xl transition cursor-pointer"
+            >
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                ></path>
+              </svg>
+              <span>Filter</span>
+              @if (filterStore.hasActiveFilters()) {
+                <span
+                  class="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 px-1 flex items-center justify-center text-[10px] font-bold text-white bg-primary rounded-full ring-2 ring-surface"
+                  >{{ filterStore.activeCount() }}</span
+                >
+              }
+            </button>
+          </div>
+        }
+
+        <!-- Active-filter summary: removable chips (all group types) -->
+        @if (activeFilterChips().length > 0) {
+          <div
+            data-testid="active-filter-chips"
+            class="flex flex-wrap items-center gap-2 mb-4"
+          >
+            @for (chip of activeFilterChips(); track chip.key) {
+              <span
+                class="inline-flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold"
+              >
+                {{ chip.label }}
+                <button
+                  (click)="removeFilterChip(chip)"
+                  [attr.aria-label]="'Remove ' + chip.label + ' filter'"
+                  class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-primary/20 transition cursor-pointer"
+                >
+                  <svg
+                    class="w-3 h-3"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2.5"
+                      d="M6 18L18 6M6 6l12 12"
+                    ></path>
+                  </svg>
+                </button>
+              </span>
+            }
+            <button
+              (click)="clearAllFilters()"
+              class="text-xs font-bold text-muted hover:text-primary transition cursor-pointer px-1"
+            >
+              Clear all
+            </button>
+          </div>
+        }
+
+        <!-- Unified Filter Drawer — page-level so it opens from any tab -->
+        @if (isFilterBottomSheetOpen()) {
+          <div
+            (keydown)="onBottomSheetKeyDown($event)"
+            tabindex="-1"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Filter options"
+            class="fixed inset-0 z-[100] flex items-end sm:items-center justify-center select-none animate-fade-in"
+          >
+            <!-- Backdrop -->
+            <div
+              (click)="cancelFilterDrawer()"
+              (keydown.escape)="cancelFilterDrawer()"
+              role="presentation"
+              class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
+            ></div>
+
+            <!-- Content Panel -->
+            <div
+              id="filterDrawer"
+              class="relative w-full max-w-lg bg-finmate-card dark:bg-finmate-card/90 rounded-t-3xl sm:rounded-3xl shadow-2xl p-6 border-t sm:border border-border/10 transform transition-transform duration-300 translate-y-0 select-text flex flex-col max-h-[85vh] overflow-y-auto"
+            >
+              <div
+                class="mx-auto w-12 h-1.5 bg-muted/20 rounded-full mb-6 sm:hidden"
+              ></div>
+
+              <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-primary">Filters</h3>
+                <button
+                  (click)="cancelFilterDrawer()"
+                  aria-label="Close filter panel"
+                  class="text-muted hover:text-primary transition cursor-pointer"
+                >
+                  <svg
+                    class="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Form Fields -->
+              <div class="space-y-6 flex-1">
+                <!-- Date: preset dropdown + custom range (all group types) -->
+                <div>
+                  <p class="text-label">Date</p>
+                    <app-dropdown
+                      [ngModel]="filterStore.draft().date.preset"
+                      (ngModelChange)="filterStore.setDraftPreset($event)"
+                      [options]="datePresetOptions"
+                      size="md"
+                    ></app-dropdown>
+                    @if (filterStore.draft().date.preset === 'custom') {
+                      <div class="grid grid-cols-2 gap-3 mt-3">
+                        <div>
+                          <label for="filterCustomFrom" class="text-label"
+                            >From</label
+                          >
+                          <input
+                            id="filterCustomFrom"
+                            type="date"
+                            [ngModel]="filterStore.draft().date.from || ''"
+                            (ngModelChange)="
+                              filterStore.setDraftCustomFrom($event)
+                            "
+                            class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                        <div>
+                          <label for="filterCustomTo" class="text-label"
+                            >To</label
+                          >
+                          <input
+                            id="filterCustomTo"
+                            type="date"
+                            [ngModel]="filterStore.draft().date.to || ''"
+                            (ngModelChange)="filterStore.setDraftCustomTo($event)"
+                            class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
+                          />
+                        </div>
+                      </div>
+                      @if (!draftDateRangeValid()) {
+                        <p
+                          data-testid="custom-range-error"
+                          class="text-[11px] font-semibold text-red-500 mt-2"
+                        >
+                          The "From" date must be on or before the "To" date.
+                        </p>
+                      }
+                      @if (
+                        filterStore.draft().date.from ||
+                        filterStore.draft().date.to
+                      ) {
+                        <button
+                          (click)="
+                            filterStore.setDraftCustomFrom('');
+                            filterStore.setDraftCustomTo('')
+                          "
+                          class="mt-2 text-[11px] font-semibold text-muted hover:text-primary transition cursor-pointer"
+                        >
+                          Clear dates
+                        </button>
+                      }
+                    }
+                  </div>
+
+                <!-- Category (multi-select) -->
+                <div>
+                  <p class="text-label">Category</p>
+                  <app-dropdown
+                    [ngModel]="filterStore.draft().categories ?? []"
+                    (ngModelChange)="onDraftCategoriesChange($event)"
+                    [options]="categoryPillOptions"
+                    placeholder="All Categories"
+                    size="md"
+                    [multiple]="true"
+                  ></app-dropdown>
+                </div>
+
+                <!-- Member (multi-select) -->
+                <div>
+                  <p class="text-label">Member</p>
+                  @if (memberPillOptions().length) {
+                    <app-dropdown
+                      [ngModel]="filterStore.draft().memberIds ?? []"
+                      (ngModelChange)="onDraftMembersChange($event)"
+                      [options]="memberPillOptions()"
+                      placeholder="All Members"
+                      size="md"
+                      [multiple]="true"
+                    ></app-dropdown>
+                  } @else {
+                    <p class="text-xs text-muted mt-1">No members yet.</p>
+                  }
+                </div>
+
+                <!-- Paid By (multi-select) -->
+                <div>
+                  <p class="text-label">Paid By</p>
+                  @if (memberPillOptions().length) {
+                    <app-dropdown
+                      [ngModel]="filterStore.draft().paidByIds ?? []"
+                      (ngModelChange)="onDraftPaidByChange($event)"
+                      [options]="memberPillOptions()"
+                      placeholder="Anyone"
+                      size="md"
+                      [multiple]="true"
+                    ></app-dropdown>
+                  } @else {
+                    <p class="text-xs text-muted mt-1">No members yet.</p>
+                  }
+                </div>
+
+                <!-- Transaction Type -->
+                <div>
+                  <p class="text-label">Transaction Type</p>
+                  <div class="grid grid-cols-3 gap-2 mt-1">
+                    <button
+                      (click)="filterStore.setDraftTxType('expense')"
+                      class="py-2 rounded-xl text-xs font-semibold border transition cursor-pointer"
+                      [class]="
+                        filterStore.draft().transactionType === 'expense'
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-surface text-secondary border-border/10 hover:brightness-110'
+                      "
+                    >
+                      Expense
+                    </button>
+                    <button
+                      (click)="filterStore.setDraftTxType('refund')"
+                      class="py-2 rounded-xl text-xs font-semibold border transition cursor-pointer"
+                      [class]="
+                        filterStore.draft().transactionType === 'refund'
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-surface text-secondary border-border/10 hover:brightness-110'
+                      "
+                    >
+                      Refund
+                    </button>
+                    <button
+                      (click)="filterStore.setDraftTxType('both')"
+                      class="py-2 rounded-xl text-xs font-semibold border transition cursor-pointer"
+                      [class]="
+                        (filterStore.draft().transactionType ?? 'both') === 'both'
+                          ? 'bg-primary text-white border-primary'
+                          : 'bg-surface text-secondary border-border/10 hover:brightness-110'
+                      "
+                    >
+                      Both
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Amount range -->
+                <div>
+                  <p class="text-label">Amount Range</p>
+                  <div class="grid grid-cols-2 gap-3 mt-1">
+                    <input
+                      type="number"
+                      inputmode="decimal"
+                      min="0"
+                      placeholder="Min"
+                      aria-label="Minimum amount"
+                      [ngModel]="filterStore.draft().minAmount ?? null"
+                      (ngModelChange)="filterStore.setDraftMinAmount($event)"
+                      class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <input
+                      type="number"
+                      inputmode="decimal"
+                      min="0"
+                      placeholder="Max"
+                      aria-label="Maximum amount"
+                      [ngModel]="filterStore.draft().maxAmount ?? null"
+                      (ngModelChange)="filterStore.setDraftMaxAmount($event)"
+                      class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+
+                <!-- Sort (ledger ordering) -->
+                <div>
+                  <p class="text-label">Sort By</p>
+                  <app-dropdown
+                    [ngModel]="draftSortValue()"
+                    (ngModelChange)="onSortChange($event)"
+                    [options]="sortOptions"
+                    size="md"
+                  ></app-dropdown>
+                </div>
+              </div>
+
+              <!-- Action Buttons: Clear All / Cancel / Apply -->
+              <div class="mt-8 pt-4 border-t border-border/5 flex gap-3">
+                <button
+                  (click)="resetFilterDrawer()"
+                  class="flex-1 py-3.5 bg-surface hover:bg-surface-alt text-secondary rounded-2xl text-sm font-bold transition cursor-pointer"
+                >
+                  Clear All
+                </button>
+                <button
+                  (click)="cancelFilterDrawer()"
+                  class="flex-1 py-3.5 bg-surface hover:bg-surface-alt text-secondary rounded-2xl text-sm font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  (click)="applyFilterDrawer()"
+                  [disabled]="!draftDateRangeValid()"
+                  class="flex-1 py-3.5 bg-primary hover:brightness-110 text-white rounded-2xl text-sm font-bold shadow-md shadow-primary/10 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+
         <!-- TAB: Ledger -->
         @if (activeTab() === 'ledger') {
           <!-- Error Handling Banner -->
@@ -493,10 +885,10 @@
           }
 
           <div
-            class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 shadow-xl shadow-black/5"
+            class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-3.5 sm:p-6 shadow-xl shadow-black/5"
           >
-            <div class="flex items-center justify-between mb-6">
-              <h2 class="text-xl font-bold">Expenses Ledger</h2>
+            <div class="flex items-center justify-between mb-4 sm:mb-6">
+              <h2 class="text-lg sm:text-xl font-bold">Expenses Ledger</h2>
               <!-- Export the full ledger to Excel (decrypted client-side).
                    Hidden when the ledger is empty — nothing to export. -->
               @if (totalExpenses() > 0) {
@@ -529,258 +921,46 @@
             @if (expenses().length > 0) {
               <div
                 data-testid="ledger-spending-summary"
-                class="grid grid-cols-3 gap-3 mb-6"
+                class="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6"
               >
-                <div class="p-3 rounded-2xl bg-surface border border-border/5">
+                <div
+                  class="p-3 rounded-2xl bg-surface border border-border/5 min-w-0"
+                >
                   <p class="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">
                     Expenses
                   </p>
-                  <p class="text-sm font-bold text-red-500 dark:text-red-400">
+                  <p class="text-sm font-bold text-red-500 dark:text-red-400 truncate">
                     {{
                       ledgerSpendingSummary().totalExpense
                         | currency: group()!.currency
                     }}
                   </p>
                 </div>
-                <div class="p-3 rounded-2xl bg-surface border border-border/5">
+                <div
+                  class="p-3 rounded-2xl bg-surface border border-border/5 min-w-0"
+                >
                   <p class="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">
                     Refunds
                   </p>
-                  <p class="text-sm font-bold text-green-500 dark:text-green-400">
+                  <p class="text-sm font-bold text-green-500 dark:text-green-400 truncate">
                     {{
                       ledgerSpendingSummary().totalRefund
                         | currency: group()!.currency
                     }}
                   </p>
                 </div>
-                <div class="p-3 rounded-2xl bg-surface border border-border/5">
+                <div
+                  class="p-3 rounded-2xl bg-surface border border-border/5 min-w-0 col-span-2 sm:col-span-1"
+                >
                   <p class="text-[10px] font-bold uppercase tracking-wide text-muted mb-1">
                     Net Group Spending
                   </p>
-                  <p class="text-sm font-bold">
+                  <p class="text-sm font-bold truncate">
                     {{
                       ledgerSpendingSummary().netSpending
                         | currency: group()!.currency
                     }}
                   </p>
-                </div>
-              </div>
-            }
-
-            <!-- Filters Toggle / Info Row (Visible only on Mobile, hides on Desktop) -->
-            @if (group()!.groupType !== 'household') {
-              <div
-                class="flex sm:hidden items-center justify-between bg-surface p-3 rounded-2xl border border-border/10 mb-4"
-              >
-                <button
-                  #filterBtn
-                  (click)="setFilterBottomSheet(true)"
-                  class="flex items-center space-x-2 text-xs font-bold text-secondary bg-surface-alt hover:brightness-110 px-3.5 py-2 rounded-xl transition cursor-pointer"
-                >
-                  <svg
-                    class="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
-                    ></path>
-                  </svg>
-                  <span>Filter Ledger</span>
-                  @if (
-                    filterCategory() || filterStartDate() || filterEndDate()
-                  ) {
-                    <span
-                      class="w-2 h-2 rounded-full bg-primary ring-2 ring-surface"
-                    ></span>
-                  }
-                </button>
-
-                @if (filterCategory() || filterStartDate() || filterEndDate()) {
-                  <button
-                    (click)="resetFilters()"
-                    class="text-xs font-bold text-muted hover:text-primary transition cursor-pointer"
-                  >
-                    Reset
-                  </button>
-                }
-              </div>
-            }
-
-            <!-- Sticky Filters Row (Only for desktop, hidden on Mobile) -->
-            @if (group()!.groupType !== 'household') {
-              <div
-                class="hidden sm:grid sticky top-[64px] lg:top-0 z-30 bg-surface/95 backdrop-blur-md p-4 mb-6 rounded-2xl border border-border/10 grid-cols-4 gap-4"
-              >
-                <div>
-                  <label class="text-label" for="filterCategory"
-                    >Category</label
-                  >
-                  <app-dropdown
-                    [ngModel]="filterCategory()"
-                    (ngModelChange)="filterCategory.set($event); applyFilters()"
-                    [options]="filterCategoryOptions"
-                    size="sm"
-                  ></app-dropdown>
-                </div>
-                <div>
-                  <label for="filterStartDate" class="text-label"
-                    >Start Date</label
-                  >
-                  <input
-                    id="filterStartDate"
-                    type="date"
-                    [ngModel]="filterStartDate()"
-                    (ngModelChange)="
-                      filterStartDate.set($event); applyFilters()
-                    "
-                    class="w-full text-xs px-3 py-2 rounded-xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none"
-                  />
-                </div>
-                <div>
-                  <label for="filterEndDate" class="text-label">End Date</label>
-                  <input
-                    id="filterEndDate"
-                    type="date"
-                    [ngModel]="filterEndDate()"
-                    (ngModelChange)="filterEndDate.set($event); applyFilters()"
-                    class="w-full text-xs px-3 py-2 rounded-xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none"
-                  />
-                </div>
-                <div class="flex items-end">
-                  <button
-                    (click)="resetFilters()"
-                    class="w-full py-2 bg-surface hover:bg-surface-alt text-secondary rounded-xl text-xs font-semibold transition-all cursor-pointer"
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              </div>
-            }
-
-            <!-- Mobile Filters Bottom Sheet -->
-            @if (isFilterBottomSheetOpen()) {
-              <div
-                (keydown)="onBottomSheetKeyDown($event)"
-                tabindex="-1"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Filter options"
-                class="fixed inset-0 z-[100] flex items-end justify-center select-none animate-fade-in"
-              >
-                <!-- Backdrop -->
-                <div
-                  (click)="setFilterBottomSheet(false)"
-                  (keydown.escape)="setFilterBottomSheet(false)"
-                  role="presentation"
-                  class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300"
-                ></div>
-
-                <!-- Content Panel -->
-                <div
-                  class="relative w-full max-w-lg bg-finmate-card dark:bg-finmate-card/90 rounded-t-3xl shadow-2xl p-6 border-t border-border/10 transform transition-transform duration-300 translate-y-0 select-text flex flex-col max-h-[85vh] overflow-y-auto"
-                >
-                  <!-- Drag Handle indicator -->
-                  <div
-                    (click)="setFilterBottomSheet(false)"
-                    (keydown.escape)="setFilterBottomSheet(false)"
-                    role="button"
-                    tabindex="0"
-                    aria-label="Close filter panel"
-                    class="mx-auto w-12 h-1.5 bg-muted/20 rounded-full mb-6 cursor-pointer hover:bg-muted/40 transition-colors"
-                  ></div>
-
-                  <div class="flex items-center justify-between mb-6">
-                    <h3 class="text-lg font-bold text-primary">
-                      Filter Ledger
-                    </h3>
-                    <button
-                      (click)="setFilterBottomSheet(false)"
-                      class="text-muted hover:text-primary transition cursor-pointer"
-                    >
-                      <svg
-                        class="w-5 h-5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M6 18L18 6M6 6l12 12"
-                        ></path>
-                      </svg>
-                    </button>
-                  </div>
-
-                  <!-- Form Fields -->
-                  <div class="space-y-6 flex-1">
-                    <div>
-                      <label class="text-label" for="filterCategoryMobile"
-                        >Category</label
-                      >
-                      <app-dropdown
-                        id="filterCategoryMobile"
-                        [ngModel]="filterCategory()"
-                        (ngModelChange)="
-                          filterCategory.set($event); applyFilters()
-                        "
-                        [options]="filterCategoryOptions"
-                        size="md"
-                      ></app-dropdown>
-                    </div>
-
-                    <div>
-                      <label for="filterStartDateMobile" class="text-label"
-                        >Start Date</label
-                      >
-                      <input
-                        id="filterStartDateMobile"
-                        type="date"
-                        [ngModel]="filterStartDate()"
-                        (ngModelChange)="
-                          filterStartDate.set($event); applyFilters()
-                        "
-                        class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-
-                    <div>
-                      <label for="filterEndDateMobile" class="text-label"
-                        >End Date</label
-                      >
-                      <input
-                        id="filterEndDateMobile"
-                        type="date"
-                        [ngModel]="filterEndDate()"
-                        (ngModelChange)="
-                          filterEndDate.set($event); applyFilters()
-                        "
-                        class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
-                      />
-                    </div>
-                  </div>
-
-                  <!-- Action Buttons -->
-                  <div class="mt-8 pt-4 border-t border-border/5 flex gap-3">
-                    <button
-                      (click)="resetFilters(); setFilterBottomSheet(false)"
-                      class="flex-1 py-3.5 bg-surface hover:bg-surface-alt text-secondary rounded-2xl text-sm font-bold transition cursor-pointer"
-                    >
-                      Clear Filters
-                    </button>
-                    <button
-                      (click)="setFilterBottomSheet(false)"
-                      class="flex-1 py-3.5 bg-primary hover:brightness-110 text-white rounded-2xl text-sm font-bold shadow-md shadow-primary/10 transition cursor-pointer"
-                    >
-                      Apply
-                    </button>
-                  </div>
                 </div>
               </div>
             }
@@ -812,11 +992,11 @@
                   No expenses found
                 </h3>
                 <p class="text-muted text-xs max-w-xs mx-auto mb-6 text-center">
-                  No expenses match your active category or date range filters.
+                  No expenses match your active filters.
                 </p>
-                @if (filterCategory() || filterStartDate() || filterEndDate()) {
+                @if (filterStore.hasActiveFilters()) {
                   <button
-                    (click)="resetFilters()"
+                    (click)="clearAllFilters()"
                     class="py-2 px-5 bg-primary/10 hover:bg-primary/20 text-primary hover:text-primary-hover rounded-xl text-xs font-bold transition-all cursor-pointer animate-fade-in"
                   >
                     Clear Filters
@@ -830,7 +1010,7 @@
                    sticky header / bottom nav stay put. -->
               <div
                 data-testid="expense-list-scroll-container"
-                class="space-y-4 max-h-[65vh] overflow-y-auto pr-1 -mr-1"
+                class="space-y-2 sm:space-y-3 max-h-[65vh] overflow-y-auto pr-1 -mr-1"
                 [class.opacity-40]="isLoadingExpenses()"
                 [class.pointer-events-none]="isLoadingExpenses()"
                 (scroll)="onExpenseListScroll($event)"
@@ -839,16 +1019,16 @@
                   <div
                     [attr.data-expense-id]="expense.id"
                     data-testid="expense-card"
-                    class="flex flex-col p-4 rounded-2xl bg-surface border border-border/5 hover:border-primary/30 hover:bg-surface-alt transition-colors group/row"
+                    class="flex flex-col p-3 sm:p-4 rounded-2xl bg-surface border border-border/5 hover:border-primary/30 hover:bg-surface-alt transition-colors group/row"
                   >
-                    <div class="flex items-start justify-between gap-2 w-full">
-                      <div class="flex items-center space-x-3 sm:space-x-4 min-w-0 flex-1">
+                    <div class="flex items-start justify-between gap-3 w-full">
+                      <div class="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
                         <button
                           (click)="toggleExpenseExpand(expense.id)"
                           [attr.data-testid]="
                             'expense-expand-button-' + expense.id
                           "
-                          class="p-1 rounded hover:bg-secondary/15 text-secondary transition-colors"
+                          class="p-1 mt-0.5 shrink-0 rounded hover:bg-secondary/15 text-secondary transition-colors"
                           [title]="'View Splits'"
                         >
                           <svg
@@ -869,8 +1049,8 @@
                         <div
                           [class]="
                             isRefundTx(expense)
-                              ? 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-green-500/10'
-                              : 'w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-surface-alt to-surface'
+                              ? 'w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 bg-green-500/10'
+                              : 'w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-surface-alt to-surface'
                           "
                         >
                           <!-- Refund icon takes precedence over the category icon,
@@ -993,14 +1173,14 @@
                         </div>
                         <div class="min-w-0 flex-1">
                           <h4
-                            class="font-bold flex items-start gap-2 min-w-0"
+                            class="font-bold text-sm sm:text-base flex items-center gap-2 min-w-0"
                             data-testid="expense-title"
                           >
                             @if (
                               !$any(expense).decryption ||
                               $any(expense).decryption.state === 'success'
                             ) {
-                              <span class="line-clamp-2 break-words">{{
+                              <span class="truncate min-w-0">{{
                                 expense.title
                               }}</span>
                             } @else if (
@@ -1066,6 +1246,12 @@
                               >
                             }
                           </h4>
+                          <p
+                            class="text-[11px] sm:text-xs text-muted mt-0.5 truncate"
+                          >
+                            {{ isRefundTx(expense) ? 'Received by' : 'Paid by' }}
+                            {{ payerDisplayName(expense) }}
+                          </p>
                           <p class="text-[11px] sm:text-xs text-muted mt-0.5 line-clamp-1">
                             {{ expense.expenseDate | date: 'MMM d' }} •
                             {{ expense.category }}
@@ -1081,39 +1267,51 @@
                         </div>
                       </div>
 
-                      <div class="flex items-start space-x-1 sm:space-x-4 shrink-0">
-                        <div class="text-right shrink-0">
-                          <p
-                            [class]="
-                              'font-bold text-base sm:text-lg whitespace-nowrap ' +
-                              (expense.status === 'void'
-                                ? ''
-                                : isRefundTx(expense)
-                                  ? 'text-green-500 dark:text-green-400'
-                                  : 'text-red-500 dark:text-red-400')
-                            "
-                            data-testid="expense-amount"
-                            [style.text-decoration]="
-                              expense.status === 'void'
-                                ? 'line-through'
-                                : 'none'
-                            "
-                          >
-                            {{ isRefundTx(expense) ? '+' : '-'
-                            }}{{
-                              expense.amountTotal | currency: group()!.currency
-                            }}
-                          </p>
-                          <p class="text-[11px] sm:text-xs text-muted truncate max-w-[110px] sm:max-w-none">
-                            {{ isRefundTx(expense) ? 'Received by' : 'Paid by' }}
-                            {{ payerDisplayName(expense) }}
-                          </p>
-                        </div>
+                      <div class="shrink-0 flex flex-col items-end gap-1.5">
+                        <p
+                          [class]="
+                            'font-bold text-lg sm:text-xl whitespace-nowrap ' +
+                            (expense.status === 'void'
+                              ? ''
+                              : isRefundTx(expense)
+                                ? 'text-green-500 dark:text-green-400'
+                                : 'text-red-500 dark:text-red-400')
+                          "
+                          data-testid="expense-amount"
+                          [style.text-decoration]="
+                            expense.status === 'void' ? 'line-through' : 'none'
+                          "
+                        >
+                          {{ isRefundTx(expense) ? '+' : '-'
+                          }}{{
+                            expense.amountTotal | currency: group()!.currency
+                          }}
+                        </p>
+                        <!-- Desktop: actions inline under the amount. On mobile
+                             these are hidden and shown in the expanded panel
+                             instead, so collapsed rows stay clean. -->
+                        @if (canActOnExpense(expense)) {
+                          <div class="hidden xs:flex items-center gap-0.5">
+                            <ng-container
+                              [ngTemplateOutlet]="rowActions"
+                            ></ng-container>
+                          </div>
+                        }
+                      </div>
+                    </div>
 
-                        <!-- Ledger Actions with Hover details indicator -->
-                        <div class="flex items-center space-x-0.5 sm:space-x-1">
+                    <!-- Action buttons defined once, rendered in two places:
+                         inline under the amount on desktop, and inside the
+                         expanded panel on mobile (keeps collapsed rows clean). -->
+                    <ng-template #rowActions>
+                      @if (isExpenseEditLocked(expense)) {
+                        <span
+                          data-testid="expense-locked-badge"
+                          class="inline-flex items-center justify-center w-9 h-9 text-amber-500 cursor-help"
+                          [title]="expenseLockMessage(expense)"
+                        >
                           <svg
-                            class="hidden sm:block w-4 h-4 text-primary opacity-0 group-hover/row:opacity-100 transition-opacity mr-2"
+                            class="w-4 h-4"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -1122,122 +1320,84 @@
                               stroke-linecap="round"
                               stroke-linejoin="round"
                               stroke-width="2"
-                              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                             ></path>
                           </svg>
-                          @if (
-                            !isViewer() &&
-                            expense.status !== 'void' &&
-                            isExpenseEditLocked(expense) &&
-                            (isOwnerOrAdmin() ||
-                              expense.ownerUserId === currentUserId() ||
-                              expense.paidByUserId === currentUserId())
-                          ) {
-                            <span
-                              data-testid="expense-locked-badge"
-                              class="p-2 text-amber-500 cursor-help"
-                              [title]="expenseLockMessage(expense)"
-                            >
-                              <svg
-                                class="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                                ></path>
-                              </svg>
-                            </span>
-                          }
-                          @if (
-                            !isMonthLocked() &&
-                            !isExpenseEditLocked(expense) &&
-                            !isViewer() &&
-                            expense.status !== 'void' &&
-                            (isOwnerOrAdmin() ||
-                              expense.ownerUserId === currentUserId() ||
-                              expense.paidByUserId === currentUserId())
-                          ) {
-                            <button
-                              data-action="history"
-                              [attr.data-testid]="
-                                'expense-history-button-' + expense.id
-                              "
-                              (click)="openExpenseHistory(expense)"
-                              class="p-2 text-muted hover:text-secondary hover:bg-surface rounded-xl transition-all"
-                              title="View version history"
-                            >
-                              <svg
-                                class="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                                />
-                              </svg>
-                            </button>
-                            <button
-                              data-action="edit"
-                              [attr.data-testid]="
-                                'expense-edit-button-' + expense.id
-                              "
-                              (click)="openExpenseModal(expense)"
-                              class="p-2 text-muted hover:text-primary hover:bg-surface rounded-xl transition-all"
-                            >
-                              <svg
-                                class="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
-                                ></path>
-                              </svg>
-                            </button>
-                            <button
-                              data-action="delete"
-                              [attr.data-testid]="
-                                'expense-delete-button-' + expense.id
-                              "
-                              (click)="confirmDeleteExpense(expense.id)"
-                              class="p-2 text-muted hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-                            >
-                              <svg
-                                class="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                ></path>
-                              </svg>
-                            </button>
-                          }
-                        </div>
-                      </div>
-                    </div>
+                        </span>
+                      }
+                      @if (!isMonthLocked() && !isExpenseEditLocked(expense)) {
+                        <button
+                          data-action="history"
+                          [attr.data-testid]="
+                            'expense-history-button-' + expense.id
+                          "
+                          (click)="openExpenseHistory(expense)"
+                          class="inline-flex items-center justify-center w-9 h-9 text-muted hover:text-secondary hover:bg-surface rounded-xl transition-all"
+                          title="View version history"
+                        >
+                          <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
+                          </svg>
+                        </button>
+                        <button
+                          data-action="edit"
+                          [attr.data-testid]="'expense-edit-button-' + expense.id"
+                          (click)="openExpenseModal(expense)"
+                          class="inline-flex items-center justify-center w-9 h-9 text-muted hover:text-primary hover:bg-surface rounded-xl transition-all"
+                        >
+                          <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                            ></path>
+                          </svg>
+                        </button>
+                        <button
+                          data-action="delete"
+                          [attr.data-testid]="
+                            'expense-delete-button-' + expense.id
+                          "
+                          (click)="confirmDeleteExpense(expense.id)"
+                          class="inline-flex items-center justify-center w-9 h-9 text-muted hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                        >
+                          <svg
+                            class="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            ></path>
+                          </svg>
+                        </button>
+                      }
+                    </ng-template>
 
                     <!-- Slide-Down Transaction Details (type, amount, payer, split, notes, date, category) -->
                     @if (expandedExpenseIds()[expense.id]) {
                       <div
-                        class="mt-4 pt-4 border-t border-secondary/15 space-y-3 animate-fade-in"
+                        class="mt-3 pt-3 sm:mt-4 sm:pt-4 border-t border-secondary/15 space-y-3 animate-fade-in"
                         data-testid="expense-detail-panel"
                       >
                         <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -1322,6 +1482,17 @@
                             </div>
                           }
                         </div>
+                        <!-- Mobile-only: the row's actions live here; desktop shows
+                             them inline in the collapsed row instead. -->
+                        @if (canActOnExpense(expense)) {
+                          <div
+                            class="flex sm:hidden items-center justify-end gap-1 pt-3 border-t border-secondary/10"
+                          >
+                            <ng-container
+                              [ngTemplateOutlet]="rowActions"
+                            ></ng-container>
+                          </div>
+                        }
                       </div>
                     }
 
@@ -1395,6 +1566,7 @@
             <app-analytics-charts
               [groupId]="group()!.id"
               [currency]="group()!.currency"
+              [filter]="analyticsFilter()"
             ></app-analytics-charts>
           </div>
         }
@@ -2433,12 +2605,36 @@
             </button>
           </div>
         } @else {
+          @if (filterStore.hasActiveFilters()) {
+            <p
+              class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2"
+            >
+              Overall balance
+            </p>
+          }
           <app-group-balances
             [userBalance]="userBalance()"
             [groupCurrency]="group()!.currency"
             [suggestedSettlements]="suggestedSettlements()"
             [members]="members()"
           ></app-group-balances>
+
+          @if (filterStore.hasActiveFilters()) {
+            <p
+              class="text-[11px] font-bold uppercase tracking-wider text-muted mt-6 mb-2 flex items-center gap-2"
+            >
+              Filtered balance
+              <span class="text-[10px] font-semibold text-primary normal-case"
+                >(excludes settlements)</span
+              >
+            </p>
+            <app-group-balances
+              [userBalance]="filteredUserBalance()"
+              [groupCurrency]="group()!.currency"
+              [suggestedSettlements]="filteredSuggestedSettlements()"
+              [members]="members()"
+            ></app-group-balances>
+          }
         }
 
         @if (isLoadingMembers()) {
@@ -2797,3 +2993,4 @@
     </div>
   </div>
 }
+
