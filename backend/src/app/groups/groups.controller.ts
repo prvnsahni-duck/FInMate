@@ -17,6 +17,7 @@ import {
 import { CreateGroupDto, UpdateContributionDto, UpdateGroupDto } from './dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ExpensesCarryForwardService } from '../expenses/services';
+import { parseRawGroupExpenseFilter } from '../expenses/group-expense-filters.util';
 import {
   GroupsAuditService,
   GroupsContributionsService,
@@ -253,8 +254,7 @@ export class GroupsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
-    @Query('from') from: string | undefined,
-    @Query('to') to: string | undefined,
+    @Query() query: Record<string, string>,
     @Req() req: Request & { user: { id: string } },
   ) {
     const result = await this.expensesCarryForwardService.listDeletedExpenses(
@@ -262,7 +262,7 @@ export class GroupsController {
       id,
       page,
       limit,
-      { from, to },
+      parseRawGroupExpenseFilter(query),
     );
     return new SuccessResponse(
       'Deleted expenses retrieved successfully',

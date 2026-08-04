@@ -20,31 +20,40 @@ describe('GroupFilterStore', () => {
   it('apply() commits the draft to applied', () => {
     store.openDraft();
     store.setDraftPreset('last_3_months');
-    store.setDraftCategory('Food & Drinks');
+    store.toggleDraftCategory('Food & Drinks');
     // Not yet applied.
     expect(store.applied().date.preset).toBe('this_month');
 
     store.apply();
     expect(store.applied().date.preset).toBe('last_3_months');
-    expect(store.applied().category).toBe('Food & Drinks');
+    expect(store.applied().categories).toEqual(['Food & Drinks']);
     expect(store.activeCount()).toBe(2);
+  });
+
+  it('toggling a category twice removes it', () => {
+    store.openDraft();
+    store.toggleDraftCategory('Food & Drinks');
+    store.toggleDraftCategory('Travel');
+    expect(store.draft().categories).toEqual(['Food & Drinks', 'Travel']);
+    store.toggleDraftCategory('Food & Drinks');
+    expect(store.draft().categories).toEqual(['Travel']);
   });
 
   it('cancelDraft() discards draft edits', () => {
     store.openDraft();
-    store.setDraftCategory('Travel');
+    store.toggleDraftCategory('Travel');
     store.cancelDraft();
-    expect(store.draft().category).toBeUndefined();
-    expect(store.applied().category).toBeUndefined();
+    expect(store.draft().categories).toBeUndefined();
+    expect(store.applied().categories).toBeUndefined();
   });
 
   it('resetDraft() clears the draft back to defaults', () => {
     store.openDraft();
     store.setDraftPreset('all_time');
-    store.setDraftMember('m1');
+    store.toggleDraftMember('m1');
     store.resetDraft();
     expect(store.draft().date.preset).toBe('this_month');
-    expect(store.draft().memberId).toBeUndefined();
+    expect(store.draft().memberIds).toBeUndefined();
     expect(store.draftCount()).toBe(0);
   });
 
@@ -80,9 +89,12 @@ describe('GroupFilterStore', () => {
   it('survives a URL query-param round-trip', () => {
     store.openDraft();
     store.setDraftPreset('last_year');
-    store.setDraftCategory('Utilities');
-    store.setDraftPaidBy('user-9');
+    store.toggleDraftCategory('Utilities');
+    store.toggleDraftCategory('Travel');
+    store.toggleDraftPaidBy('user-9');
     store.setDraftTxType('expense');
+    store.setDraftMinAmount(100);
+    store.setDraftMaxAmount(500);
     store.apply();
 
     const params = filterToQueryParams(store.applied());
@@ -94,8 +106,10 @@ describe('GroupFilterStore', () => {
     const rebuilt = filterFromQueryParams(raw);
 
     expect(rebuilt.date.preset).toBe('last_year');
-    expect(rebuilt.category).toBe('Utilities');
-    expect(rebuilt.paidById).toBe('user-9');
+    expect(rebuilt.categories).toEqual(['Utilities', 'Travel']);
+    expect(rebuilt.paidByIds).toEqual(['user-9']);
     expect(rebuilt.transactionType).toBe('expense');
+    expect(rebuilt.minAmount).toBe(100);
+    expect(rebuilt.maxAmount).toBe(500);
   });
 });

@@ -8,7 +8,11 @@ import {
   computed,
   inject,
 } from '@angular/core';
-import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
+import {
+  FormsModule,
+  ControlValueAccessor,
+  NG_VALUE_ACCESSOR,
+} from '@angular/forms';
 
 export interface DropdownOption {
   value: any;
@@ -27,6 +31,7 @@ export interface DropdownOption {
       multi: true,
     },
   ],
+  imports: [FormsModule],
   templateUrl: './dropdown.component.html',
 })
 export class DropdownComponent implements ControlValueAccessor {
@@ -38,8 +43,10 @@ export class DropdownComponent implements ControlValueAccessor {
   @Input() id = '';
   @Input() size: 'sm' | 'md' = 'md';
   @Input() buttonClass = '';
+  @Input() multiple = false;
 
   value = signal<any>(null);
+  searchTerm = signal('');
   isOpen = false;
   focusedIndex = -1;
 
@@ -52,30 +59,81 @@ export class DropdownComponent implements ControlValueAccessor {
     return this.options.find((opt) => opt.value === this.value()) || null;
   });
 
+  selectedOptions = computed(() => {
+    if (!this.multiple) return [];
+    const selectedValues = this.value();
+    if (!Array.isArray(selectedValues)) return [];
+    return this.options.filter((opt) => selectedValues.includes(opt.value));
+  });
+
+  filteredOptions = computed(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+    if (!this.multiple || this.options.length < 10 || !term) {
+      return this.options;
+    }
+    return this.options.filter((opt) =>
+      `${opt.label} ${opt.description ?? ''}`.toLowerCase().includes(term),
+    );
+  });
+
+  displayLabel = computed(() => {
+    if (!this.multiple) {
+      return this.selectedOption()?.label ?? this.placeholder;
+    }
+    const selected = this.selectedOptions();
+    if (selected.length === 0) return this.placeholder;
+    if (selected.length === 1) return selected[0].label;
+    if (selected.length === 2)
+      return selected.map((opt) => opt.label).join(', ');
+    return `${selected.length} selected`;
+  });
+
   toggle() {
     if (this.disabled) return;
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
-      this.focusedIndex = this.options.findIndex(
-        (opt) => opt.value === this.value(),
+      this.focusedIndex = this.filteredOptions().findIndex((opt) =>
+        this.isSelected(opt),
       );
-      if (this.focusedIndex === -1 && this.options.length > 0) {
+      if (this.focusedIndex === -1 && this.filteredOptions().length > 0) {
         this.focusedIndex = 0;
       }
+    } else {
+      this.searchTerm.set('');
     }
   }
 
   selectOption(option: DropdownOption) {
     if (this.disabled) return;
+    if (this.multiple) {
+      const selectedValues = Array.isArray(this.value()) ? this.value() : [];
+      const nextValue = selectedValues.includes(option.value)
+        ? selectedValues.filter((value: any) => value !== option.value)
+        : [...selectedValues, option.value];
+      this.value.set(nextValue);
+      this.onChange(nextValue);
+      this.onTouched();
+      return;
+    }
     this.value.set(option.value);
     this.onChange(option.value);
     this.onTouched();
     this.isOpen = false;
   }
 
+  isSelected(option: DropdownOption): boolean {
+    if (this.multiple) {
+      const selectedValues = this.value();
+      return (
+        Array.isArray(selectedValues) && selectedValues.includes(option.value)
+      );
+    }
+    return option.value === this.value();
+  }
+
   // ControlValueAccessor methods
   writeValue(value: any): void {
-    this.value.set(value);
+    this.value.set(this.multiple ? (Array.isArray(value) ? value : []) : value);
   }
 
   registerOnChange(fn: any): void {
@@ -119,18 +177,27 @@ export class DropdownComponent implements ControlValueAccessor {
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
-        this.focusedIndex = (this.focusedIndex + 1) % this.options.length;
+        if (this.filteredOptions().length > 0) {
+          this.focusedIndex =
+            (this.focusedIndex + 1) % this.filteredOptions().length;
+        }
         break;
       case 'ArrowUp':
         event.preventDefault();
-        this.focusedIndex =
-          (this.focusedIndex - 1 + this.options.length) % this.options.length;
+        if (this.filteredOptions().length > 0) {
+          this.focusedIndex =
+            (this.focusedIndex - 1 + this.filteredOptions().length) %
+            this.filteredOptions().length;
+        }
         break;
       case 'Enter':
       case ' ':
         event.preventDefault();
-        if (this.focusedIndex >= 0 && this.focusedIndex < this.options.length) {
-          this.selectOption(this.options[this.focusedIndex]);
+        if (
+          this.focusedIndex >= 0 &&
+          this.focusedIndex < this.filteredOptions().length
+        ) {
+          this.selectOption(this.filteredOptions()[this.focusedIndex]);
         }
         break;
       case 'Escape':
@@ -143,5 +210,6 @@ export class DropdownComponent implements ControlValueAccessor {
   close() {
     this.isOpen = false;
     this.focusedIndex = -1;
+    this.searchTerm.set('');
   }
 }

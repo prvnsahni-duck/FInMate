@@ -545,7 +545,7 @@
               >
                 {{ chip.label }}
                 <button
-                  (click)="removeFilterChip(chip.key)"
+                  (click)="removeFilterChip(chip)"
                   [attr.aria-label]="'Remove ' + chip.label + ' filter'"
                   class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-primary/20 transition cursor-pointer"
                 >
@@ -689,37 +689,51 @@
                     }
                   </div>
 
-                <!-- Category -->
+                <!-- Category (multi-select) -->
                 <div>
                   <p class="text-label">Category</p>
                   <app-dropdown
-                    [ngModel]="filterStore.draft().category || ''"
-                    (ngModelChange)="filterStore.setDraftCategory($event)"
-                    [options]="filterCategoryOptions"
+                    [ngModel]="filterStore.draft().categories ?? []"
+                    (ngModelChange)="onDraftCategoriesChange($event)"
+                    [options]="categoryPillOptions"
+                    placeholder="All Categories"
                     size="md"
+                    [multiple]="true"
                   ></app-dropdown>
                 </div>
 
-                <!-- Member -->
+                <!-- Member (multi-select) -->
                 <div>
                   <p class="text-label">Member</p>
-                  <app-dropdown
-                    [ngModel]="filterStore.draft().memberId || ''"
-                    (ngModelChange)="filterStore.setDraftMember($event)"
-                    [options]="memberFilterOptions()"
-                    size="md"
-                  ></app-dropdown>
+                  @if (memberPillOptions().length) {
+                    <app-dropdown
+                      [ngModel]="filterStore.draft().memberIds ?? []"
+                      (ngModelChange)="onDraftMembersChange($event)"
+                      [options]="memberPillOptions()"
+                      placeholder="All Members"
+                      size="md"
+                      [multiple]="true"
+                    ></app-dropdown>
+                  } @else {
+                    <p class="text-xs text-muted mt-1">No members yet.</p>
+                  }
                 </div>
 
-                <!-- Paid By -->
+                <!-- Paid By (multi-select) -->
                 <div>
                   <p class="text-label">Paid By</p>
-                  <app-dropdown
-                    [ngModel]="filterStore.draft().paidById || ''"
-                    (ngModelChange)="filterStore.setDraftPaidBy($event)"
-                    [options]="paidByFilterOptions()"
-                    size="md"
-                  ></app-dropdown>
+                  @if (memberPillOptions().length) {
+                    <app-dropdown
+                      [ngModel]="filterStore.draft().paidByIds ?? []"
+                      (ngModelChange)="onDraftPaidByChange($event)"
+                      [options]="memberPillOptions()"
+                      placeholder="Anyone"
+                      size="md"
+                      [multiple]="true"
+                    ></app-dropdown>
+                  } @else {
+                    <p class="text-xs text-muted mt-1">No members yet.</p>
+                  }
                 </div>
 
                 <!-- Transaction Type -->
@@ -760,6 +774,44 @@
                       Both
                     </button>
                   </div>
+                </div>
+
+                <!-- Amount range -->
+                <div>
+                  <p class="text-label">Amount Range</p>
+                  <div class="grid grid-cols-2 gap-3 mt-1">
+                    <input
+                      type="number"
+                      inputmode="decimal"
+                      min="0"
+                      placeholder="Min"
+                      aria-label="Minimum amount"
+                      [ngModel]="filterStore.draft().minAmount ?? null"
+                      (ngModelChange)="filterStore.setDraftMinAmount($event)"
+                      class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <input
+                      type="number"
+                      inputmode="decimal"
+                      min="0"
+                      placeholder="Max"
+                      aria-label="Maximum amount"
+                      [ngModel]="filterStore.draft().maxAmount ?? null"
+                      (ngModelChange)="filterStore.setDraftMaxAmount($event)"
+                      class="w-full text-sm px-4 py-3 rounded-2xl bg-surface border border-border/10 text-secondary focus:border-primary outline-none focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+
+                <!-- Sort (ledger ordering) -->
+                <div>
+                  <p class="text-label">Sort By</p>
+                  <app-dropdown
+                    [ngModel]="draftSortValue()"
+                    (ngModelChange)="onSortChange($event)"
+                    [options]="sortOptions"
+                    size="md"
+                  ></app-dropdown>
                 </div>
               </div>
 
@@ -2553,12 +2605,36 @@
             </button>
           </div>
         } @else {
+          @if (filterStore.hasActiveFilters()) {
+            <p
+              class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2"
+            >
+              Overall balance
+            </p>
+          }
           <app-group-balances
             [userBalance]="userBalance()"
             [groupCurrency]="group()!.currency"
             [suggestedSettlements]="suggestedSettlements()"
             [members]="members()"
           ></app-group-balances>
+
+          @if (filterStore.hasActiveFilters()) {
+            <p
+              class="text-[11px] font-bold uppercase tracking-wider text-muted mt-6 mb-2 flex items-center gap-2"
+            >
+              Filtered balance
+              <span class="text-[10px] font-semibold text-primary normal-case"
+                >(excludes settlements)</span
+              >
+            </p>
+            <app-group-balances
+              [userBalance]="filteredUserBalance()"
+              [groupCurrency]="group()!.currency"
+              [suggestedSettlements]="filteredSuggestedSettlements()"
+              [members]="members()"
+            ></app-group-balances>
+          }
         }
 
         @if (isLoadingMembers()) {
@@ -2917,3 +2993,4 @@
     </div>
   </div>
 }
+

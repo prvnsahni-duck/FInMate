@@ -95,9 +95,12 @@ describe('GroupDetailComponent', () => {
     mockGroupsService = {
       getGroup: jest.fn().mockReturnValue(of(mockGroup)),
       getMembers: jest.fn().mockReturnValue(of(mockMembers)),
-      getBalances: jest
-        .fn()
-        .mockReturnValue(of({ balances: [], suggestedSettlements: [] })),
+      getBalances: jest.fn().mockReturnValue(
+        of({
+          overall: { balances: [], suggestedSettlements: [] },
+          filtered: { balances: [], suggestedSettlements: [] },
+        }),
+      ),
       getHistoryLogs: jest.fn().mockReturnValue(of({ data: [] })),
       getDeletedExpenses: jest.fn().mockReturnValue(of({ data: [] })),
       getCarryForward: jest.fn().mockReturnValue(of([])),
@@ -353,7 +356,7 @@ describe('GroupDetailComponent', () => {
       expect(mockGroupsService.getMembers).toHaveBeenCalledWith('group-1');
       expect(mockGroupsService.getBalances).toHaveBeenCalledWith(
         'group-1',
-        undefined,
+        expect.anything(),
       );
       expect(mockGroupsService.getHistoryLogs).toHaveBeenCalledWith(
         'group-1',
@@ -402,8 +405,13 @@ describe('GroupDetailComponent', () => {
         .mockReturnValue(getGroupSubject.asObservable()) as any;
       mockGroupsService.getBalances = jest.fn().mockReturnValue(
         of({
-          balances: [{ userId: 'user-owner', currency: 'USD', netBalance: 42 }],
-          suggestedSettlements: [],
+          overall: {
+            balances: [
+              { userId: 'user-owner', currency: 'USD', netBalance: 42 },
+            ],
+            suggestedSettlements: [],
+          },
+          filtered: { balances: [], suggestedSettlements: [] },
         }),
       ) as any;
 
@@ -443,8 +451,8 @@ describe('GroupDetailComponent', () => {
 
     it('tracks balances loading independently via isLoadingBalances', () => {
       const getBalancesSubject = new Subject<{
-        balances: unknown[];
-        suggestedSettlements: unknown[];
+        overall: { balances: unknown[]; suggestedSettlements: unknown[] };
+        filtered: { balances: unknown[]; suggestedSettlements: unknown[] };
       }>();
       mockGroupsService.getBalances = jest
         .fn()
@@ -453,7 +461,10 @@ describe('GroupDetailComponent', () => {
       fixture.detectChanges();
       expect(component.isLoadingBalances()).toBe(true);
 
-      getBalancesSubject.next({ balances: [], suggestedSettlements: [] });
+      getBalancesSubject.next({
+        overall: { balances: [], suggestedSettlements: [] },
+        filtered: { balances: [], suggestedSettlements: [] },
+      });
       getBalancesSubject.complete();
       expect(component.isLoadingBalances()).toBe(false);
     });
@@ -653,7 +664,7 @@ describe('GroupDetailComponent', () => {
 
       // Change only the category through the drawer (date preset unchanged).
       component.filterStore.openDraft();
-      component.filterStore.setDraftCategory('Food & Drinks');
+      component.filterStore.toggleDraftCategory('Food & Drinks');
       component.applyFilterDrawer();
 
       // The navigated month must be preserved (not re-anchored to the current month).

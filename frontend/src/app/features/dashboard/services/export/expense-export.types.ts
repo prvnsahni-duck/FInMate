@@ -23,12 +23,17 @@ export interface ExportFilter {
    */
   groupId?: string;
   // ── Unified group-filter dimensions (group-ledger mode only) ───────────────
-  /** Group-member id (participant via splits). */
-  memberId?: string;
-  /** Group-member id (payer). */
-  paidById?: string;
+  /** Categories (exact names) — matches ANY. */
+  categories?: string[];
+  /** Group-member ids (participants via splits) — matches ANY. */
+  memberIds?: string[];
+  /** Group-member ids (payers) — matches ANY. */
+  paidByIds?: string[];
   /** Omit or 'both' to apply no transaction-type filter. */
   transactionType?: 'expense' | 'refund' | 'both';
+  /** Inclusive amount bounds. */
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 /**

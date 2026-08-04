@@ -44,8 +44,30 @@ describe('SettlementsService', () => {
       })),
     };
 
-    const mockExpenseRepository = {
+    const mockExpenseRepository: any = {
       find: jest.fn(),
+      // computeBalancesCore fetches expenses via a query builder; delegate its
+      // getMany() to the same `find` mock the tests already configure, forwarding
+      // the groupId (captured from `.where('expense.group = :groupId', ...)`) so
+      // group-keyed mock implementations still resolve the right expenses.
+      createQueryBuilder: jest.fn(() => {
+        let capturedGroupId: string | undefined;
+        const qb: any = {
+          leftJoinAndSelect: jest.fn(() => qb),
+          where: jest.fn((_sql: string, params?: any) => {
+            if (params?.groupId) capturedGroupId = params.groupId;
+            return qb;
+          }),
+          andWhere: jest.fn(() => qb),
+          setParameter: jest.fn(() => qb),
+          getMany: jest.fn(() =>
+            mockExpenseRepository.find({
+              where: { group: { id: capturedGroupId } },
+            }),
+          ),
+        };
+        return qb;
+      }),
     };
 
     const mockExpenseSplitRepository = {
@@ -299,7 +321,8 @@ describe('SettlementsService', () => {
           paidByUser: userA,
         },
       ] as any[];
-      expenseRepository.find.mockResolvedValueOnce(mockExpenses);
+      // Persistent (not Once): computeBalancesCore runs for both overall + filtered.
+      expenseRepository.find.mockResolvedValue(mockExpenses);
 
       // Splits: User B owes $100 for exp-1
       const mockSplits = [
@@ -309,7 +332,7 @@ describe('SettlementsService', () => {
           amountOwed: 100.0,
         },
       ] as any[];
-      expenseSplitRepository.find.mockResolvedValueOnce(mockSplits);
+      expenseSplitRepository.find.mockResolvedValue(mockSplits);
 
       // Settlements: B paid A $30 in USD (confirmed)
       const mockSettlements = [
@@ -328,14 +351,14 @@ describe('SettlementsService', () => {
       // USD net balance calculations:
       // A paid 100, owes 0, received 30. Net = 100 - 0 - 30 = 70.
       // B paid 0, owes 100, paid 30. Net = 0 - 100 + 30 = -70.
-      expect(result.balances).toContainEqual(
+      expect(result.overall.balances).toContainEqual(
         expect.objectContaining({
           userId: 'aaaa',
           netBalance: 70.0,
           currency: 'USD',
         }),
       );
-      expect(result.balances).toContainEqual(
+      expect(result.overall.balances).toContainEqual(
         expect.objectContaining({
           userId: 'bbbb',
           netBalance: -70.0,
@@ -347,8 +370,8 @@ describe('SettlementsService', () => {
       // additionally carries GroupMember/Contact ids for pending-member
       // support — fromUserId/toUserId stay populated and unchanged for an
       // all-registered group like this one.
-      expect(result.suggestedSettlements).toHaveLength(1);
-      expect(result.suggestedSettlements[0]).toMatchObject({
+      expect(result.overall.suggestedSettlements).toHaveLength(1);
+      expect(result.overall.suggestedSettlements[0]).toMatchObject({
         fromUserId: 'bbbb',
         toUserId: 'aaaa',
         amount: 70.0,
@@ -374,7 +397,7 @@ describe('SettlementsService', () => {
       groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
       groupMemberRepository.find.mockResolvedValueOnce(mockMembers);
 
-      expenseRepository.find.mockResolvedValueOnce([
+      expenseRepository.find.mockResolvedValue([
         {
           id: 'exp-1',
           amountTotal: 100.0,
@@ -391,7 +414,7 @@ describe('SettlementsService', () => {
         },
       ] as any[]);
 
-      expenseSplitRepository.find.mockResolvedValueOnce([
+      expenseSplitRepository.find.mockResolvedValue([
         {
           expense: { id: 'exp-1', currency: 'USD', transactionType: 'expense' },
           participantUser: userA,
@@ -426,21 +449,21 @@ describe('SettlementsService', () => {
 
       const result = await service.calculateGroupBalances('aaaa', 'group-id');
 
-      expect(result.balances).toContainEqual(
+      expect(result.overall.balances).toContainEqual(
         expect.objectContaining({
           userId: 'aaaa',
           netBalance: 40.0,
           currency: 'USD',
         }),
       );
-      expect(result.balances).toContainEqual(
+      expect(result.overall.balances).toContainEqual(
         expect.objectContaining({
           userId: 'bbbb',
           netBalance: -40.0,
           currency: 'USD',
         }),
       );
-      expect(result.suggestedSettlements[0]).toMatchObject({
+      expect(result.overall.suggestedSettlements[0]).toMatchObject({
         fromUserId: 'bbbb',
         toUserId: 'aaaa',
         amount: 40.0,

@@ -2,6 +2,7 @@ import { Transform } from 'class-transformer';
 import {
   IsDateString,
   IsIn,
+  IsNumber,
   IsOptional,
   IsString,
   Length,
@@ -67,18 +68,50 @@ export class ExportExpensesQueryDto {
 
   // ── Unified group-filter dimensions (group-ledger mode only) ───────────────
 
-  /** Group member (participant via splits) to filter by — a group-member id. */
+  /** Categories (comma-separated) — matches ANY. */
   @IsOptional()
-  @IsString()
-  memberId?: string;
+  @Transform(({ value }) => splitCsv(value))
+  categories?: string[];
 
-  /** Payer to filter by — a group-member id. */
+  /** Members (participants via splits) — comma-separated group-member ids. */
   @IsOptional()
-  @IsString()
-  paidById?: string;
+  @Transform(({ value }) => splitCsv(value))
+  memberIds?: string[];
+
+  /** Payers — comma-separated group-member ids. */
+  @IsOptional()
+  @Transform(({ value }) => splitCsv(value))
+  paidByIds?: string[];
 
   /** `both` (or omitted) applies no transaction-type filter. */
   @IsOptional()
   @IsIn(['expense', 'refund', 'both'])
   transactionType?: 'expense' | 'refund' | 'both';
+
+  /** Inclusive amount bounds. */
+  @IsOptional()
+  @Transform(({ value }) => toNum(value))
+  @IsNumber()
+  minAmount?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => toNum(value))
+  @IsNumber()
+  maxAmount?: number;
+}
+
+function splitCsv(value: unknown): string[] | undefined {
+  if (Array.isArray(value)) return value.length ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  const arr = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return arr.length ? arr : undefined;
+}
+
+function toNum(value: unknown): number | undefined {
+  if (value == null || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
 }

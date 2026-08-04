@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PaginatedResponse } from '../../common/pagination.util';
 import { ExpensesService } from '../expenses.service';
+import { RawGroupExpenseFilter } from '../group-expense-filters.util';
 
 export interface CarryForwardSummaryItem {
   userId: string;
@@ -38,14 +39,14 @@ export class ExpensesCarryForwardService {
     groupId: string,
     page: number,
     limit: number,
-    range?: { from?: string; to?: string },
+    filter?: RawGroupExpenseFilter,
   ): Promise<PaginatedResponse<Record<string, unknown>>> {
     return this.expensesService.listDeletedExpenses(
       userId,
       groupId,
       page,
       limit,
-      range,
+      filter,
     );
   }
 }

@@ -3,9 +3,12 @@ import {
   DEFAULT_GROUP_FILTER,
   DatePreset,
   GroupFilter,
+  GroupSortBy,
+  SortOrder,
   TransactionTypeFilter,
   cloneFilter,
   countActiveFilters,
+  toggleInArray,
 } from '../models/group-filter.model';
 import {
   ResolvedRange,
@@ -97,20 +100,41 @@ export class GroupFilterStore {
     }));
   }
 
-  setDraftCategory(category: string): void {
-    this._draft.update((d) => ({ ...d, category: category || undefined }));
+  toggleDraftCategory(value: string): void {
+    this._draft.update((d) => ({
+      ...d,
+      categories: toggleInArray(d.categories, value),
+    }));
   }
 
-  setDraftMember(memberId: string): void {
-    this._draft.update((d) => ({ ...d, memberId: memberId || undefined }));
+  toggleDraftMember(value: string): void {
+    this._draft.update((d) => ({
+      ...d,
+      memberIds: toggleInArray(d.memberIds, value),
+    }));
   }
 
-  setDraftPaidBy(paidById: string): void {
-    this._draft.update((d) => ({ ...d, paidById: paidById || undefined }));
+  toggleDraftPaidBy(value: string): void {
+    this._draft.update((d) => ({
+      ...d,
+      paidByIds: toggleInArray(d.paidByIds, value),
+    }));
   }
 
   setDraftTxType(transactionType: TransactionTypeFilter): void {
     this._draft.update((d) => ({ ...d, transactionType }));
+  }
+
+  setDraftMinAmount(value: number | null): void {
+    this._draft.update((d) => ({ ...d, minAmount: value ?? undefined }));
+  }
+
+  setDraftMaxAmount(value: number | null): void {
+    this._draft.update((d) => ({ ...d, maxAmount: value ?? undefined }));
+  }
+
+  setDraftSort(sortBy: GroupSortBy, sortOrder: SortOrder): void {
+    this._draft.update((d) => ({ ...d, sortBy, sortOrder }));
   }
 
   // ── Lifecycle actions ─────────────────────────────────────────────────────
@@ -145,23 +169,42 @@ export class GroupFilterStore {
     this.syncDraftToApplied();
   }
 
-  clearAppliedCategory(): void {
-    this._applied.update((a) => ({ ...a, category: undefined }));
+  /** Remove one category value (chip); clears the field when empty. */
+  removeAppliedCategory(value: string): void {
+    this._applied.update((a) => ({
+      ...a,
+      categories: toggleInArray(a.categories, value),
+    }));
     this.syncDraftToApplied();
   }
 
-  clearAppliedMember(): void {
-    this._applied.update((a) => ({ ...a, memberId: undefined }));
+  removeAppliedMember(value: string): void {
+    this._applied.update((a) => ({
+      ...a,
+      memberIds: toggleInArray(a.memberIds, value),
+    }));
     this.syncDraftToApplied();
   }
 
-  clearAppliedPaidBy(): void {
-    this._applied.update((a) => ({ ...a, paidById: undefined }));
+  removeAppliedPaidBy(value: string): void {
+    this._applied.update((a) => ({
+      ...a,
+      paidByIds: toggleInArray(a.paidByIds, value),
+    }));
     this.syncDraftToApplied();
   }
 
   clearAppliedTxType(): void {
     this._applied.update((a) => ({ ...a, transactionType: 'both' }));
+    this.syncDraftToApplied();
+  }
+
+  clearAppliedAmount(): void {
+    this._applied.update((a) => ({
+      ...a,
+      minAmount: undefined,
+      maxAmount: undefined,
+    }));
     this.syncDraftToApplied();
   }
 }

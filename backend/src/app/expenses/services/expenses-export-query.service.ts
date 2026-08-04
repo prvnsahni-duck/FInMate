@@ -33,12 +33,17 @@ export interface ExportFilter {
    */
   groupId?: string;
   // ── Unified group-filter dimensions (group-ledger mode only) ───────────────
-  /** Group-member id (participant via splits). */
-  memberId?: string;
-  /** Group-member id (payer). */
-  paidById?: string;
+  /** Categories (exact names) — matches ANY. */
+  categories?: string[];
+  /** Group-member ids (participants via splits) — matches ANY. */
+  memberIds?: string[];
+  /** Group-member ids (payers) — matches ANY. */
+  paidByIds?: string[];
   /** `both`/undefined applies no transaction-type filter. */
   transactionType?: 'expense' | 'refund' | 'both';
+  /** Inclusive amount bounds. */
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 /**
@@ -298,16 +303,13 @@ export class ExpenseExportQueryService {
 
     this.applyExpenseFilters(qb, filter, currency);
 
-    // Unified group-filter dimensions (member / payer / transaction type).
+    // Unified group-filter dimensions (categories / members / payers / type / amount).
     const [member, paidBy] = await Promise.all([
-      filter.memberId
-        ? this.resolveGroupMemberRef(filter.memberId, groupId)
-        : Promise.resolve(undefined),
-      filter.paidById
-        ? this.resolveGroupMemberRef(filter.paidById, groupId)
-        : Promise.resolve(undefined),
+      this.resolveGroupMemberRefs(filter.memberIds, groupId),
+      this.resolveGroupMemberRefs(filter.paidByIds, groupId),
     ]);
     applyExpenseDimensionFilters(qb, {
+      categories: filter.categories,
       transactionType:
         filter.transactionType === 'expense' ||
         filter.transactionType === 'refund'
@@ -315,6 +317,8 @@ export class ExpenseExportQueryService {
           : undefined,
       member,
       paidBy,
+      minAmount: filter.minAmount,
+      maxAmount: filter.maxAmount,
     });
 
     const expenses = await qb.take(MAX_EXPORT_ROWS + 1).getMany();
@@ -370,16 +374,19 @@ export class ExpenseExportQueryService {
    * appear under — its own id and the backing user's id (null for pending
    * members). Returns undefined when it's not a member of the group.
    */
-  private async resolveGroupMemberRef(
-    groupMemberId: string,
+  private async resolveGroupMemberRefs(
+    groupMemberIds: string[] | undefined,
     groupId: string,
-  ): Promise<MemberRef | undefined> {
-    const member = await this.groupMemberRepository.findOne({
-      where: { id: groupMemberId, group: { id: groupId } },
+  ): Promise<MemberRef[]> {
+    if (!groupMemberIds?.length) return [];
+    const members = await this.groupMemberRepository.find({
+      where: { id: In(groupMemberIds), group: { id: groupId } },
       relations: ['user'],
     });
-    if (!member) return undefined;
-    return { groupMemberId: member.id, userId: member.user?.id ?? null };
+    return members.map((m) => ({
+      groupMemberId: m.id,
+      userId: m.user?.id ?? null,
+    }));
   }
 
   private async loadCallerShares(

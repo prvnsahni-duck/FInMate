@@ -68,46 +68,64 @@ describe('applyExpenseDimensionFilters', () => {
     expect(qb.params['gefTxType']).toBe('refund');
   });
 
-  it('payer with a backing user matches both payer columns', () => {
-    const qb = apply({ paidBy: { groupMemberId: 'gm-1', userId: 'u-1' } });
-    expect(qb.clauses).toContain(
-      '(expense.paidByGroupMember = :gefPaidGm OR expense.paidByUser = :gefPaidUser)',
-    );
-    expect(qb.params['gefPaidGm']).toBe('gm-1');
-    expect(qb.params['gefPaidUser']).toBe('u-1');
+  it('filters by categories (IN)', () => {
+    const qb = apply({ categories: ['Food & Drinks', 'Travel'] });
+    expect(qb.clauses).toContain('expense.category IN (:...gefCats)');
+    expect(qb.params['gefCats']).toEqual(['Food & Drinks', 'Travel']);
   });
 
-  it('pending payer (no user) matches only the group-member column', () => {
-    const qb = apply({ paidBy: { groupMemberId: 'gm-2', userId: null } });
-    expect(qb.clauses).toContain('expense.paidByGroupMember = :gefPaidGm');
-    expect(qb.params['gefPaidGm']).toBe('gm-2');
+  it('filters by amount range (inclusive bounds)', () => {
+    const qb = apply({ minAmount: 100, maxAmount: 500 });
+    expect(qb.clauses).toContain('expense.amountTotal >= :gefMinAmount');
+    expect(qb.clauses).toContain('expense.amountTotal <= :gefMaxAmount');
+    expect(qb.params['gefMinAmount']).toBe(100);
+    expect(qb.params['gefMaxAmount']).toBe(500);
+  });
+
+  it('payers with backing users match both payer columns (IN)', () => {
+    const qb = apply({
+      paidBy: [
+        { groupMemberId: 'gm-1', userId: 'u-1' },
+        { groupMemberId: 'gm-2', userId: 'u-2' },
+      ],
+    });
+    expect(qb.clauses).toContain(
+      '(expense.paidByGroupMember IN (:...gefPaidGm) OR expense.paidByUser IN (:...gefPaidUser))',
+    );
+    expect(qb.params['gefPaidGm']).toEqual(['gm-1', 'gm-2']);
+    expect(qb.params['gefPaidUser']).toEqual(['u-1', 'u-2']);
+  });
+
+  it('pending payers (no user) match only the group-member column', () => {
+    const qb = apply({ paidBy: [{ groupMemberId: 'gm-2', userId: null }] });
+    expect(qb.clauses).toContain(
+      '(expense.paidByGroupMember IN (:...gefPaidGm))',
+    );
+    expect(qb.params['gefPaidGm']).toEqual(['gm-2']);
     expect(qb.params['gefPaidUser']).toBeUndefined();
   });
 
-  it('member with a backing user matches both split columns via EXISTS', () => {
-    const qb = apply({ member: { groupMemberId: 'gm-3', userId: 'u-3' } });
+  it('members with backing users match both split columns via EXISTS (IN)', () => {
+    const qb = apply({ member: [{ groupMemberId: 'gm-3', userId: 'u-3' }] });
     expect(qb.clauses.some((c) => c.startsWith('EXISTS'))).toBe(true);
     expect(qb.lastSub?.conditions).toContain(
-      '(gefSplit.participantGroupMember = :gefMemGm OR gefSplit.participantUser = :gefMemUser)',
+      '(gefSplit.participantGroupMember IN (:...gefMemGm) OR gefSplit.participantUser IN (:...gefMemUser))',
     );
-    expect(qb.params['gefMemGm']).toBe('gm-3');
-    expect(qb.params['gefMemUser']).toBe('u-3');
+    expect(qb.params['gefMemGm']).toEqual(['gm-3']);
+    expect(qb.params['gefMemUser']).toEqual(['u-3']);
   });
 
-  it('pending member (no user) matches only the group-member split column', () => {
-    const qb = apply({ member: { groupMemberId: 'gm-4', userId: null } });
+  it('pending members (no user) match only the group-member split column', () => {
+    const qb = apply({ member: [{ groupMemberId: 'gm-4', userId: null }] });
     expect(qb.lastSub?.conditions).toContain(
-      'gefSplit.participantGroupMember = :gefMemGm',
+      'gefSplit.participantGroupMember IN (:...gefMemGm)',
     );
-    expect(qb.lastSub?.conditions).not.toContain(
-      '(gefSplit.participantGroupMember = :gefMemGm OR gefSplit.participantUser = :gefMemUser)',
-    );
-    expect(qb.params['gefMemGm']).toBe('gm-4');
+    expect(qb.params['gefMemGm']).toEqual(['gm-4']);
     expect(qb.params['gefMemUser']).toBeUndefined();
   });
 
   it('correlates the subquery to the outer expense alias and excludes soft-deleted splits', () => {
-    const qb = apply({ member: { groupMemberId: 'gm-5', userId: 'u-5' } });
+    const qb = apply({ member: [{ groupMemberId: 'gm-5', userId: 'u-5' }] });
     expect(qb.lastSub?.conditions).toContain('gefSplit.expense = expense.id');
     expect(qb.lastSub?.conditions).toContain('gefSplit.deletedAt IS NULL');
   });

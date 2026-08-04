@@ -24,19 +24,20 @@
     [class.border-primary]="isOpen"
     [class.ring-1]="isOpen"
     [class.ring-primary]="isOpen"
-    [attr.aria-haspopup]="true"
+    [attr.aria-haspopup]="multiple ? 'listbox' : true"
     [attr.aria-expanded]="isOpen"
+    [attr.aria-label]="label || placeholder"
   >
-    <span class="truncate flex items-center gap-2">
-      @if (selectedOption()?.icon) {
+    <span class="truncate flex items-center gap-2 min-w-0">
+      @if (!multiple && selectedOption()?.icon) {
         <span class="flex-shrink-0" [innerHTML]="selectedOption()?.icon"></span>
       }
-      <span class="font-medium text-secondary">
-        {{ selectedOption() ? selectedOption()!.label : placeholder }}
+      <span class="font-medium text-secondary truncate">
+        {{ displayLabel() }}
       </span>
     </span>
     <svg
-      class="text-muted transition-transform duration-200 flex-shrink-0"
+      class="text-muted transition-transform duration-200 flex-shrink-0 ml-2"
       [class.w-4]="size === 'md'"
       [class.h-4]="size === 'md'"
       [class.w-3.5]="size === 'sm'"
@@ -58,60 +59,114 @@
   <!-- Dropdown Menu -->
   @if (isOpen) {
     <div
-      class="absolute z-50 mt-2 w-full bg-finmate-card border border-border/10 rounded-2xl shadow-xl max-h-60 overflow-y-auto transform origin-top transition-all duration-200 py-1"
+      class="absolute z-50 mt-2 w-full sm:min-w-64 bg-finmate-card border border-border/10 rounded-2xl shadow-xl max-h-[70vh] sm:max-h-72 overflow-hidden transform origin-top transition-all duration-200 py-1"
+      [attr.role]="multiple ? 'listbox' : 'menu'"
+      [attr.aria-multiselectable]="multiple ? true : null"
     >
-      @for (option of options; track option.value; let idx = $index) {
-        <button
-          type="button"
-          (click)="selectOption(option)"
-          class="w-full text-left hover:bg-surface flex flex-col transition-colors relative border-b last:border-0 border-border/5"
-          [class.px-4]="size === 'md'"
-          [class.py-3]="size === 'md'"
-          [class.px-3]="size === 'sm'"
-          [class.py-2]="size === 'sm'"
-          [class.bg-surface]="idx === focusedIndex"
-        >
-          <div class="flex items-center justify-between w-full">
-            <span
-              class="truncate flex items-center gap-2 text-secondary"
-              [class.text-sm]="size === 'md'"
-              [class.text-xs]="size === 'sm'"
-              [class.font-bold]="option.value === value()"
-            >
-              @if (option.icon) {
-                <span class="flex-shrink-0" [innerHTML]="option.icon"></span>
-              }
-              <span>{{ option.label }}</span>
-            </span>
-            @if (option.value === value()) {
-              <svg
-                class="text-primary flex-shrink-0"
-                [class.w-4]="size === 'md'"
-                [class.h-4]="size === 'md'"
-                [class.w-3.5]="size === 'sm'"
-                [class.h-3.5]="size === 'sm'"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+      @if (multiple && options.length >= 10) {
+        <div class="sticky top-0 z-10 bg-finmate-card p-2 border-b border-border/5">
+          <input
+            type="search"
+            [ngModel]="searchTerm()"
+            (ngModelChange)="searchTerm.set($event); focusedIndex = filteredOptions().length ? 0 : -1"
+            [attr.placeholder]="'Search ' + (label || 'options').toLowerCase() + '...'"
+            class="w-full text-sm px-3 py-2 rounded-xl bg-surface border border-border/10 text-secondary placeholder:text-muted focus:border-primary outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+      }
+
+      <div class="max-h-60 sm:max-h-64 overflow-y-auto">
+        @for (option of filteredOptions(); track option.value; let idx = $index) {
+          <button
+            type="button"
+            (click)="selectOption(option)"
+            class="w-full text-left hover:bg-surface flex flex-col transition-colors relative border-b last:border-0 border-border/5"
+            [class.px-4]="size === 'md'"
+            [class.py-3]="size === 'md'"
+            [class.px-3]="size === 'sm'"
+            [class.py-2]="size === 'sm'"
+            [class.bg-surface]="idx === focusedIndex"
+            [attr.role]="multiple ? 'option' : 'menuitem'"
+            [attr.aria-selected]="isSelected(option)"
+          >
+            <div class="flex items-center justify-between w-full gap-3">
+              <span
+                class="truncate flex items-center gap-2 text-secondary min-w-0"
+                [class.text-sm]="size === 'md'"
+                [class.text-xs]="size === 'sm'"
+                [class.font-bold]="isSelected(option)"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2.5"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
+                @if (multiple) {
+                  <span
+                    class="w-4 h-4 rounded border flex items-center justify-center flex-shrink-0"
+                    [class.border-primary]="isSelected(option)"
+                    [class.bg-primary]="isSelected(option)"
+                    [class.border-border]="!isSelected(option)"
+                    aria-hidden="true"
+                  >
+                    @if (isSelected(option)) {
+                      <svg
+                        class="w-3 h-3 text-white"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="3"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    }
+                  </span>
+                } @else if (option.icon) {
+                  <span class="flex-shrink-0" [innerHTML]="option.icon"></span>
+                }
+                <span class="truncate">{{ option.label }}</span>
+              </span>
+              @if (!multiple && isSelected(option)) {
+                <svg
+                  class="text-primary flex-shrink-0"
+                  [class.w-4]="size === 'md'"
+                  [class.h-4]="size === 'md'"
+                  [class.w-3.5]="size === 'sm'"
+                  [class.h-3.5]="size === 'sm'"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2.5"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              }
+            </div>
+            @if (option.description) {
+              <span class="text-[11px] text-muted mt-0.5 truncate">{{
+                option.description
+              }}</span>
             }
+          </button>
+        } @empty {
+          <div class="px-4 py-3 text-sm text-muted text-center">
+            No options available
           </div>
-          @if (option.description) {
-            <span class="text-[11px] text-muted mt-0.5 truncate">{{
-              option.description
-            }}</span>
-          }
-        </button>
-      } @empty {
-        <div class="px-4 py-3 text-sm text-muted text-center">
-          No options available
+        }
+      </div>
+
+      @if (multiple) {
+        <div class="sticky bottom-0 bg-finmate-card p-2 border-t border-border/5 sm:hidden">
+          <button
+            type="button"
+            (click)="close()"
+            class="w-full py-2.5 rounded-xl bg-primary text-white text-sm font-bold"
+          >
+            Done
+          </button>
         </div>
       }
     </div>

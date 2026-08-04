@@ -26,6 +26,27 @@ import {
   UpdateGroupDto,
 } from '@finmate/data-models';
 
+/** The unified group-filter dimensions passed to the balances/trash endpoints. */
+export interface GroupFilterQueryOptions {
+  from?: string;
+  to?: string;
+  categories?: string[];
+  memberIds?: string[];
+  paidByIds?: string[];
+  transactionType?: 'expense' | 'refund';
+  minAmount?: number;
+  maxAmount?: number;
+}
+
+/**
+ * Balances response: `overall` is the all-time picture (carry-forward intact);
+ * `filtered` recomputes balances/settlements for the active filter.
+ */
+export interface GroupBalancesResult {
+  overall: GroupBalancesResponse;
+  filtered: GroupBalancesResponse;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -68,17 +89,46 @@ export class GroupsService {
   }
 
   /**
-   * Fetch settlements & balances of a group. When the unified group filter has
-   * an active date range, pass it so balances reflect that period.
+   * Append the unified group-filter dimensions to query params (shared by the
+   * balances and trash endpoints). Arrays serialize comma-joined.
+   */
+  private appendFilterParams(
+    params: HttpParams,
+    o?: GroupFilterQueryOptions,
+  ): HttpParams {
+    if (!o) return params;
+    if (o.from) params = params.set('from', o.from);
+    if (o.to) params = params.set('to', o.to);
+    if (o.categories?.length) {
+      params = params.set('categories', o.categories.join(','));
+    }
+    if (o.memberIds?.length) {
+      params = params.set('memberIds', o.memberIds.join(','));
+    }
+    if (o.paidByIds?.length) {
+      params = params.set('paidByIds', o.paidByIds.join(','));
+    }
+    if (o.transactionType) {
+      params = params.set('transactionType', o.transactionType);
+    }
+    if (o.minAmount != null)
+      params = params.set('minAmount', String(o.minAmount));
+    if (o.maxAmount != null)
+      params = params.set('maxAmount', String(o.maxAmount));
+    return params;
+  }
+
+  /**
+   * Fetch settlements & balances of a group. Returns both the all-time `overall`
+   * balances (carry-forward intact) and the `filtered` balances for the supplied
+   * filter, so the UI can show both.
    */
   getBalances(
     groupId: string,
-    range?: { from?: string; to?: string },
-  ): Observable<GroupBalancesResponse> {
-    let params = new HttpParams();
-    if (range?.from) params = params.set('from', range.from);
-    if (range?.to) params = params.set('to', range.to);
-    return this.http.get<GroupBalancesResponse>(
+    options?: GroupFilterQueryOptions,
+  ): Observable<GroupBalancesResult> {
+    const params = this.appendFilterParams(new HttpParams(), options);
+    return this.http.get<GroupBalancesResult>(
       `${this.baseUrl}/groups/${groupId}/settlements/balances`,
       { params },
     );
@@ -169,11 +219,9 @@ export class GroupsService {
    */
   getDeletedExpenses(
     groupId: string,
-    range?: { from?: string; to?: string },
+    options?: GroupFilterQueryOptions,
   ): Observable<{ data: Expense[] }> {
-    let params = new HttpParams();
-    if (range?.from) params = params.set('from', range.from);
-    if (range?.to) params = params.set('to', range.to);
+    const params = this.appendFilterParams(new HttpParams(), options);
     return this.http
       .get<{
         data: Expense[];

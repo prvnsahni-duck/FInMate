@@ -8,8 +8,8 @@ import { SelectQueryBuilder } from 'typeorm';
  *  - `userId` — used for registered members in expense splits
  *    (`participantUser`) and legacy payer rows (`paidByUser`).
  *
- * A member dropdown yields only a `groupMemberId`; the owning service resolves
- * the paired `userId` (null for pending members) before calling the helper.
+ * Member pickers yield only `groupMemberId`s; the owning service resolves the
+ * paired `userId` (null for pending members) before calling the helper.
  */
 export interface MemberRef {
   groupMemberId: string;
@@ -17,25 +17,80 @@ export interface MemberRef {
 }
 
 /**
- * The "new" filter dimensions shared by the ledger list, analytics and export
- * query builders. Date/category/currency stay in each builder (they predate
- * this and already work); this centralizes only the dimensions that are added
- * across the board so a future filter is a one-line addition here.
- *
- * `transactionType: 'both'` must be normalized to `undefined` by the caller.
+ * The shared filter dimensions applied across the ledger list, analytics,
+ * export and (filtered) balances. Centralized so a future filter is a one-line
+ * addition here. `transactionType: 'both'` must be normalized to `undefined`
+ * by the caller. Category/member/payer are multi-select (match ANY).
  */
 export interface GroupExpenseDimensionFilters {
+  categories?: string[];
   transactionType?: 'expense' | 'refund';
-  paidBy?: MemberRef;
-  member?: MemberRef;
+  paidBy?: MemberRef[];
+  member?: MemberRef[];
+  minAmount?: number;
+  maxAmount?: number;
+}
+
+/**
+ * The unified group filter as raw ids (before member resolution), shared by the
+ * balances and trash endpoints. Date range plus the same dimensions.
+ */
+export interface RawGroupExpenseFilter {
+  from?: string;
+  to?: string;
+  categories?: string[];
+  memberIds?: string[];
+  paidByIds?: string[];
+  transactionType?: 'expense' | 'refund';
+  minAmount?: number;
+  maxAmount?: number;
+}
+
+/** Parse raw query strings (comma-separated arrays, numbers) into a filter. */
+export function parseRawGroupExpenseFilter(q: {
+  from?: string;
+  to?: string;
+  categories?: string;
+  memberIds?: string;
+  paidByIds?: string;
+  transactionType?: string;
+  minAmount?: string;
+  maxAmount?: string;
+}): RawGroupExpenseFilter {
+  const csv = (v?: string): string[] | undefined => {
+    if (!v) return undefined;
+    const arr = v
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return arr.length ? arr : undefined;
+  };
+  const num = (v?: string): number | undefined => {
+    if (v == null || v === '') return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  return {
+    from: q.from || undefined,
+    to: q.to || undefined,
+    categories: csv(q.categories),
+    memberIds: csv(q.memberIds),
+    paidByIds: csv(q.paidByIds),
+    transactionType:
+      q.transactionType === 'expense' || q.transactionType === 'refund'
+        ? q.transactionType
+        : undefined,
+    minAmount: num(q.minAmount),
+    maxAmount: num(q.maxAmount),
+  };
 }
 
 /**
  * Apply the shared expense-dimension filters to a query builder whose root
  * alias is an `Expense`. References entity relation *properties* (never raw
  * physical column names) so TypeORM maps them to the correct FK columns
- * regardless of the project's naming strategy, and so the same helper works
- * for the ledger, analytics and export builders alike.
+ * regardless of the naming strategy, and so the same helper works for the
+ * ledger, analytics, export and balances builders alike.
  *
  * The `member` filter uses a correlated `EXISTS` subquery over `expense_splits`
  * rather than a JOIN, so it never multiplies rows — `getCount()`, pagination
@@ -46,44 +101,63 @@ export function applyExpenseDimensionFilters<T>(
   filter: GroupExpenseDimensionFilters,
   alias = 'expense',
 ): void {
+  if (filter.categories?.length) {
+    qb.andWhere(`${alias}.category IN (:...gefCats)`, {
+      gefCats: filter.categories,
+    });
+  }
+
   if (filter.transactionType) {
     qb.andWhere(`${alias}.transactionType = :gefTxType`, {
       gefTxType: filter.transactionType,
     });
   }
 
-  if (filter.paidBy) {
-    const { groupMemberId, userId } = filter.paidBy;
-    if (userId) {
-      qb.andWhere(
-        `(${alias}.paidByGroupMember = :gefPaidGm OR ${alias}.paidByUser = :gefPaidUser)`,
-        { gefPaidGm: groupMemberId, gefPaidUser: userId },
-      );
-    } else {
-      qb.andWhere(`${alias}.paidByGroupMember = :gefPaidGm`, {
-        gefPaidGm: groupMemberId,
-      });
-    }
+  if (filter.minAmount != null) {
+    qb.andWhere(`${alias}.amountTotal >= :gefMinAmount`, {
+      gefMinAmount: filter.minAmount,
+    });
+  }
+  if (filter.maxAmount != null) {
+    qb.andWhere(`${alias}.amountTotal <= :gefMaxAmount`, {
+      gefMaxAmount: filter.maxAmount,
+    });
   }
 
-  if (filter.member) {
-    const { groupMemberId, userId } = filter.member;
+  if (filter.paidBy?.length) {
+    const gmIds = filter.paidBy.map((p) => p.groupMemberId);
+    const userIds = filter.paidBy
+      .map((p) => p.userId)
+      .filter((u): u is string => !!u);
+    const clauses = [`${alias}.paidByGroupMember IN (:...gefPaidGm)`];
+    const params: Record<string, unknown> = { gefPaidGm: gmIds };
+    if (userIds.length) {
+      clauses.push(`${alias}.paidByUser IN (:...gefPaidUser)`);
+      params.gefPaidUser = userIds;
+    }
+    qb.andWhere(`(${clauses.join(' OR ')})`, params);
+  }
+
+  if (filter.member?.length) {
+    const gmIds = filter.member.map((m) => m.groupMemberId);
+    const userIds = filter.member
+      .map((m) => m.userId)
+      .filter((u): u is string => !!u);
     qb.andWhere((sub) => {
+      const cond = userIds.length
+        ? '(gefSplit.participantGroupMember IN (:...gefMemGm) OR gefSplit.participantUser IN (:...gefMemUser))'
+        : 'gefSplit.participantGroupMember IN (:...gefMemGm)';
       const inner = sub
         .subQuery()
         .select('1')
         .from(ExpenseSplit, 'gefSplit')
         .where(`gefSplit.expense = ${alias}.id`)
         .andWhere('gefSplit.deletedAt IS NULL')
-        .andWhere(
-          userId
-            ? '(gefSplit.participantGroupMember = :gefMemGm OR gefSplit.participantUser = :gefMemUser)'
-            : 'gefSplit.participantGroupMember = :gefMemGm',
-        )
+        .andWhere(cond)
         .getQuery();
       return `EXISTS ${inner}`;
     });
-    qb.setParameter('gefMemGm', groupMemberId);
-    if (userId) qb.setParameter('gefMemUser', userId);
+    qb.setParameter('gefMemGm', gmIds);
+    if (userIds.length) qb.setParameter('gefMemUser', userIds);
   }
 }

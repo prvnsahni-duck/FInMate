@@ -78,9 +78,18 @@ import {
 import { GroupFilterStore } from '../../services/group-filter.store';
 import {
   DatePreset,
+  GroupFilter,
   filterFromQueryParams,
   filterToQueryParams,
 } from '../../models/group-filter.model';
+
+/** A single removable filter-summary chip. Per-value for multi-select dimensions. */
+export interface FilterChip {
+  kind: 'date' | 'category' | 'member' | 'paidBy' | 'type' | 'amount';
+  key: string;
+  label: string;
+  value?: string;
+}
 
 export interface GroupExpense extends Expense {
   paidByUserId: string | null;
@@ -259,6 +268,75 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     })),
   ]);
 
+  /** Category pills for the multi-select drawer (the plain 7 categories). */
+  readonly categoryPillOptions = this.filterCategoryOptions.slice(1);
+
+  /** Member pills (id + display name) for the multi-select member/payer controls. */
+  memberPillOptions = computed(() =>
+    this.members().map((m) => ({
+      value: m.id,
+      label: this.memberDisplayName(m),
+    })),
+  );
+
+  /** Sort options (field + direction combined into one dropdown value). */
+  readonly sortOptions: DropdownOption[] = [
+    { value: 'date_desc', label: 'Newest first' },
+    { value: 'date_asc', label: 'Oldest first' },
+    { value: 'amount_desc', label: 'Amount: high → low' },
+    { value: 'amount_asc', label: 'Amount: low → high' },
+  ];
+
+  /** Current draft sort as a single `field_order` string for the dropdown. */
+  draftSortValue = computed(() => {
+    const d = this.filterStore.draft();
+    return d.sortBy ? `${d.sortBy}_${d.sortOrder ?? 'desc'}` : 'date_desc';
+  });
+
+  onSortChange(value: string): void {
+    const [by, order] = value.split('_') as ['date' | 'amount', 'asc' | 'desc'];
+    this.filterStore.setDraftSort(by, order);
+  }
+
+  onDraftCategoriesChange(nextValues: string[]): void {
+    this.syncDraftArray(
+      this.filterStore.draft().categories ?? [],
+      nextValues,
+      (value) => this.filterStore.toggleDraftCategory(value),
+    );
+  }
+
+  onDraftMembersChange(nextValues: string[]): void {
+    this.syncDraftArray(
+      this.filterStore.draft().memberIds ?? [],
+      nextValues,
+      (value) => this.filterStore.toggleDraftMember(value),
+    );
+  }
+
+  onDraftPaidByChange(nextValues: string[]): void {
+    this.syncDraftArray(
+      this.filterStore.draft().paidByIds ?? [],
+      nextValues,
+      (value) => this.filterStore.toggleDraftPaidBy(value),
+    );
+  }
+
+  private syncDraftArray(
+    currentValues: string[],
+    nextValues: string[],
+    toggleValue: (value: string) => void,
+  ): void {
+    const nextSet = new Set(nextValues);
+    for (const value of currentValues) {
+      if (!nextSet.has(value)) toggleValue(value);
+    }
+    const currentSet = new Set(currentValues);
+    for (const value of nextValues) {
+      if (!currentSet.has(value)) toggleValue(value);
+    }
+  }
+
   /**
    * Date presets that represent a single calendar month. For a household group
    * these are the only states where the month ◀ ▶ navigator is meaningful (it
@@ -303,37 +381,62 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
    * Active (non-default) filters as removable summary chips. The date chip only
    * appears when the date is not the default (This Month).
    */
-  activeFilterChips = computed(() => {
+  activeFilterChips = computed<FilterChip[]>(() => {
     const f = this.filterStore.applied();
-    const chips: {
-      key: 'date' | 'category' | 'member' | 'paidBy' | 'type';
-      label: string;
-    }[] = [];
+    const chips: FilterChip[] = [];
     if (f.date.preset !== 'this_month') {
-      chips.push({ key: 'date', label: this.filterStore.dateRangeLabel() });
-    }
-    if (f.category) chips.push({ key: 'category', label: f.category });
-    if (f.memberId) {
       chips.push({
-        key: 'member',
-        label: 'Member: ' + this.memberNameById(f.memberId),
+        kind: 'date',
+        key: 'date',
+        label: this.filterStore.dateRangeLabel(),
       });
     }
-    if (f.paidById) {
+    for (const c of f.categories ?? []) {
+      chips.push({ kind: 'category', key: 'cat:' + c, value: c, label: c });
+    }
+    for (const m of f.memberIds ?? []) {
       chips.push({
-        key: 'paidBy',
-        label: 'Paid by: ' + this.memberNameById(f.paidById),
+        kind: 'member',
+        key: 'mem:' + m,
+        value: m,
+        label: 'Member: ' + this.memberNameById(m),
+      });
+    }
+    for (const p of f.paidByIds ?? []) {
+      chips.push({
+        kind: 'paidBy',
+        key: 'pb:' + p,
+        value: p,
+        label: 'Paid by: ' + this.memberNameById(p),
       });
     }
     if (f.transactionType && f.transactionType !== 'both') {
       chips.push({
+        kind: 'type',
         key: 'type',
         label:
           f.transactionType === 'refund' ? 'Refunds only' : 'Expenses only',
       });
     }
+    if (f.minAmount != null || f.maxAmount != null) {
+      chips.push({
+        kind: 'amount',
+        key: 'amount',
+        label: this.amountChipLabel(f),
+      });
+    }
     return chips;
   });
+
+  private amountChipLabel(f: GroupFilter): string {
+    const cur = this.group()?.currency ?? '';
+    const fmt = (n: number) => `${cur} ${n}`.trim();
+    if (f.minAmount != null && f.maxAmount != null) {
+      return `${fmt(f.minAmount)} – ${fmt(f.maxAmount)}`;
+    }
+    if (f.minAmount != null) return `≥ ${fmt(f.minAmount)}`;
+    return `≤ ${fmt(f.maxAmount as number)}`;
+  }
 
   /** Display name for a group-member id (used by the member/payer chips). */
   memberNameById(id: string): string {
@@ -342,26 +445,27 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   /** Remove one applied filter from its summary chip. */
-  removeFilterChip(
-    key: 'date' | 'category' | 'member' | 'paidBy' | 'type',
-  ): void {
-    switch (key) {
+  removeFilterChip(chip: FilterChip): void {
+    switch (chip.kind) {
       case 'date':
         this.filterStore.clearAppliedDate();
         // Date reverted to This Month → re-anchor the household navigator.
         this.anchorHouseholdMonth();
         break;
       case 'category':
-        this.filterStore.clearAppliedCategory();
+        if (chip.value) this.filterStore.removeAppliedCategory(chip.value);
         break;
       case 'member':
-        this.filterStore.clearAppliedMember();
+        if (chip.value) this.filterStore.removeAppliedMember(chip.value);
         break;
       case 'paidBy':
-        this.filterStore.clearAppliedPaidBy();
+        if (chip.value) this.filterStore.removeAppliedPaidBy(chip.value);
         break;
       case 'type':
         this.filterStore.clearAppliedTxType();
+        break;
+      case 'amount':
+        this.filterStore.clearAppliedAmount();
         break;
     }
   }
@@ -408,15 +512,37 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return {
       startDate: from,
       endDate: to,
-      category: applied.category,
-      memberId: applied.memberId,
-      paidById: applied.paidById,
+      categories: applied.categories,
+      memberIds: applied.memberIds,
+      paidByIds: applied.paidByIds,
       transactionType:
         applied.transactionType === 'both'
           ? undefined
           : applied.transactionType,
+      minAmount: applied.minAmount,
+      maxAmount: applied.maxAmount,
     };
   });
+
+  /** The applied dimension filters shared by the ledger, export and balances. */
+  private appliedDimensionOptions() {
+    const a = this.filterStore.applied();
+    return {
+      categories: a.categories,
+      memberIds: a.memberIds,
+      paidByIds: a.paidByIds,
+      transactionType:
+        a.transactionType === 'both' ? undefined : a.transactionType,
+      minAmount: a.minAmount,
+      maxAmount: a.maxAmount,
+    };
+  }
+
+  /** Full filter options (effective date range + dimensions) for balances/trash. */
+  private appliedFilterOptions() {
+    const { from, to } = this.effectiveDateRange();
+    return { from, to, ...this.appliedDimensionOptions() };
+  }
 
   visibilityOptions: DropdownOption[] = [
     { value: 'private', label: 'Private' },
@@ -448,6 +574,9 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   members = signal<GroupMember[]>([]);
   balances = signal<BalanceEntry[]>([]);
   suggestedSettlements = signal<SuggestedSettlement[]>([]);
+  /** Filtered balances/settlements (shown alongside overall when filters active). */
+  filteredBalances = signal<BalanceEntry[]>([]);
+  filteredSuggestedSettlements = signal<SuggestedSettlement[]>([]);
   historyLogs = signal<GroupAuditLog[]>([]);
   deletedExpenses = signal<Expense[]>([]);
   carryForwardBalances = signal<CarryForwardBalance[]>([]);
@@ -631,6 +760,16 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     const g = this.group();
     const currentUserId = this.currentUserId();
     const entry = this.balances().find(
+      (b) => b.userId === currentUserId && b.currency === g?.currency,
+    );
+    return entry ? entry.netBalance : 0;
+  });
+
+  /** The caller's balance within the current filter (for the Filtered section). */
+  filteredUserBalance = computed(() => {
+    const g = this.group();
+    const currentUserId = this.currentUserId();
+    const entry = this.filteredBalances().find(
       (b) => b.userId === currentUserId && b.currency === g?.currency,
     );
     return entry ? entry.netBalance : 0;
@@ -1060,15 +1199,11 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       .getExpenses(groupId, {
         page: this.currentPage(),
         limit: this.pageSize(),
-        category: applied.category,
         startDate: from,
         endDate: to,
-        memberId: applied.memberId,
-        paidById: applied.paidById,
-        transactionType:
-          applied.transactionType === 'both'
-            ? undefined
-            : applied.transactionType,
+        ...this.appliedDimensionOptions(),
+        sortBy: applied.sortBy,
+        sortOrder: applied.sortOrder,
       })
       .subscribe({
         next: (res) => {
@@ -1191,35 +1326,31 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   fetchBalances(groupId: string) {
-    // No group()-null early return here (removed): this now fires in
-    // parallel with getGroup() rather than after it. userBalance is a
-    // computed() derived from group()+balances(), so it's correct regardless
-    // of arrival order — see the userBalance computed() above.
+    // Fires in parallel with getGroup(); userBalance is a computed() derived from
+    // group()+balances(), so it's correct regardless of arrival order.
     this.isLoadingBalances.set(true);
     this.balancesError.set(false);
-    // Scope balances to the unified filter's date range only once the group is
-    // known to be non-household. Until the group type resolves (initial parallel
-    // fetch, group() still null) — and always for household groups, which are
-    // driven by month close/rollover — balances stay all-time, preserving the
-    // prior behavior. The applied() effect re-fetches with the range once a
-    // filter is applied.
-    const g = this.group();
-    const range =
-      g && g.groupType !== 'household'
-        ? this.filterStore.resolvedRange()
-        : undefined;
-    this.groupsService.getBalances(groupId, range).subscribe({
-      next: (res) => {
-        this.balances.set(res.balances);
-        this.suggestedSettlements.set(res.suggestedSettlements);
-        this.isLoadingBalances.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to fetch balances', err);
-        this.isLoadingBalances.set(false);
-        this.balancesError.set(true);
-      },
-    });
+    // The backend returns both `overall` (all-time, carry-forward intact) and
+    // `filtered` (for the active filter). We always request both; the Filtered
+    // block is only shown in the UI when filters are actually active.
+    this.groupsService
+      .getBalances(groupId, this.appliedFilterOptions())
+      .subscribe({
+        next: (res) => {
+          this.balances.set(res.overall.balances);
+          this.suggestedSettlements.set(res.overall.suggestedSettlements);
+          this.filteredBalances.set(res.filtered.balances);
+          this.filteredSuggestedSettlements.set(
+            res.filtered.suggestedSettlements,
+          );
+          this.isLoadingBalances.set(false);
+        },
+        error: (err) => {
+          console.error('Failed to fetch balances', err);
+          this.isLoadingBalances.set(false);
+          this.balancesError.set(true);
+        },
+      });
   }
 
   /**
@@ -1291,7 +1422,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.isLoadingTrash.set(true);
     this.trashError.set(false);
     this.groupsService
-      .getDeletedExpenses(groupId, this.effectiveDateRange())
+      .getDeletedExpenses(groupId, this.appliedFilterOptions())
       .subscribe({
         next: (res) => {
           this.deletedExpenses.set(res.data || []);
@@ -1641,19 +1772,18 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.isExporting.set(true);
     try {
       // The export automatically uses every currently applied filter dimension.
-      const applied = this.filterStore.applied();
+      const dims = this.appliedDimensionOptions();
       const filter: ExportFilter = {
         groupId: g.id,
         type: 'group',
         from,
         to,
-        category: applied.category || undefined,
-        memberId: applied.memberId || undefined,
-        paidById: applied.paidById || undefined,
-        transactionType:
-          applied.transactionType && applied.transactionType !== 'both'
-            ? applied.transactionType
-            : undefined,
+        categories: dims.categories,
+        memberIds: dims.memberIds,
+        paidByIds: dims.paidByIds,
+        transactionType: dims.transactionType,
+        minAmount: dims.minAmount,
+        maxAmount: dims.maxAmount,
       };
       const datePart = new Date().toISOString().slice(0, 10);
       await this.expenseExportService.exportExpenses(

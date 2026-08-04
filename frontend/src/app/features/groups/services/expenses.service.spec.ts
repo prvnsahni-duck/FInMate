@@ -105,14 +105,15 @@ describe('ExpensesService', () => {
         .getExpenses('group-1', {
           page: 2,
           limit: 10,
-          category: 'food',
+          categories: ['food', 'travel'],
           startDate: '2026-01-01',
           endDate: '2026-01-31',
+          minAmount: 100,
         })
         .subscribe(() => done());
 
       const req = httpMock.expectOne(
-        '/api/expenses?groupId=group-1&page=2&limit=10&category=food&startDate=2026-01-01&endDate=2026-01-31',
+        '/api/expenses?groupId=group-1&page=2&limit=10&categories=food,travel&startDate=2026-01-01&endDate=2026-01-31&minAmount=100',
       );
       req.flush({ data: [], meta: { totalItems: 0 } });
     });

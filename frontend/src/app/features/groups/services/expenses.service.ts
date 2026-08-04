@@ -21,11 +21,13 @@ import { CryptoSessionManager } from '../../../core/services/crypto-session-mana
 export interface GroupAnalyticsQuery {
   startDate?: string;
   endDate?: string;
-  category?: string;
-  memberId?: string;
-  paidById?: string;
+  categories?: string[];
+  memberIds?: string[];
+  paidByIds?: string[];
   /** Omit or 'both' to apply no transaction-type filter. */
   transactionType?: 'expense' | 'refund';
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 /** Minimal shape of a duplicate-check match — only what the warning dialog
@@ -146,13 +148,17 @@ export class ExpensesService {
     options: {
       page?: number;
       limit?: number;
-      category?: string;
+      categories?: string[];
       startDate?: string;
       endDate?: string;
-      memberId?: string;
-      paidById?: string;
+      memberIds?: string[];
+      paidByIds?: string[];
       /** Omit or 'both' to apply no transaction-type filter. */
       transactionType?: 'expense' | 'refund';
+      minAmount?: number;
+      maxAmount?: number;
+      sortBy?: 'date' | 'amount';
+      sortOrder?: 'asc' | 'desc';
     } = {},
   ): Observable<GetExpensesResponse> {
     let params = new HttpParams().set('groupId', groupId);
@@ -163,8 +169,8 @@ export class ExpensesService {
     if (options.limit !== undefined) {
       params = params.set('limit', options.limit.toString());
     }
-    if (options.category) {
-      params = params.set('category', options.category);
+    if (options.categories?.length) {
+      params = params.set('categories', options.categories.join(','));
     }
     if (options.startDate) {
       params = params.set('startDate', options.startDate);
@@ -172,14 +178,24 @@ export class ExpensesService {
     if (options.endDate) {
       params = params.set('endDate', options.endDate);
     }
-    if (options.memberId) {
-      params = params.set('memberId', options.memberId);
+    if (options.memberIds?.length) {
+      params = params.set('memberIds', options.memberIds.join(','));
     }
-    if (options.paidById) {
-      params = params.set('paidById', options.paidById);
+    if (options.paidByIds?.length) {
+      params = params.set('paidByIds', options.paidByIds.join(','));
     }
     if (options.transactionType) {
       params = params.set('transactionType', options.transactionType);
+    }
+    if (options.minAmount != null) {
+      params = params.set('minAmount', String(options.minAmount));
+    }
+    if (options.maxAmount != null) {
+      params = params.set('maxAmount', String(options.maxAmount));
+    }
+    if (options.sortBy) {
+      params = params.set('sortBy', options.sortBy);
+      params = params.set('sortOrder', options.sortOrder ?? 'desc');
     }
 
     return this.http
@@ -269,11 +285,23 @@ export class ExpensesService {
     }
     if (query?.startDate) params = params.set('startDate', query.startDate);
     if (query?.endDate) params = params.set('endDate', query.endDate);
-    if (query?.category) params = params.set('category', query.category);
-    if (query?.memberId) params = params.set('memberId', query.memberId);
-    if (query?.paidById) params = params.set('paidById', query.paidById);
+    if (query?.categories?.length) {
+      params = params.set('categories', query.categories.join(','));
+    }
+    if (query?.memberIds?.length) {
+      params = params.set('memberIds', query.memberIds.join(','));
+    }
+    if (query?.paidByIds?.length) {
+      params = params.set('paidByIds', query.paidByIds.join(','));
+    }
     if (query?.transactionType) {
       params = params.set('transactionType', query.transactionType);
+    }
+    if (query?.minAmount != null) {
+      params = params.set('minAmount', String(query.minAmount));
+    }
+    if (query?.maxAmount != null) {
+      params = params.set('maxAmount', String(query.maxAmount));
     }
     return params;
   }

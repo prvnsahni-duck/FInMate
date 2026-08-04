@@ -6,16 +6,12 @@ import {
   PreconditionFailedException,
 } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, In, DataSource, EntityManager } from 'typeorm';
 import {
-  Repository,
-  In,
-  Between,
-  MoreThanOrEqual,
-  LessThanOrEqual,
-  FindOptionsWhere,
-  DataSource,
-  EntityManager,
-} from 'typeorm';
+  MemberRef,
+  RawGroupExpenseFilter,
+  applyExpenseDimensionFilters,
+} from '../expenses/group-expense-filters.util';
 import {
   Group,
   GroupMember,
@@ -178,10 +174,34 @@ export class SettlementsService {
     return resolveMemberDisplay(m);
   }
 
+  /** Resolve group-member ids to {groupMemberId, userId} pairs for the filter. */
+  private async resolveGroupMemberRefs(
+    groupMemberIds: string[] | undefined,
+    groupId: string,
+  ): Promise<MemberRef[]> {
+    if (!groupMemberIds?.length) return [];
+    const members = await this.groupMemberRepository.find({
+      where: { id: In(groupMemberIds), group: { id: groupId } },
+      relations: ['user'],
+    });
+    return members.map((m) => ({
+      groupMemberId: m.id,
+      userId: m.user?.id ?? null,
+    }));
+  }
+
+  /**
+   * Returns both the all-time `overall` balances (with settlements + carry
+   * forward intact) and the `filtered` balances for the supplied unified filter.
+   * Filtered balances reflect only the matching expenses (settlements are not
+   * attributable to a category/member slice, so they're excluded there) — this
+   * preserves real accounting under `overall` while enabling period/category
+   * analysis under `filtered`.
+   */
   async calculateGroupBalances(
     userId: string,
     groupId: string,
-    range?: { from?: string; to?: string },
+    filter?: RawGroupExpenseFilter,
   ) {
     // 1. Verify access: caller must have active membership
     const callerMember = await this.groupMemberRepository
@@ -208,30 +228,64 @@ export class SettlementsService {
       relations: ['user', 'contact'],
     });
 
-    // 3. Fetch posted expenses in this group. When the unified group filter has
-    //    an active date range, scope the expenses considered by expenseDate so
-    //    balances reflect that period. Settlements (real cash already moved
-    //    between members) are intentionally left unscoped.
-    const expenseWhere: FindOptionsWhere<Expense> = {
-      group: { id: groupId },
-      status: 'posted',
-    };
-    if (range?.from && range?.to) {
-      expenseWhere.expenseDate = Between(range.from, range.to);
-    } else if (range?.from) {
-      expenseWhere.expenseDate = MoreThanOrEqual(range.from);
-    } else if (range?.to) {
-      expenseWhere.expenseDate = LessThanOrEqual(range.to);
+    const overall = await this.computeBalancesCore(
+      groupId,
+      allMembers,
+      undefined,
+      true,
+    );
+    // Only compute a separate filtered view when a filter was actually supplied
+    // (internal callers like Friends pass none and just want the overall picture).
+    const filtered = filter
+      ? await this.computeBalancesCore(groupId, allMembers, filter, false)
+      : overall;
+    return { overall, filtered };
+  }
+
+  /**
+   * Core balance computation over a (optionally filtered) set of expenses.
+   * `includeSettlements` folds confirmed settlements into the balance (only
+   * meaningful for the all-time overall view).
+   */
+  private async computeBalancesCore(
+    groupId: string,
+    allMembers: GroupMember[],
+    filter: RawGroupExpenseFilter | undefined,
+    includeSettlements: boolean,
+  ) {
+    // 3. Fetch posted (non-deleted) expenses, applying the unified filter.
+    const expenseQb = this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember')
+      .leftJoinAndSelect('paidByGroupMember.user', 'pgmUser')
+      .leftJoinAndSelect('paidByGroupMember.contact', 'pgmContact')
+      .where('expense.group = :groupId', { groupId })
+      .andWhere('expense.status = :status', { status: 'posted' })
+      .andWhere('expense.deletedAt IS NULL');
+    if (filter?.from) {
+      expenseQb.andWhere('expense.expenseDate >= :balFrom', {
+        balFrom: filter.from,
+      });
     }
-    const expenses = await this.expenseRepository.find({
-      where: expenseWhere,
-      relations: [
-        'paidByUser',
-        'paidByGroupMember',
-        'paidByGroupMember.user',
-        'paidByGroupMember.contact',
-      ],
-    });
+    if (filter?.to) {
+      expenseQb.andWhere('expense.expenseDate <= :balTo', { balTo: filter.to });
+    }
+    if (filter) {
+      const [member, paidBy] = await Promise.all([
+        this.resolveGroupMemberRefs(filter.memberIds, groupId),
+        this.resolveGroupMemberRefs(filter.paidByIds, groupId),
+      ]);
+      applyExpenseDimensionFilters(expenseQb, {
+        categories: filter.categories,
+        transactionType: filter.transactionType,
+        member,
+        paidBy,
+        minAmount: filter.minAmount,
+        maxAmount: filter.maxAmount,
+      });
+    }
+    const expenses = await expenseQb.getMany();
 
     // 4. Fetch expense splits for those expenses
     const expenseIds = expenses.map((e) => e.id);
@@ -249,20 +303,23 @@ export class SettlementsService {
           })
         : [];
 
-    // 5. Fetch confirmed settlements
-    const settlements = await this.settlementRepository.find({
-      where: { group: { id: groupId }, status: 'confirmed' },
-      relations: [
-        'fromUser',
-        'toUser',
-        'fromGroupMember',
-        'fromGroupMember.user',
-        'fromGroupMember.contact',
-        'toGroupMember',
-        'toGroupMember.user',
-        'toGroupMember.contact',
-      ],
-    });
+    // 5. Fetch confirmed settlements (only for the all-time overall view — a
+    //    settlement can't be attributed to a category/member slice).
+    const settlements = includeSettlements
+      ? await this.settlementRepository.find({
+          where: { group: { id: groupId }, status: 'confirmed' },
+          relations: [
+            'fromUser',
+            'toUser',
+            'fromGroupMember',
+            'fromGroupMember.user',
+            'fromGroupMember.contact',
+            'toGroupMember',
+            'toGroupMember.user',
+            'toGroupMember.contact',
+          ],
+        })
+      : [];
 
     // 6. Build list of all unique currencies
     const currencies = new Set<string>();
@@ -751,7 +808,8 @@ export class SettlementsService {
         continue;
       }
 
-      const { suggestedSettlements } = result;
+      // Friends aggregates the all-time (overall) picture across shared groups.
+      const { suggestedSettlements } = result.overall;
 
       for (const s of suggestedSettlements) {
         if (s.fromUserId === userId || s.toUserId === userId) {

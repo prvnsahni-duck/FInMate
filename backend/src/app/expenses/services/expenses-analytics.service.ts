@@ -7,13 +7,15 @@ export interface AnalyticsFilter {
   startDate?: string;
   endDate?: string;
   // ── Unified group-filter dimensions ──────────────────────────────────────
-  category?: string;
-  /** Group-member id (participant via splits). */
-  memberId?: string;
-  /** Group-member id (payer). */
-  paidById?: string;
+  categories?: string[];
+  /** Group-member ids (participants via splits). */
+  memberIds?: string[];
+  /** Group-member ids (payers). */
+  paidByIds?: string[];
   /** `undefined` applies no transaction-type filter. */
   transactionType?: 'expense' | 'refund';
+  minAmount?: number;
+  maxAmount?: number;
 }
 
 export interface MonthlyTotal {
