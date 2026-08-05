@@ -1,9 +1,14 @@
 # Add Expense UX — Research & Design Review
 
-> **Status:** Research / design only. **No implementation.** This document is
-> the deliverable for the "audit before evolving Add Expense" task.
+> **Purpose:** Research & competitive analysis — what Add Expense does today,
+> how leading apps handle expense creation, and which capabilities are worth
+> exposing. The "why" behind the product direction.
+> **Status:** Approved (research). Its Phase A/B/C *sequencing* is superseded —
+> see the reconciliation note below and the roadmap.
+> **Last updated:** 2026-08-05
+> **Related:** [UX Audit](./add-expense-ux-audit.md) · [Implementation Roadmap](./add-expense-ux-roadmap.md)
 >
-> Date: 2026-08-05 · Scope: `create-expense-modal` (group + personal + direct-share)
+> Scope: `create-expense-modal` (group + personal + direct-share). **No implementation** — planning only.
 
 ---
 
@@ -27,6 +32,16 @@ and is used by a small minority of expenses.
 Do **not** add anything to the default (collapsed) form. Every new capability
 belongs behind the "Customize Split" progressive-disclosure surface that already
 exists.
+
+> **Product decision (2026-08-05) — supersedes the sequencing in this document.**
+> Percentage and Shares will **remain hidden for now**; they are *not* the
+> recommended first step. They stay fully backend-supported and preserved on
+> edit, but exposing them is deferred to a gated **Phase 2** in the
+> [roadmap](./add-expense-ux-roadmap.md), which is the **authoritative
+> sequencing**. The "Phase A/B/C" plan below is retained as original research
+> (the *option* is genuinely cheap); the *decision* was to prioritize
+> simplicity/height polish over exposing more split modes. Where this document
+> and the roadmap differ on ordering, the roadmap wins.
 
 ---
 
@@ -398,6 +413,10 @@ slice, which is the core reason to isolate it in its own phase.
 ---
 
 ## Recommended phased plan
+
+> **Superseded — see the [roadmap](./add-expense-ux-roadmap.md).** The product
+> decision was to keep Percentage/Shares hidden and lead with polish + height
+> reduction instead. This original plan is kept for its reasoning only.
 
 - **Phase A (MVP, ~template-only): Re-expose Shares + Percentage** in the
   Customize-Split sheet. No backend, no migration. Highest value/effort ratio.
