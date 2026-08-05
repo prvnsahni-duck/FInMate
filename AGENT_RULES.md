@@ -481,7 +481,8 @@ Use the latest stable syntax and features from the chosen libraries when officia
 
 ### Angular
 
-- All new components must be standalone with `standalone: true`.
+- Components are standalone by default in Angular 20+; do NOT set `standalone: true` explicitly, and never use NgModules.
+- Use the `input()` and `output()` functions for component inputs/outputs — not the `@Input()`/`@Output()` decorators.
 - Use `inject()` or constructor injection; never use `Injector` directly.
 - Use Angular `HttpClient` for all frontend HTTP calls.
 - Do not use raw `fetch` or `axios` in Angular frontend code.
@@ -502,6 +503,9 @@ Use the latest stable syntax and features from the chosen libraries when officia
 - Avoid importing `CommonModule` in new components; import only specific pipes or directives when needed.
 - Use signals (`signal`, `computed`) for component and derived state; update with `set`/`update`, never `mutate`.
 - Put host bindings in the `host` object of the `@Component`/`@Directive` decorator; do not use `@HostBinding`/`@HostListener`.
+- Prefer Reactive forms over template-driven forms.
+- Use the `async` pipe to consume observables in templates.
+- Use `NgOptimizedImage` for static images (it does not support inline base64).
 - Accessibility is required: meet WCAG AA (focus management, color contrast, ARIA) and pass AXE checks.
 
 ### NestJS
