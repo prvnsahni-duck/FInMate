@@ -2672,7 +2672,10 @@ export class ExpensesService {
     expenses: Expense[],
     monthPct: Map<string, Map<string, number>>,
     activeMembers: GroupMember[],
-    resolveKey: (o: { groupMember?: GroupMember; user?: User }) => string | undefined,
+    resolveKey: (o: {
+      groupMember?: GroupMember;
+      user?: User;
+    }) => string | undefined,
     equalPct: number,
   ): Map<string, { paid: number; expected: number; net: number }> {
     const monthS = new Map<string, number>();

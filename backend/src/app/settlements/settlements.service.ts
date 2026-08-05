@@ -266,9 +266,13 @@ export class SettlementsService {
     // settlement is ever counted twice (settlements live only in Closing;
     // refunds are signed expenses already inside both sums).
     const groupCurrency = groupExists.currency;
-    const callerBalanceIn = (
-      view: { balances: Array<{ userId: string | null; currency: string; netBalance: number }> },
-    ): number => {
+    const callerBalanceIn = (view: {
+      balances: Array<{
+        userId: string | null;
+        currency: string;
+        netBalance: number;
+      }>;
+    }): number => {
       const entry = view.balances.find(
         (b) => b.userId === userId && b.currency === groupCurrency,
       );

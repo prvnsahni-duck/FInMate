@@ -3,7 +3,7 @@
 > **Purpose:** Research & competitive analysis — what Add Expense does today,
 > how leading apps handle expense creation, and which capabilities are worth
 > exposing. The "why" behind the product direction.
-> **Status:** Approved (research). Its Phase A/B/C *sequencing* is superseded —
+> **Status:** Approved (research). Its Phase A/B/C _sequencing_ is superseded —
 > see the reconciliation note below and the roadmap.
 > **Last updated:** 2026-08-05
 > **Related:** [UX Audit](./add-expense-ux-audit.md) · [Implementation Roadmap](./add-expense-ux-roadmap.md)
@@ -14,8 +14,8 @@
 
 ## 0. TL;DR / Recommendation
 
-FinMate's Add Expense flow is already in good shape and was *deliberately
-simplified* in the most recent commit (`94d28e4 feat: simplify add expense
+FinMate's Add Expense flow is already in good shape and was _deliberately
+simplified_ in the most recent commit (`94d28e4 feat: simplify add expense
 split UX`) down to **Equal + Exact Amount**. The backend, however, still fully
 supports four split algorithms (`equal`, `fixed`, `percent`, `share`) with
 cent-accurate deterministic math. So most of the "advanced" capability already
@@ -34,12 +34,12 @@ belongs behind the "Customize Split" progressive-disclosure surface that already
 exists.
 
 > **Product decision (2026-08-05) — supersedes the sequencing in this document.**
-> Percentage and Shares will **remain hidden for now**; they are *not* the
+> Percentage and Shares will **remain hidden for now**; they are _not_ the
 > recommended first step. They stay fully backend-supported and preserved on
 > edit, but exposing them is deferred to a gated **Phase 2** in the
 > [roadmap](./add-expense-ux-roadmap.md), which is the **authoritative
 > sequencing**. The "Phase A/B/C" plan below is retained as original research
-> (the *option* is genuinely cheap); the *decision* was to prioritize
+> (the _option_ is genuinely cheap); the _decision_ was to prioritize
 > simplicity/height polish over exposing more split modes. Where this document
 > and the roadmap differ on ordering, the roadmap wins.
 
@@ -54,11 +54,11 @@ Component: [create-expense-modal.component.ts](../../frontend/src/app/features/g
 
 The modal serves **three modes** from one component:
 
-| Mode | Trigger | Payer/Split UI shown? |
-|------|---------|-----------------------|
-| Personal | no `groupId`, "Split with Friends" off | No — expense is just yours |
-| Direct-share | no `groupId`, "Split with Friends" on | Yes — search + add friends |
-| Group | `groupId` set | Yes — group members |
+| Mode         | Trigger                                | Payer/Split UI shown?      |
+| ------------ | -------------------------------------- | -------------------------- |
+| Personal     | no `groupId`, "Split with Friends" off | No — expense is just yours |
+| Direct-share | no `groupId`, "Split with Friends" on  | Yes — search + add friends |
+| Group        | `groupId` set                          | Yes — group members        |
 
 Default group flow (the common path):
 
@@ -67,7 +67,7 @@ Default group flow (the common path):
 3. Amount + Currency (currency pre-filled from group).
 4. Category + Date (date defaults to today).
 5. **Paid by** — defaults to the current user.
-6. **Split** — defaults to *equal among all active members*, all pre-selected.
+6. **Split** — defaults to _equal among all active members_, all pre-selected.
 7. Notes (optional), Attachments (optional).
 
 The split section shows a **summary card** ("Equal between N people", "N
@@ -79,7 +79,7 @@ Expense / Assigned / Remaining tally.
 ### 1.2 Current data model
 
 - **Expense** ([expense.entity.ts](../../shared/data-models/src/lib/expense.entity.ts)):
-  single payer — a DB `CHECK` enforces *exactly one* of `paidByUserId` /
+  single payer — a DB `CHECK` enforces _exactly one_ of `paidByUserId` /
   `paidByGroupMemberId` is set. `amountTotal` (decimal 12,2), `currency`,
   `category`, `transactionType` (`expense` | `refund`), `expenseDate`,
   `encryptionScope` (`personal` | `group` | `direct_shared`), `version`
@@ -88,7 +88,7 @@ Expense / Assigned / Remaining tally.
   one row per participant. `splitType` (`equal`|`fixed`|`percent`|`share`),
   `shareValue` (decimal 12,4 — the raw input), `amountOwed` (decimal 12,2 — the
   computed cent-accurate owed amount), plus a `CHECK` that each split names
-  exactly one participant (user *or* group member).
+  exactly one participant (user _or_ group member).
 - Group expenses key both payer and participants by **GroupMember**, not User,
   so pending (Contact-backed, account-less) members can still participate. The
   UI resolves member↔user ids in both directions (`resolveParticipantUserId`).
@@ -104,10 +104,10 @@ one payer.
   (equal always ok; fixed must total to the cent; percent must sum to 100;
   share must be >0).
 - **Server DTO** ([expense.dto.ts](../../shared/data-models/src/lib/dto/expense.dto.ts)
-  + [split-payload.validator.ts](../../backend/src/app/expenses/dto/split-payload.validator.ts)):
-  uniform `splitType` across lines, unique participants, exactly-one-identifier
-  per split, equal ⇒ every `shareValue === 1`, percent ⇒ sum 100, fixed ⇒ sum
-  equals `amountTotal` (cent-compared).
+  - [split-payload.validator.ts](../../backend/src/app/expenses/dto/split-payload.validator.ts)):
+    uniform `splitType` across lines, unique participants, exactly-one-identifier
+    per split, equal ⇒ every `shareValue === 1`, percent ⇒ sum 100, fixed ⇒ sum
+    equals `amountTotal` (cent-compared).
 - **Canonical calculator** ([split-calculator.ts](../../shared/utils/src/lib/split-calculator.ts)):
   deterministic, integer-cent math with remainder distribution ordered by
   payer-priority then participant key — so rounding is stable and the payer
@@ -124,8 +124,8 @@ Validation is **defense-in-depth**: client, DTO, and calculator each re-check.
   participant gets `-amountOwed`; refunds invert the sign on both sides;
   confirmed settlements fold in. Balances are then run through a debt simplifier
   to suggest the minimum set of transfers.
-- **Multi-payer implication:** the balance loop credits the *single* payer the
-  *full* `amountTotal`. Supporting several payers means either multiple
+- **Multi-payer implication:** the balance loop credits the _single_ payer the
+  _full_ `amountTotal`. Supporting several payers means either multiple
   payment rows or splitting the credit — i.e. a real schema + calc change.
 
 ### 1.5 Refund compatibility
@@ -133,7 +133,7 @@ Validation is **defense-in-depth**: client, DTO, and calculator each re-check.
 Refunds are first-class: `transactionType: 'refund'` reuses the identical
 paidBy/split model but is treated as a **negative expense** everywhere (balances,
 net-spend, analytics, export/import round-trip). This is already a solved,
-documented invariant (see project memory: *refund-net-calculation*). Any Add
+documented invariant (see project memory: _refund-net-calculation_). Any Add
 Expense change must preserve it — in practice that means: whatever split types we
 expose for expenses must behave identically for refunds (they do today).
 
@@ -166,12 +166,12 @@ a participant search that appears only once there are ≥8 members.
    all the logic (`selectSplitMode('percent'|'share')`, `seedShareDrafts`,
    `seedEqualPercentDrafts`, summary strings) but the split sheet's mode toggle
    only renders **Equal / Exact Amount**. So the capability exists everywhere
-   *except* where a user could pick it. (Edit mode can still *display/preserve* a
+   _except_ where a user could pick it. (Edit mode can still _display/preserve_ a
    percent/share split created via API/import, but can't create one.)
-2. **No receipt scanning / OCR.** Attachments are manual.
-3. **Attachments are device-local (Beta).** Stored in `localStorage`, not
+3. **No receipt scanning / OCR.** Attachments are manual.
+4. **Attachments are device-local (Beta).** Stored in `localStorage`, not
    synced — an explicit, documented Beta limitation, not an Add-Expense flaw.
-4. **Amount is a raw number input**, not a keypad-style entry; fine on desktop,
+5. **Amount is a raw number input**, not a keypad-style entry; fine on desktop,
    slightly less "money-app" on mobile.
 
 ---
@@ -181,9 +181,10 @@ a participant search that appears only once there are ≥8 members.
 How mature expense-sharing apps handle creation (informed by their public UX):
 
 ### Splitwise
+
 - **Default:** "You paid, split equally." One line, one tap to change each side.
 - **"Paid by" and "Split" are two separate tappable rows** — the mental model
-  is explicitly *who paid* vs *how to split*, decoupled.
+  is explicitly _who paid_ vs _how to split_, decoupled.
 - Advanced split screen has tabs: **=, 1.23 (exact), % , shares, +/- adjustment,
   itemized**. Multi-payer is under "Paid by → multiple people," entered as exact
   amounts per payer that must total the expense.
@@ -191,6 +192,7 @@ How mature expense-sharing apps handle creation (informed by their public UX):
   without moving the simple case. Weakness: the advanced screen is dense.
 
 ### Tricount
+
 - **Radically simple default:** amount, title, who paid (single), and who's
   involved (checkboxes, equal). Advanced splitting (shares/percentages/amounts)
   is one tap away but the default never shows it.
@@ -198,25 +200,29 @@ How mature expense-sharing apps handle creation (informed by their public UX):
   fewer power features.
 
 ### Settle Up
+
 - Similar to Tricount but supports **multiple payers** natively and split by
   shares/percent/amount. Uses a "for whom" weight editor. Strength: flexible.
   Weakness: the multi-payer + weights UI is the busiest of the group.
 
 ### Google Wallet / Google Pay split
+
 - Extremely minimal: equal split among selected contacts, request money. Almost
-  no advanced options — optimized for *requesting*, not *bookkeeping*.
+  no advanced options — optimized for _requesting_, not _bookkeeping_.
 
 ### Splitser / others
+
 - Converge on the same pattern: **simple equal default + a progressive
   "advanced split" surface**, with shares as the most-used non-equal mode
   (because "1 share vs 2 shares" maps to real life: couples, kids, rooms).
 
 ### Cross-app takeaways
+
 - **Everyone defaults to "you paid, equal split."** FinMate already does this.
 - **"Paid by" and "Split" are conceptually separate.** FinMate already renders
   them as separate sections — good.
 - **Shares is the highest-value non-equal mode**, more used than exact amounts
-  for recurring group life (rent, trips). FinMate hides both shares *and*
+  for recurring group life (rent, trips). FinMate hides both shares _and_
   percent today.
 - **Multi-payer is universally an advanced, opt-in affordance**, never on the
   default form. Only Splitwise/Settle Up support it at all.
@@ -227,15 +233,15 @@ How mature expense-sharing apps handle creation (informed by their public UX):
 
 ## Phase 3 — Feature-by-feature evaluation vs FinMate
 
-| Feature | Useful? | Real problem solved | Adds complexity | Frequency | Default? | Can hide until needed? |
-|---|---|---|---|---|---|---|
-| Equal split | Essential | The 90% case | None | Very high | **Yes** | — |
-| Exact amounts (fixed) | Yes | "I only had the ₹200 dish" | Low (already built) | Medium | No | Yes (in sheet, built) |
-| Percentage | Moderate | Income-proportional sharing | Low (already built in backend) | Low–med | No | Yes (in sheet) |
-| Shares | **Yes** | Rent by room, couples, kids | Low (already built in backend) | Medium | No | Yes (in sheet) |
-| Multi-payer | Moderate | "We both put in cash" | **High (schema + calc)** | Low (<5–10%) | No | Yes (payer section) |
-| Receipt OCR | Nice-to-have | Faster entry | Very high | Low | No | Separate feature |
-| Itemized split | Niche | Splitting a bill line-by-line | Very high | Very low | No | Not now |
+| Feature               | Useful?      | Real problem solved           | Adds complexity                | Frequency    | Default? | Can hide until needed? |
+| --------------------- | ------------ | ----------------------------- | ------------------------------ | ------------ | -------- | ---------------------- |
+| Equal split           | Essential    | The 90% case                  | None                           | Very high    | **Yes**  | —                      |
+| Exact amounts (fixed) | Yes          | "I only had the ₹200 dish"    | Low (already built)            | Medium       | No       | Yes (in sheet, built)  |
+| Percentage            | Moderate     | Income-proportional sharing   | Low (already built in backend) | Low–med      | No       | Yes (in sheet)         |
+| Shares                | **Yes**      | Rent by room, couples, kids   | Low (already built in backend) | Medium       | No       | Yes (in sheet)         |
+| Multi-payer           | Moderate     | "We both put in cash"         | **High (schema + calc)**       | Low (<5–10%) | No       | Yes (payer section)    |
+| Receipt OCR           | Nice-to-have | Faster entry                  | Very high                      | Low          | No       | Separate feature       |
+| Itemized split        | Niche        | Splitting a bill line-by-line | Very high                      | Very low     | No       | Not now                |
 
 **Interpretation:** the cheapest wins are Percentage and Shares — the code is
 already written and validated end-to-end; they only need a UI toggle. The
@@ -246,16 +252,16 @@ simple" mandate.
 
 ## Phase 4 — Design principles (scored against today's build)
 
-| Principle | Status today |
-|---|---|
-| First-timer understands it immediately | ✅ labels + defaults are clear |
-| Normal expense in <15s | ✅ open → type title → type amount → Save (everything else defaulted) |
-| Advanced options don't clutter default | ✅ "Customize Split" is progressive |
-| Mobile-first | ✅ bottom-sheet, safe-area, big targets |
-| Minimal scrolling | ⚠️ form is long; type/notes/attachments add height |
-| Large touch targets | ✅ |
-| Clear validation | ✅ inline + live remaining tally |
-| No unnecessary steps | ✅ |
+| Principle                              | Status today                                                          |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| First-timer understands it immediately | ✅ labels + defaults are clear                                        |
+| Normal expense in <15s                 | ✅ open → type title → type amount → Save (everything else defaulted) |
+| Advanced options don't clutter default | ✅ "Customize Split" is progressive                                   |
+| Mobile-first                           | ✅ bottom-sheet, safe-area, big targets                               |
+| Minimal scrolling                      | ⚠️ form is long; type/notes/attachments add height                    |
+| Large touch targets                    | ✅                                                                    |
+| Clear validation                       | ✅ inline + live remaining tally                                      |
+| No unnecessary steps                   | ✅                                                                    |
 
 The build already satisfies the principles. The redesign risk is **regressing**
 them by adding surface area — which is exactly why new capability should stay
@@ -279,7 +285,8 @@ Why defer:
   analytics attribution, export/import, and duplicate detection all assume one
   payer.
 
-Recommended shape *when* built (least-complex UX):
+Recommended shape _when_ built (least-complex UX):
+
 - Payer section stays a single dropdown by default.
 - A small **"Multiple people paid"** link reveals a per-payer amount editor
   (identical mental model + validation to the existing Exact-Amount split: a
@@ -340,7 +347,7 @@ Any change must keep the edit flow's current guarantees:
 4. **Optimistic-lock `version`** stays required.
 
 Re-exposing Percentage/Shares is **safe for edit** because edit mode already
-reads and preserves those types; we'd only be *enabling creation* of what edit
+reads and preserves those types; we'd only be _enabling creation_ of what edit
 could already display.
 
 ---
@@ -354,7 +361,7 @@ additive UI. This is why it's the recommended first step.
 **Multi-payer (Phase C): requires migration.** Options:
 
 - **Option 1 — `expense_payers` join table** (recommended): `(expenseId,
-  participantUserId | participantGroupMemberId, amountPaid)`. Migrate every
+participantUserId | participantGroupMemberId, amountPaid)`. Migrate every
   existing single-payer expense to one row. Drop reliance on the single-payer
   `CHECK` (or keep `paidBy*` as a denormalized "primary payer" for
   back-compat/read paths). Settlement loop changes from "credit one payer
@@ -371,6 +378,7 @@ slice, which is the core reason to isolate it in its own phase.
 ## Deliverable: text wireframes
 
 ### Default group expense (collapsed — the <15s path)
+
 ```
 ┌───────────────────────────── Add New Expense ──────────┐
 │  [ Expense ]  [ Refund ]                                │
@@ -390,6 +398,7 @@ slice, which is the core reason to isolate it in its own phase.
 ```
 
 ### "Customize Split" sheet — recommended (adds Shares + Percentage)
+
 ```
 ┌──────────────── Split Expense ─────────────────┐
 │  [ Equal ] [ Shares ] [ Exact ] [ Percentage ] │   ← today: only Equal/Exact
@@ -403,6 +412,7 @@ slice, which is the core reason to isolate it in its own phase.
 ```
 
 ### Multi-payer (future phase, opt-in)
+
 ```
 │  Paid by *  [ You ▾ ]           Multiple people paid → │
 │   ── when expanded ──                                  │
@@ -432,4 +442,7 @@ slice, which is the core reason to isolate it in its own phase.
 **Guiding rule for every phase:** the collapsed default form must not gain a
 single new always-visible control. All new power lives behind existing
 progressive-disclosure surfaces.
+
+```
+
 ```
