@@ -82,9 +82,11 @@ import { GroupFilterStore } from '../../services/group-filter.store';
 import {
   DatePreset,
   GroupFilter,
+  TimeScope,
   filterFromQueryParams,
   filterToQueryParams,
 } from '../../models/group-filter.model';
+import { formatDateRangeLabel } from '../../utils/date-preset.util';
 
 /** A single removable filter-summary chip. Per-value for multi-select dimensions. */
 export interface FilterChip {
@@ -223,6 +225,10 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         // History and Trash honor the date period too (reset to page 1).
         this.fetchHistoryLogs(g.id);
         this.fetchDeletedExpenses(g.id);
+        // Household contribution graph / period card follow the same TimeScope.
+        if (g.groupType === 'household') {
+          this.fetchCarryForward(g.id);
+        }
       });
     });
   }
@@ -379,6 +385,28 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       };
     }
     return this.filterStore.resolvedRange();
+  });
+
+  /**
+   * The single shared TimeScope for this page — the one object every date-driven
+   * surface (header label, ledger, analytics, balance period card, suggested
+   * settlements, household contribution graph, export) must read. It layers
+   * household month navigation on top of the store's filter and derives the label
+   * from the same `formatDateRangeLabel` generator, so the period and its label
+   * are always consistent. Overall/all-time surfaces deliberately ignore it.
+   */
+  timeScope = computed<TimeScope>(() => {
+    const { from, to } = this.effectiveDateRange();
+    return {
+      from,
+      to,
+      preset: this.filterStore.applied().date.preset,
+      label: formatDateRangeLabel(
+        this.filterStore.applied().date.preset,
+        from,
+        to,
+      ),
+    };
   });
 
   /**
@@ -871,33 +899,39 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     this.isHousehold() ? this.simplifyHousehold('currentMonthNet') : [],
   );
 
-  /**
-   * Title for the second ("period") balance card: "This Month" by default, or
-   * "Filtered" once any non-default filter is applied. The Overall card is never
-   * affected by filters — only this one. Household groups are always month-scoped
-   * (the contribution model has no per-dimension slice), so they stay "This Month".
-   */
-  periodCardTitle = computed(() =>
-    !this.isHousehold() && this.filterStore.hasActiveFilters()
-      ? 'Filtered'
-      : 'This Month',
-  );
+  /** True when any non-date filter dimension is active. */
+  hasDimensionFilters = computed(() => {
+    const a = this.filterStore.applied();
+    return !!(
+      a.categories?.length ||
+      a.memberIds?.length ||
+      a.paidByIds?.length ||
+      (a.transactionType && a.transactionType !== 'both') ||
+      a.minAmount != null ||
+      a.maxAmount != null
+    );
+  });
 
   /**
-   * Subtitle for the period card: the active filter summary (category/member/
-   * date chips joined) when filtering, otherwise the effective month label
-   * (e.g. "August 2026"), which also tracks household month navigation.
+   * Title for the second ("period") balance card. Always the neutral
+   * "Current Period" — the exact selection is shown in the subtitle. The Overall
+   * card is never affected by filters; only this one.
+   */
+  periodCardTitle = computed(() => 'Current Period');
+
+  /**
+   * Subtitle for the period card: the shared date-range label for the effective
+   * scope (so it reflects month navigation and every preset via the single
+   * `formatDateRangeLabel` generator), suffixed with "· Filtered" when non-date
+   * dimensions are also active. No hand-rolled month formatting.
    */
   periodCardSubtitle = computed(() => {
-    if (!this.isHousehold() && this.filterStore.hasActiveFilters()) {
-      return this.activeFilterChips()
-        .map((c) => c.label)
-        .join(' · ');
-    }
-    const { from } = this.effectiveDateRange();
-    if (!from) return '';
-    const d = new Date(from + 'T00:00:00');
-    return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    const label = this.timeScope().label;
+    // Household ignores non-date dimensions (contribution model is date-scoped),
+    // so only suffix "· Filtered" where dimensions actually change the figure.
+    return !this.isHousehold() && this.hasDimensionFilters()
+      ? `${label} · Filtered`
+      : label;
   });
 
   // Archive (Delete Group) dialog state
@@ -1248,13 +1282,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return `${y}-${m}`;
   }
 
-  getMonthDisplayName(): string {
-    return this.currentTimelineMonth().toLocaleDateString('en-US', {
-      month: 'long',
-      year: 'numeric',
-    });
-  }
-
   /** Zero-padded last calendar day of a `YYYY-MM` month (e.g. '30' for June,
    *  '28'/'29' for February). Avoids emitting impossible dates like
    *  `2026-06-31`, which the backend's date column rejects. */
@@ -1568,8 +1595,10 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   fetchCarryForward(groupId: string) {
+    // Household summary follows the shared TimeScope (effective date range),
+    // aggregating every month in range — never a single hardcoded month.
     this.groupsService
-      .getCarryForward(groupId, this.getCurrentMonthString())
+      .getCarryForward(groupId, this.appliedFilterOptions())
       .subscribe({
         next: (res) => {
           this.carryForwardBalances.set(res || []);

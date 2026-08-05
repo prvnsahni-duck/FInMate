@@ -26,6 +26,19 @@ export class ExpensesCarryForwardService {
     );
   }
 
+  /** Range-aware household summary honoring the shared TimeScope filter. */
+  async getHouseholdScopeSummary(
+    userId: string,
+    groupId: string,
+    filter: RawGroupExpenseFilter,
+  ): Promise<any[]> {
+    return this.expensesService.getHouseholdScopeSummary(
+      userId,
+      groupId,
+      filter,
+    );
+  }
+
   async closeMonth(
     userId: string,
     groupId: string,

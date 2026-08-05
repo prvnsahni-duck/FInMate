@@ -257,10 +257,13 @@ export class GroupsService {
    */
   getCarryForward(
     groupId: string,
-    month: string,
+    options?: GroupFilterQueryOptions,
   ): Observable<CarryForwardBalance[]> {
+    // Range-aware: the household summary honors the shared TimeScope (date range).
+    const params = this.appendFilterParams(new HttpParams(), options);
     return this.http.get<CarryForwardBalance[]>(
-      `${this.baseUrl}/groups/${groupId}/carry-forward?month=${month}`,
+      `${this.baseUrl}/groups/${groupId}/carry-forward`,
+      { params },
     );
   }
 

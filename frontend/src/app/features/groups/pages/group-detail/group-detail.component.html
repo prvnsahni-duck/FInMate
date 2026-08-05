@@ -236,7 +236,7 @@
         }
         <div class="text-center px-2 min-w-0">
           <span class="text-lg font-bold text-secondary">{{
-            showMonthNav() ? getMonthDisplayName() : filterStore.dateRangeLabel()
+            timeScope().label
           }}</span>
           @if (showMonthNav() && isMonthLocked()) {
             <span
@@ -311,22 +311,28 @@
         class="bg-finmate-card/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-border/10 rounded-3xl p-6 mb-4 shadow-xl shadow-black/5"
       >
         <h3
-          class="text-sm font-extrabold text-secondary uppercase tracking-wider mb-6 flex items-center gap-2"
+          class="text-sm font-extrabold text-secondary uppercase tracking-wider mb-6 flex items-center justify-between gap-2"
         >
-          <svg
-            class="w-5 h-5 text-finmate-neon"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          <span class="flex items-center gap-2 min-w-0">
+            <svg
+              class="w-5 h-5 text-finmate-neon shrink-0"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+              ></path>
+            </svg>
+            Household Target vs. Actual Contribution
+          </span>
+          <span
+            class="text-[10px] font-semibold uppercase tracking-wider text-muted whitespace-nowrap"
+            >{{ timeScope().label }}</span
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-            ></path>
-          </svg>
-          Household Target vs. Actual Contribution
         </h3>
 
         <div class="space-y-6">
@@ -2636,7 +2642,7 @@
                   [nameByKey]="householdMemberNameByKey()"
                 ></app-suggested-settlements>
                 <app-suggested-settlements
-                  [scopeLabel]="periodCardTitle()"
+                  [scopeLabel]="periodCardSubtitle()"
                   [settlements]="householdMonthSettlements()"
                   [members]="members()"
                   [nameByKey]="householdMemberNameByKey()"
@@ -2657,7 +2663,7 @@
                 [members]="members()"
               ></app-suggested-settlements>
               <app-suggested-settlements
-                [scopeLabel]="periodCardTitle()"
+                [scopeLabel]="periodCardSubtitle()"
                 [settlements]="filteredSuggestedSettlements()"
                 [members]="members()"
                 [excludesSettlements]="true"

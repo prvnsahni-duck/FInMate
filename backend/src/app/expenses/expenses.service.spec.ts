@@ -1821,6 +1821,81 @@ describe('ExpensesService', () => {
         }
       });
 
+      it('getHouseholdScopeSummary aggregates the whole date range and puts pre-range months in Opening', async () => {
+        // Jun: A pays 100 (50/50). Jul: A pays 60 (50/50). Viewing July only,
+        // the period = July (A net +30), Opening = June carried in (A +50),
+        // Closing = 80, Overall (full history) = 80.
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        const memberA = {
+          id: 'member-a',
+          user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' },
+          joinStatus: 'active',
+        };
+        const memberB = {
+          id: 'member-b',
+          user: { id: 'user-b', displayName: 'User B', email: 'b@finmate.com' },
+          joinStatus: 'active',
+        };
+        groupMemberRepository.find.mockResolvedValue([memberA, memberB] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'jun-1',
+            amountTotal: 100,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByUser: { id: 'user-a' },
+            ledgerMonth: '2026-06',
+            expenseDate: '2026-06-15',
+          },
+          {
+            id: 'jul-1',
+            amountTotal: 60,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByUser: { id: 'user-a' },
+            ledgerMonth: '2026-07',
+            expenseDate: '2026-07-10',
+          },
+        ] as any);
+
+        const rows = await service.getHouseholdScopeSummary(
+          'user-a',
+          'group-id',
+          { from: '2026-07-01', to: '2026-07-31' },
+        );
+        const rowA = rows.find((r) => r.groupMemberId === 'member-a')!;
+
+        expect(rowA.paid).toBe(60); // July only
+        expect(rowA.expected).toBe(30); // 50% of July's 60
+        expect(rowA.netBalance).toBe(30); // period net
+        expect(rowA.openingBalance).toBe(50); // June carried in
+        expect(rowA.closingBalance).toBe(80); // opening + period
+        expect(rowA.overallBalance).toBe(80); // full history
+
+        // Widening to Jun–Aug folds June into the period instead of Opening.
+        const wide = await service.getHouseholdScopeSummary(
+          'user-a',
+          'group-id',
+          { from: '2026-06-01', to: '2026-08-31' },
+        );
+        const wideA = wide.find((r) => r.groupMemberId === 'member-a')!;
+        expect(wideA.paid).toBe(160);
+        expect(wideA.netBalance).toBe(80);
+        expect(wideA.openingBalance).toBe(0);
+        expect(wideA.overallBalance).toBe(80);
+      });
+
       it('registered-only household regression: behaves identically to before', async () => {
         groupMemberRepository.findOne.mockResolvedValue({
           id: 'membership-id',

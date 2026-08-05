@@ -197,7 +197,7 @@ export class BalanceCarouselComponent {
   overall = input.required<number>();
   period = input.required<number>();
   currency = input.required<string>();
-  periodTitle = input<string>('This Month');
+  periodTitle = input<string>('Current Period');
   periodSubtitle = input<string>('');
   breakdown = input<GroupBalanceBreakdown | null>(null);
 
