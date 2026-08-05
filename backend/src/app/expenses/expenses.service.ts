@@ -2390,6 +2390,11 @@ export class ExpensesService {
       paid: number;
       expected: number;
       percentage: number;
+      currentMonthNet: number;
+      carryForwardNet: number;
+      openingBalance: number;
+      closingBalance: number;
+      overallBalance: number;
     }[]
   > {
     await this.assertGroupAccess(userId, groupId);
@@ -2529,6 +2534,90 @@ export class ExpensesService {
       }
     }
 
+    // ── Running carry-forward balance (computed; close-month-independent) ──
+    // A household ledger is a running balance: each month's Opening is the
+    // cumulative Closing of every prior month. We compute that here directly
+    // from NORMAL expenses grouped by ledgerMonth — deliberately ignoring
+    // materialized `isCarryForward` rollover expenses, which would double-count
+    // (closeMonth never deletes the originals). This makes Opening reflect prior
+    // months *without* requiring a manual month-close, and keeps Overall a
+    // full-history figure independent of the month being viewed.
+    const openingByMember = new Map<string, number>();
+    const overallByMember = new Map<string, number>();
+    {
+      const allExpenses = await this.expenseRepository.find({
+        where: { group: { id: groupId }, status: 'posted' },
+        relations: ['paidByUser', 'paidByGroupMember'],
+      });
+      const allNormalExpenses = allExpenses.filter((e) => !e.isCarryForward);
+
+      const allContributions = await this.dataSource
+        .getRepository(GroupMemberContribution)
+        .createQueryBuilder('contribution')
+        .innerJoinAndSelect('contribution.groupMember', 'groupMember')
+        .where('groupMember.group_id = :groupId', { groupId })
+        .getMany();
+
+      // month -> total signed spend (S) and month -> member -> signed paid
+      const monthSpend = new Map<string, number>();
+      const monthPaid = new Map<string, Map<string, number>>();
+      const months = new Set<string>();
+      for (const exp of allNormalExpenses) {
+        const key =
+          exp.ledgerMonth ??
+          (exp.expenseDate ? exp.expenseDate.slice(0, 7) : ledgerMonth);
+        months.add(key);
+        const signed = this.signedAmount(exp.amountTotal, exp.transactionType);
+        monthSpend.set(key, (monthSpend.get(key) ?? 0) + signed);
+        const memberId = resolveMemberKey({
+          groupMember: exp.paidByGroupMember,
+          user: exp.paidByUser,
+        });
+        if (!memberId) continue;
+        let pm = monthPaid.get(key);
+        if (!pm) {
+          pm = new Map();
+          monthPaid.set(key, pm);
+        }
+        pm.set(memberId, (pm.get(memberId) ?? 0) + signed);
+      }
+
+      // month -> member -> contribution %
+      const monthPct = new Map<string, Map<string, number>>();
+      for (const c of allContributions) {
+        months.add(c.ledgerMonth);
+        let cm = monthPct.get(c.ledgerMonth);
+        if (!cm) {
+          cm = new Map();
+          monthPct.set(c.ledgerMonth, cm);
+        }
+        cm.set(c.groupMember.id, Number(c.percentage));
+      }
+
+      const equalPct =
+        activeMembers.length > 0 ? 100 / activeMembers.length : 0;
+      // net(member, month) = paid − target, using that month's own % (or equal
+      // split when unset) — identical basis to the selected-month currentMonthNet.
+      const netFor = (memberId: string, month: string): number => {
+        const s = monthSpend.get(month) ?? 0;
+        const pct = monthPct.get(month)?.get(memberId) ?? equalPct;
+        const paid = monthPaid.get(month)?.get(memberId) ?? 0;
+        return paid - s * (pct / 100);
+      };
+
+      for (const member of activeMembers) {
+        let opening = 0;
+        let overall = 0;
+        for (const month of months) {
+          const net = netFor(member.id, month);
+          overall += net;
+          if (month < ledgerMonth) opening += net; // strictly prior months
+        }
+        openingByMember.set(member.id, opening);
+        overallByMember.set(member.id, overall);
+      }
+    }
+
     return activeMembers.map((m) => {
       const pct = contributionMap.get(m.id) ?? 100 / activeMembers.length;
       const TuNormal = S * (pct / 100);
@@ -2542,6 +2631,17 @@ export class ExpensesService {
 
       const display = this.carryForwardMemberDisplay(m);
 
+      // Running-balance decomposition for the Balance Breakdown card:
+      // opening (all prior months) + currentMonthNet (this month) = closing,
+      // and overall is the full-history running balance (month-independent).
+      const currentMonthNet = Math.round((PuNormal - TuNormal) * 100) / 100;
+      const openingBalance =
+        Math.round((openingByMember.get(m.id) ?? 0) * 100) / 100;
+      const overallBalance =
+        Math.round((overallByMember.get(m.id) ?? 0) * 100) / 100;
+      const closingBalance =
+        Math.round((openingBalance + currentMonthNet) * 100) / 100;
+
       return {
         groupMemberId: display.groupMemberId,
         userId: display.userId,
@@ -2551,6 +2651,13 @@ export class ExpensesService {
         paid: Math.round(Pu * 100) / 100,
         expected: Math.round(Tu * 100) / 100,
         percentage: pct,
+        currentMonthNet,
+        // Materialized-rollover net (from isCarryForward expenses). Retained for
+        // reference; the breakdown now uses the computed openingBalance instead.
+        carryForwardNet: Math.round((carryPaid - carryOwed) * 100) / 100,
+        openingBalance,
+        closingBalance,
+        overallBalance,
       };
     });
   }

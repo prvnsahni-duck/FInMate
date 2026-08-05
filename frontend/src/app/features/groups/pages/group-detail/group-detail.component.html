@@ -2605,35 +2605,64 @@
             </button>
           </div>
         } @else {
-          @if (filterStore.hasActiveFilters()) {
-            <p
-              class="text-[11px] font-bold uppercase tracking-wider text-muted mb-2"
-            >
-              Overall balance
-            </p>
-          }
-          <app-group-balances
-            [userBalance]="userBalance()"
-            [groupCurrency]="group()!.currency"
-            [suggestedSettlements]="suggestedSettlements()"
-            [members]="members()"
-          ></app-group-balances>
+          <!-- Balance cards: Overall (true carry-forward, filter-immune) and
+               Period/Filtered (This Month by default). Swipe / dots / arrows. -->
+          <app-balance-carousel
+            [overall]="overallCardBalance()"
+            [period]="periodCardBalance()"
+            [currency]="group()!.currency"
+            [periodTitle]="periodCardTitle()"
+            [periodSubtitle]="periodCardSubtitle()"
+            [breakdown]="balanceBreakdownForCard()"
+          ></app-balance-carousel>
 
-          @if (filterStore.hasActiveFilters()) {
-            <p
-              class="text-[11px] font-bold uppercase tracking-wider text-muted mt-6 mb-2 flex items-center gap-2"
-            >
-              Filtered balance
-              <span class="text-[10px] font-semibold text-primary normal-case"
-                >(excludes settlements)</span
+          <!-- Suggested settlements: static vertical lists (never a carousel) so
+               Overall and Period can be compared at a glance. Household groups
+               derive them from the running-balance model (consistent with the
+               cards); everyone else from the settlements engine. -->
+          @if (isHousehold()) {
+            @if (
+              householdOverallSettlements().length > 0 ||
+              householdMonthSettlements().length > 0
+            ) {
+              <div
+                class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 mt-4 space-y-5"
               >
-            </p>
-            <app-group-balances
-              [userBalance]="filteredUserBalance()"
-              [groupCurrency]="group()!.currency"
-              [suggestedSettlements]="filteredSuggestedSettlements()"
-              [members]="members()"
-            ></app-group-balances>
+                <h2 class="text-xl font-bold">Suggested Settlements</h2>
+                <app-suggested-settlements
+                  scopeLabel="Overall"
+                  [settlements]="householdOverallSettlements()"
+                  [members]="members()"
+                  [nameByKey]="householdMemberNameByKey()"
+                ></app-suggested-settlements>
+                <app-suggested-settlements
+                  [scopeLabel]="periodCardTitle()"
+                  [settlements]="householdMonthSettlements()"
+                  [members]="members()"
+                  [nameByKey]="householdMemberNameByKey()"
+                ></app-suggested-settlements>
+              </div>
+            }
+          } @else if (
+            suggestedSettlements().length > 0 ||
+            filteredSuggestedSettlements().length > 0
+          ) {
+            <div
+              class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-6 shadow-xl shadow-black/5 mt-4 space-y-5"
+            >
+              <h2 class="text-xl font-bold">Suggested Settlements</h2>
+              <app-suggested-settlements
+                scopeLabel="Overall"
+                [settlements]="suggestedSettlements()"
+                [members]="members()"
+              ></app-suggested-settlements>
+              <app-suggested-settlements
+                [scopeLabel]="periodCardTitle()"
+                [settlements]="filteredSuggestedSettlements()"
+                [members]="members()"
+                [excludesSettlements]="true"
+              ></app-suggested-settlements>
+            </div>
           }
         }
 
