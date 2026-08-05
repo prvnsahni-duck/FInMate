@@ -135,7 +135,6 @@ export class CreateExpenseModalComponent implements OnChanges {
   selectedUserIds = new Set<string>();
   splitMode: EditableSplitMode = 'equal';
   splitDraftAmounts = new Map<string, number>();
-  isSplitEditorOpen = signal(false);
   participantSearchTerm = signal('');
   private splitExplicitlyChanged = false;
   isSubmitting = false;
@@ -480,11 +479,6 @@ export class CreateExpenseModalComponent implements OnChanges {
     );
   });
 
-  selectedParticipantCount = computed(() => {
-    this.changeTick();
-    return this.selectedUserIds.size;
-  });
-
   selectedParticipants = computed(() => {
     this.changeTick();
     return this.availableParticipants.filter((participant) =>
@@ -495,6 +489,28 @@ export class CreateExpenseModalComponent implements OnChanges {
   splitTotalCents = computed(() => {
     this.changeTick();
     return this.amountCents(this.expenseForm.get('amountTotal')?.value);
+  });
+
+  /**
+   * Live per-participant equal share (in cents), recomputed from the total and
+   * the current selection. Drives the read-only amounts shown in Equal mode so
+   * they update instantly as the amount or participant set changes — the equal
+   * split is never stored in `splitDraftAmounts` (that map is only meaningful in
+   * Custom/fixed mode). Remainder cents go to the first N participants, matching
+   * `seedSplitDraftAmounts` so switching Equal → Custom pre-fills identical rows.
+   */
+  equalShareCents = computed<Map<string, number>>(() => {
+    this.changeTick();
+    const participants = this.selectedParticipants();
+    const map = new Map<string, number>();
+    if (!participants.length) return map;
+    const totalCents = this.splitTotalCents();
+    const baseCents = Math.floor(totalCents / participants.length);
+    const remainder = totalCents - baseCents * participants.length;
+    participants.forEach((participant, index) => {
+      map.set(participant.id, baseCents + (index < remainder ? 1 : 0));
+    });
+    return map;
   });
 
   splitAssignedCents = computed(() => {
@@ -605,10 +621,6 @@ export class CreateExpenseModalComponent implements OnChanges {
     if (cur === 'INR') return '₹';
     if (cur === 'EUR') return '€';
     return '$';
-  }
-
-  currencyCode(): string {
-    return this.expenseForm.get('currency')?.value || 'USD';
   }
 
   getTodayDateString(): string {
@@ -982,15 +994,6 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
     this.markChanged();
   }
-  openSplitEditor(): void {
-    this.seedSplitDraftAmounts();
-    this.isSplitEditorOpen.set(true);
-  }
-
-  closeSplitEditor(): void {
-    this.isSplitEditorOpen.set(false);
-  }
-
   selectSplitMode(mode: EditableSplitMode): void {
     const previousMode = this.splitMode;
     if (mode === 'fixed' && previousMode !== 'fixed') {
@@ -1003,11 +1006,18 @@ export class CreateExpenseModalComponent implements OnChanges {
     this.markChanged();
   }
 
-  resetSplitToEqual(): void {
-    this.splitMode = 'equal';
-    this.splitExplicitlyChanged = true;
-    this.seedSplitDraftAmounts();
-    this.markChanged();
+  /**
+   * Focusing an amount field while in Equal mode flips the whole split to
+   * Custom (fixed) — the second way to enter Custom mode besides the segmented
+   * control (the first is the "Custom" toggle). `selectSplitMode('fixed')` seeds
+   * every draft amount from the current equal shares, so the field the user
+   * tapped (and every other) starts pre-filled with its equal value, ready to
+   * edit. No-op once already in Custom mode.
+   */
+  onAmountFocus(): void {
+    if (this.splitMode === 'equal') {
+      this.selectSplitMode('fixed');
+    }
   }
 
   setExactSplitAmount(userId: string, value: number | string | null): void {
@@ -1032,6 +1042,11 @@ export class CreateExpenseModalComponent implements OnChanges {
   }
 
   splitDisplayAmount(userId: string): number {
+    // Equal mode reads the live computed share (never the draft map, which only
+    // holds Custom/fixed amounts); Custom mode reads the user-entered draft.
+    if (this.splitMode === 'equal') {
+      return this.fromCents(this.equalShareCents().get(userId) ?? 0);
+    }
     return this.splitDraftAmounts.get(userId) ?? 0;
   }
 
