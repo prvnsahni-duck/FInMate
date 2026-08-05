@@ -8,3 +8,6 @@
 # Angular component templates use Angular-specific attribute syntax
 # (e.g. [class.bg-error/15]) that Prettier's HTML parser cannot handle.
 **/*.html
+
+# Cursor rule files (.mdc) have no Prettier parser.
+**/*.mdc
