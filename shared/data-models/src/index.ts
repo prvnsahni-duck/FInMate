@@ -27,6 +27,7 @@ export * from './lib/audit-log.entity';
 export * from './lib/encryption.transformer';
 export * from './lib/encrypted-envelope';
 export * from './lib/api-responses';
+export * from './lib/ledger-debt-simplifier';
 
 // Shared validation DTOs
 export * from './lib/dto/auth.dto';

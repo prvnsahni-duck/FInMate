@@ -279,16 +279,18 @@ export class GroupsController {
   @Get(':id/carry-forward')
   async getCarryForward(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query('month') month: string,
+    @Query() query: Record<string, string>,
     @Req() req: Request & { user: { id: string } },
   ) {
-    // Default to current month if not provided
-    const ledgerMonth = month ?? new Date().toISOString().slice(0, 7);
+    // Range-aware: the household summary now honors the shared TimeScope (date
+    // range + preset) passed as query params, aggregating every month in range.
+    // An empty range (All Time) yields the full-history figures.
+    const filter = parseRawGroupExpenseFilter(query);
     const result =
-      await this.expensesCarryForwardService.getCarryForwardSummary(
+      await this.expensesCarryForwardService.getHouseholdScopeSummary(
         req.user.id,
         id,
-        ledgerMonth,
+        filter,
       );
     return new SuccessResponse(
       'Carry-forward summary retrieved successfully',

@@ -68,6 +68,21 @@ export const DEFAULT_GROUP_FILTER: GroupFilter = {
 };
 
 /**
+ * The single, shared interpretation of the selected time period for the Group
+ * module. Every date-driven surface (ledger, analytics, export, balance period
+ * card, suggested settlements, household contribution graph) must derive its
+ * period from this — never from its own month/date math. `from`/`to` are
+ * inclusive `YYYY-MM-DD` bounds (both undefined for `all_time`); `label` is the
+ * canonical display string from `formatDateRangeLabel`.
+ */
+export interface TimeScope {
+  from?: string;
+  to?: string;
+  preset: DatePreset;
+  label: string;
+}
+
+/**
  * Count of non-default filters — drives the notification badge. The default
  * `this_month` date and `both` transaction type never count, and sort ordering
  * is not a filter, so a freshly opened group shows no badge.

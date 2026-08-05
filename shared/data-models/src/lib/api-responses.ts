@@ -138,6 +138,19 @@ export interface CarryForwardBalance {
   netBalance: number;
   percentage: number;
   currency: string;
+  /** This month's own activity (paid − expected), excluding carried-in balance. */
+  currentMonthNet: number;
+  /**
+   * Net from materialized `isCarryForward` rollover expenses. Retained for
+   * reference; the running-balance breakdown uses `openingBalance` instead.
+   */
+  carryForwardNet: number;
+  /** Running balance carried in from all prior months (this period's Opening). */
+  openingBalance: number;
+  /** openingBalance + currentMonthNet — the balance through this period. */
+  closingBalance: number;
+  /** Full-history running balance, independent of the selected month (Overall). */
+  overallBalance: number;
 }
 
 export interface GroupContributionResponse {

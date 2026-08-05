@@ -52,19 +52,31 @@ describe('SettlementsService', () => {
       // group-keyed mock implementations still resolve the right expenses.
       createQueryBuilder: jest.fn(() => {
         let capturedGroupId: string | undefined;
+        // The filtered/period query adds `expense.isCarryForward = false`; honor
+        // just that one clause so tests can assert carry-forward exclusion (the
+        // other andWhere clauses stay no-ops, exercised by the DB layer instead).
+        let excludeCarryForward = false;
         const qb: any = {
           leftJoinAndSelect: jest.fn(() => qb),
           where: jest.fn((_sql: string, params?: any) => {
             if (params?.groupId) capturedGroupId = params.groupId;
             return qb;
           }),
-          andWhere: jest.fn(() => qb),
+          andWhere: jest.fn((sql: string) => {
+            if (typeof sql === 'string' && sql.includes('isCarryForward')) {
+              excludeCarryForward = true;
+            }
+            return qb;
+          }),
           setParameter: jest.fn(() => qb),
-          getMany: jest.fn(() =>
-            mockExpenseRepository.find({
+          getMany: jest.fn(async () => {
+            const rows = await mockExpenseRepository.find({
               where: { group: { id: capturedGroupId } },
-            }),
-          ),
+            });
+            return excludeCarryForward
+              ? (rows ?? []).filter((e: any) => !e.isCarryForward)
+              : rows;
+          }),
         };
         return qb;
       }),
@@ -469,6 +481,120 @@ describe('SettlementsService', () => {
         amount: 40.0,
         currency: 'USD',
       });
+    });
+
+    it('returns a caller breakdown where opening + period = closing', async () => {
+      // A pays 100, B owes 100. A settlement (B→A 30) folds into overall only.
+      // Caller = A: closing (overall) = 100 − 30 = 70; period (filtered, no
+      // settlements) = 100; opening = closing − period = −30 (the settlement,
+      // correctly attributed to the carried-in Opening, never the period).
+      const userA = { id: 'aaaa', email: 'a@ex.com', displayName: 'User A' };
+      const userB = { id: 'bbbb', email: 'b@ex.com', displayName: 'User B' };
+      const mockMembers = [
+        { id: 'member-a', user: userA, joinStatus: 'active' },
+        { id: 'member-b', user: userB, joinStatus: 'active' },
+      ] as any[];
+
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({
+        id: 'group-id',
+        currency: 'USD',
+      } as any);
+      groupMemberRepository.find.mockResolvedValueOnce(mockMembers);
+
+      expenseRepository.find.mockResolvedValue([
+        { id: 'exp-1', amountTotal: 100.0, currency: 'USD', paidByUser: userA },
+      ] as any[]);
+      expenseSplitRepository.find.mockResolvedValue([
+        {
+          expense: { id: 'exp-1', currency: 'USD' },
+          participantUser: userB,
+          amountOwed: 100.0,
+        },
+      ] as any[]);
+      settlementRepository.find.mockResolvedValue([
+        { amount: 30.0, currency: 'USD', fromUser: userB, toUser: userA },
+      ] as any[]);
+
+      // A filter must be supplied for a distinct filtered/period view to be
+      // computed (otherwise filtered === overall).
+      const result = await service.calculateGroupBalances('aaaa', 'group-id', {
+        from: '2020-01-01',
+      });
+
+      expect(result.breakdown).toEqual({
+        currency: 'USD',
+        openingBalance: -30.0,
+        currentPeriodBalance: 100.0,
+        closingBalance: 70.0,
+      });
+      expect(
+        result.breakdown.openingBalance + result.breakdown.currentPeriodBalance,
+      ).toBeCloseTo(result.breakdown.closingBalance, 2);
+    });
+
+    it('excludes system carry-forward expenses from the filtered/period view but keeps them in overall', async () => {
+      // Household rollover: a normal 100 expense (A pays, B owes) plus a
+      // system carry-forward 40 expense (A pays, B owes). Overall counts both
+      // (A +140/owed → net 140−0); the period slice drops the carry-forward.
+      const userA = { id: 'aaaa', email: 'a@ex.com', displayName: 'User A' };
+      const userB = { id: 'bbbb', email: 'b@ex.com', displayName: 'User B' };
+      const mockMembers = [
+        { id: 'member-a', user: userA, joinStatus: 'active' },
+        { id: 'member-b', user: userB, joinStatus: 'active' },
+      ] as any[];
+
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member',
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({
+        id: 'group-id',
+        currency: 'USD',
+      } as any);
+      groupMemberRepository.find.mockResolvedValueOnce(mockMembers);
+
+      expenseRepository.find.mockResolvedValue([
+        {
+          id: 'exp-1',
+          amountTotal: 100.0,
+          currency: 'USD',
+          paidByUser: userA,
+          isCarryForward: false,
+        },
+        {
+          id: 'cf-1',
+          amountTotal: 40.0,
+          currency: 'USD',
+          paidByUser: userA,
+          isCarryForward: true,
+        },
+      ] as any[]);
+      expenseSplitRepository.find.mockResolvedValue([
+        {
+          expense: { id: 'exp-1', currency: 'USD' },
+          participantUser: userB,
+          amountOwed: 100.0,
+        },
+        {
+          expense: { id: 'cf-1', currency: 'USD' },
+          participantUser: userB,
+          amountOwed: 40.0,
+        },
+      ] as any[]);
+      settlementRepository.find.mockResolvedValue([]);
+
+      const result = await service.calculateGroupBalances('aaaa', 'group-id', {
+        from: '2020-01-01',
+      });
+
+      // Overall keeps the carry-forward: A net = 100 + 40 = 140.
+      expect(result.breakdown.closingBalance).toBe(140.0);
+      // Period drops it: A net = 100 only.
+      expect(result.breakdown.currentPeriodBalance).toBe(100.0);
+      // Opening therefore carries the 40 rollover.
+      expect(result.breakdown.openingBalance).toBe(40.0);
     });
   });
 

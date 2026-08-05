@@ -71,6 +71,8 @@ export interface ExpenseFieldChange {
  * edit mode. Every field the form can touch is recorded here so the current
  * form state can be diffed against it (see `changeSummary`).
  */
+type EditableSplitMode = 'equal' | 'fixed';
+
 interface ExpenseSnapshot {
   title: string;
   description: string;
@@ -131,6 +133,10 @@ export class CreateExpenseModalComponent implements OnChanges {
   @Output() closeModalEvent = new EventEmitter<void>();
 
   selectedUserIds = new Set<string>();
+  splitMode: EditableSplitMode = 'equal';
+  splitDraftAmounts = new Map<string, number>();
+  participantSearchTerm = signal('');
+  private splitExplicitlyChanged = false;
   isSubmitting = false;
   errorMessage = '';
   attachedFiles: { name: string; size: string; key: string }[] = [];
@@ -334,12 +340,23 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
 
     const currentParticipants = Array.from(this.selectedUserIds).sort();
-    if (!this.arraysEqual(currentParticipants, snap.participantIds)) {
+    const participantsChanged = !this.arraysEqual(
+      currentParticipants,
+      snap.participantIds,
+    );
+    if (participantsChanged) {
       changes.push({
         key: 'participants',
         label: 'Participants',
         from: this.participantNames(snap.participantIds),
         to: this.participantNames(currentParticipants),
+      });
+    } else if (this.splitExplicitlyChanged) {
+      changes.push({
+        key: 'participants',
+        label: 'Split',
+        from: 'Original split',
+        to: this.splitSummary(),
       });
     }
 
@@ -422,6 +439,137 @@ export class CreateExpenseModalComponent implements OnChanges {
   private fileCountLabel(count: number): string {
     return count === 1 ? '1 file' : `${count} files`;
   }
+  private amountCents(value: number | null | undefined): number {
+    if (
+      value === null ||
+      value === undefined ||
+      !Number.isFinite(Number(value))
+    ) {
+      return 0;
+    }
+    return Math.round((Number(value) + Number.EPSILON) * 100);
+  }
+
+  private fromCents(value: number): number {
+    return Math.round(value) / 100;
+  }
+
+  participantName(participant: { name?: string | null }): string {
+    return participant.name || 'Member';
+  }
+
+  participantInitials(name: string | null | undefined): string {
+    return (
+      (name || 'Member')
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? '')
+        .join('') || '?'
+    );
+  }
+
+  filteredParticipants = computed(() => {
+    this.changeTick();
+    const term = this.participantSearchTerm().trim().toLowerCase();
+    const participants = this.availableParticipants;
+    if (participants.length < 8 || !term) return participants;
+    return participants.filter((participant) =>
+      this.participantName(participant).toLowerCase().includes(term),
+    );
+  });
+
+  selectedParticipants = computed(() => {
+    this.changeTick();
+    return this.availableParticipants.filter((participant) =>
+      this.selectedUserIds.has(participant.id),
+    );
+  });
+
+  splitTotalCents = computed(() => {
+    this.changeTick();
+    return this.amountCents(this.expenseForm.get('amountTotal')?.value);
+  });
+
+  /**
+   * Live per-participant equal share (in cents), recomputed from the total and
+   * the current selection. Drives the read-only amounts shown in Equal mode so
+   * they update instantly as the amount or participant set changes — the equal
+   * split is never stored in `splitDraftAmounts` (that map is only meaningful in
+   * Custom/fixed mode). Remainder cents go to the first N participants, matching
+   * `seedSplitDraftAmounts` so switching Equal → Custom pre-fills identical rows.
+   */
+  equalShareCents = computed<Map<string, number>>(() => {
+    this.changeTick();
+    const participants = this.selectedParticipants();
+    const map = new Map<string, number>();
+    if (!participants.length) return map;
+    const totalCents = this.splitTotalCents();
+    const baseCents = Math.floor(totalCents / participants.length);
+    const remainder = totalCents - baseCents * participants.length;
+    participants.forEach((participant, index) => {
+      map.set(participant.id, baseCents + (index < remainder ? 1 : 0));
+    });
+    return map;
+  });
+
+  splitAssignedCents = computed(() => {
+    this.changeTick();
+    if (this.splitMode !== 'fixed') return this.splitTotalCents();
+    return this.selectedParticipants().reduce(
+      (sum, participant) =>
+        sum + this.amountCents(this.splitDraftAmounts.get(participant.id) ?? 0),
+      0,
+    );
+  });
+
+  splitRemainingCents = computed(
+    () => this.splitTotalCents() - this.splitAssignedCents(),
+  );
+
+  splitIsValid = computed(() => {
+    this.changeTick();
+    if (this.selectedUserIds.size === 0) return false;
+    if (this.splitMode === 'equal') return true;
+    return this.splitRemainingCents() === 0;
+  });
+
+  splitSummary = computed(() => {
+    this.changeTick();
+    const count = this.selectedUserIds.size;
+    if (count === 0) return 'No people selected';
+    if (!this.splitExplicitlyChanged && this.originalSplits?.length) {
+      const originalType = this.originalSplits[0]?.splitType;
+      if (originalType === 'percent')
+        return `Percentage split between ${count} people`;
+      if (originalType === 'share')
+        return `Share split between ${count} people`;
+      if (originalType === 'fixed') return `Exact amounts for ${count} people`;
+    }
+    if (this.splitMode === 'fixed') return `Exact amounts for ${count} people`;
+    return `Equal between ${count} ${count === 1 ? 'person' : 'people'}`;
+  });
+
+  splitAssignedLabel = computed(() =>
+    this.formatAmount(
+      this.fromCents(this.splitAssignedCents()),
+      this.expenseForm.get('currency')?.value ?? undefined,
+    ),
+  );
+
+  splitRemainingLabel = computed(() =>
+    this.formatAmount(
+      Math.abs(this.fromCents(this.splitRemainingCents())),
+      this.expenseForm.get('currency')?.value ?? undefined,
+    ),
+  );
+
+  splitTotalLabel = computed(() =>
+    this.formatAmount(
+      this.fromCents(this.splitTotalCents()),
+      this.expenseForm.get('currency')?.value ?? undefined,
+    ),
+  );
 
   constructor() {
     this.expenseForm.valueChanges
@@ -734,6 +882,20 @@ export class CreateExpenseModalComponent implements OnChanges {
             shareValue: s.shareValue,
           }))
         : null;
+      this.splitExplicitlyChanged = false;
+      const originalSplitType = this.originalSplits?.[0]?.splitType;
+      this.splitMode = originalSplitType === 'fixed' ? 'fixed' : 'equal';
+      this.splitDraftAmounts.clear();
+      for (const split of this.expense.splits ?? []) {
+        const uid = this.resolveParticipantUserId(
+          split.participantUserId,
+          split.participantGroupMemberId,
+        );
+        if (uid && split.splitType === 'fixed') {
+          this.splitDraftAmounts.set(uid, Number(split.shareValue));
+        }
+      }
+      this.seedSplitDraftAmounts();
       this.originalSnapshot = {
         title: this.expense.title ?? '',
         description: this.expense.description ?? '',
@@ -826,8 +988,106 @@ export class CreateExpenseModalComponent implements OnChanges {
       this.selectedUserIds.delete(userId);
     } else {
       this.selectedUserIds.add(userId);
+      if (this.splitMode === 'fixed' && !this.splitDraftAmounts.has(userId)) {
+        this.splitDraftAmounts.set(userId, 0);
+      }
     }
     this.markChanged();
+  }
+  selectSplitMode(mode: EditableSplitMode): void {
+    const previousMode = this.splitMode;
+    if (mode === 'fixed' && previousMode !== 'fixed') {
+      this.splitMode = 'equal';
+      this.seedSplitDraftAmounts();
+    }
+    this.splitMode = mode;
+    this.splitExplicitlyChanged = true;
+    this.seedSplitDraftAmounts();
+    this.markChanged();
+  }
+
+  /**
+   * Focusing an amount field while in Equal mode flips the whole split to
+   * Custom (fixed) — the second way to enter Custom mode besides the segmented
+   * control (the first is the "Custom" toggle). `selectSplitMode('fixed')` seeds
+   * every draft amount from the current equal shares, so the field the user
+   * tapped (and every other) starts pre-filled with its equal value, ready to
+   * edit. No-op once already in Custom mode.
+   */
+  onAmountFocus(): void {
+    if (this.splitMode === 'equal') {
+      this.selectSplitMode('fixed');
+    }
+  }
+
+  setExactSplitAmount(userId: string, value: number | string | null): void {
+    const amount = value === null || value === '' ? 0 : Number(value);
+    this.splitDraftAmounts.set(userId, Number.isFinite(amount) ? amount : 0);
+    this.splitMode = 'fixed';
+    this.splitExplicitlyChanged = true;
+    this.markChanged();
+  }
+
+  selectAllParticipants(): void {
+    this.availableParticipants.forEach((participant) => {
+      this.selectedUserIds.add(participant.id);
+    });
+    this.seedSplitDraftAmounts();
+    this.markChanged();
+  }
+
+  clearParticipants(): void {
+    this.selectedUserIds.clear();
+    this.markChanged();
+  }
+
+  splitDisplayAmount(userId: string): number {
+    // Equal mode reads the live computed share (never the draft map, which only
+    // holds Custom/fixed amounts); Custom mode reads the user-entered draft.
+    if (this.splitMode === 'equal') {
+      return this.fromCents(this.equalShareCents().get(userId) ?? 0);
+    }
+    return this.splitDraftAmounts.get(userId) ?? 0;
+  }
+
+  private seedSplitDraftAmounts(): void {
+    const participants = this.selectedParticipants();
+    if (!participants.length) return;
+
+    if (this.splitMode === 'fixed') {
+      for (const participant of participants) {
+        if (!this.splitDraftAmounts.has(participant.id)) {
+          this.splitDraftAmounts.set(participant.id, 0);
+        }
+      }
+      return;
+    }
+
+    const totalCents = this.splitTotalCents();
+    const baseCents = Math.floor(totalCents / participants.length);
+    const remainder = totalCents - baseCents * participants.length;
+    participants.forEach((participant, index) => {
+      this.splitDraftAmounts.set(
+        participant.id,
+        this.fromCents(baseCents + (index < remainder ? 1 : 0)),
+      );
+    });
+  }
+
+  private currentSplitPayload(): ExpenseSplitInputDto[] {
+    if (this.splitMode === 'fixed') {
+      return Array.from(this.selectedUserIds).map((userId) => ({
+        participantUserId: userId,
+        splitType: 'fixed' as const,
+        shareValue: this.splitDraftAmounts.get(userId) ?? 0,
+      }));
+    }
+
+    return Array.from(this.selectedUserIds).map((userId) => ({
+      participantUserId: userId,
+      splitType: 'equal' as const,
+      shareValue: 1,
+    }));
   }
 
   onSplitToggleChange() {
@@ -948,6 +1208,11 @@ export class CreateExpenseModalComponent implements OnChanges {
     }
 
     if (this.expenseForm.valid && this.selectedUserIds.size > 0) {
+      if (!this.splitIsValid()) {
+        this.errorMessage = 'Split amounts must add up to the total.';
+        return;
+      }
+
       this.isSubmitting = true;
       this.errorMessage = '';
 
@@ -965,18 +1230,16 @@ export class CreateExpenseModalComponent implements OnChanges {
           this.originalSnapshot.participantIds,
         );
       const splits: ExpenseSplitInputDto[] =
-        participantsUnchanged && this.originalSplits?.length
+        participantsUnchanged &&
+        !this.splitExplicitlyChanged &&
+        this.originalSplits?.length
           ? this.originalSplits.map((s) => ({
               participantUserId: s.participantUserId,
               participantGroupMemberId: s.participantGroupMemberId,
               splitType: s.splitType,
               shareValue: s.shareValue,
             }))
-          : Array.from(this.selectedUserIds).map((userId) => ({
-              participantUserId: userId,
-              splitType: 'equal' as const,
-              shareValue: 1,
-            }));
+          : this.currentSplitPayload();
 
       const title = formValue.title;
       const amountTotal = formValue.amountTotal;

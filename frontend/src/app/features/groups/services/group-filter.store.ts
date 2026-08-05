@@ -5,6 +5,7 @@ import {
   GroupFilter,
   GroupSortBy,
   SortOrder,
+  TimeScope,
   TransactionTypeFilter,
   cloneFilter,
   countActiveFilters,
@@ -61,6 +62,22 @@ export class GroupFilterStore {
     const d = this._applied().date;
     const { from, to } = this.resolvedRange();
     return formatDateRangeLabel(d.preset, from, to);
+  });
+
+  /**
+   * The shared TimeScope derived purely from the applied date filter — the
+   * single source of truth every date-driven surface should consume. Household
+   * month navigation feeds through the same applied date (see the owning
+   * component), so this stays authoritative in every mode.
+   */
+  readonly timeScope = computed<TimeScope>(() => {
+    const { from, to } = this.resolvedRange();
+    return {
+      from,
+      to,
+      preset: this._applied().date.preset,
+      label: this.dateRangeLabel(),
+    };
   });
 
   /** Seed both applied and draft (e.g. from URL query params on load). */

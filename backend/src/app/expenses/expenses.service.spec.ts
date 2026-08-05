@@ -1726,6 +1726,174 @@ describe('ExpensesService', () => {
         const rowB = balances.find((b) => b.groupMemberId === 'member-b');
         expect(rowA!.netBalance).toBe(30);
         expect(rowB!.netBalance).toBe(-30);
+
+        // Breakdown decomposition: a pure carry-forward month has all of the
+        // balance in the opening (carryForwardNet) and nothing in this month,
+        // and opening + this-month must reconcile to netBalance.
+        expect(rowA!.carryForwardNet).toBe(30);
+        expect(rowA!.currentMonthNet).toBe(0);
+        expect(rowB!.carryForwardNet).toBe(-30);
+        expect(rowB!.currentMonthNet).toBe(0);
+        for (const row of balances) {
+          expect(row.carryForwardNet + row.currentMonthNet).toBeCloseTo(
+            row.netBalance,
+            2,
+          );
+        }
+      });
+
+      it("running balance: a prior month's net becomes this month's Opening, not This Month", async () => {
+        // July: A pays 100 (50/50) → net A +50, B −50. August: no activity.
+        // Viewing August, the ₹50 must appear as Opening (carried in), This
+        // Month must be 0, and Overall must be the full-history +50 — never
+        // counting the prior month as current activity. This is the exact bug
+        // the user reported (Opening 0 / This Month = prior balance).
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        const memberA = {
+          id: 'member-a',
+          user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' },
+          joinStatus: 'active',
+        };
+        const memberB = {
+          id: 'member-b',
+          user: { id: 'user-b', displayName: 'User B', email: 'b@finmate.com' },
+          joinStatus: 'active',
+        };
+        groupMemberRepository.find.mockResolvedValue([memberA, memberB] as any);
+
+        const allExpenses = [
+          {
+            id: 'jul-1',
+            amountTotal: 100,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByUser: { id: 'user-a' },
+            paidByGroupMember: undefined,
+            ledgerMonth: '2026-07',
+            expenseDate: '2026-07-15',
+          },
+        ];
+        // The selected-month query filters by ledgerMonth; the running-balance
+        // query fetches all months (no ledgerMonth). Honor both.
+        expenseRepository.find.mockImplementation((opts: any) => {
+          const lm = opts?.where?.ledgerMonth;
+          return Promise.resolve(
+            lm ? allExpenses.filter((e) => e.ledgerMonth === lm) : allExpenses,
+          ) as any;
+        });
+
+        const balances = await service.getCarryForwardSummary(
+          'user-a',
+          'group-id',
+          '2026-08',
+        );
+        const rowA = balances.find((b) => b.groupMemberId === 'member-a')!;
+        const rowB = balances.find((b) => b.groupMemberId === 'member-b')!;
+
+        // August itself is empty.
+        expect(rowA.currentMonthNet).toBe(0);
+        // July's balance is carried into August's Opening.
+        expect(rowA.openingBalance).toBe(50);
+        expect(rowA.closingBalance).toBe(50);
+        // Overall is the full-history running balance, month-independent.
+        expect(rowA.overallBalance).toBe(50);
+
+        expect(rowB.currentMonthNet).toBe(0);
+        expect(rowB.openingBalance).toBe(-50);
+        expect(rowB.overallBalance).toBe(-50);
+
+        // Identity holds for every member.
+        for (const row of balances) {
+          expect(row.openingBalance + row.currentMonthNet).toBeCloseTo(
+            row.closingBalance,
+            2,
+          );
+        }
+      });
+
+      it('getHouseholdScopeSummary aggregates the whole date range and puts pre-range months in Opening', async () => {
+        // Jun: A pays 100 (50/50). Jul: A pays 60 (50/50). Viewing July only,
+        // the period = July (A net +30), Opening = June carried in (A +50),
+        // Closing = 80, Overall (full history) = 80.
+        groupMemberRepository.findOne.mockResolvedValue({
+          id: 'membership-id',
+          role: 'member',
+          joinStatus: 'active',
+        } as any);
+        groupRepository.findOne.mockResolvedValue({
+          id: 'group-id',
+          groupType: 'household',
+          currency: 'USD',
+        } as any);
+
+        const memberA = {
+          id: 'member-a',
+          user: { id: 'user-a', displayName: 'User A', email: 'a@finmate.com' },
+          joinStatus: 'active',
+        };
+        const memberB = {
+          id: 'member-b',
+          user: { id: 'user-b', displayName: 'User B', email: 'b@finmate.com' },
+          joinStatus: 'active',
+        };
+        groupMemberRepository.find.mockResolvedValue([memberA, memberB] as any);
+
+        expenseRepository.find.mockResolvedValue([
+          {
+            id: 'jun-1',
+            amountTotal: 100,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByUser: { id: 'user-a' },
+            ledgerMonth: '2026-06',
+            expenseDate: '2026-06-15',
+          },
+          {
+            id: 'jul-1',
+            amountTotal: 60,
+            currency: 'USD',
+            isCarryForward: false,
+            paidByUser: { id: 'user-a' },
+            ledgerMonth: '2026-07',
+            expenseDate: '2026-07-10',
+          },
+        ] as any);
+
+        const rows = await service.getHouseholdScopeSummary(
+          'user-a',
+          'group-id',
+          { from: '2026-07-01', to: '2026-07-31' },
+        );
+        const rowA = rows.find((r) => r.groupMemberId === 'member-a')!;
+
+        expect(rowA.paid).toBe(60); // July only
+        expect(rowA.expected).toBe(30); // 50% of July's 60
+        expect(rowA.netBalance).toBe(30); // period net
+        expect(rowA.openingBalance).toBe(50); // June carried in
+        expect(rowA.closingBalance).toBe(80); // opening + period
+        expect(rowA.overallBalance).toBe(80); // full history
+
+        // Widening to Jun–Aug folds June into the period instead of Opening.
+        const wide = await service.getHouseholdScopeSummary(
+          'user-a',
+          'group-id',
+          { from: '2026-06-01', to: '2026-08-31' },
+        );
+        const wideA = wide.find((r) => r.groupMemberId === 'member-a')!;
+        expect(wideA.paid).toBe(160);
+        expect(wideA.netBalance).toBe(80);
+        expect(wideA.openingBalance).toBe(0);
+        expect(wideA.overallBalance).toBe(80);
       });
 
       it('registered-only household regression: behaves identically to before', async () => {

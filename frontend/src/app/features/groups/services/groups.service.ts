@@ -39,12 +39,27 @@ export interface GroupFilterQueryOptions {
 }
 
 /**
+ * The caller's balance decomposed for the Balance Breakdown view. Computed by
+ * the backend (single source of truth); `openingBalance + currentPeriodBalance
+ * = closingBalance` always holds. Nested/optional so the backend can add further
+ * terms later without breaking older clients.
+ */
+export interface GroupBalanceBreakdown {
+  currency: string;
+  openingBalance: number;
+  currentPeriodBalance: number;
+  closingBalance: number;
+}
+
+/**
  * Balances response: `overall` is the all-time picture (carry-forward intact);
- * `filtered` recomputes balances/settlements for the active filter.
+ * `filtered` recomputes balances/settlements for the active filter; `breakdown`
+ * decomposes the caller's balance (opening/current-period/closing).
  */
 export interface GroupBalancesResult {
   overall: GroupBalancesResponse;
   filtered: GroupBalancesResponse;
+  breakdown?: GroupBalanceBreakdown;
 }
 
 @Injectable({
@@ -242,10 +257,13 @@ export class GroupsService {
    */
   getCarryForward(
     groupId: string,
-    month: string,
+    options?: GroupFilterQueryOptions,
   ): Observable<CarryForwardBalance[]> {
+    // Range-aware: the household summary honors the shared TimeScope (date range).
+    const params = this.appendFilterParams(new HttpParams(), options);
     return this.http.get<CarryForwardBalance[]>(
-      `${this.baseUrl}/groups/${groupId}/carry-forward?month=${month}`,
+      `${this.baseUrl}/groups/${groupId}/carry-forward`,
+      { params },
     );
   }
 

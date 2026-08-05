@@ -64,6 +64,26 @@ export interface SuggestedSettlement {
   currency: string;
 }
 
+/**
+ * The calling member's balance decomposed for the "Balance Breakdown" view.
+ * Intentionally minimal and nested so future terms (e.g. refunds/settlements
+ * lines) can be added without breaking existing clients. The identity always
+ * holds by construction: `openingBalance + currentPeriodBalance = closingBalance`.
+ *
+ *  - `closingBalance`       — the caller's true all-time balance (carry-forward
+ *                             and settlements folded in). Never affected by filters.
+ *  - `currentPeriodBalance` — the caller's balance within the active filter slice
+ *                             (settlements and system carry-forward excluded).
+ *  - `openingBalance`       — everything carried in before the period
+ *                             (`closing − period`).
+ */
+export interface CallerBalanceBreakdown {
+  currency: string;
+  openingBalance: number;
+  currentPeriodBalance: number;
+  closingBalance: number;
+}
+
 @Injectable()
 export class SettlementsService {
   constructor(
@@ -239,7 +259,36 @@ export class SettlementsService {
     const filtered = filter
       ? await this.computeBalancesCore(groupId, allMembers, filter, false)
       : overall;
-    return { overall, filtered };
+
+    // Decompose the *caller's* balance for the Balance Breakdown UI. The
+    // backend stays the single source of truth: Opening is derived here as
+    // Closing − Period, so the three always reconcile exactly and no refund or
+    // settlement is ever counted twice (settlements live only in Closing;
+    // refunds are signed expenses already inside both sums).
+    const groupCurrency = groupExists.currency;
+    const callerBalanceIn = (view: {
+      balances: Array<{
+        userId: string | null;
+        currency: string;
+        netBalance: number;
+      }>;
+    }): number => {
+      const entry = view.balances.find(
+        (b) => b.userId === userId && b.currency === groupCurrency,
+      );
+      return entry ? entry.netBalance : 0;
+    };
+    const closingBalance = callerBalanceIn(overall);
+    const currentPeriodBalance = callerBalanceIn(filtered);
+    const breakdown: CallerBalanceBreakdown = {
+      currency: groupCurrency,
+      openingBalance:
+        Math.round((closingBalance - currentPeriodBalance) * 100) / 100,
+      currentPeriodBalance,
+      closingBalance,
+    };
+
+    return { overall, filtered, breakdown };
   }
 
   /**
@@ -263,6 +312,14 @@ export class SettlementsService {
       .where('expense.group = :groupId', { groupId })
       .andWhere('expense.status = :status', { status: 'posted' })
       .andWhere('expense.deletedAt IS NULL');
+    // The filtered/period view excludes system carry-forward rollover expenses
+    // (household groups only) so "This Month" reflects real in-period spending
+    // rather than the balance rolled in from prior months — that rolled-in
+    // amount belongs to the Opening balance (Closing − Period), not the period.
+    // The overall view (includeSettlements) keeps them: they're real debt.
+    if (!includeSettlements) {
+      expenseQb.andWhere('expense.isCarryForward = false');
+    }
     if (filter?.from) {
       expenseQb.andWhere('expense.expenseDate >= :balFrom', {
         balFrom: filter.from,

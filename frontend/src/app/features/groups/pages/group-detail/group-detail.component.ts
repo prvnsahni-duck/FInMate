@@ -26,7 +26,10 @@ import { jwtDecode } from 'jwt-decode';
 import { FormsModule } from '@angular/forms';
 import { AnalyticsChartsComponent } from '../../components/analytics-charts/analytics-charts.component';
 import { ConfirmModalComponent } from '../../../../shared/components/confirm-modal/confirm-modal.component';
-import { GroupsService } from '../../services/groups.service';
+import {
+  GroupsService,
+  GroupBalanceBreakdown,
+} from '../../services/groups.service';
 import {
   ExpensesService,
   GroupAnalyticsQuery,
@@ -55,6 +58,7 @@ import {
   Expense,
   ExpenseSplitInputDto,
   Group,
+  simplifyLedgerDebts,
   GroupContributionResponse,
   GroupMember,
   JwtPayload,
@@ -65,10 +69,9 @@ import {
   GroupAuditLog,
 } from '../../components/group-history-log/group-history-log.component';
 import { GroupTrashComponent } from '../../components/group-trash/group-trash.component';
-import {
-  GroupBalancesComponent,
-  SuggestedSettlement,
-} from '../../components/group-balances/group-balances.component';
+import { SuggestedSettlement } from '../../components/group-balances/group-balances.component';
+import { BalanceCarouselComponent } from '../../components/balance-cards/balance-carousel.component';
+import { SuggestedSettlementsComponent } from '../../components/balance-cards/suggested-settlements.component';
 import { GroupMembersComponent } from '../../components/group-members/group-members.component';
 import { CryptoRecoveryPanelComponent } from '../../../../shared/components/crypto-recovery-panel/crypto-recovery-panel.component';
 import {
@@ -79,9 +82,11 @@ import { GroupFilterStore } from '../../services/group-filter.store';
 import {
   DatePreset,
   GroupFilter,
+  TimeScope,
   filterFromQueryParams,
   filterToQueryParams,
 } from '../../models/group-filter.model';
+import { formatDateRangeLabel } from '../../utils/date-preset.util';
 
 /** A single removable filter-summary chip. Per-value for multi-select dimensions. */
 export interface FilterChip {
@@ -140,7 +145,8 @@ export interface LedgerTotals {
     ConfirmModalComponent,
     GroupHistoryLogComponent,
     GroupTrashComponent,
-    GroupBalancesComponent,
+    BalanceCarouselComponent,
+    SuggestedSettlementsComponent,
     GroupMembersComponent,
     DropdownComponent,
     CryptoRecoveryPanelComponent,
@@ -219,6 +225,10 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
         // History and Trash honor the date period too (reset to page 1).
         this.fetchHistoryLogs(g.id);
         this.fetchDeletedExpenses(g.id);
+        // Household contribution graph / period card follow the same TimeScope.
+        if (g.groupType === 'household') {
+          this.fetchCarryForward(g.id);
+        }
       });
     });
   }
@@ -375,6 +385,28 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       };
     }
     return this.filterStore.resolvedRange();
+  });
+
+  /**
+   * The single shared TimeScope for this page — the one object every date-driven
+   * surface (header label, ledger, analytics, balance period card, suggested
+   * settlements, household contribution graph, export) must read. It layers
+   * household month navigation on top of the store's filter and derives the label
+   * from the same `formatDateRangeLabel` generator, so the period and its label
+   * are always consistent. Overall/all-time surfaces deliberately ignore it.
+   */
+  timeScope = computed<TimeScope>(() => {
+    const { from, to } = this.effectiveDateRange();
+    return {
+      from,
+      to,
+      preset: this.filterStore.applied().date.preset,
+      label: formatDateRangeLabel(
+        this.filterStore.applied().date.preset,
+        from,
+        to,
+      ),
+    };
   });
 
   /**
@@ -577,6 +609,8 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   /** Filtered balances/settlements (shown alongside overall when filters active). */
   filteredBalances = signal<BalanceEntry[]>([]);
   filteredSuggestedSettlements = signal<SuggestedSettlement[]>([]);
+  /** Caller's Opening/Current-Period/Closing decomposition (backend-computed). */
+  balanceBreakdown = signal<GroupBalanceBreakdown | null>(null);
   historyLogs = signal<GroupAuditLog[]>([]);
   deletedExpenses = signal<Expense[]>([]);
   carryForwardBalances = signal<CarryForwardBalance[]>([]);
@@ -773,6 +807,131 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
       (b) => b.userId === currentUserId && b.currency === g?.currency,
     );
     return entry ? entry.netBalance : 0;
+  });
+
+  /** True for household (contribution/carry-forward) groups. */
+  isHousehold = computed(() => this.group()?.groupType === 'household');
+
+  /**
+   * The caller's row in the household carry-forward summary for the navigated
+   * month. Null for non-household groups (they use the settlements engine).
+   * Household balances follow the *contribution* model (paid vs. target %), not
+   * expense splits, so the balance card must read from here — the settlements
+   * engine both mis-models household shares and double-counts closed months.
+   */
+  private callerCarryForward = computed(() => {
+    if (!this.isHousehold()) return null;
+    const uid = this.currentUserId();
+    return this.carryForwardBalances().find((b) => b.userId === uid) ?? null;
+  });
+
+  /**
+   * Overall balance for the card. Household uses the full-history running
+   * balance (independent of the navigated month); everyone else the settlements
+   * all-time balance.
+   */
+  overallCardBalance = computed(() => {
+    const cf = this.callerCarryForward();
+    return cf ? cf.overallBalance : this.userBalance();
+  });
+
+  /** Period/"This Month" balance for the card — this month's own net for household. */
+  periodCardBalance = computed(() => {
+    const cf = this.callerCarryForward();
+    return cf ? cf.currentMonthNet : this.filteredUserBalance();
+  });
+
+  /**
+   * Opening / current-period / closing decomposition for the breakdown. Household
+   * reconstructs it from the running carry-forward summary (opening = all prior
+   * months, closing = opening + this month); everyone else uses the settlements
+   * breakdown.
+   */
+  balanceBreakdownForCard = computed<GroupBalanceBreakdown | null>(() => {
+    const cf = this.callerCarryForward();
+    if (cf) {
+      return {
+        currency: cf.currency,
+        openingBalance: cf.openingBalance,
+        currentPeriodBalance: cf.currentMonthNet,
+        closingBalance: cf.closingBalance,
+      };
+    }
+    return this.balanceBreakdown();
+  });
+
+  /** GroupMember.id → display name, for resolving household settlement rows. */
+  householdMemberNameByKey = computed<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const r of this.carryForwardBalances()) {
+      map[r.groupMemberId] = r.displayName ?? 'Member';
+    }
+    return map;
+  });
+
+  /**
+   * Household suggested settlements, derived from the SAME running-balance model
+   * as the cards (so they stay consistent) via the shared debt simplifier —
+   * `overallBalance` for the Overall scope, `currentMonthNet` for This Month.
+   * Keyed by GroupMember.id (resolved to names via householdMemberNameByKey).
+   */
+  private simplifyHousehold(
+    field: 'overallBalance' | 'currentMonthNet',
+  ): SuggestedSettlement[] {
+    const currency = this.group()?.currency ?? 'USD';
+    const balances = this.carryForwardBalances().map((r) => ({
+      key: r.groupMemberId,
+      balance: r[field],
+    }));
+    return simplifyLedgerDebts(balances, currency).map((t) => ({
+      fromUserId: t.fromKey,
+      toUserId: t.toKey,
+      amount: t.amount,
+      currency: t.currency,
+    }));
+  }
+
+  householdOverallSettlements = computed<SuggestedSettlement[]>(() =>
+    this.isHousehold() ? this.simplifyHousehold('overallBalance') : [],
+  );
+
+  householdMonthSettlements = computed<SuggestedSettlement[]>(() =>
+    this.isHousehold() ? this.simplifyHousehold('currentMonthNet') : [],
+  );
+
+  /** True when any non-date filter dimension is active. */
+  hasDimensionFilters = computed(() => {
+    const a = this.filterStore.applied();
+    return !!(
+      a.categories?.length ||
+      a.memberIds?.length ||
+      a.paidByIds?.length ||
+      (a.transactionType && a.transactionType !== 'both') ||
+      a.minAmount != null ||
+      a.maxAmount != null
+    );
+  });
+
+  /**
+   * Title for the second ("period") balance card. Always the neutral
+   * "Current Period" — the exact selection is shown in the subtitle. The Overall
+   * card is never affected by filters; only this one.
+   */
+  periodCardTitle = computed(() => 'Current Period');
+
+  /**
+   * Subtitle for the period card: the shared date-range label for the effective
+   * scope (so it reflects month navigation and every preset via the single
+   * `formatDateRangeLabel` generator), suffixed with "· Filtered" when non-date
+   * dimensions are also active. No hand-rolled month formatting.
+   */
+  periodCardSubtitle = computed(() => {
+    const label = this.timeScope().label;
+    // Household ignores non-date dimensions (contribution model is date-scoped),
+    // so only suffix "· Filtered" where dimensions actually change the figure.
+    return !this.isHousehold() && this.hasDimensionFilters()
+      ? `${label} · Filtered`
+      : label;
   });
 
   // Archive (Delete Group) dialog state
@@ -1123,13 +1282,6 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     return `${y}-${m}`;
   }
 
-  getMonthDisplayName(): string {
-    return this.currentTimelineMonth().toLocaleDateString('en-US', {
-      month: 'long',
-      year: 'numeric',
-    });
-  }
-
   /** Zero-padded last calendar day of a `YYYY-MM` month (e.g. '30' for June,
    *  '28'/'29' for February). Avoids emitting impossible dates like
    *  `2026-06-31`, which the backend's date column rejects. */
@@ -1159,6 +1311,11 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
     if (g?.id) {
       this.fetchExpenses(g.id);
       this.fetchCarryForward(g.id);
+      // Balances feed the "This Month" card + breakdown, whose period is the
+      // navigated household month (effectiveDateRange follows currentTimelineMonth
+      // in month mode). Without this refetch the card/breakdown stay on the old
+      // month even though the ledger and carry-forward bars move.
+      this.fetchBalances(g.id);
       // History and Trash follow the navigated household month too.
       this.fetchHistoryLogs(g.id);
       this.fetchDeletedExpenses(g.id);
@@ -1343,6 +1500,7 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
           this.filteredSuggestedSettlements.set(
             res.filtered.suggestedSettlements,
           );
+          this.balanceBreakdown.set(res.breakdown ?? null);
           this.isLoadingBalances.set(false);
         },
         error: (err) => {
@@ -1437,8 +1595,10 @@ export class GroupDetailComponent implements OnInit, AfterViewInit {
   }
 
   fetchCarryForward(groupId: string) {
+    // Household summary follows the shared TimeScope (effective date range),
+    // aggregating every month in range — never a single hardcoded month.
     this.groupsService
-      .getCarryForward(groupId, this.getCurrentMonthString())
+      .getCarryForward(groupId, this.appliedFilterOptions())
       .subscribe({
         next: (res) => {
           this.carryForwardBalances.set(res || []);

@@ -179,14 +179,16 @@ describe('GroupsService', () => {
   });
 
   describe('getCarryForward', () => {
-    it('should fetch carry-forward balances for a month', (done) => {
-      service.getCarryForward('group-1', '2026-06').subscribe((res) => {
-        expect(res).toEqual([]);
-        done();
-      });
+    it('should fetch carry-forward balances for the filtered date range', (done) => {
+      service
+        .getCarryForward('group-1', { from: '2026-06-01', to: '2026-08-31' })
+        .subscribe((res) => {
+          expect(res).toEqual([]);
+          done();
+        });
 
       const req = httpMock.expectOne(
-        '/api/groups/group-1/carry-forward?month=2026-06',
+        '/api/groups/group-1/carry-forward?from=2026-06-01&to=2026-08-31',
       );
       expect(req.request.method).toBe('GET');
       req.flush([]);
