@@ -500,6 +500,9 @@ Use the latest stable syntax and features from the chosen libraries when officia
 - Interceptors must use the functional `HttpInterceptorFn` signature.
 - Use modern Angular control flow syntax: `@if`, `@else if`, `@else`, `@for`, `@switch`, and `@case`.
 - Avoid importing `CommonModule` in new components; import only specific pipes or directives when needed.
+- Use signals (`signal`, `computed`) for component and derived state; update with `set`/`update`, never `mutate`.
+- Put host bindings in the `host` object of the `@Component`/`@Directive` decorator; do not use `@HostBinding`/`@HostListener`.
+- Accessibility is required: meet WCAG AA (focus management, color contrast, ARIA) and pass AXE checks.
 
 ### NestJS
 
