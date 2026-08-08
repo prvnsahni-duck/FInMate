@@ -15,6 +15,8 @@ import {
   RefreshTokenDto,
   Verify2FaDto,
   ChangePasswordDto,
+  ForgotPasswordDto,
+  ResetPasswordDto,
 } from '@finmate/data-models';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -44,6 +46,48 @@ export class AuthController {
   async verifyEmail(@Query('token') token: string) {
     const result = await this.authService.verifyEmail(token);
     return new SuccessResponse('Email verified successfully', result);
+  }
+
+  @Post('forgot-password')
+  @ThrottleAs(THROTTLE_PROFILES.FORGOT_PASSWORD)
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.requestPasswordReset(dto.email);
+    // Always generic — never reveals whether the address is registered.
+    return new SuccessResponse(
+      'If an account exists for that address, a password reset link has been sent.',
+      {},
+    );
+  }
+
+  @Get('reset-password')
+  @ThrottleAs(THROTTLE_PROFILES.RESET_PASSWORD)
+  async getResetContext(@Query('token') token: string) {
+    const result = await this.authService.getPasswordResetContext(token);
+    return new SuccessResponse('Reset context retrieved successfully', result);
+  }
+
+  @Post('reset-password')
+  @ThrottleAs(THROTTLE_PROFILES.RESET_PASSWORD)
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto, @Req() req: Request) {
+    const context = {
+      ip:
+        req.ip ||
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket.remoteAddress,
+      userAgent: req.headers['user-agent'] as string,
+    };
+    await this.authService.resetPassword(
+      dto.token,
+      dto.newPassword,
+      dto.encryptedPrivateWrappingKey,
+      context,
+    );
+    return new SuccessResponse(
+      'Password reset successfully. Please sign in with your new password.',
+      {},
+    );
   }
 
   @Post('login')

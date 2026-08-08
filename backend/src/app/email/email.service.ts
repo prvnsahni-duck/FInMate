@@ -55,14 +55,19 @@ export class EmailService {
     const fromName =
       this.configService.get<string>('MAIL_FROM_NAME') || 'Finmate';
     // MAIL_FROM_EMAIL is canonical; FROM_EMAIL is kept as a back-compat fallback.
-    this.fromEmail =
+    // Normalize to a bare address: if a full "Name <email>" is configured here
+    // by mistake, using it verbatim would produce an invalid, doubly-wrapped
+    // "Name <Name <email>>" From header that providers reject (Resend 422).
+    this.fromEmail = EmailService.extractEmailAddress(
       this.configService.get<string>('MAIL_FROM_EMAIL') ||
-      this.configService.get<string>('FROM_EMAIL') ||
-      'noreply@mail.prvnsahni.com';
+        this.configService.get<string>('FROM_EMAIL') ||
+        'noreply@mail.prvnsahni.com',
+    );
     this.defaultFrom = `${fromName} <${this.fromEmail}>`;
 
-    this.supportEmail =
-      this.configService.get<string>('SUPPORT_EMAIL') || this.fromEmail;
+    this.supportEmail = EmailService.extractEmailAddress(
+      this.configService.get<string>('SUPPORT_EMAIL') || this.fromEmail,
+    );
 
     if (!this.resendApiKey) {
       this.logger.warn(
@@ -351,6 +356,19 @@ export class EmailService {
       .replace(/\n{3,}/g, '\n\n')
       .replace(/[ \t]{2,}/g, ' ')
       .trim();
+  }
+
+  /**
+   * Normalizes a configured sender/support value to a bare email address.
+   * Accepts either `email@example.com` or `Name <email@example.com>` and always
+   * returns just the address, so a mis-set env value can never produce an
+   * invalid `From` header. Falls back to the trimmed input if no address is found.
+   */
+  private static extractEmailAddress(value: string): string {
+    const angle = value.match(/<([^>]+)>/);
+    const candidate = (angle ? angle[1] : value).trim();
+    const bare = candidate.match(/[^\s<>]+@[^\s<>]+\.[^\s<>]+/);
+    return bare ? bare[0] : candidate;
   }
 
   /** Escapes user-provided text for safe interpolation into HTML. */

@@ -49,6 +49,9 @@ export class LoginComponent {
 
   isLoading = false;
   errorMessage = '';
+  /** Shown after a successful password reset redirects back here. */
+  readonly resetSuccess =
+    this.route.snapshot.queryParamMap.get('reset') === 'success';
 
   onSubmit() {
     if (this.loginForm.valid) {

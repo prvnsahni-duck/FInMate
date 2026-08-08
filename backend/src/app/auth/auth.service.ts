@@ -20,6 +20,8 @@ import { generateSecret, verifyTotp } from './utils/totp.util';
 import { JwtPayload } from '../common/interfaces/jwt-payload.interface';
 
 const EMAIL_VERIFICATION_TTL_SECONDS = 24 * 60 * 60;
+const PASSWORD_RESET_TTL_SECONDS = 60 * 60;
+const PASSWORD_RESET_PREFIX = 'pwd_reset:';
 
 @Injectable()
 export class AuthService {
@@ -171,6 +173,118 @@ export class AuthService {
     });
 
     return claimResult;
+  }
+
+  /**
+   * Forgot-password step 1: issue a single-use, 1h reset token for the given
+   * email and send the reset link. Always resolves without revealing whether
+   * the address is registered (anti-enumeration): unknown emails are a silent
+   * no-op, and sending is best-effort. The token maps to the user id in Redis
+   * and is never returned to the caller or logged.
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    if (!user || user.status !== 'active') {
+      return;
+    }
+
+    const token = randomUUID();
+    await this.redisService.set(
+      `${PASSWORD_RESET_PREFIX}${token}`,
+      user.id,
+      PASSWORD_RESET_TTL_SECONDS,
+    );
+
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:4200';
+    const resetUrl = `${frontendUrl}/auth/reset-password?token=${token}`;
+    await this.emailService.sendPasswordResetEmail(user.email, resetUrl);
+  }
+
+  /**
+   * Forgot-password step 2 (peek): validates a reset token WITHOUT consuming it
+   * and returns just enough for the client to run the zero-knowledge unwrap —
+   * the account email (PBKDF2 salt), whether a recovery key exists, and the
+   * recovery-wrapped private-key blob (ciphertext; safe to serve). A missing or
+   * expired token throws so the reset page can show a generic invalid state.
+   */
+  async getPasswordResetContext(token: string): Promise<{
+    email: string;
+    hasRecoveryKey: boolean;
+    recoveryWrappedKey: string | null;
+  }> {
+    const userId = await this.redisService.get(
+      `${PASSWORD_RESET_PREFIX}${token}`,
+    );
+    if (!userId) {
+      throw new BadRequestException({
+        errorCode: 'AUTH_RESET_INVALID',
+        message: 'This password reset link is invalid or has expired',
+      });
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new BadRequestException({
+        errorCode: 'AUTH_RESET_INVALID',
+        message: 'This password reset link is invalid or has expired',
+      });
+    }
+
+    return {
+      email: user.email,
+      hasRecoveryKey: !!user.recoveryWrappedKey,
+      recoveryWrappedKey: user.recoveryWrappedKey ?? null,
+    };
+  }
+
+  /**
+   * Forgot-password step 3 (consume): atomically single-uses the reset token,
+   * swaps the password hash, stores the client-re-wrapped private key so
+   * encrypted data stays accessible, and revokes every session (fresh login
+   * required). Zero-knowledge — the server never sees plaintext key material.
+   * A user with no recovery key cannot reach a valid submission (the client
+   * blocks it), so encrypted data is never silently orphaned.
+   */
+  async resetPassword(
+    token: string,
+    newPassword: string,
+    encryptedPrivateWrappingKey: string,
+    context?: { ip?: string; userAgent?: string },
+  ): Promise<void> {
+    // GETDEL: atomic single-use — a concurrent second submit sees null.
+    const userId = await this.redisService.getDel(
+      `${PASSWORD_RESET_PREFIX}${token}`,
+    );
+    if (!userId) {
+      throw new BadRequestException({
+        errorCode: 'AUTH_RESET_INVALID',
+        message: 'This password reset link is invalid or has expired',
+      });
+    }
+
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new BadRequestException({
+        errorCode: 'AUTH_RESET_INVALID',
+        message: 'This password reset link is invalid or has expired',
+      });
+    }
+
+    user.passwordHash = await argon2.hash(newPassword);
+    user.encryptedPrivateWrappingKey = encryptedPrivateWrappingKey;
+    await this.usersService.updateUser(user);
+
+    // Force re-authentication everywhere with the new password.
+    await this.revokeAllSessions(user.id);
+
+    void this.writeAuditLog({
+      actorUser: user,
+      action: 'auth.password_reset',
+      entityId: user.id,
+      ip: context?.ip,
+      userAgent: context?.userAgent,
+    });
   }
 
   async login(

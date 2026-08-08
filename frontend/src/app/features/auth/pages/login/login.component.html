@@ -11,6 +11,15 @@
   (ngSubmit)="onSubmit()"
   class="space-y-6"
 >
+  @if (resetSuccess) {
+    <div
+      class="p-3 bg-finmate-neon/10 text-slate-700 dark:text-slate-200 border border-finmate-neon/40 rounded-xl text-sm"
+      role="status"
+    >
+      Your password has been reset. Sign in with your new password.
+    </div>
+  }
+
   @if (errorMessage) {
     <div
       class="p-3 bg-red-100/10 text-red-500 border border-red-500/50 rounded-xl text-sm"
@@ -49,6 +58,14 @@
       "
       formControlName="password"
     ></app-password-input>
+    <div class="mt-2 text-right">
+      <a
+        routerLink="/auth/forgot-password"
+        data-testid="forgot-password-link"
+        class="text-sm text-finmate-neon2 font-medium hover:underline"
+        >Forgot password?</a
+      >
+    </div>
   </div>
 
   <app-submit-button

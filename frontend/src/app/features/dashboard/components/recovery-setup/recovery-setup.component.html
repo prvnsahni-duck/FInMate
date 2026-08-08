@@ -1,0 +1,125 @@
+<div>
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h3 class="text-base font-semibold">Account recovery</h3>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+        A recovery code lets you reset a forgotten password without losing access
+        to your encrypted data. Keep it somewhere safe — it's the only way back in.
+      </p>
+    </div>
+  </div>
+
+  @switch (phase()) {
+    @case ('loading') {
+      <p class="mt-4 text-sm text-slate-400">Checking recovery status…</p>
+    }
+
+    @case ('view') {
+      <div class="mt-4">
+        @if (hasRecoveryKey()) {
+          <div
+            class="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400"
+          >
+            <span
+              class="inline-block w-2 h-2 rounded-full bg-emerald-500"
+              aria-hidden="true"
+            ></span>
+            <span
+              >Recovery code is set up@if (createdAt()) {
+                <span class="text-slate-400">
+                  · {{ createdAt() | date: 'mediumDate' }}</span
+                >
+              }.</span
+            >
+          </div>
+          <button
+            type="button"
+            data-testid="recovery-regenerate-button"
+            (click)="startSetup()"
+            class="mt-3 text-sm text-finmate-neon2 font-medium hover:underline"
+          >
+            Generate a new code
+          </button>
+          <p class="mt-1 text-xs text-slate-400">
+            Generating a new code replaces the old one — the previous code will
+            stop working.
+          </p>
+        } @else {
+          <button
+            type="button"
+            data-testid="recovery-setup-button"
+            (click)="startSetup()"
+            class="py-2.5 px-4 bg-gradient-neon text-white rounded-xl font-semibold text-sm shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 transition-all"
+          >
+            Set up recovery code
+          </button>
+        }
+      </div>
+    }
+
+    @case ('reveal') {
+      <div class="mt-4 space-y-4">
+        @if (error()) {
+          <div
+            class="p-3 bg-red-100/10 text-red-500 border border-red-500/50 rounded-xl text-sm"
+            role="alert"
+          >
+            {{ error() }}
+          </div>
+        }
+
+        <div
+          class="p-4 rounded-xl border border-slate-200 dark:border-white/10 bg-white/50 dark:bg-black/20"
+        >
+          <p class="text-xs uppercase tracking-wide text-slate-400 mb-2">
+            Your recovery code
+          </p>
+          <p
+            data-testid="recovery-code-value"
+            class="font-mono text-lg tracking-widest break-all select-all"
+          >
+            {{ generatedCode() }}
+          </p>
+          <button
+            type="button"
+            (click)="copyCode()"
+            class="mt-3 text-sm text-finmate-neon2 font-medium hover:underline"
+          >
+            {{ copied() ? 'Copied!' : 'Copy code' }}
+          </button>
+        </div>
+
+        <div
+          class="p-3 bg-amber-100/10 text-amber-600 dark:text-amber-400 border border-amber-500/40 rounded-xl text-sm"
+          role="alert"
+        >
+          Save this code now. It's shown only once and is never stored where it
+          can be recovered — if you lose it, you won't be able to reset a
+          forgotten password.
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button
+            type="button"
+            data-testid="recovery-confirm-button"
+            (click)="confirmSaved()"
+            class="py-2.5 px-4 bg-gradient-neon text-white rounded-xl font-semibold text-sm shadow-lg shadow-finmate-neon/30 hover:shadow-finmate-neon/50 transition-all"
+          >
+            I've saved it
+          </button>
+          <button
+            type="button"
+            (click)="cancel()"
+            class="py-2.5 px-4 text-sm font-medium text-slate-500 dark:text-slate-400 hover:underline"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    }
+
+    @case ('saving') {
+      <p class="mt-4 text-sm text-slate-400">Saving your recovery code…</p>
+    }
+  }
+</div>

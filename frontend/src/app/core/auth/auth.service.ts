@@ -69,6 +69,44 @@ export class AuthService {
     return this.http.post(`${this.baseUrl}/change-password`, payload);
   }
 
+  /**
+   * Forgot-password step 1: ask the server to email a reset link. The response
+   * is always generic (never reveals whether the address is registered).
+   */
+  requestPasswordReset(email: string): Observable<unknown> {
+    return this.http.post(`${this.baseUrl}/forgot-password`, { email });
+  }
+
+  /**
+   * Forgot-password step 2: fetch the zero-knowledge reset context for a token
+   * (account email as PBKDF2 salt, whether a recovery key exists, and the
+   * recovery-wrapped private-key ciphertext). Throws for an invalid/expired token.
+   */
+  getResetContext(token: string): Observable<{
+    email: string;
+    hasRecoveryKey: boolean;
+    recoveryWrappedKey: string | null;
+  }> {
+    return this.http.get<{
+      email: string;
+      hasRecoveryKey: boolean;
+      recoveryWrappedKey: string | null;
+    }>(`${this.baseUrl}/reset-password`, { params: { token } });
+  }
+
+  /**
+   * Forgot-password step 3: submit the new password with the private wrapping
+   * key re-encrypted under the new master key, so encrypted data stays
+   * accessible. Zero-knowledge — the server never sees plaintext key material.
+   */
+  resetPassword(payload: {
+    token: string;
+    newPassword: string;
+    encryptedPrivateWrappingKey: string;
+  }): Observable<unknown> {
+    return this.http.post(`${this.baseUrl}/reset-password`, payload);
+  }
+
   /** Store the client-produced recovery-wrapped key blob. */
   setRecoveryKey(recoveryWrappedKey: string): Observable<unknown> {
     return this.http.post(`${environment.apiBaseUrl}/users/me/recovery-key`, {

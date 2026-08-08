@@ -61,6 +61,24 @@ describe('EmailService', () => {
     expect(payload.text).toContain('https://app.finmate.test/groups/join/abc');
   });
 
+  it('normalizes a mis-set formatted MAIL_FROM_EMAIL to a valid From header (no double-wrap)', async () => {
+    mockedAxios.post.mockResolvedValue({ data: { id: 'msg_1' } } as never);
+    // A full "Name <email>" wrongly placed in MAIL_FROM_EMAIL must not produce
+    // "Finmate <Finmate <noreply@...>>" (Resend 422).
+    const service = await buildService({
+      RESEND_API_KEY: 'test_key',
+      MAIL_FROM_NAME: 'Finmate',
+      MAIL_FROM_EMAIL: 'FinMate <noreply@mail.prvnsahni.com>',
+    });
+
+    await service.sendPasswordResetEmail('user@example.com', 'https://x/reset');
+
+    const [, body] = mockedAxios.post.mock.calls[0];
+    expect(body).toMatchObject({
+      from: 'Finmate <noreply@mail.prvnsahni.com>',
+    });
+  });
+
   it('does not send to an invalid recipient address', async () => {
     const service = await buildService(withKey);
 

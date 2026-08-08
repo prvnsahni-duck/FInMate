@@ -29,6 +29,7 @@ describe('AuthService', () => {
   let emailService: {
     sendEmail: jest.Mock;
     sendVerificationEmail: jest.Mock;
+    sendPasswordResetEmail: jest.Mock;
   };
   let contactsService: { claimContactsForUser: jest.Mock };
 
@@ -75,6 +76,7 @@ describe('AuthService', () => {
     const mockEmailService = {
       sendEmail: jest.fn().mockResolvedValue(undefined),
       sendVerificationEmail: jest.fn().mockResolvedValue(undefined),
+      sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     const mockContactsService = {
@@ -298,6 +300,152 @@ describe('AuthService', () => {
 
       expect(user.recoveryWrappedKey).toBe('new-recovery-blob');
       expect(user.recoveryKeyCreatedAt).toBeInstanceOf(Date);
+    });
+  });
+
+  describe('requestPasswordReset', () => {
+    it('issues a token and sends the reset email for an active user', async () => {
+      usersService.findByEmail.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        status: 'active',
+      } as any);
+
+      await service.requestPasswordReset('test@example.com');
+
+      expect(redisService.set).toHaveBeenCalledWith(
+        expect.stringMatching(/^pwd_reset:/),
+        'user-id',
+        60 * 60,
+      );
+      expect(emailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        'test@example.com',
+        expect.stringContaining('/auth/reset-password?token='),
+      );
+    });
+
+    it('is a silent no-op for an unknown email (no enumeration, no token, no email)', async () => {
+      usersService.findByEmail.mockResolvedValue(null);
+
+      await expect(
+        service.requestPasswordReset('nobody@example.com'),
+      ).resolves.toBeUndefined();
+
+      expect(redisService.set).not.toHaveBeenCalled();
+      expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('does not issue a token for a non-active account', async () => {
+      usersService.findByEmail.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        status: 'disabled',
+      } as any);
+
+      await service.requestPasswordReset('test@example.com');
+
+      expect(redisService.set).not.toHaveBeenCalled();
+      expect(emailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPasswordResetContext', () => {
+    it('returns email + recovery blob for a valid token WITHOUT consuming it', async () => {
+      redisService.get.mockResolvedValue('user-id');
+      usersService.findById.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        recoveryWrappedKey: 'recovery-blob',
+      } as any);
+
+      const result = await service.getPasswordResetContext('good-token');
+
+      expect(redisService.get).toHaveBeenCalledWith('pwd_reset:good-token');
+      expect(redisService.getDel).not.toHaveBeenCalled();
+      expect(result).toEqual({
+        email: 'test@example.com',
+        hasRecoveryKey: true,
+        recoveryWrappedKey: 'recovery-blob',
+      });
+    });
+
+    it('reports hasRecoveryKey false when the user has no recovery blob', async () => {
+      redisService.get.mockResolvedValue('user-id');
+      usersService.findById.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+        recoveryWrappedKey: undefined,
+      } as any);
+
+      const result = await service.getPasswordResetContext('good-token');
+
+      expect(result).toEqual({
+        email: 'test@example.com',
+        hasRecoveryKey: false,
+        recoveryWrappedKey: null,
+      });
+    });
+
+    it('throws for an invalid or expired token', async () => {
+      redisService.get.mockResolvedValue(null);
+
+      await expect(
+        service.getPasswordResetContext('bad-token'),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('swaps the hash, stores the re-wrapped key, and revokes all sessions', async () => {
+      redisService.getDel.mockResolvedValue('user-id');
+      const user = {
+        id: 'user-id',
+        email: 'test@example.com',
+        passwordHash: 'old-hash',
+      } as any;
+      usersService.findById.mockResolvedValue(user);
+      (argon2.hash as jest.Mock).mockResolvedValue('new-hash');
+      redisService.scanKeys.mockResolvedValue([
+        'refresh_token:user-id:aaa',
+        'refresh_token:user-id:bbb',
+      ]);
+
+      await service.resetPassword('good-token', 'newpass12', 'new-wrapped-key');
+
+      expect(redisService.getDel).toHaveBeenCalledWith('pwd_reset:good-token');
+      expect(user.passwordHash).toBe('new-hash');
+      expect(user.encryptedPrivateWrappingKey).toBe('new-wrapped-key');
+      expect(usersService.updateUser).toHaveBeenCalledWith(user);
+      expect(redisService.del).toHaveBeenCalledTimes(2);
+    });
+
+    it('rejects an invalid or expired token', async () => {
+      redisService.getDel.mockResolvedValue(null);
+
+      await expect(
+        service.resetPassword('bad-token', 'newpass12', 'wrapped'),
+      ).rejects.toThrow(BadRequestException);
+      expect(usersService.updateUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects a second concurrent use of the same token (GETDEL closes the race)', async () => {
+      redisService.getDel
+        .mockResolvedValueOnce('user-id')
+        .mockResolvedValueOnce(null);
+      usersService.findById.mockResolvedValue({
+        id: 'user-id',
+        email: 'test@example.com',
+      } as any);
+      (argon2.hash as jest.Mock).mockResolvedValue('new-hash');
+
+      await expect(
+        service.resetPassword('shared', 'newpass12', 'wrapped'),
+      ).resolves.toBeUndefined();
+      await expect(
+        service.resetPassword('shared', 'newpass12', 'wrapped'),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(usersService.updateUser).toHaveBeenCalledTimes(1);
     });
   });
 

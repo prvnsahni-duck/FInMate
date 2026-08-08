@@ -6,6 +6,7 @@ import { environment } from '../../../environments/environment';
 import { ClientEncryptionService } from './encryption.service';
 import { ZkKeyVaultService } from './zk-key-vault.service';
 import { GroupKeyStatus } from '../models/decryption-state';
+import { normalizeRecoveryCode } from './recovery-code.util';
 
 /**
  * Classified outcome of resolving a group data key. `ready` carries the key;
@@ -765,6 +766,56 @@ export class GroupKeyService {
 
     // Re-encrypt the private key JWK under the new master key
     return this.encryptionService.encrypt(privateKeyJwkStr, newMasterKey);
+  }
+
+  /**
+   * Produces the recovery-wrapped private-key blob for account-recovery setup
+   * (zero-knowledge). Decrypts the stored private wrapping key with the current
+   * session master key, derives a recovery key from the recovery code (PBKDF2,
+   * email as salt — same derivation as a password), and re-encrypts the private
+   * key JWK under it. The returned ciphertext is what `POST /users/me/recovery-key`
+   * stores; the recovery code itself never leaves the device.
+   *
+   * @param recoveryCode The plaintext recovery code shown to the user.
+   * @returns The recovery-wrapped private-key ciphertext blob.
+   */
+  async generateRecoveryBlob(recoveryCode: string): Promise<string> {
+    const user = this.store.selectSnapshot((state: any) => state.auth?.user);
+    if (!user || !user.email) {
+      throw new Error('User session not found');
+    }
+
+    const masterKey = await this.encryptionService.loadKeyFromSession(
+      user.email,
+    );
+    if (!masterKey) {
+      throw new Error('Master encryption key not derived');
+    }
+
+    const keysResponse = await firstValueFrom(
+      this.http.get<
+        | { encryptedPrivateWrappingKey: string | null }
+        | { data: { encryptedPrivateWrappingKey: string | null } }
+      >(`${this.baseUrl}/users/me/keys`),
+    );
+    const data = this.unwrapHttpData(keysResponse) as {
+      encryptedPrivateWrappingKey: string | null;
+    } | null;
+    if (!data || !data.encryptedPrivateWrappingKey) {
+      throw new Error('No wrapping key found to protect with a recovery code');
+    }
+
+    const privateKeyJwkStr = await this.encryptionService.decrypt(
+      data.encryptedPrivateWrappingKey,
+      masterKey,
+    );
+
+    const recoveryKey = await this.encryptionService.deriveMasterKey(
+      normalizeRecoveryCode(recoveryCode),
+      user.email,
+    );
+
+    return this.encryptionService.encrypt(privateKeyJwkStr, recoveryKey);
   }
 
   // ─────────────────────────────────────────────────────────────────────────

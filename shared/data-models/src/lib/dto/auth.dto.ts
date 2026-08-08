@@ -80,3 +80,38 @@ export class ChangePasswordDto {
   @IsOptional()
   recoveryWrappedKey?: string;
 }
+
+/**
+ * Request a password-reset email. The response is always generic (never
+ * reveals whether the address is registered) to prevent account enumeration.
+ */
+export class ForgotPasswordDto {
+  @IsEmail({}, { message: 'Must be a valid email address' })
+  @IsNotEmpty({ message: 'Email is required' })
+  email!: string;
+}
+
+/**
+ * Complete a password reset via emailed token (forgot-password flow).
+ * Zero-knowledge: the client unwraps its private wrapping key with the recovery
+ * code, re-wraps it under the new master key, and submits the ciphertext. The
+ * server only validates the token, swaps the password hash, stores the
+ * re-wrapped blob, and revokes all sessions — it never sees plaintext keys.
+ */
+export class ResetPasswordDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Reset token is required' })
+  token!: string;
+
+  @IsString()
+  @IsNotEmpty({ message: 'New password is required' })
+  @MinLength(8, { message: 'Password must be at least 8 characters long' })
+  newPassword!: string;
+
+  /** Private wrapping key re-encrypted under the new master key (ciphertext blob). */
+  @IsString()
+  @IsNotEmpty({
+    message: 'Re-wrapped private key is required to preserve encrypted data',
+  })
+  encryptedPrivateWrappingKey!: string;
+}

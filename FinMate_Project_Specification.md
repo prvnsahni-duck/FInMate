@@ -2104,3 +2104,61 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   - No new features introduced.
 - **Next Actions:**
   - Execute staged operational rehearsal using the new runbooks before production release.
+
+## 2026-08-08 - Forgot-Password + Account Recovery (Zero-Knowledge)
+
+- **Summary:** Implemented the forgot-password flow end-to-end, preserving the
+  user's end-to-end-encrypted data via a user-held recovery code, delivered over
+  email through the existing Resend `EmailService.sendPasswordResetEmail`.
+- **Changes Made:**
+  - Recovery model: the private wrapping key JWK is wrapped a second time under a
+    recovery-code-derived key (`recoveryWrappedKey`). Reset unwraps it with the
+    recovery code and re-wraps under the new password's master key. Server never
+    sees plaintext key material.
+  - Backend: `ForgotPasswordDto` / `ResetPasswordDto`; `AuthService`
+    `requestPasswordReset` (1h single-use Redis token `pwd_reset:*`,
+    anti-enumeration), `getPasswordResetContext` (peek, non-consuming),
+    `resetPassword` (GETDEL single-use, hash swap, store re-wrapped key, revoke
+    all sessions, `auth.password_reset` audit); `AuthController` routes
+    `POST /auth/forgot-password`, `GET /auth/reset-password`,
+    `POST /auth/reset-password` on reserved `FORGOT_PASSWORD`/`RESET_PASSWORD`
+    throttle profiles.
+  - Frontend: `AuthService` `requestPasswordReset`/`getResetContext`/
+    `resetPassword`; `recovery-code.util` (Crockford base32 generator +
+    normalizer); `GroupKeyService.generateRecoveryBlob`; new lazy `forgot-password`
+    and `reset-password` pages + routes; login "Forgot password?" link and
+    post-reset success banner; new `recovery-setup` component mounted in the
+    dashboard profile (setup was previously unbuilt — endpoints existed but had
+    no UI). No-recovery-code accounts are blocked at reset with guidance (no
+    silent data loss).
+  - Tests: `auth.service.spec` (forgot/context/reset incl. GETDEL race);
+    `recovery-code.util.spec` (format/normalize + setup→reset crypto round-trip
+    and wrong-code rejection).
+- **Artifacts Updated:**
+  - `shared/data-models/src/lib/dto/auth.dto.ts`
+  - `backend/src/app/auth/auth.controller.ts`, `auth.service.ts`, `auth.service.spec.ts`
+  - `frontend/src/app/core/auth/auth.service.ts`
+  - `frontend/src/app/core/services/recovery-code.util.ts` (+ spec)
+  - `frontend/src/app/core/services/group-key.service.ts`
+  - `frontend/src/app/features/auth/auth.routes.ts`
+  - `frontend/src/app/features/auth/pages/forgot-password/*`, `pages/reset-password/*`
+  - `frontend/src/app/features/auth/pages/login/login.component.{ts,html}`
+  - `frontend/src/app/features/dashboard/components/recovery-setup/*`
+  - `frontend/src/app/features/dashboard/components/dashboard-profile/dashboard-profile.component.{ts,html}`
+  - `docs/plans/forgot-password-recovery-plan.md`
+- **Decisions:**
+  - Recovery-code model preserves data (chosen over data-wipe/hybrid).
+  - No-recovery-code reset is blocked with guidance; no server-side key escrow.
+  - `recoveryWrappedKey` is unchanged on reset (same code + same private key).
+  - No new env vars — reuses `RESEND_API_KEY` and `FRONTEND_URL`.
+- **Verification Status:**
+  - Pending user run: `npx nx test backend` and `npx nx test frontend`, plus a
+    manual end-to-end pass (setup code → forgot → reset → login).
+  - Architecture drift: PASS (uses pre-provisioned recovery columns, throttle
+    profiles, and email template; no architecture changes).
+- **Next Actions:**
+  - User to run affected test targets and manual E2E.
+  - Consider follow-ups: recovery-code download/print affordance, and
+    re-wrapping `recoveryWrappedKey` on normal password change so the code
+    survives a change-password (currently only change-password with an explicit
+    recovery blob updates it).
