@@ -78,3 +78,42 @@ functional gain.
 **Decision:** go with **Option 1** in v2.1. It's not a frontend bug — the
 underlying issue is an incomplete audit data model, and Option 1 sidesteps it
 cleanly. Escalate to Option 2 only if product decides history must show titles.
+
+---
+
+## KI-2 — Legacy master-key-wrapped group keys may be unrecoverable after a password reset
+
+- **Area:** Frontend · encryption recovery (`group-key.service.ts`) — see
+  [`docs/group-key-flow.md`](group-key-flow.md)
+- **Severity:** Medium — potential data-loss for *legacy* self keys only. New and
+  already-migrated keys are unaffected. Not release-blocking.
+- **Status:** Mitigated by lazy migration (2026-08-08). New group keys are wrapped
+  under the caller's RSA public key, which survives a reset because the recovery
+  code restores the RSA private key. Legacy keys are migrated opportunistically.
+
+### The limitation
+
+The account-recovery flow can restore the RSA **private wrapping key** (the
+recovery code decrypts it; it is then re-wrapped under the new master key), but it
+can **never** restore the old password-derived **master key**. Therefore any group
+key still wrapped **symmetrically under the master key** (the pre-2026-08-08
+format) is unrecoverable once a password reset changes the master key.
+
+`GroupKeyService.migrateSelfKeyToAsymmetric` re-wraps such a legacy key under the
+RSA public key on first access — **but only while the old master key is still in
+session** (i.e. during a normal login *before* any reset). A legacy self key that
+is never accessed between deploying this fix and a password reset stays orphaned.
+
+### Practical impact
+
+- Accounts created/used after the fix: no legacy keys, no exposure.
+- Existing accounts: safe as soon as each group is opened once while logged in.
+- At risk: a user who resets their password without ever opening a given legacy
+  group after the fix ships loses that group's encrypted data (their own copy).
+
+### Follow-up (not done — deliberately out of scope for the recovery fix)
+
+Add a **one-shot login-time migration sweep** that iterates the user's groups and
+re-wraps every legacy symmetric self key immediately after login, so recovery no
+longer depends on per-group lazy access. Until then, the lazy per-access migration
+is the only safeguard.

@@ -1419,6 +1419,14 @@ export class GroupsService {
               wrappedGroupKey: entry.wrappedKey,
             }),
           );
+        } else if (isSelfProvision) {
+          // A member may replace their OWN wrapped copy — e.g. migrating a
+          // legacy master-key-wrapped key to their RSA wrapping key so it
+          // survives a password reset. Zero-knowledge and safe: the caller
+          // already holds the key, so re-wrapping it leaks nothing. Provisioning
+          // for OTHER members stays insert-only (never overwrite their copy).
+          existing.wrappedGroupKey = entry.wrappedKey;
+          await manager.getRepository(MemberWrappedGroupKey).save(existing);
         }
       }
     });

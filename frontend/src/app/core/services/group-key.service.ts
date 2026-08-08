@@ -279,10 +279,17 @@ export class GroupKeyService {
       throw new Error('Master key not loaded');
     }
 
+    // Wrap the caller's own copy under their RSA public wrapping key — NOT the
+    // password-derived master key. The account-recovery flow can restore the
+    // RSA private key (it is re-wrapped under the new master key on reset), but
+    // it can never restore the old master key. Wrapping under the master key
+    // would silently orphan this group's data on any password reset.
+    const { publicKey } = await this.getMyAsymmetricKeys();
+
     const groupKey = await this.encryptionService.generateDataKey();
     const wrappedKeyForSelf = await this.encryptionService.wrapKey(
       groupKey,
-      masterKey,
+      publicKey,
     );
 
     // Optimistically cache under the active-version alias; updated below once
@@ -342,11 +349,19 @@ export class GroupKeyService {
         try {
           // extractable: true — must match generateDataKey() so the key can
           // later be re-wrapped when provisioning keys for new members.
-          canonicalKey = await this.encryptionService.unwrapKey(
-            storedWrappedKey,
-            masterKey,
-            true,
-          );
+          // A stored key may be RSA-wrapped (new default) or, for older
+          // accounts, symmetrically wrapped under the master key (`iv:ct`).
+          canonicalKey = storedWrappedKey.includes(':')
+            ? await this.encryptionService.unwrapKey(
+                storedWrappedKey,
+                masterKey,
+                true,
+              )
+            : await this.encryptionService.unwrapKey(
+                storedWrappedKey,
+                (await this.getMyAsymmetricKeys()).privateKey,
+                true,
+              );
           canonicalWrappedKey = storedWrappedKey;
         } catch (e) {
           console.warn(
@@ -479,12 +494,10 @@ export class GroupKeyService {
     if (!user || !user.email) {
       throw new Error('No user session found');
     }
-    const masterKey = await this.encryptionService.loadKeyFromSession(
-      user.email,
-    );
-    if (!masterKey) {
-      throw new Error('Master key not loaded');
-    }
+    // Loads the RSA wrapping pair (and enforces an unlocked crypto session).
+    // The caller's own copy is wrapped under this public key — not the master
+    // key — so the rotated key survives a future password reset.
+    const { publicKey: selfPublicKey } = await this.getMyAsymmetricKeys();
     const selfId = user.userId ?? user.id;
 
     const newKey = await this.encryptionService.generateDataKey();
@@ -508,7 +521,7 @@ export class GroupKeyService {
     for (const member of members) {
       const uid = member.user?.id as string;
       if (uid === selfId) {
-        const wk = await this.encryptionService.wrapKey(newKey, masterKey);
+        const wk = await this.encryptionService.wrapKey(newKey, selfPublicKey);
         selfWrappedKey = wk;
         keys.push({ userId: uid, wrappedKey: wk });
         continue;
@@ -818,6 +831,45 @@ export class GroupKeyService {
     return this.encryptionService.encrypt(privateKeyJwkStr, recoveryKey);
   }
 
+  /**
+   * Migrates a legacy group key that was wrapped symmetrically under the master
+   * key to one wrapped under the caller's RSA public wrapping key, and posts the
+   * re-wrapped copy so it survives a future password reset (the recovery flow
+   * restores the RSA private key, not the master key). Best-effort and
+   * idempotent: any failure is swallowed and simply retried on the next fetch,
+   * and the server only replaces the caller's OWN wrapped copy.
+   *
+   * @param groupId  The group whose self-wrapped key is being migrated.
+   * @param groupKey The already-unwrapped (extractable) group data key.
+   */
+  private async migrateSelfKeyToAsymmetric(
+    groupId: string,
+    groupKey: CryptoKey,
+  ): Promise<void> {
+    try {
+      const user = this.store.selectSnapshot((state: any) => state.auth?.user);
+      const selfId = user?.userId ?? user?.id;
+      if (!selfId) {
+        return;
+      }
+      const { publicKey } = await this.getMyAsymmetricKeys();
+      const rewrapped = await this.encryptionService.wrapKey(
+        groupKey,
+        publicKey,
+      );
+      await firstValueFrom(
+        this.http.post(`${this.baseUrl}/groups/${groupId}/keys`, {
+          keys: [{ userId: selfId, wrappedKey: rewrapped }],
+        }),
+      );
+    } catch (e) {
+      console.warn(
+        'Failed to migrate symmetric group key to RSA wrapping',
+        e,
+      );
+    }
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Private fetch implementation
   // ─────────────────────────────────────────────────────────────────────────
@@ -891,11 +943,17 @@ export class GroupKeyService {
 
       let unwrappedKey: CryptoKey;
       if (wrappedKey.includes(':')) {
-        // Wrapped symmetrically with the user's master key
+        // Legacy: wrapped symmetrically with the user's master key. Unwrap as
+        // extractable so it can be re-wrapped under the RSA public key, then
+        // migrate it (best-effort) so this key survives a future password
+        // reset — the recovery flow restores the RSA private key, never the
+        // password-derived master key.
         unwrappedKey = await this.encryptionService.unwrapKey(
           wrappedKey,
           masterKey,
+          true,
         );
+        void this.migrateSelfKeyToAsymmetric(groupId, unwrappedKey);
       } else {
         // Wrapped asymmetrically with the user's public wrapping key
         const { privateKey } = await this.getMyAsymmetricKeys();

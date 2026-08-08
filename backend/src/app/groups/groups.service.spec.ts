@@ -1145,6 +1145,68 @@ describe('GroupsService', () => {
       expect(managerMemberWrappedRepo.save).not.toHaveBeenCalled();
     });
 
+    it('lets a member replace their OWN wrapped key (legacy master-key -> RSA migration)', async () => {
+      groupMemberRepository.findOne.mockResolvedValueOnce({
+        id: 'caller-member-id',
+        role: 'member',
+        joinStatus: 'active',
+        user: { id: 'owner-id' },
+        group: { id: 'group-id' },
+      } as any);
+      groupRepository.findOne.mockResolvedValueOnce({ id: 'group-id' } as any);
+
+      const existingWrappedKey = {
+        id: 'wrapped-key-id',
+        wrappedGroupKey: 'legacy:master-wrapped',
+      };
+
+      const managerGroupKeyVersionRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          id: 'active-version-id',
+          version: 1,
+          status: 'ACTIVE',
+          group: { id: 'group-id' },
+        }),
+        save: jest.fn(),
+        create: jest.fn((data) => data),
+      };
+
+      const managerMemberWrappedRepo = {
+        findOne: jest.fn().mockResolvedValue(existingWrappedKey),
+        save: jest.fn(async (data) => data),
+        create: jest.fn((data) => data),
+      };
+
+      const managerGroupMemberRepo = {
+        findOne: jest.fn().mockResolvedValue({
+          id: 'self-member-id',
+          user: { id: 'owner-id' },
+          group: { id: 'group-id' },
+          joinStatus: 'active',
+        }),
+      };
+
+      dataSource.transaction.mockImplementationOnce(async (cb: any) =>
+        cb({
+          getRepository: (entity: unknown) => {
+            if (entity === GroupKeyVersion) return managerGroupKeyVersionRepo;
+            if (entity === MemberWrappedGroupKey)
+              return managerMemberWrappedRepo;
+            if (entity === GroupMember) return managerGroupMemberRepo;
+            return null;
+          },
+        }),
+      );
+
+      // Caller re-provisions for THEMSELVES (owner-id === owner-id).
+      await service.provisionGroupKeys('owner-id', 'group-id', [
+        { userId: 'owner-id', wrappedKey: 'rsa-wrapped' },
+      ]);
+
+      expect(managerMemberWrappedRepo.save).toHaveBeenCalledTimes(1);
+      expect(existingWrappedKey.wrappedGroupKey).toBe('rsa-wrapped');
+    });
+
     it('should rotate group key by superseding current active and creating next active version', async () => {
       groupMemberRepository.findOne.mockResolvedValueOnce({
         id: 'caller-member-id',

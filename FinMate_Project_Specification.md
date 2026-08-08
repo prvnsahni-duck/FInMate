@@ -2162,3 +2162,89 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     re-wrapping `recoveryWrappedKey` on normal password change so the code
     survives a change-password (currently only change-password with an explicit
     recovery blob updates it).
+
+### 2026-08-08
+
+- **Summary:** End-to-end audit of the account-recovery / password-reset flow.
+  Fixed the reset-link loading hang and closed a critical data-recoverability
+  gap where an owner's group key was rooted in the (password-derived) master key
+  and thus orphaned by a reset. Added the requested test coverage.
+- **Changes Made:**
+  - Fixed reset page hanging on "Checking your reset link…": `getResetContext`
+    read `res.data`, but `responseInterceptor` already unwraps the `{success,data}`
+    envelope, so the access threw synchronously inside the `next` callback and the
+    view never left `loading`. Retyped the service method and read the unwrapped
+    shape directly (`auth.service.ts`, `reset-password.component.ts`).
+  - Group-key wrapping now roots the caller's own copy in their RSA public
+    wrapping key instead of the master key, so it survives a password reset (the
+    recovery flow restores the RSA private key, never the old master key):
+    `createGroupKey` and the self-copy in `rotateGroupKey`.
+  - Added a best-effort lazy migration: on fetch, a legacy master-key-wrapped
+    self key is unwrapped (extractable) and re-wrapped under the RSA public key,
+    then posted back (`GroupKeyService.migrateSelfKeyToAsymmetric`).
+  - Backend `GroupsService.provisionGroupKeys` now lets a member replace their
+    OWN wrapped copy (insert-only preserved for other members) so the migration
+    and self re-provision actually persist.
+  - Tests: new `reset-password.component.spec.ts` (recovery key present → ready;
+    missing → blocked; missing/expired token → invalid; wrong recovery code →
+    friendly error, no submit; success → re-wrap + navigate). Extended
+    `recovery-code.util.spec.ts` with a full generate→reset→re-login E2E proving
+    encrypted data stays recoverable via the RSA-wrapped group key, plus a
+    regression guard that a master-key-wrapped key is NOT recoverable. Extended
+    `group-key.service.spec.ts` (self key wrapped under RSA; legacy migration on
+    fetch) and `groups.service.spec.ts` (self-overwrite allowed).
+- **Artifacts Updated:**
+  - `frontend/src/app/core/auth/auth.service.ts`,
+    `frontend/src/app/features/auth/pages/reset-password/reset-password.component.ts`,
+    `frontend/src/app/core/services/group-key.service.ts`,
+    `backend/src/app/groups/groups.service.ts`.
+  - Specs: `reset-password.component.spec.ts` (new), `recovery-code.util.spec.ts`,
+    `group-key.service.spec.ts`, `groups.service.spec.ts`.
+- **Decisions:**
+  - The RSA wrapping keypair is the single recoverable root of trust; nothing a
+    user must recover may be wrapped directly under the master key. Approved with
+    the user before changing core crypto.
+  - Self-overwrite of a member's own wrapped key is safe under the zero-knowledge
+    model (the caller already holds the key); provisioning for other members
+    stays insert-only.
+- **Verification Status:**
+  - `npx nx test frontend` → all suites pass (incl. new/updated recovery specs).
+  - `npx nx test backend` for `auth.service`, `groups.service`, `users.service`
+    → pass. `npx nx build backend` and `npx nx build frontend` → success.
+  - Pre-existing, unrelated: 8 date-sensitive `expenses.service.spec.ts`
+    "closed month" failures (grace window elapsed as of 2026-08-08) — untouched
+    by this work.
+  - Architecture drift: PASS (RSA-root change approved; no new env vars/endpoints;
+    DTOs/entities unchanged).
+- **Next Actions:**
+  - Manual E2E on a real account: create a solo group + data, set a recovery
+    code, reset password, log in, confirm data decrypts.
+  - Consider a one-shot login-time sweep to migrate all legacy symmetric group
+    keys (current migration is lazy, per-group on first fetch).
+
+### 2026-08-08 (Part 2 — production-safety verification)
+
+- **Summary:** Ran a live end-to-end verification of the recovery flow against
+  the running backend + real Postgres + Redis (not mocks). 32/32 checks passed.
+- **Changes Made:** None (verification only).
+- **Verification Status:**
+  - Live E2E (API + DB + Redis, crypto mirrored from `encryption.service.ts`):
+    generate→recovery-setup→forgot→reset→re-login recovers RSA-wrapped group data;
+    legacy master-key-wrapped key migrated to RSA via self-overwrite (one row, no
+    duplicate); used token & bogus token rejected (400); wrong recovery code
+    cannot unwrap; old password rejected (401); no-recovery-key account reports
+    `hasRecoveryKey:false`. DB: `recovery_wrapped_key` persisted,
+    `encrypted_private_wrapping_key` updated, self key rows asymmetric & single.
+    No-plaintext audit: recovery code / private key / group keys never sent;
+    password only to auth register/login/reset.
+  - `npx nx test frontend` 460/460 pass. Backend affected specs pass; expenses
+    still exactly 8 pre-existing date-sensitive "closed month" failures
+    (unchanged). `npx nx build backend` + `npx nx build frontend` succeed.
+- **Decisions:**
+  - "No recovery key" and "invalid recovery code" are necessarily CLIENT-side
+    gates: zero-knowledge means the server never sees the code and cannot validate
+    it. The server-side guarantee is confidentiality (cannot decrypt others'
+    data), not "cannot reset your own password". Confirmed acceptable.
+- **Next Actions:**
+  - Not committed yet (per request). Browser-UI click-path and multi-member
+    "other members' keys unchanged" remain covered by unit tests, not the live run.
