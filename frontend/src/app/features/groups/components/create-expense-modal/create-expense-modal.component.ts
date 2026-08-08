@@ -125,6 +125,8 @@ export class CreateExpenseModalComponent implements OnChanges {
 
   @Input() groupId: string | null = null;
   @Input() groupCurrency!: string;
+  /** Group type from the group model; drives the household-specific UX. */
+  @Input() groupType: string | null = null;
   @Input() members: GroupMember[] = [];
   @Input() expense: GroupExpense | null = null; // To support edit mode
   @Input() defaultCategory: string = CATEGORY_OPTIONS[0].value;
@@ -408,6 +410,26 @@ export class CreateExpenseModalComponent implements OnChanges {
 
   private categoryLabel(value: string): string {
     return this.categoryOptions.find((o) => o.value === value)?.label ?? value;
+  }
+
+  /**
+   * True for household groups. Household expenses are contribution records
+   * attributed to the payer (payer-based personal spending), not cost-sharing,
+   * so the split editor is hidden and the full amount is shown as the payer's
+   * household contribution. Normal groups are unaffected.
+   */
+  isHousehold(): boolean {
+    return this.groupType === 'household';
+  }
+
+  /**
+   * Display name of the currently selected payer, for the household helper text.
+   * Falls back to a neutral phrase when no payer is resolved yet.
+   */
+  householdPayerName(): string {
+    const id = this.expenseForm.get('paidByUserId')?.value ?? '';
+    const name = id ? this.userName(id) : '';
+    return name && name !== '—' ? name : 'the selected member';
   }
 
   private userName(id: string): string {

@@ -416,6 +416,7 @@
             </div>
           </div>
 
+          @if (!isHousehold()) {
           <div class="space-y-2">
             <div
               class="flex items-center text-sm font-semibold text-slate-700 dark:text-slate-300"
@@ -636,6 +637,40 @@
               </span>
             }
           </div>
+          } @else {
+            <!-- Household: contribution record, not a shared/split expense. The
+                 payer (above) is the source of truth; the full amount is that
+                 member's household contribution and is never split. -->
+            <div class="space-y-2">
+              <div
+                class="flex items-center text-sm font-semibold text-slate-700 dark:text-slate-300"
+              >
+                Household Contribution
+              </div>
+              <div
+                class="rounded-2xl bg-slate-50 dark:bg-black/10 border border-slate-200/50 dark:border-white/5 p-3"
+              >
+                <div
+                  data-testid="household-contribution-amount"
+                  class="text-lg font-extrabold text-slate-900 dark:text-white"
+                >
+                  {{
+                    (expenseForm.get('amountTotal')?.value || 0)
+                      | currency: expenseForm.get('currency')?.value || groupCurrency
+                  }}
+                </div>
+                <p
+                  data-testid="household-contribution-help"
+                  class="mt-1 text-xs text-slate-500 dark:text-slate-400"
+                >
+                  This expense is recorded as
+                  {{ isRefund() ? 'received by' : 'paid by' }}
+                  {{ householdPayerName() }} and is not split between household
+                  members.
+                </p>
+              </div>
+            </div>
+          }
         }
 
         <!-- Notes (Optional) -->

@@ -2248,3 +2248,109 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Next Actions:**
   - Not committed yet (per request). Browser-UI click-path and multi-member
     "other members' keys unchanged" remain covered by unit tests, not the live run.
+
+### 2026-08-08 (Part 3 — household personal-spending semantics)
+
+- **Summary:** Fixed household expenses being divided between members on the
+  Personal Dashboard. Household = contribution tracking: the member's personal
+  spending is the amount they actually PAID, never an equal-split share.
+- **Root cause:** Household expenses are stored like normal shared expenses —
+  the Add-Expense modal auto-selects all members and builds equal splits, so a
+  ₹1,000 household expense persists as two ₹500 `ExpenseSplit` rows. Three
+  personal read paths attributed spending by `split.amountOwed` (₹500) instead
+  of by payer/paid amount. The household balance/contribution/carry-forward
+  views were already correct (paid-based); settlements are not surfaced for
+  household (UI uses the contribution model).
+- **Changes Made (approach: read-query fix, no migration):**
+  - `ExpensesService.listMyExpenses` (`GET /expenses/me`): exclude household from
+    the split branch; add a payer-attributed household branch (myShare = full
+    amount; non-payers get nothing).
+  - `ExpensesService.getCombinedMonthlyAnalytics` (`GET /analytics/all-monthly`):
+    exclude household splits; add household expenses the user paid at full amount
+    (refunds net via `signedAmount`).
+  - `ExpenseExportQueryService`: exclude household from the group-split export;
+    add `buildHouseholdPaidQuery` so the caller's export line is the full paid
+    amount (no settlement concept, like personal).
+  - Normal groups and direct-friend splits are unchanged.
+- **Migration:** NOT needed — existing rows already carry the correct
+  `paidBy*` + `amountTotal`; the fix reads those, so historical household
+  expenses are correct immediately. The equal-split rows remain but are ignored
+  for household personal spending (already ignored by the balance/contribution
+  views).
+- **Tests:** `expenses.service.spec.ts` — household payer gets full amount
+  (Case 1), non-payer gets ₹0, combined-analytics household full amount, and a
+  household refund nets down (Case 4). Normal-group `myShare = amountOwed`
+  regression retained (Case 3). Historical rows (Case 5) covered by the same
+  read paths with no data change.
+- **Verification Status:**
+  - Backend expenses/export specs pass (+4 new tests); expenses still exactly 8
+    pre-existing date-sensitive "closed month" failures (unchanged). Frontend
+    460/460. `npx nx build backend` + `npx nx build frontend` succeed.
+  - Architecture drift: PASS — no data-model change, no migration, no
+    normal-group accounting change.
+- **Next Actions (not done — proposed):**
+  - UX: the household Add-Expense form still shows the shared-group "split"
+    affordance. Propose relabeling for household to "Paid by" + "Household
+    contribution: <amount>" (no "₹500 + ₹500" implication); keep normal-group
+    wording. Optionally normalize the household write path to store a single
+    payer-owes-full split so the settlement engine also nets to zero.
+  - Not committed (no commit requested).
+
+### 2026-08-08 (Part 4 — household Add-Expense UX)
+
+- **Summary:** Add-Expense modal now presents household expenses as a
+  contribution record (Paid By + Household Contribution + helper text) instead
+  of the shared-group split editor. Frontend-only; normal groups unchanged.
+- **Changes Made:**
+  - `CreateExpenseModalComponent`: new `@Input() groupType`; `isHousehold()` and
+    `householdPayerName()` helpers.
+  - Template: the "Split With" editor (mode toggle + participant list + split
+    validation) is wrapped in `@if (!isHousehold())`; the household `@else`
+    branch shows a compact "Household Contribution" card (full amount, currency-
+    formatted) with helper text: "This expense is recorded as paid by <payer>
+    and is not split between household members" ("received by" for refunds).
+    "Paid by" remains the source of truth for both.
+  - `group-detail.component.html`: passes `[groupType]="group()!.groupType"`.
+  - The submit/write path is unchanged — `selectedUserIds` still auto-populates,
+    so household expenses continue to persist their (ignored) equal-split rows.
+    No backend, read-query, settlement, migration, refund, validation, or
+    duplicate-detection changes.
+- **Tests:** `create-expense-modal.component.spec.ts` — new household describe:
+  new-expense (split editor hidden, contribution card shown), payer named + full
+  amount, edit mode (existing payer/amount), refund ("received by"), normal-group
+  regression (split editor present, household UI absent), and mobile/compact
+  (no wide `max-h-52` split scroller).
+- **Verification Status:**
+  - `npx nx test frontend` 466/466 pass (+6). Prettier clean on changed files.
+    `npx nx lint frontend` 0 errors (pre-existing `any` warnings only).
+    `npx nx build frontend` (AOT production) succeeds.
+- **Next Actions:**
+  - Optional: normalize the household write path to a single payer-owes-full
+    split so the latent (non-surfaced) settlement debt is also zeroed at the
+    data level. Not committed (no commit requested).
+
+### 2026-08-08 (Part 5 — household group-ledger export)
+
+- **Summary:** Read-path audit confirmed the personal dashboard/analytics/
+  personal-export/settlement surfaces are correct for household. One remaining
+  household-reachable export surface was folded in: the per-group ledger export.
+- **Changes Made:**
+  - `ExpenseExportQueryService.buildGroupLedgerRows`: when the exported group is
+    household, `myShare` is the full `amountTotal` if the caller is the payer,
+    else 0 (never the equal-split share); `splitType`/`isSettled` are neutralized.
+    Normal-group ledger export is unchanged (caller's split share).
+  - Test: `expenses-export-query.service.spec.ts` — household ledger export
+    ignores the equal-split rows (payer → full amount, non-payer → 0).
+- **Audit result (read-only):** Correct/protected — `listMyExpenses`,
+  `getCombinedMonthlyAnalytics`, per-caller export, dashboard list/total/category
+  chart/search-filter, and settlements (household uses the contribution model,
+  not the split engine). Remaining, deliberately deferred: (B) group-detail
+  ledger list `shareAmount` display (group-scoped, cosmetic); (C) carry-forward
+  rollover rows are not excluded from household personal spending (pre-existing
+  edge case, only after a month-close).
+- **Verification Status:**
+  - Backend export spec passes (+1 test); expenses still exactly 8 pre-existing
+    date-sensitive failures. `nx lint backend` 0 errors; `nx build backend`
+    succeeds. Prettier clean on changed files.
+- **Next Actions:**
+  - Optional follow-ups B and C above. Not committed (no commit requested).

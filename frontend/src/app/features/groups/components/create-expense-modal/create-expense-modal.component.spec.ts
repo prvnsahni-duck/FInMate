@@ -963,4 +963,122 @@ describe('CreateExpenseModalComponent', () => {
       );
     });
   });
+
+  // --- Household UX (contribution record, not a shared/split expense) ---
+  describe('household UX', () => {
+    const members = [
+      {
+        id: 'gm-1',
+        role: 'owner',
+        joinStatus: 'active',
+        user: { id: 'user-1', displayName: 'Praveen', email: 'p@e.com' },
+      },
+      {
+        id: 'gm-2',
+        role: 'member',
+        joinStatus: 'active',
+        user: { id: 'user-2', displayName: 'Naveen', email: 'n@e.com' },
+      },
+    ] as any;
+
+    function setupHousehold(
+      patch: Record<string, unknown> = {
+        paidByUserId: 'user-1',
+        amountTotal: 1000,
+        currency: 'INR',
+      },
+    ): HTMLElement {
+      component.groupId = 'grp-1';
+      component.groupCurrency = 'INR';
+      component.groupType = 'household';
+      component.members = members;
+      component.expenseForm.patchValue(patch);
+      fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    }
+
+    it('new household expense: hides the split editor and shows the contribution record', () => {
+      const el = setupHousehold();
+      expect(
+        el.querySelector('[data-testid="household-contribution-amount"]'),
+      ).toBeTruthy();
+      expect(
+        el.querySelector('[data-testid="household-contribution-help"]'),
+      ).toBeTruthy();
+      // No split-mode toggle / participant editor for household.
+      expect(el.querySelector('[data-testid="split-mode-equal"]')).toBeNull();
+      expect(el.querySelector('[data-testid="split-mode-custom"]')).toBeNull();
+    });
+
+    it('names the payer and shows the full amount as the contribution', () => {
+      const el = setupHousehold();
+      const help = el.querySelector(
+        '[data-testid="household-contribution-help"]',
+      )!.textContent!;
+      expect(help).toContain('paid by');
+      expect(help).toContain('Praveen');
+      expect(help).toContain('not split between household members');
+      const amount = el.querySelector(
+        '[data-testid="household-contribution-amount"]',
+      )!.textContent!;
+      expect(amount).toContain('1,000'); // full amount, currency-formatted
+    });
+
+    it('edit mode: displays the existing payer and amount', () => {
+      const el = setupHousehold({
+        paidByUserId: 'user-2',
+        amountTotal: 750,
+        currency: 'INR',
+      });
+      expect(
+        el.querySelector('[data-testid="household-contribution-help"]')!
+          .textContent,
+      ).toContain('Naveen');
+      expect(
+        el.querySelector('[data-testid="household-contribution-amount"]')!
+          .textContent,
+      ).toContain('750');
+    });
+
+    it('refund: helper text says "received by"', () => {
+      const el = setupHousehold({
+        paidByUserId: 'user-1',
+        amountTotal: 1000,
+        currency: 'INR',
+        transactionType: 'refund',
+      });
+      expect(
+        el.querySelector('[data-testid="household-contribution-help"]')!
+          .textContent,
+      ).toContain('received by');
+    });
+
+    it('normal-group regression: split editor is shown, household UI absent', () => {
+      component.groupId = 'grp-1';
+      component.groupCurrency = 'INR';
+      component.groupType = 'normal';
+      component.members = members;
+      component.expenseForm.patchValue({
+        paidByUserId: 'user-1',
+        amountTotal: 1000,
+        currency: 'INR',
+      });
+      fixture.detectChanges();
+      const el = fixture.nativeElement as HTMLElement;
+      expect(el.querySelector('[data-testid="split-mode-equal"]')).toBeTruthy();
+      expect(
+        el.querySelector('[data-testid="household-contribution-amount"]'),
+      ).toBeNull();
+    });
+
+    it('mobile layout: household record is a single compact card, not the wide scrolling split list', () => {
+      const el = setupHousehold();
+      // The tall/wide participant editor (max-h-52 scroller) is never rendered
+      // for household — only the compact contribution card is.
+      expect(el.querySelector('.max-h-52')).toBeNull();
+      expect(
+        el.querySelector('[data-testid="household-contribution-amount"]'),
+      ).toBeTruthy();
+    });
+  });
 });

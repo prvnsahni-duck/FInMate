@@ -3181,6 +3181,9 @@ export class ExpensesService {
       .getMany();
 
     // ── 2. Group shares via ExpenseSplit ────────────────────────────────────
+    // Household groups are excluded here: their expenses are contribution
+    // tracking, not cost-sharing, so personal spending is the amount the member
+    // actually PAID (attributed in step 2b), never their equal-split share.
     const groupSplits = await this.expenseSplitRepository
       .createQueryBuilder('split')
       .innerJoinAndSelect('split.expense', 'expense')
@@ -3195,10 +3198,28 @@ export class ExpensesService {
       .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
       .leftJoin('split.participantGroupMember', 'groupMember')
       .where('expense.deletedAt IS NULL')
+      .andWhere("(group.id IS NULL OR group.group_type != 'household')")
       .andWhere(
         '(split.participantUser = :userId OR groupMember.user_id = :userId)',
         { userId },
       )
+      .getMany();
+
+    // ── 2b. Household spending via the PAYER (not splits) ────────────────────
+    // For a household expense the payer's personal spending is the full amount
+    // they paid; non-payers contribute nothing to their own dashboard. Refunds
+    // carry through amountTotal's sign via the payer field, as elsewhere.
+    const householdPaid = await this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember')
+      .leftJoinAndSelect('paidByGroupMember.user', 'pgmUser')
+      .leftJoinAndSelect('paidByGroupMember.contact', 'pgmContact')
+      .leftJoinAndSelect('expense.group', 'group')
+      .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
+      .where('expense.deletedAt IS NULL')
+      .andWhere("group.group_type = 'household'")
+      .andWhere('(paidByUser.id = :userId OR pgmUser.id = :userId)', { userId })
       .getMany();
 
     // ── 3. Build unified items ──────────────────────────────────────────────
@@ -3274,6 +3295,43 @@ export class ExpensesService {
       });
     }
 
+    for (const exp of householdPaid) {
+      if (seen.has(exp.id)) continue;
+      seen.add(exp.id);
+      items.push({
+        id: exp.id,
+        title: exp.title,
+        description: exp.description,
+        amountTotal: Number(exp.amountTotal),
+        // Household: personal spending is the full paid amount, not a share.
+        myShare: Number(exp.amountTotal),
+        transactionType: exp.transactionType ?? 'expense',
+        category: exp.category,
+        expenseDate: exp.expenseDate,
+        currency: exp.currency,
+        status: exp.status,
+        encryptionScope: exp.encryptionScope,
+        expenseType: 'GROUP_SHARE',
+        groupId: exp.group?.id ?? null,
+        groupName: exp.group?.name ?? null,
+        paidByUserId:
+          exp.paidByUser?.id ?? exp.paidByGroupMember?.user?.id ?? null,
+        paidByGroupMemberId: exp.paidByGroupMember?.id ?? null,
+        paidByDisplayName:
+          exp.paidByUser?.displayName ??
+          exp.paidByUser?.email ??
+          exp.paidByGroupMember?.user?.displayName ??
+          exp.paidByGroupMember?.user?.email ??
+          exp.paidByGroupMember?.contact?.displayName ??
+          exp.paidByGroupMember?.contact?.email ??
+          null,
+        groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
+        splitId: null,
+        isSettled: false,
+        deletedAt: null,
+      });
+    }
+
     // Sort newest first
     items.sort((a, b) =>
       String(b.expenseDate).localeCompare(String(a.expenseDate)),
@@ -3340,12 +3398,16 @@ export class ExpensesService {
       personalSplits.map((s) => s.expense.id),
     );
 
-    // 3. Get all splits where the user is a participant (either direct user split or group member split)
+    // 3. Get all splits where the user is a participant (either direct user
+    //    split or group member split). Household groups are excluded — their
+    //    spending is the amount actually paid (added in step 3b), not a share.
     const userSplits = await this.expenseSplitRepository
       .createQueryBuilder('split')
       .innerJoinAndSelect('split.expense', 'expense')
+      .leftJoin('expense.group', 'group')
       .leftJoin('split.participantGroupMember', 'groupMember')
       .where('expense.status = :status', { status: 'posted' })
+      .andWhere("(group.id IS NULL OR group.group_type != 'household')")
       .andWhere(
         '(expense.ledgerMonth = :month OR (expense.expenseDate >= :monthStart AND expense.expenseDate < :monthEnd))',
         { month, monthStart, monthEnd },
@@ -3354,6 +3416,22 @@ export class ExpensesService {
         '(split.participantUser = :userId OR groupMember.user_id = :userId)',
         { userId },
       )
+      .getMany();
+
+    // 3b. Household expenses the user PAID — full amount is their contribution.
+    const householdPaid = await this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoin('expense.paidByUser', 'paidByUser')
+      .leftJoin('expense.paidByGroupMember', 'pgm')
+      .leftJoin('pgm.user', 'pgmUser')
+      .leftJoin('expense.group', 'group')
+      .where('expense.status = :status', { status: 'posted' })
+      .andWhere("group.group_type = 'household'")
+      .andWhere(
+        '(expense.ledgerMonth = :month OR (expense.expenseDate >= :monthStart AND expense.expenseDate < :monthEnd))',
+        { month, monthStart, monthEnd },
+      )
+      .andWhere('(paidByUser.id = :userId OR pgmUser.id = :userId)', { userId })
       .getMany();
 
     const categorySum = new Map<string, { amount: number; currency: string }>();
@@ -3378,6 +3456,18 @@ export class ExpensesService {
       const exp = split.expense;
       const cat = exp.category || 'Other';
       const amount = this.signedAmount(split.amountOwed, exp.transactionType);
+      const curr = exp.currency || 'USD';
+      const key = `${cat}_${curr}`;
+      const entry = categorySum.get(key) ?? { amount: 0, currency: curr };
+      entry.amount += amount;
+      categorySum.set(key, entry);
+    }
+
+    // Add household expenses at the full amount the user paid (contribution
+    // tracking, not cost-sharing). A refund reduces the payer's net spending.
+    for (const exp of householdPaid) {
+      const cat = exp.category || 'Other';
+      const amount = this.signedAmount(exp.amountTotal, exp.transactionType);
       const curr = exp.currency || 'USD';
       const key = `${cat}_${curr}`;
       const entry = categorySum.get(key) ?? { amount: 0, currency: curr };

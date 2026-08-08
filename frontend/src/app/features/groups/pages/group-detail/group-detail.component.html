@@ -2711,6 +2711,7 @@
   <app-create-expense-modal
     [groupId]="group()!.id"
     [groupCurrency]="group()!.currency"
+    [groupType]="group()!.groupType"
     [members]="members()"
     [expense]="selectedExpenseForEdit()"
     (closeModalEvent)="closeExpenseModal()"

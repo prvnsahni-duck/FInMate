@@ -2306,6 +2306,59 @@ describe('ExpensesService', () => {
       expect((result.data[0] as any).groupName).toBe('House');
     });
 
+    it('attributes a HOUSEHOLD expense to the payer at the FULL amount, not a split share', async () => {
+      // Case 1: ₹1,000 electricity paid by Praveen in a 2-member household.
+      // The equal-split rows (₹500 each) must be ignored for personal spending —
+      // the payer's dashboard shows the full ₹1,000, non-payers show nothing.
+      const householdExp = {
+        id: 'hh-1',
+        title: 'enc:Electricity',
+        amountTotal: 1000,
+        category: 'Utilities',
+        expenseDate: '2026-08-01',
+        currency: 'INR',
+        status: 'posted',
+        encryptionScope: 'group',
+        group: { id: 'hh-grp', name: 'Home', groupType: 'household' },
+        paidByUser: { id: 'user-1', displayName: 'Praveen', email: 'p@e.com' },
+      };
+      // 1st expenseRepo QB call = personal (none); 2nd = household-paid.
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValueOnce(makeQb([]))
+        .mockReturnValueOnce(makeQb([householdExp]));
+      // Household splits are excluded from the split branch (SQL filter).
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+
+      const result = await service.listMyExpenses('user-1', 1, 20);
+
+      expect(result.data).toHaveLength(1);
+      const item = result.data[0] as any;
+      expect(item.expenseType).toBe('GROUP_SHARE');
+      expect(item.myShare).toBe(1000); // full paid — NOT 500
+      expect(item.amountTotal).toBe(1000);
+      expect(item.groupId).toBe('hh-grp');
+      expect(item.paidByUserId).toBe('user-1');
+    });
+
+    it('shows nothing on a household non-payer dashboard (no split share leaks in)', async () => {
+      // Naveen did not pay: household-paid query (payer-filtered) returns none,
+      // and the split branch excludes household — so his dashboard shows ₹0.
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValueOnce(makeQb([])) // personal
+        .mockReturnValueOnce(makeQb([])); // household-paid (he isn't the payer)
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+
+      const result = await service.listMyExpenses('user-2', 1, 20);
+
+      expect(result.data).toHaveLength(0);
+    });
+
     it('resolves the payer display for a GROUP_SHARE item via paidByGroupMember — the shape every new group expense uses (frozen group-ledger identity rule)', async () => {
       expenseRepository.createQueryBuilder = jest
         .fn()
@@ -2525,6 +2578,76 @@ describe('ExpensesService', () => {
           condition.includes('participantUserId'),
         ),
       ).toBe(false);
+    });
+
+    it('counts a household expense at the full amount the user paid, not a split share', async () => {
+      const householdExp = {
+        id: 'hh-1',
+        category: 'Utilities',
+        currency: 'INR',
+        expenseDate: '2026-08-01',
+        ledgerMonth: '2026-08',
+        amountTotal: 1000,
+        transactionType: 'expense',
+      };
+      // 1st expenseRepo QB call = personal paid; 2nd = household-paid.
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValueOnce(makeQb([]))
+        .mockReturnValueOnce(makeQb([householdExp]));
+      splitRepository.find = jest.fn().mockResolvedValue([]);
+      // Household split shares are excluded from the split branch.
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+
+      const result = await service.getCombinedMonthlyAnalytics(
+        'user-1',
+        '2026-08',
+      );
+
+      expect(result).toEqual([
+        { category: 'Utilities', amount: 1000, currency: 'INR' },
+      ]);
+    });
+
+    it('nets a household refund against the payer contribution (Case 4)', async () => {
+      const exp = {
+        id: 'hh-e',
+        category: 'Utilities',
+        currency: 'INR',
+        expenseDate: '2026-08-01',
+        ledgerMonth: '2026-08',
+        amountTotal: 1000,
+        transactionType: 'expense',
+      };
+      const refund = {
+        id: 'hh-r',
+        category: 'Utilities',
+        currency: 'INR',
+        expenseDate: '2026-08-05',
+        ledgerMonth: '2026-08',
+        amountTotal: 400,
+        transactionType: 'refund',
+      };
+      expenseRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValueOnce(makeQb([]))
+        .mockReturnValueOnce(makeQb([exp, refund]));
+      splitRepository.find = jest.fn().mockResolvedValue([]);
+      splitRepository.createQueryBuilder = jest
+        .fn()
+        .mockReturnValue(makeQb([]));
+
+      const result = await service.getCombinedMonthlyAnalytics(
+        'user-1',
+        '2026-08',
+      );
+
+      // 1000 paid − 400 refunded = 600 net contribution.
+      expect(result).toEqual([
+        { category: 'Utilities', amount: 600, currency: 'INR' },
+      ]);
     });
   });
 });

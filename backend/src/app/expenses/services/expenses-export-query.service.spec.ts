@@ -379,5 +379,72 @@ describe('ExpenseExportQueryService', () => {
       ).rejects.toBeInstanceOf(ForbiddenException);
       expect(expenseRepo.createQueryBuilder).not.toHaveBeenCalled();
     });
+
+    it('household ledger: caller share is the full amount only when they paid, never the split', async () => {
+      memberRepo.findOne.mockResolvedValue({ id: 'gm-1' });
+      const household = { id: 'grp-h', name: 'Home', groupType: 'household' };
+      expenseRepo.createQueryBuilder.mockReturnValue(
+        makeQb([
+          ledgerExpense({
+            id: 'hh-1',
+            amountTotal: 1000,
+            group: household,
+            paidByUser: null,
+            paidByGroupMember: {
+              id: 'gm-1',
+              user: { id: 'user-1', displayName: 'Praveen', email: 'p@e.com' },
+              contact: null,
+            },
+          }),
+          ledgerExpense({
+            id: 'hh-2',
+            amountTotal: 500,
+            expenseDate: '2026-07-06',
+            createdAt: new Date('2026-07-06T10:00:00Z'),
+            group: household,
+            paidByUser: null,
+            paidByGroupMember: {
+              id: 'gm-2',
+              user: { id: 'user-2', displayName: 'Naveen', email: 'n@e.com' },
+              contact: null,
+            },
+          }),
+        ]),
+      );
+      // Equal-split rows exist (₹500 / ₹250) — household must IGNORE them.
+      splitRepo.createQueryBuilder.mockReturnValue(
+        makeQb([
+          {
+            amountOwed: 500,
+            isSettled: true,
+            splitType: 'equal',
+            expense: { id: 'hh-1' },
+          },
+          {
+            amountOwed: 250,
+            isSettled: false,
+            splitType: 'equal',
+            expense: { id: 'hh-2' },
+          },
+        ]),
+      );
+
+      const rows = await service.getExportRows('user-1', { groupId: 'grp-h' });
+
+      // Newest first: hh-2 (user-1 not payer → 0), then hh-1 (user-1 paid → full).
+      expect(rows[0]).toMatchObject({
+        id: 'hh-2',
+        myShare: 0,
+        splitType: null,
+        isSettled: false,
+      });
+      expect(rows[1]).toMatchObject({
+        id: 'hh-1',
+        myShare: 1000,
+        amountTotal: 1000,
+        splitType: null,
+        isSettled: false,
+      });
+    });
   });
 });

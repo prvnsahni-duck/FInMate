@@ -231,6 +231,50 @@ export class ExpenseExportQueryService {
           status: exp.status,
         });
       }
+
+      // Household expenses the caller paid — full amount, no settlement concept
+      // (so excluded when a settlement `status` filter is active, like personal).
+      if (!filter.status) {
+        const householdPaid = await this.buildHouseholdPaidQuery(
+          userId,
+          filter,
+          currency,
+        ).getMany();
+        for (const exp of householdPaid) {
+          if (seen.has(exp.id)) continue;
+          seen.add(exp.id);
+          rows.push({
+            id: exp.id,
+            expenseDate: exp.expenseDate,
+            createdAt: exp.createdAt,
+            title: exp.title,
+            description: exp.description ?? null,
+            encryptionScope: exp.encryptionScope ?? 'group',
+            groupId: exp.group?.id ?? null,
+            groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
+            wrappedContentKeys: [],
+            amountTotal: Number(exp.amountTotal),
+            // Household: the caller's line is the full amount they paid.
+            myShare: Number(exp.amountTotal),
+            transactionType: exp.transactionType ?? 'expense',
+            currency: exp.currency,
+            category: exp.category,
+            expenseType: 'GROUP_SHARE',
+            groupName: exp.group?.name ?? null,
+            paidByDisplayName:
+              exp.paidByUser?.displayName ??
+              exp.paidByUser?.email ??
+              exp.paidByGroupMember?.user?.displayName ??
+              exp.paidByGroupMember?.user?.email ??
+              exp.paidByGroupMember?.contact?.displayName ??
+              exp.paidByGroupMember?.contact?.email ??
+              null,
+            splitType: null,
+            isSettled: false,
+            status: exp.status,
+          });
+        }
+      }
     }
 
     return this.finalizeRows(rows);
@@ -330,6 +374,21 @@ export class ExpenseExportQueryService {
 
     return expenses.map((exp) => {
       const mine = myShareByExpense.get(exp.id);
+      // Household groups track actual contribution, not cost-sharing: the
+      // caller's line is the full amount when they are the payer, otherwise 0 —
+      // never the equal-split share, and no settlement concept applies. This
+      // mirrors the per-caller export and the personal-dashboard read paths.
+      const isHousehold = exp.group?.groupType === 'household';
+      const callerIsPayer =
+        exp.paidByUser?.id === userId ||
+        exp.paidByGroupMember?.user?.id === userId;
+      const myShare = isHousehold
+        ? callerIsPayer
+          ? Number(exp.amountTotal)
+          : 0
+        : mine
+          ? mine.amount
+          : 0;
       return {
         id: exp.id,
         expenseDate: exp.expenseDate,
@@ -341,7 +400,7 @@ export class ExpenseExportQueryService {
         groupKeyVersionId: exp.groupKeyVersion?.id ?? null,
         wrappedContentKeys: [],
         amountTotal: Number(exp.amountTotal),
-        myShare: mine ? mine.amount : 0,
+        myShare,
         transactionType: exp.transactionType ?? 'expense',
         currency: exp.currency,
         category: exp.category,
@@ -357,8 +416,8 @@ export class ExpenseExportQueryService {
           exp.paidByGroupMember?.contact?.displayName ??
           exp.paidByGroupMember?.contact?.email ??
           null,
-        splitType: mine?.splitType ?? null,
-        isSettled: mine?.isSettled ?? false,
+        splitType: isHousehold ? null : (mine?.splitType ?? null),
+        isSettled: isHousehold ? false : (mine?.isSettled ?? false),
         status: exp.status,
       };
     });
@@ -465,6 +524,9 @@ export class ExpenseExportQueryService {
       .leftJoin('split.participantGroupMember', 'groupMember')
       .where('expense.deletedAt IS NULL')
       .andWhere('expense.group IS NOT NULL')
+      // Household spending is attributed to the payer at full amount
+      // (buildHouseholdPaidQuery), never split, so exclude it here.
+      .andWhere("group.group_type != 'household'")
       .andWhere(
         '(split.participantUser = :userId OR groupMember.user_id = :userId)',
         {
@@ -480,6 +542,39 @@ export class ExpenseExportQueryService {
       });
     }
 
+    return qb.take(MAX_EXPORT_ROWS + 1);
+  }
+
+  /**
+   * Household expenses the caller PAID. Household groups track actual
+   * contribution rather than cost-sharing, so the caller's export line is the
+   * full amount they paid — never an equal-split share. No settlement concept
+   * applies, mirroring personal expenses.
+   */
+  private buildHouseholdPaidQuery(
+    userId: string,
+    filter: ExportFilter,
+    currency: string | undefined,
+  ): SelectQueryBuilder<Expense> {
+    const qb = this.expenseRepository
+      .createQueryBuilder('expense')
+      .leftJoinAndSelect('expense.paidByUser', 'paidByUser')
+      .leftJoinAndSelect('expense.paidByGroupMember', 'paidByGroupMember')
+      .leftJoinAndSelect('paidByGroupMember.user', 'paidByGroupMemberUser')
+      .leftJoinAndSelect(
+        'paidByGroupMember.contact',
+        'paidByGroupMemberContact',
+      )
+      .leftJoinAndSelect('expense.group', 'group')
+      .leftJoinAndSelect('expense.groupKeyVersion', 'gkv')
+      .where('expense.deletedAt IS NULL')
+      .andWhere("group.group_type = 'household'")
+      .andWhere(
+        '(paidByUser.id = :userId OR paidByGroupMemberUser.id = :userId)',
+        { userId },
+      );
+
+    this.applyExpenseFilters(qb, filter, currency);
     return qb.take(MAX_EXPORT_ROWS + 1);
   }
 
