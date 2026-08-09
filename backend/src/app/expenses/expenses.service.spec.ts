@@ -46,6 +46,37 @@ describe('ExpensesService', () => {
   let receiptVersionRepository: jest.Mocked<Repository<ReceiptVersion>>;
   let entityManagerMock: { create: jest.Mock; save: jest.Mock };
 
+  // Freeze the clock so the month-lock edit window (ExpenseEditPolicyService)
+  // is deterministic. The fixtures below use fixed dates written against a
+  // "current month = June 2026" assumption: 15 Jun 2026 keeps June/July open
+  // and locks May 2026 and older, which is exactly what these tests expect.
+  // Only Date is faked — timers stay real so async flows are unaffected.
+  beforeAll(() => {
+    jest.useFakeTimers({
+      doNotFake: [
+        'setTimeout',
+        'clearTimeout',
+        'setInterval',
+        'clearInterval',
+        'setImmediate',
+        'clearImmediate',
+        'nextTick',
+        'hrtime',
+        'performance',
+        'queueMicrotask',
+        'requestAnimationFrame',
+        'cancelAnimationFrame',
+        'requestIdleCallback',
+        'cancelIdleCallback',
+      ],
+      now: new Date('2026-06-15T12:00:00Z'),
+    });
+  });
+
+  afterAll(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(async () => {
     const mockExpenseRepository = {
       find: jest.fn().mockResolvedValue([]),
