@@ -74,17 +74,11 @@ encryptedPrivateWrappingKey }`.
     `passwordHash = argon2.hash(newPassword)`, set `encryptedPrivateWrappingKey`,
     `revokeAllSessions(userId)`, audit `auth.password_reset`.
 - **Frontend**
-  - `reset-password` lazy page + route reading `?token=`:
-    1. `GET` reset context. If `!hasRecoveryKey` → blocked-guidance screen (no form).
-    2. Form: recovery code + new password (+ confirm).
-    3. `recoveryKey = deriveMasterKey(recoveryCode, email)`; `privateKeyJWK =
+  - `reset-password` lazy page + route reading `?token=`: 1. `GET` reset context. If `!hasRecoveryKey` → blocked-guidance screen (no form). 2. Form: recovery code + new password (+ confirm). 3. `recoveryKey = deriveMasterKey(recoveryCode, email)`; `privateKeyJWK =
 decrypt(recoveryWrappedKey, recoveryKey)` — wrong code → AEAD failure →
-       "recovery code didn't match" error.
-    4. `newMasterKey = deriveAndStoreKey(newPassword, email)`;
-       `newBlob = encrypt(privateKeyJWK, newMasterKey)`.
-    5. `POST /auth/reset-password { token, newPassword, encryptedPrivateWrappingKey: newBlob }`.
-    6. On success → redirect to login. `recoveryWrappedKey` is unchanged (same
-       code, same privateKeyJWK) so the user keeps their existing recovery code.
+    "recovery code didn't match" error. 4. `newMasterKey = deriveAndStoreKey(newPassword, email)`;
+    `newBlob = encrypt(privateKeyJWK, newMasterKey)`. 5. `POST /auth/reset-password { token, newPassword, encryptedPrivateWrappingKey: newBlob }`. 6. On success → redirect to login. `recoveryWrappedKey` is unchanged (same
+    code, same privateKeyJWK) so the user keeps their existing recovery code.
   - `auth.service.ts` (frontend): `requestPasswordReset`, `getResetContext(token)`,
     `resetPassword(payload)`.
   - Add "Forgot password?" link on the login page.
