@@ -65,7 +65,10 @@ describe('GroupKeyService', () => {
     // Isolate this test from the fire-and-forget legacy-key migration that a
     // symmetric wrapped key would otherwise trigger.
     jest
-      .spyOn(service as unknown as { migrateSelfKeyToAsymmetric: () => unknown }, 'migrateSelfKeyToAsymmetric')
+      .spyOn(
+        service as unknown as { migrateSelfKeyToAsymmetric: () => unknown },
+        'migrateSelfKeyToAsymmetric',
+      )
       .mockReturnValue(undefined);
 
     const promise = service.getGroupKeyForEncryption('group-1');

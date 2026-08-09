@@ -863,10 +863,7 @@ export class GroupKeyService {
         }),
       );
     } catch (e) {
-      console.warn(
-        'Failed to migrate symmetric group key to RSA wrapping',
-        e,
-      );
+      console.warn('Failed to migrate symmetric group key to RSA wrapping', e);
     }
   }
 

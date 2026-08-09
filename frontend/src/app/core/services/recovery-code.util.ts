@@ -45,7 +45,9 @@ export function generateRecoveryCode(): string {
 
   const groups: string[] = [];
   for (let i = 0; i < GROUPS; i++) {
-    groups.push(chars.slice(i * CHARS_PER_GROUP, (i + 1) * CHARS_PER_GROUP).join(''));
+    groups.push(
+      chars.slice(i * CHARS_PER_GROUP, (i + 1) * CHARS_PER_GROUP).join(''),
+    );
   }
   return groups.join('-');
 }

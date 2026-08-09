@@ -85,7 +85,7 @@ cleanly. Escalate to Option 2 only if product decides history must show titles.
 
 - **Area:** Frontend · encryption recovery (`group-key.service.ts`) — see
   [`docs/group-key-flow.md`](group-key-flow.md)
-- **Severity:** Medium — potential data-loss for *legacy* self keys only. New and
+- **Severity:** Medium — potential data-loss for _legacy_ self keys only. New and
   already-migrated keys are unaffected. Not release-blocking.
 - **Status:** Mitigated by lazy migration (2026-08-08). New group keys are wrapped
   under the caller's RSA public key, which survives a reset because the recovery
@@ -101,7 +101,7 @@ format) is unrecoverable once a password reset changes the master key.
 
 `GroupKeyService.migrateSelfKeyToAsymmetric` re-wraps such a legacy key under the
 RSA public key on first access — **but only while the old master key is still in
-session** (i.e. during a normal login *before* any reset). A legacy self key that
+session** (i.e. during a normal login _before_ any reset). A legacy self key that
 is never accessed between deploying this fix and a password reset stays orphaned.
 
 ### Practical impact

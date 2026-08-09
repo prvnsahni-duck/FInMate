@@ -32,6 +32,7 @@ All crypto reuses `ClientEncryptionService` primitives (`deriveMasterKey`,
 ## Scope: three parts
 
 ### Part A — Recovery-code setup (prerequisite)
+
 Populates `recoveryWrappedKey`; without it Part C has nothing to unwrap.
 
 - **Frontend**
@@ -47,6 +48,7 @@ Populates `recoveryWrappedKey`; without it Part C has nothing to unwrap.
 - **Backend**: `POST /users/me/recovery-key` + status endpoint already exist — reuse.
 
 ### Part B — Forgot request
+
 - **Backend**
   - `auth.dto.ts`: `ForgotPasswordDto { email }`.
   - `auth.controller.ts`: `POST /auth/forgot-password` — `@ThrottleAs(FORGOT_PASSWORD)`,
@@ -60,11 +62,12 @@ Populates `recoveryWrappedKey`; without it Part C has nothing to unwrap.
     → always show "if an account exists, a link was sent".
 
 ### Part C — Reset (data-preserving)
+
 - **Backend**
   - `GET /auth/reset-password?token=` — validate token (peek, no consume),
     return `{ email, hasRecoveryKey, recoveryWrappedKey | null }`.
   - `auth.dto.ts`: `ResetPasswordDto { token, newPassword (MinLength 8),
-    encryptedPrivateWrappingKey }`.
+encryptedPrivateWrappingKey }`.
   - `POST /auth/reset-password` — `@ThrottleAs(RESET_PASSWORD)`:
     `resetPassword(dto)` → `redis.getDel('pwd_reset:'+token)` (atomic single-use);
     invalid/expired → `AUTH_RESET_INVALID` BadRequest; set
@@ -75,7 +78,7 @@ Populates `recoveryWrappedKey`; without it Part C has nothing to unwrap.
     1. `GET` reset context. If `!hasRecoveryKey` → blocked-guidance screen (no form).
     2. Form: recovery code + new password (+ confirm).
     3. `recoveryKey = deriveMasterKey(recoveryCode, email)`; `privateKeyJWK =
-       decrypt(recoveryWrappedKey, recoveryKey)` — wrong code → AEAD failure →
+decrypt(recoveryWrappedKey, recoveryKey)` — wrong code → AEAD failure →
        "recovery code didn't match" error.
     4. `newMasterKey = deriveAndStoreKey(newPassword, email)`;
        `newBlob = encrypt(privateKeyJWK, newMasterKey)`.

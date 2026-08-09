@@ -34,7 +34,9 @@ describe('recovery-code util', () => {
   describe('generateRecoveryCode', () => {
     it('produces four hyphen-separated groups of five Crockford base32 chars', () => {
       const code = generateRecoveryCode();
-      expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/);
+      expect(code).toMatch(
+        /^[0-9A-HJKMNP-TV-Z]{5}(-[0-9A-HJKMNP-TV-Z]{5}){3}$/,
+      );
     });
 
     it('never emits Crockford-ambiguous characters (I, L, O, U)', () => {
@@ -161,14 +163,19 @@ describe('recovery-code util', () => {
       // 1. Account setup: RSA wrapping pair; private key wrapped under both the
       //    master key (normal login) and the recovery key (recovery path).
       const wrappingPair = await enc.generateWrappingKeyPair();
-      const privateKeyPkcs8 = await enc.exportPrivateKey(wrappingPair.privateKey);
+      const privateKeyPkcs8 = await enc.exportPrivateKey(
+        wrappingPair.privateKey,
+      );
 
       const code = generateRecoveryCode();
       const recoveryKey = await enc.deriveMasterKey(
         normalizeRecoveryCode(code),
         email,
       );
-      const recoveryWrappedKey = await enc.encrypt(privateKeyPkcs8, recoveryKey);
+      const recoveryWrappedKey = await enc.encrypt(
+        privateKeyPkcs8,
+        recoveryKey,
+      );
 
       // 2. The owner creates a group key and wraps their own copy under the RSA
       //    PUBLIC key (the fixed behaviour), then encrypts data with it.

@@ -156,7 +156,10 @@ describe('ResetPasswordComponent', () => {
       'recovery-blob',
       fakeKey,
     );
-    expect(mockEncryption.encrypt).toHaveBeenCalledWith('private-key-jwk', fakeKey);
+    expect(mockEncryption.encrypt).toHaveBeenCalledWith(
+      'private-key-jwk',
+      fakeKey,
+    );
     expect(mockAuthService.resetPassword).toHaveBeenCalledWith({
       token: 'reset-token',
       newPassword: 'newpassword1',
