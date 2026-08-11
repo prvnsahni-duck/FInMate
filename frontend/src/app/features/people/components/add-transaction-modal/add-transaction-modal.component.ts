@@ -1,10 +1,6 @@
 import { Component, inject, input, output, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PeopleService } from '../../services/people.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 
@@ -35,7 +31,10 @@ export class AddTransactionModalComponent {
 
   readonly form = this.fb.nonNullable.group({
     entryType: ['lend' as 'lend' | 'borrow', Validators.required],
-    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    amount: [
+      null as number | null,
+      [Validators.required, Validators.min(0.01)],
+    ],
     occurredOn: [new Date().toISOString().slice(0, 10), Validators.required],
     note: [''],
   });
@@ -64,7 +63,8 @@ export class AddTransactionModalComponent {
         error: (err: HttpErrorResponse) => {
           this.isSaving.set(false);
           this.errorMsg.set(
-            err?.error?.message ?? 'Could not save the transaction. Please try again.',
+            err?.error?.message ??
+              'Could not save the transaction. Please try again.',
           );
         },
       });

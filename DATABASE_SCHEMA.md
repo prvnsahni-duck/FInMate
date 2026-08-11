@@ -232,17 +232,17 @@ erDiagram
   engine reads these rows and falls back to `expenses.paid_by_*` when none exist.
 - **Columns**:
 
-| Column Name               | Type            | Nullable | Default              | Constraints                                          |
-| :------------------------ | :-------------- | :------: | :------------------- | :--------------------------------------------------- |
-| `id`                      | `uuid`          |    No    | `uuid_generate_v4()` | Primary Key                                          |
-| `expense_id`              | `uuid`          |    No    |                      | Foreign Key -> `expenses(id)` `ON DELETE CASCADE`    |
-| `paid_by_user_id`         | `uuid`          |   Yes    | `NULL`               | Foreign Key -> `users(id)`                           |
-| `paid_by_group_member_id` | `uuid`          |   Yes    | `NULL`               | Foreign Key -> `group_members(id)`                   |
-| `amount`                  | `decimal(12,2)` |    No    |                      |                                                      |
-| `version`                 | `integer`       |    No    | `1`                  | Optimistic Concurrency Control                       |
-| `created_at`              | `timestamptz`   |    No    | `NOW()`              |                                                      |
-| `updated_at`              | `timestamptz`   |    No    | `NOW()`              |                                                      |
-| `deleted_at`              | `timestamptz`   |   Yes    | `NULL`               | Soft-delete (ledger history)                         |
+| Column Name               | Type            | Nullable | Default              | Constraints                                                  |
+| :------------------------ | :-------------- | :------: | :------------------- | :----------------------------------------------------------- |
+| `id`                      | `uuid`          |    No    | `uuid_generate_v4()` | Primary Key                                                  |
+| `expense_id`              | `uuid`          |    No    |                      | Foreign Key -> `expenses(id)` `ON DELETE CASCADE`            |
+| `paid_by_user_id`         | `uuid`          |   Yes    | `NULL`               | Foreign Key -> `users(id)`                                   |
+| `paid_by_group_member_id` | `uuid`          |   Yes    | `NULL`               | Foreign Key -> `group_members(id)`                           |
+| `amount`                  | `decimal(12,2)` |    No    |                      |                                                              |
+| `version`                 | `integer`       |    No    | `1`                  | Optimistic Concurrency Control                               |
+| `created_at`              | `timestamptz`   |    No    | `NOW()`              |                                                              |
+| `updated_at`              | `timestamptz`   |    No    | `NOW()`              |                                                              |
+| `deleted_at`              | `timestamptz`   |   Yes    | `NULL`               | Soft-delete (ledger history)                                 |
 | **Check Constraint**      |                 |          |                      | Exactly one of `paid_by_user_id` / `paid_by_group_member_id` |
 
 ### 8. `settlements`
@@ -275,22 +275,22 @@ erDiagram
   aggregate. Entries are immutable history — edits/voids soft-delete.
 - **Columns**:
 
-| Column Name          | Type            | Nullable | Default              | Constraints                                       |
-| :------------------- | :-------------- | :------: | :------------------- | :------------------------------------------------ |
-| `id`                 | `uuid`          |    No    | `uuid_generate_v4()` | Primary Key                                       |
-| `from_user_id`       | `uuid`          |    No    |                      | Foreign Key -> `users(id)` (Debtor)               |
-| `to_user_id`         | `uuid`          |    No    |                      | Foreign Key -> `users(id)` (Creditor)             |
-| `created_by_user_id` | `uuid`          |    No    |                      | Foreign Key -> `users(id)` (Recorder)             |
-| `entry_type`         | `varchar(16)`   |    No    |                      | Values: `lend`, `borrow`, `settlement`            |
-| `amount`             | `decimal(12,2)` |    No    |                      | `CHECK (amount > 0)`                              |
-| `currency`           | `char(3)`       |    No    |                      |                                                   |
-| `note`               | `text`          |   Yes    | `NULL`               |                                                   |
-| `occurred_on`        | `date`          |    No    |                      | User-facing date                                  |
-| `version`            | `integer`       |    No    | `1`                  | Optimistic Concurrency Control                    |
-| `created_at`         | `timestamptz`   |    No    | `NOW()`              |                                                   |
-| `updated_at`         | `timestamptz`   |    No    | `NOW()`              |                                                   |
-| `deleted_at`         | `timestamptz`   |   Yes    | `NULL`               | Soft-delete (history)                             |
-| **Check Constraint** |                 |          |                      | `from_user_id <> to_user_id`                      |
+| Column Name          | Type            | Nullable | Default              | Constraints                            |
+| :------------------- | :-------------- | :------: | :------------------- | :------------------------------------- |
+| `id`                 | `uuid`          |    No    | `uuid_generate_v4()` | Primary Key                            |
+| `from_user_id`       | `uuid`          |    No    |                      | Foreign Key -> `users(id)` (Debtor)    |
+| `to_user_id`         | `uuid`          |    No    |                      | Foreign Key -> `users(id)` (Creditor)  |
+| `created_by_user_id` | `uuid`          |    No    |                      | Foreign Key -> `users(id)` (Recorder)  |
+| `entry_type`         | `varchar(16)`   |    No    |                      | Values: `lend`, `borrow`, `settlement` |
+| `amount`             | `decimal(12,2)` |    No    |                      | `CHECK (amount > 0)`                   |
+| `currency`           | `char(3)`       |    No    |                      |                                        |
+| `note`               | `text`          |   Yes    | `NULL`               |                                        |
+| `occurred_on`        | `date`          |    No    |                      | User-facing date                       |
+| `version`            | `integer`       |    No    | `1`                  | Optimistic Concurrency Control         |
+| `created_at`         | `timestamptz`   |    No    | `NOW()`              |                                        |
+| `updated_at`         | `timestamptz`   |    No    | `NOW()`              |                                        |
+| `deleted_at`         | `timestamptz`   |   Yes    | `NULL`               | Soft-delete (history)                  |
+| **Check Constraint** |                 |          |                      | `from_user_id <> to_user_id`           |
 
 ### 9. `recurring_expenses`
 

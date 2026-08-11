@@ -7,23 +7,23 @@ run.** Local Postgres migration verified and reversible; Neon production
 untouched.
 
 > ⚠️ **Do not run the production migration until explicitly authorised.** This
-> runbook is the procedure to follow *once* authorised. Every command that writes
+> runbook is the procedure to follow _once_ authorised. Every command that writes
 > to production is gated behind the confirmation steps below.
 
 ---
 
 ## 0. Readiness snapshot (verified)
 
-| Check | Result |
-| --- | --- |
-| Working tree = only P2P Phase 1–3 changes | ✓ (no unrelated changes) |
-| Backend migration present + registered | ✓ `migrations/index.ts` |
-| `/people` API exists | ✓ `people.controller.ts` (GET, GET/:id, POST txns, POST settlements, PATCH/DELETE) |
-| `/friends` → `/people` redirect | ✓ `app.routes.ts` (`pathMatch: 'full'`) |
-| Frontend calls `/people` | ✓ `people.service.ts` |
-| Single-payer fallback keeps existing balances intact | ✓ verified (byte-identical, local) |
-| Migration executed against production | **NO** (only local `ts-node` harness against `localhost`; `npm run db:migrate` never run with the production `DATABASE_URL`) |
-| Regression | backend 515 ✓ · frontend 501 ✓ · builds ✓ · lint 0 errors · UAT 30/30 |
+| Check                                                | Result                                                                                                                       |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Working tree = only P2P Phase 1–3 changes            | ✓ (no unrelated changes)                                                                                                     |
+| Backend migration present + registered               | ✓ `migrations/index.ts`                                                                                                      |
+| `/people` API exists                                 | ✓ `people.controller.ts` (GET, GET/:id, POST txns, POST settlements, PATCH/DELETE)                                           |
+| `/friends` → `/people` redirect                      | ✓ `app.routes.ts` (`pathMatch: 'full'`)                                                                                      |
+| Frontend calls `/people`                             | ✓ `people.service.ts`                                                                                                        |
+| Single-payer fallback keeps existing balances intact | ✓ verified (byte-identical, local)                                                                                           |
+| Migration executed against production                | **NO** (only local `ts-node` harness against `localhost`; `npm run db:migrate` never run with the production `DATABASE_URL`) |
+| Regression                                           | backend 515 ✓ · frontend 501 ✓ · builds ✓ · lint 0 errors · UAT 30/30                                                        |
 
 ---
 
@@ -43,20 +43,18 @@ untouched.
 
 ### ✅ Backup record — CONFIRMED (2026-08-11)
 
-| Field | Value |
-| --- | --- |
-| Backup/branch identifier | `pre-p2p-migration-backup` |
-| Parent branch | `production` |
-| Backup type | Neon branch — data **and** schema |
-| Created | 2026-08-11 (reported "just now"); precise UTC per Neon console — ≈ `2026-08-11T13:40Z` (derived from the 7-day retention expiry below) |
-| Expiry | 2026-08-18 19:10 (GMT+5:30) = `2026-08-18T13:40Z` |
-| Target it protects | production Neon (host confirmed out-of-band via Render/env — not recorded here) |
+| Field                    | Value                                                                                                                                  |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Backup/branch identifier | `pre-p2p-migration-backup`                                                                                                             |
+| Parent branch            | `production`                                                                                                                           |
+| Backup type              | Neon branch — data **and** schema                                                                                                      |
+| Created                  | 2026-08-11 (reported "just now"); precise UTC per Neon console — ≈ `2026-08-11T13:40Z` (derived from the 7-day retention expiry below) |
+| Expiry                   | 2026-08-18 19:10 (GMT+5:30) = `2026-08-18T13:40Z`                                                                                      |
+| Target it protects       | production Neon (host confirmed out-of-band via Render/env — not recorded here)                                                        |
 
 > Note: the backup branch **expires 2026-08-18**. Complete the production
 > migration and its verification well before expiry, or refresh the branch, so a
 > valid recovery point exists throughout the rollout window.
-
-
 
 1. In Neon, create/confirm a backup: a **branch** or **point-in-time snapshot** of
    the production database taken immediately before migration.
@@ -85,7 +83,7 @@ Deploy in this order:
 4. **Backend smoke tests** (Step 5).
 5. **Deploy frontend** (Step 6) — only after 2–4 pass.
 
-Because of the fallback, a backend deployed *before* the migration still serves
+Because of the fallback, a backend deployed _before_ the migration still serves
 correct balances (from the legacy payer columns); the migration then backfills
 payment rows without changing any result.
 
@@ -170,13 +168,14 @@ The migration must **not** change any existing balance. Using the backend's own
 balance services (not ad-hoc SQL), compare a representative sample **before vs
 after**:
 
-- Capture, *before* deploying, the output of `GET
-  /groups/{id}/settlements/balances` for a handful of representative groups
+- Capture, _before_ deploying, the output of `GET
+/groups/{id}/settlements/balances` for a handful of representative groups
   (store the `balances` array values in the ticket, not in logs).
-- *After* migration, call the same endpoints and confirm each group/person
+- _After_ migration, call the same endpoints and confirm each group/person
   balance is **identical**.
 
 Cover at least one of each:
+
 - normal group, household group,
 - a group with a refunded expense,
 - a group with unequal shares,
@@ -239,10 +238,12 @@ Only after Steps 3–7 pass, deploy the frontend and confirm:
 ## Step 9 — Monitoring (first hours/days post-deploy)
 
 Watch:
+
 - `/people` API error rate, settlement errors, expense-creation errors,
 - DB/migration errors, frontend People-route errors.
 
 Alert specifically on:
+
 - unexpected balance discrepancies,
 - duplicate `ExpensePayment` rows (see §4c),
 - missing direct ledger entries,
@@ -254,12 +255,14 @@ Alert specifically on:
 ## Step 10 — Rollback strategy (two distinct kinds)
 
 ### 10a. Application rollback (the normal mechanism)
+
 If the frontend/backend deployment misbehaves: **roll back the application
 deployment** (redeploy the previous build). **Keep the new database tables.** The
 old backend is unaffected by the extra tables; the new tables simply go unused.
 **Do NOT revert the database migration to roll back the app.**
 
 ### 10b. Database migration rollback (exceptional only)
+
 `npm run db:migrate:revert` drops `direct_ledger_entries` and `expense_payments`.
 It is technically reversible, but **once production has written new data**
 (multi-payer `ExpensePayment` rows, direct ledger entries, settlements) a revert
@@ -288,6 +291,7 @@ It is technically reversible, but **once production has written new data**
 ## Step 12 — Final production checklist
 
 Backfill/DB:
+
 - [ ] Production backup confirmed (id + UTC time recorded)
 - [ ] Correct Neon production database confirmed (host only)
 - [ ] Backend deployed
@@ -298,12 +302,14 @@ Backfill/DB:
 - [ ] existing balance parity verified (normal + household + refund + unequal + older + multi-member)
 
 API:
+
 - [ ] `GET /people` verified
 - [ ] `GET /people/:userId` verified
 - [ ] `GET /groups/:id/settlements/balances` verified
 - [ ] household exclusion verified
 
 App smoke:
+
 - [ ] existing expense rendering verified
 - [ ] People dashboard verified
 - [ ] person detail verified
@@ -313,6 +319,7 @@ App smoke:
 - [ ] source expense navigation verified
 
 Frontend:
+
 - [ ] Frontend deployed
 - [ ] `/friends` → `/people` verified
 - [ ] E2EE title decryption verified
@@ -323,6 +330,7 @@ Frontend:
 ## Step 13 — Stop conditions (halt immediately, do not "fix" prod)
 
 Stop and report (awaiting approval) if any occur:
+
 - wrong `DATABASE_URL` / unidentifiable target,
 - backup unavailable,
 - migration fails,

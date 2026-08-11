@@ -6,6 +6,7 @@ Migration written but **not yet run**. Verification: `nx build backend` ✓,
 Date: 2026-08-11
 
 ### Decisions taken (2026-08-11)
+
 1. **Multiple payers: implement now** (new `ExpensePayment` table — see §11a).
 2. **`/friends`: replace with `/people`**, redirect the old route, fix the
    household leak in cross-person aggregation.
@@ -28,10 +29,11 @@ a minimal, non-conflicting extension.
 ## 1. Current architecture (files inspected)
 
 ### Entities (`shared/data-models/src/lib/`)
+
 - `expense.entity.ts` — single payer: `paidByUser` XOR `paidByGroupMember` (CHECK
   constraint). `transactionType: 'expense' | 'refund'`. `group` nullable
   (personal expenses allowed). Soft-delete via `deletedAt`. `encryptionScope:
-  personal | group | direct_shared`.
+personal | group | direct_shared`.
 - `expense-split.entity.ts` — one row per participant: `participantUser` XOR
   `participantGroupMember`, `splitType`, `shareValue`, `amountOwed`, `isSettled`,
   soft-delete.
@@ -49,6 +51,7 @@ a minimal, non-conflicting extension.
   claimed.
 
 ### Services / controllers
+
 - `backend/src/app/settlements/settlements.service.ts`
   - `computeBalancesCore()` — the canonical balance engine. Per group, keyed by
     `GroupMember.id`: `+amountTotal` to payer, `−amountOwed` to each participant,
@@ -77,6 +80,7 @@ a minimal, non-conflicting extension.
   percentage targets; separate from debts).
 
 ### Frontend
+
 - `features/friends/` — `FriendsComponent` + `FriendsService` (`GET /friends`).
   Aggregate cards + expandable per-group breakdown. **No** person detail, **no**
   direct lending, **no** settle-from-here. Registered users only.
@@ -108,41 +112,42 @@ a minimal, non-conflicting extension.
 
 ## 3. Gaps relative to the requirement
 
-| # | Requirement | Status today |
-|---|---|---|
-| G1 | Unified per-person view across groups **+ direct** | Partial: `/friends` is group-only, simplified, registered-only, includes household |
-| G2 | Direct lending/borrowing (no group) | **Missing** entity/API/UI |
-| G3 | Person detail page + chronological history + source refs | **Missing** |
-| G4 | "Return"/settle from the person page (not group-scoped) | **Missing** (settlements are group-scoped) |
-| G5 | Household must NOT create P2P debt | **Violated** (household leaks into `/friends`) |
-| G6 | Preserve pairwise obligations + source expense (no chain simplification, §25) | `/friends` uses `simplifyDebts` which can reroute A→B→C |
-| G7 | Max-5 on dashboard + "View all", ordered by outstanding | **Missing** (friends page shows all) |
-| G8 | Multiple payers (§7) | **Missing** (single-payer schema) — see §11 risk |
-| G9 | Nav entry for People | **Missing** |
+| #   | Requirement                                                                   | Status today                                                                       |
+| --- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| G1  | Unified per-person view across groups **+ direct**                            | Partial: `/friends` is group-only, simplified, registered-only, includes household |
+| G2  | Direct lending/borrowing (no group)                                           | **Missing** entity/API/UI                                                          |
+| G3  | Person detail page + chronological history + source refs                      | **Missing**                                                                        |
+| G4  | "Return"/settle from the person page (not group-scoped)                       | **Missing** (settlements are group-scoped)                                         |
+| G5  | Household must NOT create P2P debt                                            | **Violated** (household leaks into `/friends`)                                     |
+| G6  | Preserve pairwise obligations + source expense (no chain simplification, §25) | `/friends` uses `simplifyDebts` which can reroute A→B→C                            |
+| G7  | Max-5 on dashboard + "View all", ordered by outstanding                       | **Missing** (friends page shows all)                                               |
+| G8  | Multiple payers (§7)                                                          | **Missing** (single-payer schema) — see §11 risk                                   |
+| G9  | Nav entry for People                                                          | **Missing**                                                                        |
 
 ---
 
 ## 4. Proposed data model
 
-**Principle:** derive balances; add the *minimum* persistent surface. One new
+**Principle:** derive balances; add the _minimum_ persistent surface. One new
 entity only.
 
 ### New entity: `DirectLedgerEntry` (`direct_ledger_entries`)
+
 Represents an explicit, group-less obligation or settlement between two **Users**.
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | uuid PK | |
-| `fromUser` | User (NOT NULL) | debtor side of the movement |
-| `toUser` | User (NOT NULL) | creditor side |
-| `entryType` | `'lend' \| 'borrow' \| 'settlement'` | UI verb; normalised so direction is unambiguous |
-| `amount` | decimal(12,2) > 0 | |
-| `currency` | char(3) | |
-| `note` | text nullable | |
-| `occurredOn` | date | user-facing date (§23) |
-| `version` | VersionColumn | optimistic locking |
-| `createdAt/updatedAt` | timestamps | |
-| `deletedAt` | soft-delete | edit/void without destroying history (§12) |
+| Field                 | Type                                 | Notes                                           |
+| --------------------- | ------------------------------------ | ----------------------------------------------- |
+| `id`                  | uuid PK                              |                                                 |
+| `fromUser`            | User (NOT NULL)                      | debtor side of the movement                     |
+| `toUser`              | User (NOT NULL)                      | creditor side                                   |
+| `entryType`           | `'lend' \| 'borrow' \| 'settlement'` | UI verb; normalised so direction is unambiguous |
+| `amount`              | decimal(12,2) > 0                    |                                                 |
+| `currency`            | char(3)                              |                                                 |
+| `note`                | text nullable                        |                                                 |
+| `occurredOn`          | date                                 | user-facing date (§23)                          |
+| `version`             | VersionColumn                        | optimistic locking                              |
+| `createdAt/updatedAt` | timestamps                           |                                                 |
+| `deletedAt`           | soft-delete                          | edit/void without destroying history (§12)      |
 
 Direction convention (mirrors `computeBalancesCore`): a `lend`/`borrow` entry adds
 `+amount` to `toUser`'s claim on `fromUser`; a `settlement` reduces it. `lend` and
@@ -162,7 +167,9 @@ read-model computed on the fly from: normal-group expenses/splits/settlements
 truth = transactions" rule (§4, §28) and auto-handles edit/delete (§29).
 
 ### History reference (§20, §33)
+
 No new join table needed. Each history line already carries its origin:
+
 - group obligation → `Expense.id` (+ group id/name) — link to the expense.
 - direct → `DirectLedgerEntry.id` (type lend/borrow/settlement).
 
@@ -180,7 +187,7 @@ honour §25/G6. Two sub-options:
 
 - **A1 (recommended): per-expense decomposition.** For each posted, non-deleted
   expense in the group, for each participant `p ≠ payer`: `p owes payer
-  amountOwed(p)` (refund inverts). Aggregate only edges where the caller is one
+amountOwed(p)` (refund inverts). Aggregate only edges where the caller is one
   side. This yields true pairwise debts, each tagged with its **source expense**
   (needed for §19/§20 history) and never reroutes across people.
 - **A2: caller-vs-each-member net.** Simpler but loses per-expense source lines and
@@ -197,8 +204,9 @@ them)`. Positive → "X owes you"; negative → "You owe X". Group settlements
 (existing) reduce the group portion; direct settlements reduce the net.
 
 **Outputs:**
+
 - `GET /people` → `[{ counterpartyUserId, displayName, avatar, currency,
-  netBalance, direction }]`, sorted by `|netBalance|` desc, settled last (G7).
+netBalance, direction }]`, sorted by `|netBalance|` desc, settled last (G7).
 - `GET /people/:userId` → header net + **breakdown** (group total / direct total /
   settlements) + paginated **history** (each line: amount, direction, type, date,
   note, groupId/groupName, expenseId, entryId).
@@ -213,14 +221,14 @@ remain visible inside their group. (Documented, not a bug.)
 
 New module `people` (controller + `PersonLedgerService`), all `@UseGuards(JwtAuthGuard)`:
 
-| Method | Route | Purpose |
-|---|---|---|
-| GET | `/people` | dashboard list (support `?limit=5` for the max-5 widget, full list otherwise) |
-| GET | `/people/:userId` | header + breakdown + history (paginated) |
-| POST | `/people/:userId/transactions` | create direct lend/borrow (`{ entryType, amount, currency, occurredOn, note }`) |
-| POST | `/people/:userId/settlements` | "Return" — creates a `settlement` DirectLedgerEntry |
-| PATCH | `/people/transactions/:id` | edit (version-checked) |
-| DELETE | `/people/transactions/:id` | soft-delete/void |
+| Method | Route                          | Purpose                                                                         |
+| ------ | ------------------------------ | ------------------------------------------------------------------------------- |
+| GET    | `/people`                      | dashboard list (support `?limit=5` for the max-5 widget, full list otherwise)   |
+| GET    | `/people/:userId`              | header + breakdown + history (paginated)                                        |
+| POST   | `/people/:userId/transactions` | create direct lend/borrow (`{ entryType, amount, currency, occurredOn, note }`) |
+| POST   | `/people/:userId/settlements`  | "Return" — creates a `settlement` DirectLedgerEntry                             |
+| PATCH  | `/people/transactions/:id`     | edit (version-checked)                                                          |
+| DELETE | `/people/transactions/:id`     | soft-delete/void                                                                |
 
 New DTOs in `shared/data-models`: `CreateDirectTransactionDto`,
 `CreateDirectSettlementDto`, `UpdateDirectTransactionDto`, and response interfaces
@@ -292,8 +300,8 @@ excluded from cross-person view but visible in group.
 
 1. **Multiple payers (§7, G8).** Current schema is single-payer. Options:
    (a) **V1: keep single payer** — §7's "multiple overpayers" needs the group's
-   *net* across several single-payer expenses (still correct via net+pairwise), but
-   a *single expense with 2 payers* cannot be entered. (b) Add a `payments` table
+   _net_ across several single-payer expenses (still correct via net+pairwise), but
+   a _single expense with 2 payers_ cannot be entered. (b) Add a `payments` table
    (multi-payer) — larger change. **Recommend (a) for V1**, document the limitation.
    **Decision needed.**
 2. **Chain simplification vs `/friends` (G6).** New People view uses per-expense
@@ -301,8 +309,8 @@ excluded from cross-person view but visible in group.
    `simplifyDebts`. Two different answers can coexist; recommend the UI standardise
    on `/people`. **Decision: deprecate `/friends` UI?**
 3. **Return semantics when balance mixes group + direct.** A direct `settlement`
-   reduces the *net*; it does not touch confirmed group settlements. Risk of double
-   counting only if a user *also* confirms a group settlement for the same money.
+   reduces the _net_; it does not touch confirmed group settlements. Risk of double
+   counting only if a user _also_ confirms a group settlement for the same money.
    Acceptable for V1; document. **Decision needed.**
 4. **Over-settlement** (§Edge): return > outstanding → either reject or allow
    (flips direction). Recommend **reject** in V1 with a clear error. **Decision.**
@@ -314,15 +322,17 @@ excluded from cross-person view but visible in group.
 ## 11. Files that WILL be modified / created
 
 **Create**
+
 - `shared/data-models/src/lib/direct-ledger-entry.entity.ts`
 - `shared/data-models/src/lib/dto/direct-transaction.dto.ts`
-- `shared/data-models` barrel + `api-responses.ts` (Person* interfaces)
+- `shared/data-models` barrel + `api-responses.ts` (Person\* interfaces)
 - `backend/src/app/people/people.module.ts`, `people.controller.ts`,
   `person-ledger.service.ts` (+ `.spec.ts`)
 - `backend/src/migrations/<ts>-AddDirectLedgerEntries.ts`
 - `frontend/src/app/features/people/` (routes, pages, `people.service.ts` + specs)
 
 **Modify**
+
 - `backend/src/app/app.module.ts` (register `PeopleModule`)
 - `shared/data-models` entity index + TypeORM entity list / `ormconfig`
 - `frontend/src/app/app.routes.ts` (+ `/people`)
@@ -332,6 +342,7 @@ excluded from cross-person view but visible in group.
   `API_SPECIFICATION.md`, `openapi.yaml` (new entity/endpoints)
 
 **Must NOT modify (reuse only)**
+
 - `expense.entity.ts`, `expense-split.entity.ts`, `settlement.entity.ts` and the
   group settlement propose/confirm flow.
 - `split-calculator.ts`, `ledger-debt-simplifier`, `computeBalancesCore` internals
@@ -345,22 +356,23 @@ excluded from cross-person view but visible in group.
 
 **New entity `ExpensePayment` (`expense_payments`)** — one row per payer of an expense.
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | uuid PK | |
-| `expense` | Expense (NOT NULL, onDelete CASCADE) | |
-| `paidByUser` | User nullable | XOR with `paidByGroupMember` (CHECK) |
-| `paidByGroupMember` | GroupMember nullable | group expenses; frozen group-identity rule |
-| `amount` | decimal(12,2) > 0 | |
-| `version` / timestamps / `deletedAt` | | mirrors split lifecycle |
+| Field                                | Type                                 | Notes                                      |
+| ------------------------------------ | ------------------------------------ | ------------------------------------------ |
+| `id`                                 | uuid PK                              |                                            |
+| `expense`                            | Expense (NOT NULL, onDelete CASCADE) |                                            |
+| `paidByUser`                         | User nullable                        | XOR with `paidByGroupMember` (CHECK)       |
+| `paidByGroupMember`                  | GroupMember nullable                 | group expenses; frozen group-identity rule |
+| `amount`                             | decimal(12,2) > 0                    |                                            |
+| `version` / timestamps / `deletedAt` |                                      | mirrors split lifecycle                    |
 
 **Invariant:** `Σ payments.amount == expense.amountTotal` (validated on create/update,
 same cents math as the split calculator).
 
 **Source-of-truth switch:**
+
 - `ExpensePayment` becomes authoritative for "who paid".
 - `Expense.paidByUser/paidByGroupMember` are **kept** and continue to hold the
-  *primary* payer (payments[0]) for backward compatibility, existing reads, the
+  _primary_ payer (payments[0]) for backward compatibility, existing reads, the
   CHECK constraint, and single-payer UX. New code reads payments; legacy columns
   stay consistent.
 
@@ -376,6 +388,7 @@ existing `paidBy*` (100% backward compatible). `persistSplits` still takes a sin
 rounding-priority key (deterministic tie-break by member id).
 
 **Migration & backfill (the risky part):**
+
 1. Create `expense_payments` (indexes on `expense`, `paidByUser`,
    `paidByGroupMember`; partial `deletedAt IS NULL`).
 2. **Backfill:** for every existing non-deleted `expenses` row, insert one
@@ -397,9 +410,10 @@ radius than the direct-ledger work** and is why it needs its own sign-off.
 ## 12. Step-by-step implementation order (after approval)
 
 **Backend-only scope (Decision 4 — stop before frontend):**
+
 1. **Multi-payer core (§11a):** `ExpensePayment` entity + backfill migration;
    `computeBalancesCore` reads payments; create/update expense accept `payments[]`
-   (back-compatible); DTO changes. Tests. *(gated on §11a sign-off)*
+   (back-compatible); DTO changes. Tests. _(gated on §11a sign-off)_
 2. `DirectLedgerEntry` entity + DTOs + shared barrel; migration.
 3. `PersonLedgerService`: direct-entry CRUD (lend/borrow/settle, reject
    over-settlement) + read-model (group per-expense pairwise A1 + direct + net),

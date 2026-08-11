@@ -2425,7 +2425,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   - `/friends` → `/people` redirect added; `People` added to the primary nav.
     `FriendsService` kept (still used by group-members user search).
   - Minimal backend enrichment: `PersonHistoryItem` now carries `encryptionScope`
-    + `groupKeyVersionId` so the client can reuse the standard expense decryptor.
+    - `groupKeyVersionId` so the client can reuse the standard expense decryptor.
   - `openapi.yaml`: added `/people` paths + `PersonSummary` / `PersonHistoryItem`
     schemas.
 - **Artifacts Updated:** `app.routes.ts`, `main-layout.component.ts` (nav +
@@ -2438,7 +2438,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
 - **Verification:** `nx build frontend` ✓, `nx test frontend` **498 passed / 56
   suites / 0 fail** (new People specs: service, dashboard, list, detail, both
   modals, navigation), `nx lint frontend` **0 errors**. Backend regression: `nx
-  test backend` **515 pass / 34 suites**, `nx build backend` ✓. Production
+test backend` **515 pass / 34 suites**, `nx build backend` ✓. Production
   migration NOT run (per instruction).
 - **Next Actions:** Optional — "start a new relationship" via user search on the
   People list; edit-in-place for direct entries; retire the now-unreachable
@@ -2474,7 +2474,7 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   `person-search-modal` (+ spec), `openapi.yaml`,
   `docs/plans/people-api-contracts.md` (currency section).
 - **Verification (Phase 3, all green):** `nx test backend` 515, `nx test
-  frontend` 501, `nx build backend` ✓, `nx build frontend` ✓, `nx lint backend`
+frontend` 501, `nx build backend` ✓, `nx build frontend` ✓, `nx lint backend`
   0 errors, `nx lint frontend` 0 errors. UAT harness 30/30.
 - **Bugs found:** none in product code. One harness-only gap (raw-seeded expense
   lacked a `GroupKeyVersion`, so the decryption-hint assertion initially failed);
@@ -2493,11 +2493,11 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
   backup + target verification, backend-first deploy order, gated
   `npm run db:migrate`, post-migration invariants (orphan_expenses/sum_mismatches/
   duplicate-backfill), balance-parity procedure via backend services, People API
-  + app smoke tests, frontend deploy, two-tier rollback (app rollback keeps tables;
-  DB revert only under approved recovery), monitoring, checklist, and stop
-  conditions. Reinforces: never print DATABASE_URL/secrets, never revert as routine
-  rollback, keep `verify-p2p-migration.ts` + `uat-p2p.ts`, `npm run db:down` to stop
-  local DB.
+  - app smoke tests, frontend deploy, two-tier rollback (app rollback keeps tables;
+    DB revert only under approved recovery), monitoring, checklist, and stop
+    conditions. Reinforces: never print DATABASE_URL/secrets, never revert as routine
+    rollback, keep `verify-p2p-migration.ts` + `uat-p2p.ts`, `npm run db:down` to stop
+    local DB.
 - **Readiness verified:** migration present/registered; `/people` API present;
   `/friends`→`/people` redirect; frontend calls `/people`; single-payer fallback
   intact. Prior results: UAT 30/30, backend 515, frontend 501, builds ✓, lint 0

@@ -61,7 +61,10 @@ describe('PersonLedgerService', () => {
         { provide: getRepositoryToken(ExpenseSplit), useValue: splitRepo },
         { provide: getRepositoryToken(ExpensePayment), useValue: paymentRepo },
         { provide: getRepositoryToken(Settlement), useValue: settlementRepo },
-        { provide: getRepositoryToken(DirectLedgerEntry), useValue: directRepo },
+        {
+          provide: getRepositoryToken(DirectLedgerEntry),
+          useValue: directRepo,
+        },
         { provide: getRepositoryToken(User), useValue: userRepo },
       ],
     }).compile();

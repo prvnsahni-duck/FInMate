@@ -36,7 +36,11 @@ describe('AddTransactionModalComponent', () => {
     component.submit();
     expect(peopleService.createTransaction).toHaveBeenCalledWith(
       'u2',
-      expect.objectContaining({ entryType: 'lend', amount: 500, currency: 'INR' }),
+      expect.objectContaining({
+        entryType: 'lend',
+        amount: 500,
+        currency: 'INR',
+      }),
     );
     expect(saved).toHaveBeenCalled();
   });

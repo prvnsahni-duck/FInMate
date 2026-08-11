@@ -50,7 +50,12 @@ describe('PeopleService', () => {
     service.getOverview().subscribe();
     const req = httpMock.expectOne('/api/people');
     expect(req.request.method).toBe('GET');
-    req.flush({ currency: 'INR', totalYouAreOwed: 0, totalYouOwe: 0, people: [] });
+    req.flush({
+      currency: 'INR',
+      totalYouAreOwed: 0,
+      totalYouOwe: 0,
+      people: [],
+    });
   });
 
   it('decrypts group-expense history titles via the shared decryptor', (done) => {

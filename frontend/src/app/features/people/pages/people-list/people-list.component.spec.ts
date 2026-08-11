@@ -11,7 +11,14 @@ const data: PeopleOverviewResponse = {
   totalYouOwe: 0,
   hasMultipleCurrencies: false,
   people: [
-    { counterpartyUserId: 'u2', displayName: 'Naveen', email: 'n@x.com', currency: 'INR', netBalance: 720, direction: 'owes_you' },
+    {
+      counterpartyUserId: 'u2',
+      displayName: 'Naveen',
+      email: 'n@x.com',
+      currency: 'INR',
+      netBalance: 720,
+      direction: 'owes_you',
+    },
   ],
 };
 
@@ -44,6 +51,8 @@ describe('PeopleListComponent', () => {
 
   it('shows an error state on failure', async () => {
     await setup(throwError(() => new Error('x')));
-    expect(fixture.nativeElement.querySelector('[data-testid="people-retry"]')).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="people-retry"]'),
+    ).toBeTruthy();
   });
 });

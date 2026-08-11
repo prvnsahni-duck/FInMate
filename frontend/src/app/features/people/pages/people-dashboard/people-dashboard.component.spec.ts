@@ -15,9 +15,30 @@ function overview(
     totalYouOwe: 180,
     hasMultipleCurrencies: false,
     people: [
-      { counterpartyUserId: 'u2', displayName: 'Naveen', email: 'n@x.com', currency: 'INR', netBalance: 720, direction: 'owes_you' },
-      { counterpartyUserId: 'u3', displayName: 'Praveen', email: 'p@x.com', currency: 'INR', netBalance: -180, direction: 'you_owe' },
-      { counterpartyUserId: 'u4', displayName: 'Sneha', email: 's@x.com', currency: 'INR', netBalance: 0, direction: 'settled' },
+      {
+        counterpartyUserId: 'u2',
+        displayName: 'Naveen',
+        email: 'n@x.com',
+        currency: 'INR',
+        netBalance: 720,
+        direction: 'owes_you',
+      },
+      {
+        counterpartyUserId: 'u3',
+        displayName: 'Praveen',
+        email: 'p@x.com',
+        currency: 'INR',
+        netBalance: -180,
+        direction: 'you_owe',
+      },
+      {
+        counterpartyUserId: 'u4',
+        displayName: 'Sneha',
+        email: 's@x.com',
+        currency: 'INR',
+        netBalance: 0,
+        direction: 'settled',
+      },
     ],
     ...partial,
   };
@@ -34,7 +55,10 @@ describe('PeopleDashboardComponent', () => {
       providers: [
         provideRouter([]),
         { provide: PeopleService, useValue: peopleService },
-        { provide: Store, useValue: { selectSnapshot: () => ({ userId: 'me' }) } },
+        {
+          provide: Store,
+          useValue: { selectSnapshot: () => ({ userId: 'me' }) },
+        },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(PeopleDashboardComponent);
@@ -60,13 +84,17 @@ describe('PeopleDashboardComponent', () => {
   });
 
   it('shows the empty state when there are no people', async () => {
-    await setup(of(overview({ people: [], totalYouAreOwed: 0, totalYouOwe: 0 })));
+    await setup(
+      of(overview({ people: [], totalYouAreOwed: 0, totalYouOwe: 0 })),
+    );
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('all settled up');
   });
 
   it('shows an error state on failure', async () => {
     await setup(throwError(() => new Error('boom')));
-    expect(fixture.nativeElement.querySelector('[data-testid="people-retry"]')).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="people-retry"]'),
+    ).toBeTruthy();
   });
 });

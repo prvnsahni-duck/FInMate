@@ -8,11 +8,7 @@ import {
 } from '@angular/core';
 import { CurrencyPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  FormBuilder,
-  ReactiveFormsModule,
-  Validators,
-} from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { PeopleService } from '../../services/people.service';
 import { SubmitButtonComponent } from '../../../../shared/components/submit-button/submit-button.component';
 
@@ -58,7 +54,10 @@ export class ReturnModalComponent implements OnInit {
   readonly errorMsg = signal<string | null>(null);
 
   readonly form = this.fb.nonNullable.group({
-    amount: [null as number | null, [Validators.required, Validators.min(0.01)]],
+    amount: [
+      null as number | null,
+      [Validators.required, Validators.min(0.01)],
+    ],
     occurredOn: [new Date().toISOString().slice(0, 10), Validators.required],
     note: [''],
   });
@@ -96,7 +95,8 @@ export class ReturnModalComponent implements OnInit {
         error: (err: HttpErrorResponse) => {
           this.isSaving.set(false);
           this.errorMsg.set(
-            err?.error?.message ?? 'Could not record the settlement. Please try again.',
+            err?.error?.message ??
+              'Could not record the settlement. Please try again.',
           );
         },
       });

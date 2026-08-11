@@ -59,7 +59,14 @@ describe('ReturnModalComponent', () => {
   });
 
   it('shows the backend rejection message', async () => {
-    await setup(500, throwError(() => ({ error: { message: 'Return amount cannot exceed the outstanding balance' } })));
+    await setup(
+      500,
+      throwError(() => ({
+        error: {
+          message: 'Return amount cannot exceed the outstanding balance',
+        },
+      })),
+    );
     component.form.controls.amount.setValue(500);
     component.submit();
     expect(component.errorMsg()).toContain('exceed the outstanding');

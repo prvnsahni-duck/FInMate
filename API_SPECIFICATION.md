@@ -448,7 +448,7 @@ create person-to-person debt). Registered users only (V1).
 - **Success (`200 OK`)**: header (`netBalance`, `direction`, dominant `currency`),
   `breakdown[]` per currency (`groupObligations`, `directLending`, `settlements`,
   `net`), and chronological `history[]` (each: `source` = `group_expense|direct|
-  settlement`, signed `amount`, `date`, optional `groupId/groupName/expenseId/note`).
+settlement`, signed `amount`, `date`, optional `groupId/groupName/expenseId/note`).
 
 #### 4.3 Record a Direct Transaction (Lend / Borrow)
 

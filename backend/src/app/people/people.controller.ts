@@ -26,13 +26,19 @@ export class PeopleController {
   constructor(private readonly personLedgerService: PersonLedgerService) {}
 
   @Get()
-  async getOverview(@Query('limit') limit: string | undefined, @Req() req: any) {
+  async getOverview(
+    @Query('limit') limit: string | undefined,
+    @Req() req: any,
+  ) {
     const parsed = limit ? parseInt(limit, 10) : undefined;
     const result = await this.personLedgerService.getOverview(
       req.user.id,
       Number.isFinite(parsed) && (parsed as number) > 0 ? parsed : undefined,
     );
-    return new SuccessResponse('People balances calculated successfully', result);
+    return new SuccessResponse(
+      'People balances calculated successfully',
+      result,
+    );
   }
 
   @Get(':userId')
@@ -44,7 +50,10 @@ export class PeopleController {
       req.user.id,
       userId,
     );
-    return new SuccessResponse('Person relationship retrieved successfully', result);
+    return new SuccessResponse(
+      'Person relationship retrieved successfully',
+      result,
+    );
   }
 
   @Post(':userId/transactions')
@@ -58,7 +67,10 @@ export class PeopleController {
       userId,
       dto,
     );
-    return new SuccessResponse('Direct transaction recorded successfully', result);
+    return new SuccessResponse(
+      'Direct transaction recorded successfully',
+      result,
+    );
   }
 
   @Post(':userId/settlements')
@@ -86,7 +98,10 @@ export class PeopleController {
       id,
       dto,
     );
-    return new SuccessResponse('Direct transaction updated successfully', result);
+    return new SuccessResponse(
+      'Direct transaction updated successfully',
+      result,
+    );
   }
 
   @Delete('transactions/:id')

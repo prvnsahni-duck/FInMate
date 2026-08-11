@@ -26,9 +26,7 @@ export const appRoutes: Route[] = [
       {
         path: 'people',
         loadChildren: () =>
-          import('./features/people/people.routes').then(
-            (m) => m.peopleRoutes,
-          ),
+          import('./features/people/people.routes').then((m) => m.peopleRoutes),
       },
       // People supersedes the old Friends page; keep the path as a redirect
       // for backwards compatibility (bookmarks, existing links).

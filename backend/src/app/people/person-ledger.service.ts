@@ -88,9 +88,7 @@ export class PersonLedgerService {
     for (const cp of ledger.values()) {
       for (const [currency, bucket] of cp.byCurrency.entries()) {
         const net = round2(
-          bucket.groupObligations +
-            bucket.directLending +
-            bucket.settlements,
+          bucket.groupObligations + bucket.directLending + bucket.settlements,
         );
         const totals = byCurrency.get(currency) ?? { owed: 0, owe: 0 };
         if (net > 0) totals.owed += net;
@@ -165,9 +163,7 @@ export class PersonLedgerService {
     if (cp) {
       for (const [currency, bucket] of cp.byCurrency.entries()) {
         const net = round2(
-          bucket.groupObligations +
-            bucket.directLending +
-            bucket.settlements,
+          bucket.groupObligations + bucket.directLending + bucket.settlements,
         );
         breakdown.push({
           currency,
@@ -248,9 +244,7 @@ export class PersonLedgerService {
     const bucket = ledger.get(counterpartyUserId)?.byCurrency.get(currency);
     const net = bucket
       ? round2(
-          bucket.groupObligations +
-            bucket.directLending +
-            bucket.settlements,
+          bucket.groupObligations + bucket.directLending + bucket.settlements,
         )
       : 0;
 
@@ -346,9 +340,7 @@ export class PersonLedgerService {
       entry.fromUser.id !== callerUserId &&
       entry.toUser.id !== callerUserId
     ) {
-      throw new ForbiddenException(
-        'You are not a party to this transaction',
-      );
+      throw new ForbiddenException('You are not a party to this transaction');
     }
     return entry;
   }
@@ -400,16 +392,8 @@ export class PersonLedgerService {
       return cp;
     };
 
-    await this.accumulateGroupLedger(
-      callerUserId,
-      onlyCounterpartyId,
-      getCp,
-    );
-    await this.accumulateDirectLedger(
-      callerUserId,
-      onlyCounterpartyId,
-      getCp,
-    );
+    await this.accumulateGroupLedger(callerUserId, onlyCounterpartyId, getCp);
+    await this.accumulateDirectLedger(callerUserId, onlyCounterpartyId, getCp);
     return ledger;
   }
 
@@ -546,7 +530,8 @@ export class PersonLedgerService {
           }
           const info = memberInfo.get(counterpartyMemberId);
           if (!info || !info.userId) continue; // registered users only (V1)
-          if (onlyCounterpartyId && info.userId !== onlyCounterpartyId) continue;
+          if (onlyCounterpartyId && info.userId !== onlyCounterpartyId)
+            continue;
 
           const cp = getCp(info.userId, {
             displayName: info.displayName,
@@ -649,7 +634,8 @@ export class PersonLedgerService {
     for (const e of entries) {
       const isCallerTo = e.toUser.id === callerUserId;
       const counterparty = isCallerTo ? e.fromUser : e.toUser;
-      if (onlyCounterpartyId && counterparty.id !== onlyCounterpartyId) continue;
+      if (onlyCounterpartyId && counterparty.id !== onlyCounterpartyId)
+        continue;
 
       let signedForCaller: number;
       let bucketKey: 'directLending' | 'settlements';

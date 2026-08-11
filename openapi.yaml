@@ -1921,7 +1921,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [currency, totalYouAreOwed, totalYouOwe, hasMultipleCurrencies, people]
+                required:
+                  [
+                    currency,
+                    totalYouAreOwed,
+                    totalYouOwe,
+                    hasMultipleCurrencies,
+                    people,
+                  ]
                 properties:
                   currency:
                     type: string
@@ -1967,7 +1974,14 @@ paths:
                         type: array
                         items:
                           type: object
-                          required: [currency, groupObligations, directLending, settlements, net]
+                          required:
+                            [
+                              currency,
+                              groupObligations,
+                              directLending,
+                              settlements,
+                              net,
+                            ]
                           properties:
                             currency: { type: string }
                             groupObligations: { type: number }

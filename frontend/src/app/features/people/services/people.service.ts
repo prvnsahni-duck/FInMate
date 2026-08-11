@@ -77,9 +77,7 @@ export class PeopleService {
   }
 
   deleteTransaction(id: string): Observable<void> {
-    return this.http.delete<void>(
-      `${this.baseUrl}/people/transactions/${id}`,
-    );
+    return this.http.delete<void>(`${this.baseUrl}/people/transactions/${id}`);
   }
 
   /** Decrypt group-expense titles in-place (returns a new response object). */

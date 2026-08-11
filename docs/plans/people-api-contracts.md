@@ -21,24 +21,24 @@ perspective**. Registered users only in V1 (pending Contacts don't appear here).
 ```jsonc
 {
   "currency": "INR",
-  "totalYouAreOwed": 1030,      // Σ of positive nets (across rows)
-  "totalYouOwe": 430,           // Σ of |negative nets|
+  "totalYouAreOwed": 1030, // Σ of positive nets (across rows)
+  "totalYouOwe": 430, // Σ of |negative nets|
   "people": [
     {
-      "counterpartyUserId": "b1c2…",  // route param for the detail page
+      "counterpartyUserId": "b1c2…", // route param for the detail page
       "displayName": "Naveen",
       "email": "naveen@example.com",
       "currency": "INR",
-      "netBalance": 720,               // > 0 ⇒ they owe you
-      "direction": "owes_you"          // "owes_you" | "you_owe" | "settled"
+      "netBalance": 720, // > 0 ⇒ they owe you
+      "direction": "owes_you", // "owes_you" | "you_owe" | "settled"
     },
-    { "counterpartyUserId": "c3…", "displayName": "Praveen", "email": "…",
-      "currency": "INR", "netBalance": -180, "direction": "you_owe" }
-  ]
+    { "counterpartyUserId": "c3…", "displayName": "Praveen", "email": "…", "currency": "INR", "netBalance": -180, "direction": "you_owe" },
+  ],
 }
 ```
 
 **How the UI reads it**
+
 - **Current balance + direction**: `netBalance` + `direction`. Render human text
   from `direction`, magnitude from `Math.abs(netBalance)`:
   - `owes_you` → "{displayName} owes you ₹{|net|}"
@@ -71,11 +71,11 @@ perspective**. Registered users only in V1 (pending Contacts don't appear here).
   "breakdown": [
     {
       "currency": "INR",
-      "groupObligations": 500,   // from normal-group expenses (pairwise)
-      "directLending": 300,      // from direct lend/borrow
-      "settlements": -80,        // returns/settlements (always reduces net)
-      "net": 720
-    }
+      "groupObligations": 500, // from normal-group expenses (pairwise)
+      "directLending": 300, // from direct lend/borrow
+      "settlements": -80, // returns/settlements (always reduces net)
+      "net": 720,
+    },
   ],
 
   // Chronological (newest first). Signed from the caller's perspective:
@@ -83,12 +83,12 @@ perspective**. Registered users only in V1 (pending Contacts don't appear here).
   "history": [
     {
       "id": "settlement:9f…",
-      "source": "settlement",          // "group_expense" | "direct" | "settlement"
-      "entryType": "settlement",       // present for direct + settlement lines
+      "source": "settlement", // "group_expense" | "direct" | "settlement"
+      "entryType": "settlement", // present for direct + settlement lines
       "amount": -80,
       "currency": "INR",
       "date": "2026-08-11",
-      "note": "UPI"
+      "note": "UPI",
     },
     {
       "id": "expense:7a…",
@@ -96,25 +96,26 @@ perspective**. Registered users only in V1 (pending Contacts don't appear here).
       "amount": 500,
       "currency": "INR",
       "date": "2026-08-08",
-      "groupId": "g-goa…",             // ← source group reference
+      "groupId": "g-goa…", // ← source group reference
       "groupName": "Goa Trip",
-      "expenseId": "7a…",              // ← source expense reference (open it)
-      "title": "<ciphertext>"          // E2EE — decrypt client-side with group key
+      "expenseId": "7a…", // ← source expense reference (open it)
+      "title": "<ciphertext>", // E2EE — decrypt client-side with group key
     },
     {
       "id": "direct:4b…",
       "source": "direct",
       "entryType": "lend",
-      "amount": 200,                   // you lent → they owe you
+      "amount": 200, // you lent → they owe you
       "currency": "INR",
       "date": "2026-08-04",
-      "note": "cash"
-    }
-  ]
+      "note": "cash",
+    },
+  ],
 }
 ```
 
 **How the UI reads it**
+
 - **Header balance + direction**: `netBalance` + `direction` (dominant currency).
   The `[Return]` button prefills `Math.abs(netBalance)` in `currency`.
 - **Breakdown panel**: iterate `breakdown` (per currency). The three lines map to
@@ -142,12 +143,12 @@ perspective**. Registered users only in V1 (pending Contacts don't appear here).
 
 ## 3. Write endpoints (for the detail-page actions)
 
-| Action | Method & route | Body | Notes |
-| --- | --- | --- | --- |
-| Add Transaction (Lend/Borrow) | `POST /people/{userId}/transactions` | `{ entryType: "lend"\|"borrow", amount, currency, occurredOn, note? }` | No group selector. Returns the created `DirectLedgerEntry`. |
-| Return / Settle | `POST /people/{userId}/settlements` | `{ amount, currency, occurredOn, note? }` | Direction inferred from current net. **Over-settlement rejected** (`SETTLE_OVER_AMOUNT`); nothing outstanding → `SETTLE_NOTHING_OUTSTANDING`. |
-| Edit direct entry | `PATCH /people/transactions/{id}` | `{ amount?, occurredOn?, note?, version }` | Version-checked (`CON_VERSION_CONFLICT`). |
-| Delete direct entry | `DELETE /people/transactions/{id}` | — | Soft-delete; history preserved; caller must be a party. |
+| Action                        | Method & route                       | Body                                                                   | Notes                                                                                                                                         |
+| ----------------------------- | ------------------------------------ | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add Transaction (Lend/Borrow) | `POST /people/{userId}/transactions` | `{ entryType: "lend"\|"borrow", amount, currency, occurredOn, note? }` | No group selector. Returns the created `DirectLedgerEntry`.                                                                                   |
+| Return / Settle               | `POST /people/{userId}/settlements`  | `{ amount, currency, occurredOn, note? }`                              | Direction inferred from current net. **Over-settlement rejected** (`SETTLE_OVER_AMOUNT`); nothing outstanding → `SETTLE_NOTHING_OUTSTANDING`. |
+| Edit direct entry             | `PATCH /people/transactions/{id}`    | `{ amount?, occurredOn?, note?, version }`                             | Version-checked (`CON_VERSION_CONFLICT`).                                                                                                     |
+| Delete direct entry           | `DELETE /people/transactions/{id}`   | —                                                                      | Soft-delete; history preserved; caller must be a party.                                                                                       |
 
 Error bodies follow the existing `ErrorResponse` schema (`{ errorCode, message }`).
 After any write, the UI should re-fetch `GET /people/{userId}` (and/or `GET

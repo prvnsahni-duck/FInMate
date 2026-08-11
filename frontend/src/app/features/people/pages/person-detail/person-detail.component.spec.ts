@@ -6,7 +6,9 @@ import { PersonDetailComponent } from './person-detail.component';
 import { PeopleService } from '../../services/people.service';
 import { PersonDetailResponse } from '@finmate/data-models';
 
-function detail(partial: Partial<PersonDetailResponse> = {}): PersonDetailResponse {
+function detail(
+  partial: Partial<PersonDetailResponse> = {},
+): PersonDetailResponse {
   return {
     counterpartyUserId: 'u2',
     displayName: 'Naveen',
@@ -15,12 +17,42 @@ function detail(partial: Partial<PersonDetailResponse> = {}): PersonDetailRespon
     netBalance: 720,
     direction: 'owes_you',
     breakdown: [
-      { currency: 'INR', groupObligations: 500, directLending: 300, settlements: -80, net: 720 },
+      {
+        currency: 'INR',
+        groupObligations: 500,
+        directLending: 300,
+        settlements: -80,
+        net: 720,
+      },
     ],
     history: [
-      { id: 'expense:e1', source: 'group_expense', amount: 500, currency: 'INR', date: '2026-08-08', groupId: 'g1', groupName: 'Goa Trip', expenseId: 'e1', title: 'Room Rent' },
-      { id: 'direct:d1', source: 'direct', entryType: 'lend', amount: 300, currency: 'INR', date: '2026-08-04' },
-      { id: 'settlement:s1', source: 'settlement', entryType: 'settlement', amount: -80, currency: 'INR', date: '2026-08-10' },
+      {
+        id: 'expense:e1',
+        source: 'group_expense',
+        amount: 500,
+        currency: 'INR',
+        date: '2026-08-08',
+        groupId: 'g1',
+        groupName: 'Goa Trip',
+        expenseId: 'e1',
+        title: 'Room Rent',
+      },
+      {
+        id: 'direct:d1',
+        source: 'direct',
+        entryType: 'lend',
+        amount: 300,
+        currency: 'INR',
+        date: '2026-08-04',
+      },
+      {
+        id: 'settlement:s1',
+        source: 'settlement',
+        entryType: 'settlement',
+        amount: -80,
+        currency: 'INR',
+        date: '2026-08-10',
+      },
     ],
     ...partial,
   };
@@ -56,7 +88,9 @@ describe('PersonDetailComponent', () => {
   it('shows the current balance and direction from the backend', async () => {
     await setup();
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('[data-testid="detail-net"]')?.textContent).toContain('720');
+    expect(
+      el.querySelector('[data-testid="detail-net"]')?.textContent,
+    ).toContain('720');
     expect(el.textContent).toContain('Naveen owes you');
   });
 
@@ -73,7 +107,9 @@ describe('PersonDetailComponent', () => {
     await setup();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.textContent).toContain('Room Rent');
-    const link = el.querySelector('[data-testid="history-group-link"]') as HTMLAnchorElement;
+    const link = el.querySelector(
+      '[data-testid="history-group-link"]',
+    ) as HTMLAnchorElement;
     expect(link?.getAttribute('href')).toContain('/groups/g1');
   });
 
@@ -86,7 +122,9 @@ describe('PersonDetailComponent', () => {
   });
 
   it('hides the Return action and shows settled when net is zero', async () => {
-    await setup(of(detail({ netBalance: 0, direction: 'settled', history: [] })));
+    await setup(
+      of(detail({ netBalance: 0, direction: 'settled', history: [] })),
+    );
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('[data-testid="open-return"]')).toBeNull();
     expect(el.querySelector('[data-testid="history-empty"]')).toBeTruthy();
@@ -94,6 +132,8 @@ describe('PersonDetailComponent', () => {
 
   it('shows an error state on failure', async () => {
     await setup(throwError(() => new Error('boom')));
-    expect(fixture.nativeElement.querySelector('[data-testid="detail-retry"]')).toBeTruthy();
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="detail-retry"]'),
+    ).toBeTruthy();
   });
 });

@@ -44,7 +44,10 @@ const approx = (a: number, b: number) => Math.abs(a - b) < 0.005;
 
 async function main() {
   await AppDataSource.initialize();
-  console.log('Connected to', (AppDataSource.options as any).url?.split('@')[1]);
+  console.log(
+    'Connected to',
+    (AppDataSource.options as any).url?.split('@')[1],
+  );
 
   console.log('\n[0] Running migrations…');
   const ran = await AppDataSource.runMigrations();
@@ -87,7 +90,12 @@ async function main() {
         joinedAt: new Date(),
       }),
     );
-  const mkExpense = (group: Group, owner: User, payer: GroupMember, total: number) =>
+  const mkExpense = (
+    group: Group,
+    owner: User,
+    payer: GroupMember,
+    total: number,
+  ) =>
     expRepo.save(
       expRepo.create({
         title: 'cipher',
@@ -159,8 +167,12 @@ async function main() {
       FROM "expenses" e
       WHERE NOT EXISTS (SELECT 1 FROM "expense_payments" p WHERE p."expense_id" = e."id")
     `);
-    const rows: Array<{ expense_id: string; cnt: string; sum: string; mismatch: boolean }> =
-      await q.query(`
+    const rows: Array<{
+      expense_id: string;
+      cnt: string;
+      sum: string;
+      mismatch: boolean;
+    }> = await q.query(`
         SELECT e.id AS expense_id,
                COUNT(p.id) AS cnt,
                COALESCE(SUM(p.amount),0) AS sum,
@@ -170,14 +182,26 @@ async function main() {
         WHERE e.id IN ('${e1.id}','${e2.id}')
         GROUP BY e.id, e.amount_total
       `);
-    check('every legacy expense has exactly 1 payment', rows.every((r) => Number(r.cnt) === 1), rows);
-    check('payment sum equals amount_total', rows.every((r) => !r.mismatch), rows);
+    check(
+      'every legacy expense has exactly 1 payment',
+      rows.every((r) => Number(r.cnt) === 1),
+      rows,
+    );
+    check(
+      'payment sum equals amount_total',
+      rows.every((r) => !r.mismatch),
+      rows,
+    );
     // Global invariant across the whole DB after migration.
     const orphans = await q.query(
       `SELECT COUNT(*) AS n FROM expenses e WHERE NOT EXISTS
          (SELECT 1 FROM expense_payments p WHERE p.expense_id=e.id AND p.deleted_at IS NULL)`,
     );
-    check('no expense left without a payment row (global)', Number(orphans[0].n) === 0, orphans);
+    check(
+      'no expense left without a payment row (global)',
+      Number(orphans[0].n) === 0,
+      orphans,
+    );
   }
 
   // ── [2] Single-payer balances unchanged ────────────────────────────────────
@@ -211,10 +235,14 @@ async function main() {
       norm(withPayments) === norm(fallback),
       { withPayments: norm(withPayments), fallback: norm(fallback) },
     );
-    check('U1 net = +6 (paid 9, owes 3)', approx(
-      withPayments.overall.balances.find((b: any) => b.userId === u1.id)?.netBalance,
-      6,
-    ));
+    check(
+      'U1 net = +6 (paid 9, owes 3)',
+      approx(
+        withPayments.overall.balances.find((b: any) => b.userId === u1.id)
+          ?.netBalance,
+        6,
+      ),
+    );
   }
 
   // ── [3] Scenario A: direct lend + partial settlement ───────────────────────
@@ -228,14 +256,20 @@ async function main() {
       currency: 'USD',
       occurredOn: '2026-08-01',
     });
-    check('after lend: U2 owes U1 500', approx(await netWith(u1.id, u2.id), 500));
+    check(
+      'after lend: U2 owes U1 500',
+      approx(await netWith(u1.id, u2.id), 500),
+    );
     check('mirror: U1 owes U2 -500', approx(await netWith(u2.id, u1.id), -500));
     await people.createDirectSettlement(u1.id, u2.id, {
       amount: 200,
       currency: 'USD',
       occurredOn: '2026-08-10',
     });
-    check('after partial return: U2 owes U1 300', approx(await netWith(u1.id, u2.id), 300));
+    check(
+      'after partial return: U2 owes U1 300',
+      approx(await netWith(u1.id, u2.id), 300),
+    );
     let rejected = false;
     try {
       await people.createDirectSettlement(u1.id, u2.id, {
@@ -248,8 +282,18 @@ async function main() {
     }
     check('over-settlement (400 > 300) rejected', rejected);
     const detail = await people.getPersonDetail(u1.id, u2.id);
-    check('history preserves lend + settlement (2 lines)', detail.history.length === 2, detail.history.map((h) => h.source));
-    check('breakdown: directLending 500, settlements -200', detail.breakdown.some((b) => approx(b.directLending, 500) && approx(b.settlements, -200)), detail.breakdown);
+    check(
+      'history preserves lend + settlement (2 lines)',
+      detail.history.length === 2,
+      detail.history.map((h) => h.source),
+    );
+    check(
+      'breakdown: directLending 500, settlements -200',
+      detail.breakdown.some(
+        (b) => approx(b.directLending, 500) && approx(b.settlements, -200),
+      ),
+      detail.breakdown,
+    );
   }
 
   // ── [4] Scenario B: equal split, multiple payers ───────────────────────────
@@ -270,7 +314,10 @@ async function main() {
     await mkPayment(e, m2, 3);
     check('U3 owes U1 1', approx(await netWith(u1.id, u3.id), 1));
     check('U3 owes U2 1', approx(await netWith(u2.id, u3.id), 1));
-    check('U1 & U2 (both overpaid) settled', approx(await netWith(u1.id, u2.id), 0));
+    check(
+      'U1 & U2 (both overpaid) settled',
+      approx(await netWith(u1.id, u2.id), 0),
+    );
   }
 
   // ── [5] Scenario C: unequal shares, single payer ───────────────────────────
@@ -291,7 +338,11 @@ async function main() {
     check('U2 owes U1 3 (their share)', approx(await netWith(u1.id, u2.id), 3));
     check('U3 owes U1 5 (their share)', approx(await netWith(u1.id, u3.id), 5));
     const d = await people.getPersonDetail(u1.id, u2.id);
-    check('history line links source expense + group', d.history[0]?.expenseId === e.id && d.history[0]?.groupId === g.id, d.history[0]);
+    check(
+      'history line links source expense + group',
+      d.history[0]?.expenseId === e.id && d.history[0]?.groupId === g.id,
+      d.history[0],
+    );
   }
 
   // ── [6] Scenario D: unequal shares, multiple payers (§7) ───────────────────
@@ -312,7 +363,10 @@ async function main() {
     await mkPayment(e, m2, 6);
     check('C owes A 2', approx(await netWith(u1.id, u3.id), 2));
     check('C owes B 3', approx(await netWith(u2.id, u3.id), 3));
-    check('A & B (both overpaid) settled', approx(await netWith(u1.id, u2.id), 0));
+    check(
+      'A & B (both overpaid) settled',
+      approx(await netWith(u1.id, u2.id), 0),
+    );
   }
 
   // ── [7] Household expenses never create person-to-person debt ──────────────
@@ -330,8 +384,16 @@ async function main() {
     await mkSplit(e, m2, 50);
     await mkPayment(e, m1, 100);
     const detail = await people.getPersonDetail(uh1.id, uh2.id);
-    check('household expense creates NO person-to-person debt', approx(detail.netBalance, 0), detail);
-    check('household expense absent from People history', detail.history.length === 0, detail.history);
+    check(
+      'household expense creates NO person-to-person debt',
+      approx(detail.netBalance, 0),
+      detail,
+    );
+    check(
+      'household expense absent from People history',
+      detail.history.length === 0,
+      detail.history,
+    );
     // Sanity: the same shape in a NORMAL group WOULD create debt (control).
     const gn = await mkGroup('hh-control', uh1, 'normal');
     const n1 = await mkMember(gn, uh1);
@@ -340,7 +402,10 @@ async function main() {
     await mkSplit(en, n1, 50);
     await mkSplit(en, n2, 50);
     await mkPayment(en, n1, 100);
-    check('control: normal group DOES create debt (uh2 owes uh1 50)', approx(await netWith(uh1.id, uh2.id), 50));
+    check(
+      'control: normal group DOES create debt (uh2 owes uh1 50)',
+      approx(await netWith(uh1.id, uh2.id), 50),
+    );
   }
 
   await q.release();
