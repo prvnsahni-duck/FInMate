@@ -13,6 +13,7 @@ import {
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  ExpensePayment,
   ExpenseSplitVersion,
   ExpenseVersion,
   Group,
@@ -165,10 +166,19 @@ describe('ExpensesService', () => {
       create: jest.fn((data) => data),
     };
 
+    const mockExpensePaymentRepository = {
+      softDelete: jest.fn(async () => ({ affected: 0 })),
+      create: jest.fn((data) => data),
+      save: jest.fn(async (data) => data),
+      count: jest.fn(async () => 1),
+      find: jest.fn(async () => []),
+    };
+
     const mockEntityManager = {
       getRepository: jest.fn((entity) => {
         if (entity === Expense) return mockExpenseRepository;
         if (entity === ExpenseSplit) return mockSplitRepository;
+        if (entity === ExpensePayment) return mockExpensePaymentRepository;
         if (entity === Group) return mockGroupRepository;
         if (entity === GroupMember) return mockGroupMemberRepository;
         if (entity === User) return mockUserRepository;
@@ -215,6 +225,10 @@ describe('ExpensesService', () => {
         {
           provide: getRepositoryToken(ExpenseSplit),
           useValue: mockSplitRepository,
+        },
+        {
+          provide: getRepositoryToken(ExpensePayment),
+          useValue: mockExpensePaymentRepository,
         },
         { provide: getRepositoryToken(Group), useValue: mockGroupRepository },
         {

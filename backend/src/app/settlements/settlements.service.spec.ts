@@ -6,6 +6,7 @@ import {
   GroupMember,
   Expense,
   ExpenseSplit,
+  ExpensePayment,
   Settlement,
   SettlementVersion,
   AuditLog,
@@ -86,6 +87,12 @@ describe('SettlementsService', () => {
       find: jest.fn(),
     };
 
+    // Default to no payment rows so the balance engine uses the single-payer
+    // `paidBy*` fallback — the behaviour these tests were written against.
+    const mockExpensePaymentRepository = {
+      find: jest.fn().mockResolvedValue([]),
+    };
+
     const mockSettlementRepository = {
       findOne: jest.fn(),
       find: jest.fn(),
@@ -160,6 +167,10 @@ describe('SettlementsService', () => {
         {
           provide: getRepositoryToken(ExpenseSplit),
           useValue: mockExpenseSplitRepository,
+        },
+        {
+          provide: getRepositoryToken(ExpensePayment),
+          useValue: mockExpensePaymentRepository,
         },
         {
           provide: getRepositoryToken(Settlement),

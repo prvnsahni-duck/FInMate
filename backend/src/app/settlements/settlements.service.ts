@@ -17,6 +17,7 @@ import {
   GroupMember,
   Expense,
   ExpenseSplit,
+  ExpensePayment,
   Settlement,
   SettlementVersion,
   ProposeSettlementDto,
@@ -95,6 +96,8 @@ export class SettlementsService {
     private readonly expenseRepository: Repository<Expense>,
     @InjectRepository(ExpenseSplit)
     private readonly expenseSplitRepository: Repository<ExpenseSplit>,
+    @InjectRepository(ExpensePayment)
+    private readonly expensePaymentRepository: Repository<ExpensePayment>,
     @InjectRepository(Settlement)
     private readonly settlementRepository: Repository<Settlement>,
     @InjectRepository(AuditLog)
@@ -360,6 +363,29 @@ export class SettlementsService {
           })
         : [];
 
+    // 4b. Fetch payer breakdown rows (multi-payer). An expense may be split
+    //     across several payers; when payment rows exist they are authoritative.
+    //     Legacy/single-payer expenses without rows fall back to `paidBy*` below.
+    const payments =
+      expenseIds.length > 0
+        ? await this.expensePaymentRepository.find({
+            where: { expense: { id: In(expenseIds) } },
+            relations: [
+              'expense',
+              'paidByUser',
+              'paidByGroupMember',
+              'paidByGroupMember.user',
+              'paidByGroupMember.contact',
+            ],
+          })
+        : [];
+    const paymentsByExpense = new Map<string, ExpensePayment[]>();
+    for (const p of payments) {
+      const list = paymentsByExpense.get(p.expense.id) ?? [];
+      list.push(p);
+      paymentsByExpense.set(p.expense.id, list);
+    }
+
     // 5. Fetch confirmed settlements (only for the all-time overall view — a
     //    settlement can't be attributed to a category/member slice).
     const settlements = includeSettlements
@@ -401,6 +427,7 @@ export class SettlementsService {
     };
     allMembers.forEach((m) => registerMember(m));
     expenses.forEach((e) => registerMember(e.paidByGroupMember));
+    payments.forEach((p) => registerMember(p.paidByGroupMember));
     splits.forEach((s) => registerMember(s.participantGroupMember));
     settlements.forEach((s) => {
       registerMember(s.fromGroupMember);
@@ -441,16 +468,33 @@ export class SettlementsService {
       // portion back), while each participant's share swings the other way.
       for (const expense of expenses) {
         if (expense.currency !== currency) continue;
-        const payerId = resolveMemberId({
-          groupMember: expense.paidByGroupMember,
-          user: expense.paidByUser,
-        });
-        if (!payerId) continue;
         const sign = expense.transactionType === 'refund' ? -1 : 1;
-        balanceMap.set(
-          payerId,
-          (balanceMap.get(payerId) || 0) + sign * Number(expense.amountTotal),
-        );
+        const exPayments = paymentsByExpense.get(expense.id);
+        if (exPayments && exPayments.length > 0) {
+          // Multi-payer: attribute each payment to its own payer.
+          for (const payment of exPayments) {
+            const payerId = resolveMemberId({
+              groupMember: payment.paidByGroupMember,
+              user: payment.paidByUser,
+            });
+            if (!payerId) continue;
+            balanceMap.set(
+              payerId,
+              (balanceMap.get(payerId) || 0) + sign * Number(payment.amount),
+            );
+          }
+        } else {
+          // Legacy / single-payer fallback: use the expense's primary payer.
+          const payerId = resolveMemberId({
+            groupMember: expense.paidByGroupMember,
+            user: expense.paidByUser,
+          });
+          if (!payerId) continue;
+          balanceMap.set(
+            payerId,
+            (balanceMap.get(payerId) || 0) + sign * Number(expense.amountTotal),
+          );
+        }
       }
 
       // Subtract split owes (added back for refunds — see the payer loop above)
@@ -833,8 +877,15 @@ export class SettlementsService {
    * Calculate aggregated debts and credits with friends across all active groups.
    */
   async calculateFriendsBalances(userId: string) {
+    // Household groups never create person-to-person obligations — they track
+    // monthly contributions, not debts — so they are excluded from the
+    // cross-group friends aggregation.
     const memberships = await this.groupMemberRepository.find({
-      where: { user: { id: userId }, joinStatus: 'active' },
+      where: {
+        user: { id: userId },
+        joinStatus: 'active',
+        group: { groupType: 'normal' },
+      },
       relations: ['group'],
     });
 

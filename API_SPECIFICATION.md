@@ -424,3 +424,57 @@ For any error responses (HTTP status code >= 400), the backend returns:
 
 - **Success Response (`200 OK`)**: Updated settlement object.
 - **Validation**: Enforce that the authenticated user matching `req.user.id` must be the creditor (`toUserId`).
+
+### 👥 4. People Module (Person-to-Person Balances)
+
+Unified view of "who owes whom" per person, derived from normal-group expenses,
+direct lend/borrow, and settlements. Household groups are excluded (they never
+create person-to-person debt). Registered users only (V1).
+
+#### 4.1 Get People Overview
+
+- **Method**: `GET`
+- **Route**: `/people?limit={n}`
+- **Auth Required**: Yes
+- **Success (`200 OK`)**: `{ currency, totalYouAreOwed, totalYouOwe, people: [{ counterpartyUserId, displayName, email, currency, netBalance, direction }] }`.
+  `direction` is `owes_you | you_owe | settled`; `netBalance > 0` means they owe you.
+  `limit` (e.g. `5`) caps the list for the dashboard widget; omit for the full list.
+
+#### 4.2 Get Person Detail
+
+- **Method**: `GET`
+- **Route**: `/people/{userId}`
+- **Auth Required**: Yes
+- **Success (`200 OK`)**: header (`netBalance`, `direction`, dominant `currency`),
+  `breakdown[]` per currency (`groupObligations`, `directLending`, `settlements`,
+  `net`), and chronological `history[]` (each: `source` = `group_expense|direct|
+  settlement`, signed `amount`, `date`, optional `groupId/groupName/expenseId/note`).
+
+#### 4.3 Record a Direct Transaction (Lend / Borrow)
+
+- **Method**: `POST`
+- **Route**: `/people/{userId}/transactions`
+- **Request Body**: `{ "entryType": "lend" | "borrow", "amount": 100, "currency": "INR", "occurredOn": "2026-08-11", "note": "optional" }`
+- **Success (`201 Created`)**: The created `DirectLedgerEntry`.
+
+#### 4.4 Settle / Return
+
+- **Method**: `POST`
+- **Route**: `/people/{userId}/settlements`
+- **Request Body**: `{ "amount": 200, "currency": "INR", "occurredOn": "2026-08-11", "note": "optional" }`
+- **Behaviour**: Direction inferred from the current net; **over-settlement**
+  (amount greater than the outstanding balance in that currency) is rejected
+  (`SETTLE_OVER_AMOUNT`). Settling with nothing outstanding is rejected
+  (`SETTLE_NOTHING_OUTSTANDING`).
+
+#### 4.5 Edit / Delete a Direct Transaction
+
+- **Method**: `PATCH` / `DELETE`
+- **Route**: `/people/transactions/{id}`
+- **PATCH Body**: `{ "amount"?, "occurredOn"?, "note"?, "version" }` (version-checked).
+- **DELETE**: Soft-deletes (history preserved). Caller must be a party to the entry.
+
+> **Multi-payer expenses**: `POST/PATCH /expenses` accept an optional `payments`
+> array (`[{ paidByUserId | paidByGroupMemberId, amount }]`, group expenses only)
+> that must sum to `amountTotal` and include the primary `paidBy*`. Omit for the
+> single-payer default (fully backward-compatible).

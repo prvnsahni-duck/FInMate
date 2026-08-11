@@ -15,6 +15,7 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ExpenseSplitInputDto } from './expense-split.dto';
+import { ExpensePaymentInputDto } from './expense-payment.dto';
 import { SplitPayloadValidator } from './split-payload.validator';
 import { IsCiphertext } from '../../common/decorators/is-ciphertext.decorator';
 
@@ -106,6 +107,18 @@ export class CreateExpenseDto {
   @IsArray({ message: 'splits must be an array' })
   @Validate(SplitPayloadValidator, [true])
   splits!: ExpenseSplitInputDto[];
+
+  /**
+   * Optional multi-payer breakdown. When present, it fully specifies every
+   * payer and their amounts (must sum to `amountTotal`); the top-level
+   * `paidBy*` designates the primary payer and must appear here. When omitted,
+   * a single payment is derived from `paidBy*` for the full amount. Each item's
+   * shape (payer XOR, positive amount, sum) is validated in the service, in
+   * keeping with the other inline-array fields here.
+   */
+  @IsArray({ message: 'payments must be an array' })
+  @IsOptional()
+  payments?: ExpensePaymentInputDto[];
 
   @IsArray({ message: 'attachmentKeys must be an array of strings' })
   @IsString({ each: true, message: 'each attachment key must be a string' })

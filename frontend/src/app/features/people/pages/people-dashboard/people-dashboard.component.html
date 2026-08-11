@@ -1,0 +1,143 @@
+<div class="mb-8 flex items-start justify-between gap-4">
+  <div>
+    <h1 class="text-3xl md:text-4xl font-extrabold tracking-tight">People</h1>
+    <p class="text-slate-500 dark:text-slate-400 mt-2">
+      Who owes you and who you owe — across shared groups and direct transactions.
+    </p>
+  </div>
+  <button
+    type="button"
+    (click)="showSearch.set(true)"
+    class="shrink-0 px-4 py-2.5 rounded-xl bg-gradient-neon text-white font-semibold shadow-lg shadow-finmate-neon/30"
+    data-testid="new-transaction"
+  >
+    + New
+  </button>
+</div>
+
+@if (showSearch()) {
+  <app-person-search-modal
+    [excludeUserId]="currentUserId"
+    (selected)="onPersonPicked($event)"
+    (closed)="showSearch.set(false)"
+  />
+}
+
+@if (isLoading()) {
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="h-28 bg-slate-200 dark:bg-white/5 rounded-3xl animate-pulse"></div>
+    <div class="h-28 bg-slate-200 dark:bg-white/5 rounded-3xl animate-pulse"></div>
+  </div>
+  <div class="space-y-4">
+    @for (i of [1, 2, 3]; track i) {
+      <div class="h-20 bg-slate-200 dark:bg-white/5 rounded-2xl animate-pulse"></div>
+    }
+  </div>
+} @else if (hasError()) {
+  <div
+    class="bg-white/70 dark:bg-finmate-card/70 border border-red-200 dark:border-red-500/20 rounded-3xl p-8 text-center"
+  >
+    <p class="text-red-500 font-medium">Couldn't load your balances.</p>
+    <button
+      type="button"
+      (click)="load()"
+      class="mt-4 px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/10 font-semibold"
+      data-testid="people-retry"
+    >
+      Try again
+    </button>
+  </div>
+} @else if (overview(); as ov) {
+  <!-- Totals -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-3">
+    <app-stats-card
+      title="You are owed"
+      [value]="ov.totalYouAreOwed | currency: ov.currency"
+      type="success"
+    ></app-stats-card>
+    <app-stats-card
+      title="You owe"
+      [value]="ov.totalYouOwe | currency: ov.currency"
+      type="error"
+    ></app-stats-card>
+  </div>
+  @if (ov.hasMultipleCurrencies) {
+    <p class="text-xs text-slate-500 dark:text-slate-400 mb-8" data-testid="currency-caveat">
+      Totals are shown in {{ ov.currency }}. You also have balances in other
+      currencies — see each person below for their own amount.
+    </p>
+  } @else {
+    <div class="mb-8"></div>
+  }
+
+  <!-- People list (max 5) -->
+  <div
+    class="bg-white/70 dark:bg-finmate-card/70 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-3xl p-4 sm:p-6 shadow-xl shadow-black/5"
+  >
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-xl font-bold">Balances</h2>
+      <a
+        routerLink="/people/all"
+        class="text-sm font-semibold text-finmate-neon2 hover:underline"
+        data-testid="view-all"
+        >View all</a
+      >
+    </div>
+
+    @if (ov.people.length === 0) {
+      <div class="text-center py-12">
+        <p class="text-slate-500 dark:text-slate-400 font-medium">
+          You're all settled up — no outstanding balances with anyone.
+        </p>
+      </div>
+    } @else {
+      <ul class="space-y-2" data-testid="people-list">
+        @for (person of ov.people; track person.counterpartyUserId + person.currency) {
+          <li>
+            <a
+              [routerLink]="['/people', person.counterpartyUserId]"
+              class="flex items-center justify-between gap-3 p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-white/5 transition-colors"
+            >
+              <div class="flex items-center gap-3 min-w-0">
+                <div
+                  class="w-11 h-11 shrink-0 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300"
+                >
+                  {{ person.displayName.substring(0, 2).toUpperCase() }}
+                </div>
+                <div class="min-w-0">
+                  <p class="font-bold text-slate-800 dark:text-white truncate">
+                    {{ person.displayName }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                    {{ directionSentence(person.direction, person.displayName) }}
+                  </p>
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                @if (person.direction === 'settled') {
+                  <span class="text-sm font-semibold text-slate-400">Settled</span>
+                } @else {
+                  <span
+                    class="font-bold"
+                    [ngClass]="{
+                      'text-green-500 dark:text-green-400':
+                        person.direction === 'owes_you',
+                      'text-red-500 dark:text-red-400':
+                        person.direction === 'you_owe',
+                    }"
+                  >
+                    {{ person.direction === 'owes_you' ? '+' : '−'
+                    }}{{
+                      person.netBalance < 0 ? -person.netBalance : person.netBalance
+                        | currency: person.currency
+                    }}
+                  </span>
+                }
+              </div>
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  </div>
+}
