@@ -13,6 +13,7 @@ import {
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  ExpensePayment,
   ExpenseSplitVersion,
   ExpenseVersion,
   Group,
@@ -32,7 +33,11 @@ import { simplifyLedgerDebts } from '../common/ledger-debt-simplifier';
 import { resolveMemberDisplay } from '../common/member-display.util';
 import { calculateDeterministicSplits } from './split-calculator.util';
 import { ExpenseEditPolicyService } from './services/expense-edit-policy.service';
-import { CreateExpenseDto, UpdateExpenseDto } from './dto';
+import {
+  CreateExpenseDto,
+  ExpensePaymentInputDto,
+  UpdateExpenseDto,
+} from './dto';
 import {
   GroupExpenseDimensionFilters,
   MemberRef,
@@ -104,6 +109,8 @@ export class ExpensesService {
     private readonly expenseRepository: Repository<Expense>,
     @InjectRepository(ExpenseSplit)
     private readonly expenseSplitRepository: Repository<ExpenseSplit>,
+    @InjectRepository(ExpensePayment)
+    private readonly expensePaymentRepository: Repository<ExpensePayment>,
     @InjectRepository(Group)
     private readonly groupRepository: Repository<Group>,
     @InjectRepository(GroupMember)
@@ -868,6 +875,121 @@ export class ExpensesService {
     return savedSplits;
   }
 
+  /**
+   * Persist the payer breakdown for an expense (soft-deleting any existing
+   * payments first, so this is safe for both create and update). Multi-payer:
+   * when `payments` is supplied it fully specifies every payer and must sum to
+   * `amountTotal`; otherwise a single payment is derived from the expense's
+   * primary payer (`paidByGroupMember`/`paidByUser`). Multiple payers are only
+   * supported for group expenses.
+   */
+  private async persistExpensePayments(
+    expense: Expense,
+    opts: {
+      amountTotal: number;
+      groupId?: string;
+      primaryPaidByUser?: User;
+      primaryPaidByGroupMember?: GroupMember;
+      payments?: ExpensePaymentInputDto[];
+    },
+    manager: EntityManager,
+  ): Promise<ExpensePayment[]> {
+    const repo = manager.getRepository(ExpensePayment);
+    // Payments are ledger history — soft-delete replaced rows (like splits).
+    await repo.softDelete({ expense: { id: expense.id } as Partial<Expense> });
+
+    const toCents = (n: number) => Math.round((n + Number.EPSILON) * 100);
+    const totalCents = toCents(opts.amountTotal);
+    const saved: ExpensePayment[] = [];
+
+    // Single-payer path (default, and the only path for personal expenses).
+    if (!opts.payments || opts.payments.length === 0) {
+      const created = repo.create({
+        expense,
+        paidByUser: opts.groupId ? undefined : opts.primaryPaidByUser,
+        paidByGroupMember: opts.groupId
+          ? opts.primaryPaidByGroupMember
+          : undefined,
+        amount: opts.amountTotal,
+      });
+      saved.push(await repo.save(created));
+      return saved;
+    }
+
+    // Multi-payer path — group expenses only.
+    if (!opts.groupId) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Multiple payers are only supported for group expenses',
+      });
+    }
+
+    const { groupMemberById, activeOrInvitedByUserId } =
+      await this.buildGroupParticipantMaps(opts.groupId, manager);
+
+    let sumCents = 0;
+    const primaryId = opts.primaryPaidByGroupMember?.id;
+    let primarySeen = false;
+
+    for (const p of opts.payments) {
+      const hasUser = !!p.paidByUserId;
+      const hasMember = !!p.paidByGroupMemberId;
+      if (hasUser === hasMember) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message:
+            'Each payment must include exactly one of paidByUserId or paidByGroupMemberId',
+        });
+      }
+      if (!Number.isFinite(Number(p.amount)) || Number(p.amount) <= 0) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'Each payment amount must be a positive number',
+        });
+      }
+      const member = p.paidByGroupMemberId
+        ? groupMemberById.get(p.paidByGroupMemberId)
+        : activeOrInvitedByUserId.get(p.paidByUserId as string);
+      if (!member) {
+        throw new BadRequestException({
+          errorCode: 'VAL_INVALID_INPUT',
+          message: 'Each payer must be an active member of the selected group',
+        });
+      }
+      if (member.role === 'spectator') {
+        throw new BadRequestException({
+          errorCode: 'EXP_SPECTATOR_SPLIT',
+          message: `Spectator members (${member.user?.id ?? member.id}) cannot be expense payers`,
+        });
+      }
+      if (member.id === primaryId) primarySeen = true;
+      sumCents += toCents(p.amount);
+      saved.push(
+        await repo.save(
+          repo.create({
+            expense,
+            paidByGroupMember: member,
+            amount: p.amount,
+          }),
+        ),
+      );
+    }
+
+    if (sumCents !== totalCents) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'Payment amounts must sum to the expense total',
+      });
+    }
+    if (primaryId && !primarySeen) {
+      throw new BadRequestException({
+        errorCode: 'VAL_INVALID_INPUT',
+        message: 'The primary payer (paidBy) must be included in payments',
+      });
+    }
+    return saved;
+  }
+
   // ─── CRUD Operations ───────────────────────────────────────────────────────
 
   /** Create a personal or group expense. */
@@ -1073,6 +1195,19 @@ export class ExpensesService {
       );
 
       const savedSplits = await this.persistSplits(expense, dto, manager);
+
+      // Persist the payer breakdown (single- or multi-payer).
+      await this.persistExpensePayments(
+        expense,
+        {
+          amountTotal: dto.amountTotal,
+          groupId: group?.id,
+          primaryPaidByUser: paidByUser,
+          primaryPaidByGroupMember: paidByGroupMember,
+          payments: dto.payments,
+        },
+        manager,
+      );
 
       // Save wrapped content keys for direct_shared expenses
       if (
@@ -1754,6 +1889,40 @@ export class ExpensesService {
           savedSplits,
           'created',
           actorUser,
+        );
+      }
+
+      // Keep the payer breakdown in sync. Only touch payments when a
+      // payment-affecting field changed, so a note-only edit leaves them
+      // untouched.
+      const paymentsAffected =
+        dto.payments !== undefined ||
+        dto.amountTotal !== undefined ||
+        dto.paidByUserId !== undefined ||
+        dto.paidByGroupMemberId !== undefined;
+      if (paymentsAffected) {
+        if (dto.payments === undefined && dto.amountTotal !== undefined) {
+          const activePaymentCount = await manager
+            .getRepository(ExpensePayment)
+            .count({ where: { expense: { id: expense.id } } });
+          if (activePaymentCount > 1) {
+            throw new BadRequestException({
+              errorCode: 'VAL_INVALID_INPUT',
+              message:
+                'Editing the amount of a multi-payer expense requires providing payments',
+            });
+          }
+        }
+        await this.persistExpensePayments(
+          expense,
+          {
+            amountTotal: Number(expense.amountTotal),
+            groupId: expense.group?.id,
+            primaryPaidByUser: expense.paidByUser,
+            primaryPaidByGroupMember: expense.paidByGroupMember,
+            payments: dto.payments,
+          },
+          manager,
         );
       }
 

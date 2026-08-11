@@ -2354,3 +2354,153 @@ To reconcile zero-knowledge encryption with intelligent AI features, FinMate adh
     succeeds. Prettier clean on changed files.
 - **Next Actions:**
   - Optional follow-ups B and C above. Not committed (no commit requested).
+
+## 2026-08-11 — Person-to-Person (Splitwise) Balances: Backend Phase 1
+
+- **Summary:** Added the backend for Splitwise-style person-to-person balances
+  (People) plus multi-payer expenses. Read-model derives "who owes whom" from
+  normal-group expenses, direct lend/borrow, and settlements; household groups
+  are excluded from person-to-person debt. Frontend intentionally deferred to a
+  later phase (backend-first, per approved plan).
+- **Changes Made:**
+  - New entities `ExpensePayment` (multi-payer, one row per payer) and
+    `DirectLedgerEntry` (group-less lend/borrow/settlement between users).
+  - Migration `1719900000000-AddExpensePaymentsAndDirectLedger` creates both
+    tables and **backfills one payment per existing expense** from its primary
+    `paid_by_*` + `amount_total` (additive, reversible). **Not yet run** — user
+    to run `nx run backend:migration:run` (or equivalent).
+  - `computeBalancesCore` now attributes payments per payer, with a single-payer
+    fallback to `expenses.paid_by_*` so all existing balances are unchanged.
+  - `createExpense`/`updateExpense` accept an optional `payments[]` (sum must
+    equal `amountTotal`; primary payer must be included; group-only). Omitting it
+    is 100% backward-compatible.
+  - New `people` module: `PersonLedgerService` (per-expense pairwise extraction
+    via `simplifyLedgerDebts` scoped to one expense — no cross-obligation chain
+    simplification) + `PeopleController` (`GET /people`, `GET /people/:userId`,
+    `POST /people/:userId/transactions`, `POST /people/:userId/settlements`,
+    `PATCH/DELETE /people/transactions/:id`). Over-settlement rejected.
+  - Household leak fixed: `calculateFriendsBalances` now filters to
+    `groupType='normal'`.
+  - Shared DTOs (`direct-transaction.dto.ts`) + response interfaces
+    (`PersonSummaryResponse`, `PeopleOverviewResponse`, `PersonDetailResponse`,
+    `PersonBalanceBreakdown`, `PersonHistoryItem`).
+- **Artifacts Updated:** entities barrel + `ormconfig.ts`; expenses/settlements/
+  people modules; `DATABASE_SCHEMA.md`; `API_SPECIFICATION.md`;
+  `docs/plans/person-to-person-balances-plan.md`.
+- **Decisions:** Multi-payer via child table (backfilled) with legacy columns as
+  primary payer; `/friends` to be superseded by `/people`; registered-users-only
+  for V1 cross-context identity; per-expense (not global) pairwise to preserve
+  source + avoid chain simplification.
+- **Verification:** `nx build backend` succeeds; `nx test backend` **515 passed,
+  34 suites, 0 failed** (includes new `person-ledger.service.spec` covering
+  direct lend/borrow, over-settlement rejection, ordering/limit, household
+  exclusion, single-payer pairwise, and the §7 multi-payer case). Migration not
+  run (awaiting user); openapi.yaml paths pending frontend phase.
+- **Next Actions:** Run the migration; build the `features/people/` frontend
+  (dashboard, person detail, add-transaction/return modals, nav, `/friends`→
+  `/people` redirect); add openapi.yaml paths.
+
+## 2026-08-11 — Person-to-Person (Splitwise) Balances: Frontend Phase 2
+
+- **Summary:** Built the Splitwise-style People experience on the existing
+  `/people` API. The frontend only presents backend-computed values and submits
+  actions — it never recalculates balances, direction, breakdown, or settlement
+  results. Backend remains the single source of financial truth.
+- **Changes Made:**
+  - New `features/people/` Angular feature: `PeopleService`, dashboard, list
+    ("View all"), person detail, and Add-Transaction / Return modals. Standalone
+    components, signals for local state, RxJS for HTTP, separate `.html` templates.
+  - Dashboard shows the two totals + up to 5 people (`GET /people?limit=5`);
+    "View all" uses `GET /people`. Direction/balance rendered from the API's
+    `netBalance`/`direction`.
+  - Person detail: header (net + direction), per-currency breakdown, chronological
+    history with human labels (Group expense / Lent / Borrowed / Settlement), and
+    source group/expense references (link to `/groups/:id`). Group-expense titles
+    are E2EE — decrypted by **reusing** `ExpenseDecryptionService` (no new crypto).
+  - Lend/Borrow and Return flows re-fetch the person detail after every mutation.
+    Return prefills the outstanding amount; over-settlement is blocked client-side
+    for UX and the backend rejection message is surfaced (backend authoritative).
+  - Direct/settlement history lines can be deleted (soft-delete); group-derived
+    lines cannot.
+  - `/friends` → `/people` redirect added; `People` added to the primary nav.
+    `FriendsService` kept (still used by group-members user search).
+  - Minimal backend enrichment: `PersonHistoryItem` now carries `encryptionScope`
+    - `groupKeyVersionId` so the client can reuse the standard expense decryptor.
+  - `openapi.yaml`: added `/people` paths + `PersonSummary` / `PersonHistoryItem`
+    schemas.
+- **Artifacts Updated:** `app.routes.ts`, `main-layout.component.ts` (nav +
+  active-tab), `api-responses.ts`, `person-ledger.service.ts`, `openapi.yaml`.
+- **Decisions:** Backdrop click-to-close omitted (explicit close button only) to
+  satisfy the a11y lint rules, matching the existing expense modal. Edit-in-place
+  of direct entries deferred (needs entry `version`, not exposed in history) —
+  delete provided instead. Multi-currency totals use the dominant currency (a
+  documented V1 simplification carried over from Friends).
+- **Verification:** `nx build frontend` ✓, `nx test frontend` **498 passed / 56
+  suites / 0 fail** (new People specs: service, dashboard, list, detail, both
+  modals, navigation), `nx lint frontend` **0 errors**. Backend regression: `nx
+test backend` **515 pass / 34 suites**, `nx build backend` ✓. Production
+  migration NOT run (per instruction).
+- **Next Actions:** Optional — "start a new relationship" via user search on the
+  People list; edit-in-place for direct entries; retire the now-unreachable
+  Friends page once confident.
+
+## 2026-08-11 — Person-to-Person (Splitwise) Balances: Phase 3 UAT + Readiness
+
+- **Summary:** End-to-end UAT of the People/P2P flow on the local Postgres
+  environment (production/Neon untouched), plus three small closing items:
+  new-relationship user search, direction-aware settlement wording, and
+  multi-currency total safety. All UAT scenarios and the full regression suite
+  pass. Production migration deliberately NOT run.
+- **UAT:** `backend/uat-p2p.ts` (local-DB harness) exercises the real services:
+  direct lend ₹1+₹3 → ₹4, partial return ₹2 → ₹2, full return → settled (history
+  preserved, originals never mutated), reverse borrow ₹500 → settle ₹200 → ₹300,
+  group equal multi-payer (A owes C ₹1, no A↔B debt), unequal shares (B owes A
+  ₹3 / C owes A ₹5, A owed ₹8), §7 multi-payer (C owes A ₹2 / C owes B ₹3),
+  household exclusion (+control), refund interaction (B owes A ₹50 → ₹30; group
+  balance intact), group source refs + decryption hints, overview totals /
+  dominant currency / `hasMultipleCurrencies` / limit. **30/30 passed.**
+- **Changes Made:**
+  - Currency safety: `getOverview` totals now come from the **dominant currency
+    only** (never a mixed-currency sum); added `hasMultipleCurrencies` to the
+    response; dashboard shows a caveat when set.
+  - Item 13: `PersonSearchModalComponent` + a "New" action on the dashboard —
+    search a user (reusing `FriendsService.searchUsers` / `/users/search`,
+    self excluded) and open their detail to lend/borrow.
+  - Item 14: direction-aware settlement wording — "Record return" when they owe
+    you, "Settle up" / "Confirm payment" when you owe them (button + modal).
+  - OpenAPI overview schema updated with `hasMultipleCurrencies`.
+- **Artifacts Updated:** `person-ledger.service.ts`, `api-responses.ts`,
+  `people-dashboard` (+ spec), `return-modal` (+ wording), new
+  `person-search-modal` (+ spec), `openapi.yaml`,
+  `docs/plans/people-api-contracts.md` (currency section).
+- **Verification (Phase 3, all green):** `nx test backend` 515, `nx test
+frontend` 501, `nx build backend` ✓, `nx build frontend` ✓, `nx lint backend`
+  0 errors, `nx lint frontend` 0 errors. UAT harness 30/30.
+- **Bugs found:** none in product code. One harness-only gap (raw-seeded expense
+  lacked a `GroupKeyVersion`, so the decryption-hint assertion initially failed);
+  fixed by seeding a key version — the real `createExpense` always assigns one.
+- **Next Actions:** Production migration remains pending (run per checklist when
+  ready). Optional future: full multi-currency totals; edit-in-place for direct
+  entries; retire the unreachable Friends page.
+
+## 2026-08-11 — People / P2P: Production Deployment Runbook (readiness)
+
+- **Summary:** Prepared the production rollout runbook for the People/P2P feature.
+  No application code changed; **production migration NOT run** (awaiting explicit
+  "Run production migration"). Working tree reviewed — only P2P Phase 1–3 changes,
+  nothing unrelated.
+- **Changes Made:** Added `docs/deployment/people-p2p-production-runbook.md` —
+  backup + target verification, backend-first deploy order, gated
+  `npm run db:migrate`, post-migration invariants (orphan_expenses/sum_mismatches/
+  duplicate-backfill), balance-parity procedure via backend services, People API
+  - app smoke tests, frontend deploy, two-tier rollback (app rollback keeps tables;
+    DB revert only under approved recovery), monitoring, checklist, and stop
+    conditions. Reinforces: never print DATABASE_URL/secrets, never revert as routine
+    rollback, keep `verify-p2p-migration.ts` + `uat-p2p.ts`, `npm run db:down` to stop
+    local DB.
+- **Readiness verified:** migration present/registered; `/people` API present;
+  `/friends`→`/people` redirect; frontend calls `/people`; single-payer fallback
+  intact. Prior results: UAT 30/30, backend 515, frontend 501, builds ✓, lint 0
+  errors.
+- **Next Actions:** Await explicit authorisation to run the production migration,
+  then execute the runbook steps in order.

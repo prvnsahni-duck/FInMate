@@ -18,3 +18,4 @@ export { AddPasswordRecoveryKey1719500000000 } from './1719500000000-AddPassword
 export { AddContactsAndPendingMembers1719600000000 } from './1719600000000-AddContactsAndPendingMembers';
 export { AddRecurringExpenseGroupMemberPayer1719700000000 } from './1719700000000-AddRecurringExpenseGroupMemberPayer';
 export { AddExpenseTransactionType1719800000000 } from './1719800000000-AddExpenseTransactionType';
+export { AddExpensePaymentsAndDirectLedger1719900000000 } from './1719900000000-AddExpensePaymentsAndDirectLedger';

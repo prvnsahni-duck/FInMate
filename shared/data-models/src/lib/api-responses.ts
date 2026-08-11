@@ -178,6 +178,81 @@ export interface FriendBalanceResponse {
   isExpanded?: boolean;
 }
 
+/**
+ * One person the caller has a financial relationship with, for the People
+ * dashboard/list. `netBalance > 0` → they owe the caller; `< 0` → the caller
+ * owes them; `0` → settled. Amounts are per currency.
+ */
+export interface PersonSummaryResponse {
+  counterpartyUserId: string;
+  displayName: string;
+  email: string;
+  currency: string;
+  netBalance: number;
+  direction: 'owes_you' | 'you_owe' | 'settled';
+}
+
+/** Aggregate People-dashboard payload: totals + top people. */
+export interface PeopleOverviewResponse {
+  /** The dominant currency the headline totals are reported in. */
+  currency: string;
+  totalYouAreOwed: number;
+  totalYouOwe: number;
+  /**
+   * True when relationships span more than one currency. The totals report only
+   * `currency`; the client should surface a caveat so mixed-currency balances
+   * are never silently rolled into one misleading number.
+   */
+  hasMultipleCurrencies: boolean;
+  people: PersonSummaryResponse[];
+}
+
+/**
+ * Decomposition of the net balance with one person (per currency), for the
+ * person-detail header breakdown. `net = groupObligations + directLending
+ * + settlements` where settlements are negative.
+ */
+export interface PersonBalanceBreakdown {
+  currency: string;
+  groupObligations: number;
+  directLending: number;
+  settlements: number;
+  net: number;
+}
+
+/** One line in a person's chronological relationship history. */
+export interface PersonHistoryItem {
+  id: string;
+  source: 'group_expense' | 'direct' | 'settlement';
+  entryType?: 'lend' | 'borrow' | 'settlement';
+  /** Signed from the caller's perspective: `> 0` increases what they owe you. */
+  amount: number;
+  currency: string;
+  date: string;
+  note?: string;
+  /** Set when `source === 'group_expense'`. */
+  groupId?: string;
+  groupName?: string;
+  expenseId?: string;
+  /** Expense title — E2EE ciphertext; decrypt client-side via the group key. */
+  title?: string;
+  /** Decryption hints so the client can reuse the standard expense decryptor. */
+  encryptionScope?: 'personal' | 'group' | 'direct_shared';
+  groupKeyVersionId?: string;
+}
+
+/** Full person-detail payload: header + breakdown + paginated history. */
+export interface PersonDetailResponse {
+  counterpartyUserId: string;
+  displayName: string;
+  email: string;
+  currency: string;
+  netBalance: number;
+  direction: 'owes_you' | 'you_owe' | 'settled';
+  breakdown: PersonBalanceBreakdown[];
+  history: PersonHistoryItem[];
+}
+
 export interface UpdateContributionsPayload {
   ledgerMonth: string;
   contributions: Array<{

@@ -1,0 +1,198 @@
+<div class="mb-6 flex items-center gap-3">
+  <a
+    routerLink="/people"
+    class="w-9 h-9 rounded-full flex items-center justify-center bg-slate-100 dark:bg-white/10 shrink-0"
+    aria-label="Back to People"
+  >
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+  </a>
+</div>
+
+@if (isLoading()) {
+  <div class="h-40 bg-slate-200 dark:bg-white/5 rounded-3xl animate-pulse mb-6"></div>
+  <div class="space-y-3">
+    @for (i of [1, 2, 3]; track i) {
+      <div class="h-16 bg-slate-200 dark:bg-white/5 rounded-2xl animate-pulse"></div>
+    }
+  </div>
+} @else if (hasError()) {
+  <div class="rounded-3xl p-8 text-center border border-red-200 dark:border-red-500/20">
+    <p class="text-red-500 font-medium">Couldn't load this relationship.</p>
+    <button type="button" (click)="reload()" class="mt-4 px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/10 font-semibold" data-testid="detail-retry">
+      Try again
+    </button>
+  </div>
+} @else if (detail(); as d) {
+  <!-- Header -->
+  <div class="bg-gradient-dark rounded-3xl p-6 text-white shadow-xl mb-6">
+    <div class="flex items-center gap-4 mb-4">
+      <div class="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-xl font-bold">
+        {{ d.displayName.substring(0, 2).toUpperCase() }}
+      </div>
+      <div class="min-w-0">
+        <h1 class="text-2xl font-extrabold truncate">{{ d.displayName }}</h1>
+        <p class="text-white/70 text-sm">
+          {{ d.direction === 'settled' ? 'All settled up' : directionSentence(d.direction, d.displayName) }}
+        </p>
+      </div>
+    </div>
+
+    <p
+      class="text-4xl font-extrabold"
+      [ngClass]="{
+        'text-green-400': d.direction === 'owes_you',
+        'text-red-400': d.direction === 'you_owe',
+        'text-white/80': d.direction === 'settled',
+      }"
+      data-testid="detail-net"
+    >
+      {{ abs(d.netBalance) | currency: d.currency }}
+    </p>
+
+    <div class="flex gap-3 mt-5">
+      @if (d.direction !== 'settled') {
+        <button
+          type="button"
+          (click)="showReturn.set(true)"
+          class="flex-1 py-3 rounded-xl bg-white text-slate-900 font-semibold"
+          data-testid="open-return"
+        >
+          {{ d.direction === 'you_owe' ? 'Settle up' : 'Record return' }}
+        </button>
+      }
+      <button
+        type="button"
+        (click)="showAdd.set(true)"
+        class="flex-1 py-3 rounded-xl bg-white/15 text-white font-semibold border border-white/20"
+        data-testid="open-add"
+      >
+        Add transaction
+      </button>
+    </div>
+  </div>
+
+  <!-- Breakdown -->
+  <div class="bg-white/70 dark:bg-finmate-card/70 border border-slate-200 dark:border-white/5 rounded-3xl p-5 mb-6">
+    <h2 class="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
+      Breakdown
+    </h2>
+    @for (b of d.breakdown; track b.currency) {
+      <div class="space-y-1.5 text-sm" data-testid="breakdown-row">
+        <div class="flex justify-between">
+          <span class="text-slate-500 dark:text-slate-400">Group expenses</span>
+          <span class="font-semibold">{{ b.groupObligations | currency: b.currency }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500 dark:text-slate-400">Direct lending</span>
+          <span class="font-semibold">{{ b.directLending | currency: b.currency }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500 dark:text-slate-400">Settlements</span>
+          <span class="font-semibold">{{ b.settlements | currency: b.currency }}</span>
+        </div>
+        <div class="flex justify-between border-t border-slate-200 dark:border-white/10 pt-1.5 mt-1.5">
+          <span class="font-bold">Net</span>
+          <span class="font-bold">{{ b.net | currency: b.currency }}</span>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- History -->
+  <h2 class="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
+    History
+  </h2>
+  @if (d.history.length === 0) {
+    <div class="text-center py-10 text-slate-500 dark:text-slate-400" data-testid="history-empty">
+      No transactions yet.
+    </div>
+  } @else {
+    <ul class="space-y-2" data-testid="history-list">
+      @for (item of d.history; track item.id) {
+        <li
+          class="flex items-start justify-between gap-3 p-4 rounded-2xl bg-white/70 dark:bg-finmate-card/70 border border-slate-100 dark:border-white/5"
+        >
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10">
+                {{ historyLabel(item) }}
+              </span>
+              <span class="text-xs text-slate-400">{{ item.date | date: 'mediumDate' }}</span>
+            </div>
+            @if (item.source === 'group_expense') {
+              <p class="mt-1 font-semibold text-slate-800 dark:text-white truncate">
+                {{ item.title || 'Group expense' }}
+              </p>
+              <a
+                [routerLink]="['/groups', item.groupId]"
+                class="text-xs text-finmate-neon2 hover:underline"
+                data-testid="history-group-link"
+              >
+                {{ item.groupName }}
+              </a>
+            } @else {
+              <p class="mt-1 font-semibold text-slate-800 dark:text-white">
+                {{ item.source === 'settlement' ? 'Settlement' : (item.entryType === 'borrow' ? 'You borrowed' : 'You lent') }}
+              </p>
+              @if (item.note) {
+                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">{{ item.note }}</p>
+              } @else {
+                <p class="text-xs text-slate-400">Direct transaction</p>
+              }
+            }
+          </div>
+
+          <div class="text-right shrink-0 flex flex-col items-end gap-1">
+            <span
+              class="font-bold"
+              [ngClass]="{
+                'text-green-500 dark:text-green-400': item.amount > 0,
+                'text-red-500 dark:text-red-400': item.amount < 0,
+                'text-slate-400': item.amount === 0,
+              }"
+            >
+              {{ item.amount > 0 ? '+' : item.amount < 0 ? '−' : ''
+              }}{{ abs(item.amount) | currency: item.currency }}
+            </span>
+            @if (canDelete(item)) {
+              <button
+                type="button"
+                (click)="deleteEntry(item)"
+                [disabled]="deletingId() === item.id"
+                class="text-xs text-slate-400 hover:text-red-500 disabled:opacity-50"
+                data-testid="history-delete"
+                aria-label="Delete transaction"
+              >
+                Delete
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+  }
+
+  <!-- Modals -->
+  @if (showAdd()) {
+    <app-add-transaction-modal
+      [userId]="userId()"
+      [personName]="d.displayName"
+      [currency]="d.currency"
+      (saved)="onSaved()"
+      (closed)="showAdd.set(false)"
+    />
+  }
+  @if (showReturn()) {
+    <app-return-modal
+      [userId]="userId()"
+      [personName]="d.displayName"
+      [outstanding]="abs(d.netBalance)"
+      [currency]="d.currency"
+      [direction]="d.direction === 'you_owe' ? 'you_owe' : 'owes_you'"
+      (saved)="onSaved()"
+      (closed)="showReturn.set(false)"
+    />
+  }
+}

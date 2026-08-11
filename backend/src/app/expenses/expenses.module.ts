@@ -7,6 +7,7 @@ import {
   EncryptedExpenseKey,
   Expense,
   ExpenseSplit,
+  ExpensePayment,
   ExpenseSplitVersion,
   ExpenseVersion,
   Group,
@@ -34,6 +35,7 @@ import {
     TypeOrmModule.forFeature([
       Expense,
       ExpenseSplit,
+      ExpensePayment,
       ExpenseVersion,
       ExpenseSplitVersion,
       RecurringExpense,

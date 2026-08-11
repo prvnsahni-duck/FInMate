@@ -21,6 +21,7 @@ import { GroupsModule } from './groups/groups.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { ExpensesModule } from './expenses/expenses.module';
 import { SettlementsModule } from './settlements/settlements.module';
+import { PeopleModule } from './people/people.module';
 import { ImportModule } from './import/import.module';
 import { AiModule } from './ai/ai.module';
 import { EmailModule } from './email/email.module';
@@ -174,6 +175,7 @@ import { THROTTLE_PROFILES } from './throttler/throttle.constants';
     ContactsModule,
     ExpensesModule,
     SettlementsModule,
+    PeopleModule,
     ImportModule,
     AiModule,
     EmailModule,

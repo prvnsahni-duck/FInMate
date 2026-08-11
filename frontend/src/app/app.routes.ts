@@ -24,12 +24,13 @@ export const appRoutes: Route[] = [
           import('./features/groups/groups.routes').then((m) => m.groupsRoutes),
       },
       {
-        path: 'friends',
+        path: 'people',
         loadChildren: () =>
-          import('./features/friends/friends.routes').then(
-            (m) => m.friendsRoutes,
-          ),
+          import('./features/people/people.routes').then((m) => m.peopleRoutes),
       },
+      // People supersedes the old Friends page; keep the path as a redirect
+      // for backwards compatibility (bookmarks, existing links).
+      { path: 'friends', redirectTo: 'people', pathMatch: 'full' },
     ],
   },
   {

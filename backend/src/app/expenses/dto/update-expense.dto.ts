@@ -16,6 +16,7 @@ import {
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { ExpenseSplitInputDto } from './expense-split.dto';
+import { ExpensePaymentInputDto } from './expense-payment.dto';
 import { SplitPayloadValidator } from './split-payload.validator';
 import { IsCiphertext } from '../../common/decorators/is-ciphertext.decorator';
 
@@ -101,6 +102,17 @@ export class UpdateExpenseDto {
   @Validate(SplitPayloadValidator, [false])
   @IsOptional()
   splits?: ExpenseSplitInputDto[];
+
+  /**
+   * Optional multi-payer breakdown. When present, it replaces the expense's
+   * payer set entirely and must sum to the (new or existing) `amountTotal`.
+   * When omitted, a single-payer expense's payment stays in sync with
+   * `amountTotal`/`paidBy*`; editing a multi-payer expense's amount requires
+   * providing `payments`. Item shape is validated in the service.
+   */
+  @IsArray({ message: 'payments must be an array' })
+  @IsOptional()
+  payments?: ExpensePaymentInputDto[];
 
   @IsArray({ message: 'attachmentKeys must be an array of strings' })
   @IsString({ each: true, message: 'each attachment key must be a string' })

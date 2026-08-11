@@ -1,0 +1,101 @@
+<div
+  class="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-0 sm:p-4"
+>
+  <div
+    class="w-full sm:max-w-md bg-white dark:bg-finmate-card rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="add-txn-title"
+  >
+    <div class="flex items-center justify-between mb-5">
+      <h2 id="add-txn-title" class="text-xl font-bold">
+        Transaction with {{ personName() }}
+      </h2>
+      <button
+        type="button"
+        (click)="closed.emit()"
+        class="w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 dark:bg-white/10"
+        aria-label="Close"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+      <!-- Direction -->
+      <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Transaction type">
+        <label
+          class="cursor-pointer rounded-xl border p-3 text-center font-semibold transition-colors"
+          [class.border-finmate-neon]="form.controls.entryType.value === 'lend'"
+          [class.bg-finmate-neon]="form.controls.entryType.value === 'lend'"
+          [class.text-white]="form.controls.entryType.value === 'lend'"
+          [class.border-slate-200]="form.controls.entryType.value !== 'lend'"
+          [class.dark:border-white]="form.controls.entryType.value !== 'lend'"
+        >
+          <input type="radio" formControlName="entryType" value="lend" class="sr-only" data-testid="txn-lend" />
+          I lent
+        </label>
+        <label
+          class="cursor-pointer rounded-xl border p-3 text-center font-semibold transition-colors"
+          [class.border-finmate-neon]="form.controls.entryType.value === 'borrow'"
+          [class.bg-finmate-neon]="form.controls.entryType.value === 'borrow'"
+          [class.text-white]="form.controls.entryType.value === 'borrow'"
+          [class.border-slate-200]="form.controls.entryType.value !== 'borrow'"
+        >
+          <input type="radio" formControlName="entryType" value="borrow" class="sr-only" data-testid="txn-borrow" />
+          I borrowed
+        </label>
+      </div>
+      <p class="text-xs text-slate-500 dark:text-slate-400 -mt-2">
+        @if (form.controls.entryType.value === 'lend') {
+          You gave money to {{ personName() }} — they will owe you.
+        } @else {
+          You received money from {{ personName() }} — you will owe them.
+        }
+      </p>
+
+      <!-- Amount -->
+      <div>
+        <label for="txn-amount" class="block text-sm font-medium mb-1">Amount</label>
+        <input
+          id="txn-amount"
+          type="number"
+          step="0.01"
+          min="0.01"
+          formControlName="amount"
+          class="input-base"
+          data-testid="txn-amount"
+          placeholder="0.00"
+        />
+        @if (form.controls.amount.touched && form.controls.amount.invalid) {
+          <p class="text-xs text-red-500 mt-1">Enter an amount greater than zero.</p>
+        }
+      </div>
+
+      <!-- Date -->
+      <div>
+        <label for="txn-date" class="block text-sm font-medium mb-1">Date</label>
+        <input id="txn-date" type="date" formControlName="occurredOn" class="input-base" data-testid="txn-date" />
+      </div>
+
+      <!-- Note -->
+      <div>
+        <label for="txn-note" class="block text-sm font-medium mb-1">Note (optional)</label>
+        <input id="txn-note" type="text" formControlName="note" class="input-base" maxlength="2000" data-testid="txn-note" />
+      </div>
+
+      @if (errorMsg()) {
+        <p class="text-sm text-red-500" role="alert" data-testid="txn-error">{{ errorMsg() }}</p>
+      }
+
+      <app-submit-button
+        label="Save"
+        loadingLabel="Saving..."
+        [isLoading]="isSaving()"
+        testId="txn-save"
+      ></app-submit-button>
+    </form>
+  </div>
+</div>

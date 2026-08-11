@@ -1,0 +1,670 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+  PreconditionFailedException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, IsNull, Repository } from 'typeorm';
+import {
+  CreateDirectSettlementDto,
+  CreateDirectTransactionDto,
+  DirectLedgerEntry,
+  Expense,
+  ExpensePayment,
+  ExpenseSplit,
+  Group,
+  GroupMember,
+  PeopleOverviewResponse,
+  PersonBalanceBreakdown,
+  PersonDetailResponse,
+  PersonHistoryItem,
+  PersonSummaryResponse,
+  Settlement,
+  UpdateDirectTransactionDto,
+  User,
+  simplifyLedgerDebts,
+} from '@finmate/data-models';
+import { resolveMemberDisplay } from '../common/member-display.util';
+
+/** Per-currency accumulator for one counterparty. */
+interface CurrencyBucket {
+  groupObligations: number;
+  directLending: number;
+  settlements: number;
+  history: PersonHistoryItem[];
+}
+
+/** Accumulated relationship with one counterparty user, keyed by currency. */
+interface CounterpartyLedger {
+  userId: string;
+  displayName: string;
+  email: string;
+  byCurrency: Map<string, CurrencyBucket>;
+}
+
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+@Injectable()
+export class PersonLedgerService {
+  constructor(
+    @InjectRepository(GroupMember)
+    private readonly groupMemberRepository: Repository<GroupMember>,
+    @InjectRepository(Expense)
+    private readonly expenseRepository: Repository<Expense>,
+    @InjectRepository(ExpenseSplit)
+    private readonly expenseSplitRepository: Repository<ExpenseSplit>,
+    @InjectRepository(ExpensePayment)
+    private readonly expensePaymentRepository: Repository<ExpensePayment>,
+    @InjectRepository(Settlement)
+    private readonly settlementRepository: Repository<Settlement>,
+    @InjectRepository(DirectLedgerEntry)
+    private readonly directLedgerRepository: Repository<DirectLedgerEntry>,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  // ─── Public API ─────────────────────────────────────────────────────────────
+
+  /**
+   * Aggregate People dashboard: totals plus a per-(person, currency) list.
+   * Household groups are intentionally excluded — they never create
+   * person-to-person obligations. Sorted by outstanding magnitude; settled
+   * relationships sink to the bottom.
+   */
+  async getOverview(
+    callerUserId: string,
+    limit?: number,
+  ): Promise<PeopleOverviewResponse> {
+    const ledger = await this.buildLedger(callerUserId);
+    const people: PersonSummaryResponse[] = [];
+    // Per-currency totals — never summed across currencies (that would combine
+    // unrelated units into one misleading number). The headline totals report a
+    // single "dominant" currency; balances in other currencies still appear as
+    // their own person rows.
+    const byCurrency = new Map<string, { owed: number; owe: number }>();
+
+    for (const cp of ledger.values()) {
+      for (const [currency, bucket] of cp.byCurrency.entries()) {
+        const net = round2(
+          bucket.groupObligations + bucket.directLending + bucket.settlements,
+        );
+        const totals = byCurrency.get(currency) ?? { owed: 0, owe: 0 };
+        if (net > 0) totals.owed += net;
+        else if (net < 0) totals.owe += Math.abs(net);
+        byCurrency.set(currency, totals);
+        people.push({
+          counterpartyUserId: cp.userId,
+          displayName: cp.displayName,
+          email: cp.email,
+          currency,
+          netBalance: net,
+          direction: net > 0 ? 'owes_you' : net < 0 ? 'you_owe' : 'settled',
+        });
+      }
+    }
+
+    // Dominant currency = the one with the largest outstanding activity.
+    let dominant = 'USD';
+    let best = -1;
+    for (const [currency, t] of byCurrency.entries()) {
+      const activity = t.owed + t.owe;
+      if (activity > best) {
+        best = activity;
+        dominant = currency;
+      }
+    }
+    const dom = byCurrency.get(dominant) ?? { owed: 0, owe: 0 };
+
+    // Outstanding first (largest magnitude), settled last.
+    people.sort((a, b) => Math.abs(b.netBalance) - Math.abs(a.netBalance));
+    const limited =
+      typeof limit === 'number' && limit > 0 ? people.slice(0, limit) : people;
+
+    return {
+      currency: dominant,
+      totalYouAreOwed: round2(dom.owed),
+      totalYouOwe: round2(dom.owe),
+      hasMultipleCurrencies: byCurrency.size > 1,
+      people: limited,
+    };
+  }
+
+  /**
+   * Full relationship with one person: headline net (dominant currency),
+   * per-currency breakdown, and chronological history across every source.
+   */
+  async getPersonDetail(
+    callerUserId: string,
+    counterpartyUserId: string,
+  ): Promise<PersonDetailResponse> {
+    if (callerUserId === counterpartyUserId) {
+      throw new BadRequestException('Cannot view a relationship with yourself');
+    }
+    const ledger = await this.buildLedger(callerUserId, counterpartyUserId);
+    const cp = ledger.get(counterpartyUserId);
+
+    const counterparty = await this.userRepository.findOne({
+      where: { id: counterpartyUserId },
+    });
+    if (!counterparty) {
+      throw new NotFoundException('Person not found');
+    }
+    const displayName =
+      cp?.displayName || counterparty.displayName || counterparty.email;
+    const email = cp?.email || counterparty.email;
+
+    const breakdown: PersonBalanceBreakdown[] = [];
+    const history: PersonHistoryItem[] = [];
+    let headlineCurrency = 'USD';
+    let headlineNet = 0;
+
+    if (cp) {
+      for (const [currency, bucket] of cp.byCurrency.entries()) {
+        const net = round2(
+          bucket.groupObligations + bucket.directLending + bucket.settlements,
+        );
+        breakdown.push({
+          currency,
+          groupObligations: round2(bucket.groupObligations),
+          directLending: round2(bucket.directLending),
+          settlements: round2(bucket.settlements),
+          net,
+        });
+        history.push(...bucket.history);
+        if (Math.abs(net) >= Math.abs(headlineNet)) {
+          headlineNet = net;
+          headlineCurrency = currency;
+        }
+      }
+    }
+
+    history.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+
+    return {
+      counterpartyUserId,
+      displayName,
+      email,
+      currency: headlineCurrency,
+      netBalance: headlineNet,
+      direction:
+        headlineNet > 0 ? 'owes_you' : headlineNet < 0 ? 'you_owe' : 'settled',
+      breakdown,
+      history,
+    };
+  }
+
+  /** Record a direct lend/borrow with another registered user. */
+  async createDirectTransaction(
+    callerUserId: string,
+    counterpartyUserId: string,
+    dto: CreateDirectTransactionDto,
+  ): Promise<DirectLedgerEntry> {
+    const { caller, counterparty } = await this.resolvePair(
+      callerUserId,
+      counterpartyUserId,
+    );
+
+    // Normalise to a directional obligation: after a lend, the counterparty
+    // owes the caller; after a borrow, the caller owes the counterparty.
+    const fromUser = dto.entryType === 'lend' ? counterparty : caller;
+    const toUser = dto.entryType === 'lend' ? caller : counterparty;
+
+    const entry = this.directLedgerRepository.create({
+      fromUser,
+      toUser,
+      createdByUser: caller,
+      entryType: dto.entryType,
+      amount: dto.amount,
+      currency: dto.currency.toUpperCase(),
+      note: dto.note,
+      occurredOn: dto.occurredOn,
+    });
+    return this.directLedgerRepository.save(entry);
+  }
+
+  /**
+   * Record a settlement ("Return") reducing the outstanding balance with a
+   * person. Direction is inferred from the current net; over-settlement (more
+   * than the outstanding amount in that currency) is rejected.
+   */
+  async createDirectSettlement(
+    callerUserId: string,
+    counterpartyUserId: string,
+    dto: CreateDirectSettlementDto,
+  ): Promise<DirectLedgerEntry> {
+    const { caller, counterparty } = await this.resolvePair(
+      callerUserId,
+      counterpartyUserId,
+    );
+    const currency = dto.currency.toUpperCase();
+
+    const ledger = await this.buildLedger(callerUserId, counterpartyUserId);
+    const bucket = ledger.get(counterpartyUserId)?.byCurrency.get(currency);
+    const net = bucket
+      ? round2(
+          bucket.groupObligations + bucket.directLending + bucket.settlements,
+        )
+      : 0;
+
+    if (net === 0) {
+      throw new BadRequestException({
+        errorCode: 'SETTLE_NOTHING_OUTSTANDING',
+        message: `There is no outstanding ${currency} balance to settle with this person`,
+      });
+    }
+    if (dto.amount > Math.abs(net) + 1e-9) {
+      throw new BadRequestException({
+        errorCode: 'SETTLE_OVER_AMOUNT',
+        message: `Return amount cannot exceed the outstanding balance (${Math.abs(
+          net,
+        )} ${currency})`,
+      });
+    }
+
+    // net > 0 → they owe you → they return money to you (from=counterparty).
+    // net < 0 → you owe them → you return money to them (from=caller).
+    const fromUser = net > 0 ? counterparty : caller;
+    const toUser = net > 0 ? caller : counterparty;
+
+    const entry = this.directLedgerRepository.create({
+      fromUser,
+      toUser,
+      createdByUser: caller,
+      entryType: 'settlement',
+      amount: dto.amount,
+      currency,
+      note: dto.note,
+      occurredOn: dto.occurredOn,
+    });
+    return this.directLedgerRepository.save(entry);
+  }
+
+  /** Edit a direct entry the caller is party to (version-checked). */
+  async updateDirectTransaction(
+    callerUserId: string,
+    entryId: string,
+    dto: UpdateDirectTransactionDto,
+  ): Promise<DirectLedgerEntry> {
+    const entry = await this.loadCallerEntry(callerUserId, entryId);
+    if (entry.version !== dto.version) {
+      throw new PreconditionFailedException({
+        errorCode: 'CON_VERSION_CONFLICT',
+        message:
+          'Version conflict: the resource has been modified by another request',
+      });
+    }
+    if (dto.amount !== undefined) entry.amount = dto.amount;
+    if (dto.occurredOn !== undefined) entry.occurredOn = dto.occurredOn;
+    if (dto.note !== undefined) entry.note = dto.note;
+    return this.directLedgerRepository.save(entry);
+  }
+
+  /** Soft-delete a direct entry (preserves history). */
+  async deleteDirectTransaction(
+    callerUserId: string,
+    entryId: string,
+  ): Promise<void> {
+    const entry = await this.loadCallerEntry(callerUserId, entryId);
+    await this.directLedgerRepository.softRemove(entry);
+  }
+
+  // ─── Internals ──────────────────────────────────────────────────────────────
+
+  private async resolvePair(callerUserId: string, counterpartyUserId: string) {
+    if (callerUserId === counterpartyUserId) {
+      throw new BadRequestException(
+        'Cannot record a transaction with yourself',
+      );
+    }
+    const [caller, counterparty] = await Promise.all([
+      this.userRepository.findOne({ where: { id: callerUserId } }),
+      this.userRepository.findOne({ where: { id: counterpartyUserId } }),
+    ]);
+    if (!caller) throw new NotFoundException('User not found');
+    if (!counterparty) throw new NotFoundException('Person not found');
+    return { caller, counterparty };
+  }
+
+  private async loadCallerEntry(
+    callerUserId: string,
+    entryId: string,
+  ): Promise<DirectLedgerEntry> {
+    const entry = await this.directLedgerRepository.findOne({
+      where: { id: entryId },
+      relations: ['fromUser', 'toUser', 'createdByUser'],
+    });
+    if (!entry) throw new NotFoundException('Transaction not found');
+    if (
+      entry.fromUser.id !== callerUserId &&
+      entry.toUser.id !== callerUserId
+    ) {
+      throw new ForbiddenException('You are not a party to this transaction');
+    }
+    return entry;
+  }
+
+  private ensureBucket(
+    cp: CounterpartyLedger,
+    currency: string,
+  ): CurrencyBucket {
+    let b = cp.byCurrency.get(currency);
+    if (!b) {
+      b = {
+        groupObligations: 0,
+        directLending: 0,
+        settlements: 0,
+        history: [],
+      };
+      cp.byCurrency.set(currency, b);
+    }
+    return b;
+  }
+
+  /**
+   * Builds the caller's ledger keyed by counterparty userId, from:
+   *  - per-expense pairwise obligations in NORMAL groups (household excluded),
+   *  - confirmed group settlements between the two parties,
+   *  - direct lend/borrow/settlement entries.
+   * Registered users only (a stable cross-context identity requires a User).
+   * When `onlyCounterpartyId` is given, other counterparties are skipped.
+   */
+  private async buildLedger(
+    callerUserId: string,
+    onlyCounterpartyId?: string,
+  ): Promise<Map<string, CounterpartyLedger>> {
+    const ledger = new Map<string, CounterpartyLedger>();
+    const getCp = (
+      userId: string,
+      display: { displayName: string; email: string },
+    ): CounterpartyLedger => {
+      let cp = ledger.get(userId);
+      if (!cp) {
+        cp = {
+          userId,
+          displayName: display.displayName,
+          email: display.email,
+          byCurrency: new Map(),
+        };
+        ledger.set(userId, cp);
+      }
+      return cp;
+    };
+
+    await this.accumulateGroupLedger(callerUserId, onlyCounterpartyId, getCp);
+    await this.accumulateDirectLedger(callerUserId, onlyCounterpartyId, getCp);
+    return ledger;
+  }
+
+  private async accumulateGroupLedger(
+    callerUserId: string,
+    onlyCounterpartyId: string | undefined,
+    getCp: (
+      userId: string,
+      display: { displayName: string; email: string },
+    ) => CounterpartyLedger,
+  ): Promise<void> {
+    // Caller's active memberships in NORMAL groups only.
+    const memberships = await this.groupMemberRepository.find({
+      where: {
+        user: { id: callerUserId },
+        joinStatus: 'active',
+        group: { groupType: 'normal' },
+      },
+      relations: ['group'],
+    });
+
+    for (const membership of memberships) {
+      const group = membership.group;
+      const callerMemberId = membership.id;
+
+      const expenses = await this.expenseRepository.find({
+        where: { group: { id: group.id }, status: 'posted' },
+        relations: ['groupKeyVersion'],
+      });
+      if (expenses.length === 0) continue;
+      const expenseIds = expenses.map((e) => e.id);
+      const expenseById = new Map(expenses.map((e) => [e.id, e]));
+
+      const [splits, payments] = await Promise.all([
+        this.expenseSplitRepository.find({
+          where: { expense: { id: In(expenseIds) } },
+          relations: [
+            'expense',
+            'participantGroupMember',
+            'participantGroupMember.user',
+            'participantGroupMember.contact',
+          ],
+        }),
+        this.expensePaymentRepository.find({
+          where: { expense: { id: In(expenseIds) } },
+          relations: [
+            'expense',
+            'paidByGroupMember',
+            'paidByGroupMember.user',
+            'paidByGroupMember.contact',
+            'paidByUser',
+          ],
+        }),
+      ]);
+
+      // Index by expense.
+      const splitsByExpense = new Map<string, ExpenseSplit[]>();
+      for (const s of splits) {
+        const list = splitsByExpense.get(s.expense.id) ?? [];
+        list.push(s);
+        splitsByExpense.set(s.expense.id, list);
+      }
+      const paymentsByExpense = new Map<string, ExpensePayment[]>();
+      for (const p of payments) {
+        const list = paymentsByExpense.get(p.expense.id) ?? [];
+        list.push(p);
+        paymentsByExpense.set(p.expense.id, list);
+      }
+
+      // memberId → { userId, displayName, email }
+      const memberInfo = new Map<
+        string,
+        { userId: string | null; displayName: string; email: string | null }
+      >();
+      const registerMember = (m?: GroupMember) => {
+        if (!m || memberInfo.has(m.id)) return;
+        const d = resolveMemberDisplay(m);
+        memberInfo.set(m.id, {
+          userId: d.userId,
+          displayName: d.displayName,
+          email: d.email,
+        });
+      };
+      splits.forEach((s) => registerMember(s.participantGroupMember));
+      payments.forEach((p) => registerMember(p.paidByGroupMember));
+
+      for (const expense of expenses) {
+        const exSplits = splitsByExpense.get(expense.id) ?? [];
+        const exPayments = paymentsByExpense.get(expense.id) ?? [];
+        const sign = expense.transactionType === 'refund' ? -1 : 1;
+
+        // Net position per member within THIS expense (paid − owed).
+        const balances = new Map<string, number>();
+        const add = (memberId: string, delta: number) =>
+          balances.set(memberId, (balances.get(memberId) ?? 0) + delta);
+
+        if (exPayments.length > 0) {
+          for (const p of exPayments) {
+            const mid = p.paidByGroupMember?.id;
+            if (!mid) continue;
+            add(mid, sign * Number(p.amount));
+          }
+        } else if (expense.paidByGroupMember) {
+          // Legacy / single-payer fallback.
+          registerMember(expense.paidByGroupMember);
+          add(expense.paidByGroupMember.id, sign * Number(expense.amountTotal));
+        }
+        for (const s of exSplits) {
+          const mid = s.participantGroupMember?.id;
+          if (!mid) continue;
+          add(mid, -sign * Number(s.amountOwed));
+        }
+
+        if (!balances.has(callerMemberId)) continue; // caller uninvolved
+
+        // Per-expense pairwise settle-up (scoped to this one expense — never a
+        // cross-expense/cross-person chain simplification). Extract the caller's
+        // edges only.
+        const edges = simplifyLedgerDebts(
+          [...balances.entries()].map(([key, balance]) => ({ key, balance })),
+          expense.currency,
+        );
+        for (const edge of edges) {
+          let counterpartyMemberId: string | null = null;
+          let signedForCaller = 0;
+          if (edge.toKey === callerMemberId) {
+            counterpartyMemberId = edge.fromKey; // they owe the caller
+            signedForCaller = edge.amount;
+          } else if (edge.fromKey === callerMemberId) {
+            counterpartyMemberId = edge.toKey; // caller owes them
+            signedForCaller = -edge.amount;
+          } else {
+            continue;
+          }
+          const info = memberInfo.get(counterpartyMemberId);
+          if (!info || !info.userId) continue; // registered users only (V1)
+          if (onlyCounterpartyId && info.userId !== onlyCounterpartyId)
+            continue;
+
+          const cp = getCp(info.userId, {
+            displayName: info.displayName,
+            email: info.email ?? '',
+          });
+          const bucket = this.ensureBucket(cp, expense.currency);
+          bucket.groupObligations += signedForCaller;
+          bucket.history.push({
+            id: `expense:${expense.id}`,
+            source: 'group_expense',
+            amount: round2(signedForCaller),
+            currency: expense.currency,
+            date: expense.expenseDate,
+            groupId: group.id,
+            groupName: group.name,
+            expenseId: expense.id,
+            title: expense.title,
+            encryptionScope: expense.encryptionScope,
+            groupKeyVersionId: expense.groupKeyVersion?.id,
+          });
+        }
+      }
+
+      // Confirmed group settlements between the caller and each counterparty.
+      const settlements = await this.settlementRepository.find({
+        where: { group: { id: group.id }, status: 'confirmed' },
+        relations: [
+          'fromUser',
+          'toUser',
+          'fromGroupMember',
+          'fromGroupMember.user',
+          'toGroupMember',
+          'toGroupMember.user',
+        ],
+      });
+      for (const s of settlements) {
+        const fromUserId =
+          s.fromUser?.id ?? s.fromGroupMember?.user?.id ?? null;
+        const toUserId = s.toUser?.id ?? s.toGroupMember?.user?.id ?? null;
+        if (!fromUserId || !toUserId) continue;
+        let counterpartyUserId: string | null = null;
+        let signedForCaller = 0;
+        if (fromUserId === callerUserId) {
+          counterpartyUserId = toUserId; // caller paid → reduces what caller owes
+          signedForCaller = Number(s.amount);
+        } else if (toUserId === callerUserId) {
+          counterpartyUserId = fromUserId; // caller received → reduces their debt
+          signedForCaller = -Number(s.amount);
+        } else {
+          continue;
+        }
+        if (onlyCounterpartyId && counterpartyUserId !== onlyCounterpartyId)
+          continue;
+        // Resolve counterparty display via their membership if available.
+        const cpDisplayName =
+          (counterpartyUserId === toUserId
+            ? s.toGroupMember?.user?.displayName
+            : s.fromGroupMember?.user?.displayName) ?? '';
+        const cpEmail =
+          (counterpartyUserId === toUserId
+            ? s.toGroupMember?.user?.email
+            : s.fromGroupMember?.user?.email) ?? '';
+        const cp = getCp(counterpartyUserId, {
+          displayName: cpDisplayName || cpEmail,
+          email: cpEmail,
+        });
+        const bucket = this.ensureBucket(cp, s.currency);
+        bucket.settlements += signedForCaller;
+        bucket.history.push({
+          id: `settlement:${s.id}`,
+          source: 'settlement',
+          entryType: 'settlement',
+          amount: round2(signedForCaller),
+          currency: s.currency,
+          date: s.settledOn ?? s.updatedAt.toISOString().slice(0, 10),
+          note: s.note,
+          groupId: group.id,
+          groupName: group.name,
+        });
+      }
+    }
+  }
+
+  private async accumulateDirectLedger(
+    callerUserId: string,
+    onlyCounterpartyId: string | undefined,
+    getCp: (
+      userId: string,
+      display: { displayName: string; email: string },
+    ) => CounterpartyLedger,
+  ): Promise<void> {
+    const entries = await this.directLedgerRepository.find({
+      where: [
+        { fromUser: { id: callerUserId }, deletedAt: IsNull() },
+        { toUser: { id: callerUserId }, deletedAt: IsNull() },
+      ],
+      relations: ['fromUser', 'toUser'],
+    });
+
+    for (const e of entries) {
+      const isCallerTo = e.toUser.id === callerUserId;
+      const counterparty = isCallerTo ? e.fromUser : e.toUser;
+      if (onlyCounterpartyId && counterparty.id !== onlyCounterpartyId)
+        continue;
+
+      let signedForCaller: number;
+      let bucketKey: 'directLending' | 'settlements';
+      if (e.entryType === 'settlement') {
+        // from = payer. Caller paying back increases net toward "they owe you".
+        signedForCaller =
+          e.fromUser.id === callerUserId ? Number(e.amount) : -Number(e.amount);
+        bucketKey = 'settlements';
+      } else {
+        // lend/borrow: toUser is the creditor.
+        signedForCaller = isCallerTo ? Number(e.amount) : -Number(e.amount);
+        bucketKey = 'directLending';
+      }
+
+      const cp = getCp(counterparty.id, {
+        displayName: counterparty.displayName || counterparty.email,
+        email: counterparty.email,
+      });
+      const bucket = this.ensureBucket(cp, e.currency);
+      bucket[bucketKey] += signedForCaller;
+      bucket.history.push({
+        id: `direct:${e.id}`,
+        source: e.entryType === 'settlement' ? 'settlement' : 'direct',
+        entryType: e.entryType,
+        amount: round2(signedForCaller),
+        currency: e.currency,
+        date: e.occurredOn,
+        note: e.note,
+      });
+    }
+  }
+}

@@ -1896,6 +1896,238 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
 
+  /people:
+    get:
+      summary: People overview — per-person balances across normal groups + direct transactions
+      description: |
+        Person-to-person balances. `netBalance` is signed from the caller's
+        perspective (> 0 means they owe you). Household groups are excluded.
+        Registered users only. Pass `limit` (e.g. 5) for the dashboard widget.
+      tags:
+        - People
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Totals and a per-(person, currency) list sorted by outstanding magnitude
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  [
+                    currency,
+                    totalYouAreOwed,
+                    totalYouOwe,
+                    hasMultipleCurrencies,
+                    people,
+                  ]
+                properties:
+                  currency:
+                    type: string
+                    description: Dominant currency the headline totals are reported in.
+                  totalYouAreOwed: { type: number }
+                  totalYouOwe: { type: number }
+                  hasMultipleCurrencies:
+                    type: boolean
+                    description: True when balances span more than one currency (totals cover only `currency`).
+                  people:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PersonSummary'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /people/{userId}:
+    get:
+      summary: Person detail — net, per-currency breakdown, and chronological history
+      tags:
+        - People
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Full relationship with one person
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PersonSummary'
+                  - type: object
+                    required: [breakdown, history]
+                    properties:
+                      breakdown:
+                        type: array
+                        items:
+                          type: object
+                          required:
+                            [
+                              currency,
+                              groupObligations,
+                              directLending,
+                              settlements,
+                              net,
+                            ]
+                          properties:
+                            currency: { type: string }
+                            groupObligations: { type: number }
+                            directLending: { type: number }
+                            settlements: { type: number }
+                            net: { type: number }
+                      history:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/PersonHistoryItem'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /people/{userId}/transactions:
+    post:
+      summary: Record a direct lend/borrow with another user
+      tags:
+        - People
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entryType, amount, currency, occurredOn]
+              properties:
+                entryType: { type: string, enum: [lend, borrow] }
+                amount: { type: number, minimum: 0.01 }
+                currency: { type: string }
+                occurredOn: { type: string, format: date }
+                note: { type: string }
+      responses:
+        '201':
+          description: The created direct ledger entry
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /people/{userId}/settlements:
+    post:
+      summary: Record a settlement ("Return"); over-settlement is rejected
+      description: |
+        Direction is inferred from the current net. Rejects when the amount
+        exceeds the outstanding balance (`SETTLE_OVER_AMOUNT`) or nothing is
+        outstanding (`SETTLE_NOTHING_OUTSTANDING`).
+      tags:
+        - People
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, currency, occurredOn]
+              properties:
+                amount: { type: number, minimum: 0.01 }
+                currency: { type: string }
+                occurredOn: { type: string, format: date }
+                note: { type: string }
+      responses:
+        '201':
+          description: The created settlement entry
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /people/transactions/{id}:
+    patch:
+      summary: Edit a direct transaction (version-checked)
+      tags:
+        - People
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                amount: { type: number, minimum: 0.01 }
+                occurredOn: { type: string, format: date }
+                note: { type: string }
+                version: { type: integer }
+      responses:
+        '200':
+          description: The updated entry
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      summary: Soft-delete a direct transaction (history preserved)
+      tags:
+        - People
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
   /notes:
     post:
       summary: Create a personal or group note
@@ -2501,6 +2733,69 @@ components:
             retryable: true
 
   schemas:
+    PersonSummary:
+      type: object
+      required:
+        - counterpartyUserId
+        - displayName
+        - email
+        - currency
+        - netBalance
+        - direction
+      properties:
+        counterpartyUserId:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        email:
+          type: string
+        currency:
+          type: string
+        netBalance:
+          type: number
+          description: Signed from the caller's perspective; > 0 means they owe you.
+        direction:
+          type: string
+          enum: [owes_you, you_owe, settled]
+    PersonHistoryItem:
+      type: object
+      required:
+        - id
+        - source
+        - amount
+        - currency
+        - date
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+          enum: [group_expense, direct, settlement]
+        entryType:
+          type: string
+          enum: [lend, borrow, settlement]
+        amount:
+          type: number
+          description: Signed from the caller's perspective.
+        currency:
+          type: string
+        date:
+          type: string
+          format: date
+        note:
+          type: string
+        groupId:
+          type: string
+          format: uuid
+        groupName:
+          type: string
+        expenseId:
+          type: string
+          format: uuid
+        title:
+          type: string
+          description: Expense title — E2EE ciphertext; decrypt client-side.
     RecurringExpenseResponse:
       type: object
       required:

@@ -1,0 +1,86 @@
+<div class="mb-6 flex items-center gap-3">
+  <a
+    routerLink="/people"
+    class="w-9 h-9 rounded-full flex items-center justify-center bg-slate-100 dark:bg-white/10 shrink-0"
+    aria-label="Back to People"
+  >
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+    </svg>
+  </a>
+  <h1 class="text-2xl md:text-3xl font-extrabold tracking-tight">All people</h1>
+</div>
+
+@if (isLoading()) {
+  <div class="space-y-3">
+    @for (i of [1, 2, 3, 4, 5]; track i) {
+      <div class="h-20 bg-slate-200 dark:bg-white/5 rounded-2xl animate-pulse"></div>
+    }
+  </div>
+} @else if (hasError()) {
+  <div class="rounded-3xl p-8 text-center border border-red-200 dark:border-red-500/20">
+    <p class="text-red-500 font-medium">Couldn't load people.</p>
+    <button
+      type="button"
+      (click)="load()"
+      class="mt-4 px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/10 font-semibold"
+      data-testid="people-retry"
+    >
+      Try again
+    </button>
+  </div>
+} @else if (overview(); as ov) {
+  @if (ov.people.length === 0) {
+    <div class="text-center py-16">
+      <p class="text-slate-500 dark:text-slate-400 font-medium">
+        No people yet. Add a direct transaction to get started.
+      </p>
+    </div>
+  } @else {
+    <ul class="space-y-2" data-testid="people-list">
+      @for (person of ov.people; track person.counterpartyUserId + person.currency) {
+        <li>
+          <a
+            [routerLink]="['/people', person.counterpartyUserId]"
+            class="flex items-center justify-between gap-3 p-3 rounded-2xl bg-white/70 dark:bg-finmate-card/70 border border-slate-100 dark:border-white/5 hover:border-finmate-neon/30 transition-colors"
+          >
+            <div class="flex items-center gap-3 min-w-0">
+              <div
+                class="w-11 h-11 shrink-0 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center font-bold text-slate-600 dark:text-slate-300"
+              >
+                {{ person.displayName.substring(0, 2).toUpperCase() }}
+              </div>
+              <div class="min-w-0">
+                <p class="font-bold text-slate-800 dark:text-white truncate">
+                  {{ person.displayName }}
+                </p>
+                <p class="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {{ directionSentence(person.direction, person.displayName) }}
+                </p>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              @if (person.direction === 'settled') {
+                <span class="text-sm font-semibold text-slate-400">Settled</span>
+              } @else {
+                <span
+                  class="font-bold"
+                  [ngClass]="{
+                    'text-green-500 dark:text-green-400': person.direction === 'owes_you',
+                    'text-red-500 dark:text-red-400': person.direction === 'you_owe',
+                  }"
+                >
+                  {{ person.direction === 'owes_you' ? '+' : '−'
+                  }}{{
+                    person.netBalance < 0 ? -person.netBalance : person.netBalance
+                      | currency: person.currency
+                  }}
+                </span>
+              }
+            </div>
+          </a>
+        </li>
+      }
+    </ul>
+  }
+}
